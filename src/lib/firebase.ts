@@ -30,9 +30,13 @@ googleProvider.setCustomParameters({
   prompt: 'select_account',
 });
 
-// Pass custom firestore database ID if specified in config
-export const db = firebaseConfig.firestoreDatabaseId
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+// Pass custom firestore database ID if specified and not "(default)", otherwise standard getFirestore(app)
+const customDbId = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
+  ? firebaseConfig.firestoreDatabaseId
+  : undefined;
+
+export const db = customDbId
+  ? getFirestore(app, customDbId)
   : getFirestore(app);
 
 // Connection test per skill guidelines

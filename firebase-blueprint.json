@@ -1,0 +1,88 @@
+{
+  "entities": {
+    "userProfile": {
+      "title": "UserProfile",
+      "description": "User profile details synchronized from Google authentication",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 128 },
+        "photoURL": { "type": "string", "maxLength": 512 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["userId", "email"]
+    },
+    "financialAccount": {
+      "title": "FinancialAccount",
+      "description": "User financial account or wallet bucket",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 64 },
+        "nameAr": { "type": "string", "maxLength": 64 },
+        "type": { "type": "string", "enum": ["cash", "bank", "card", "savings"] },
+        "balance": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 10 },
+        "color": { "type": "string", "maxLength": 32 },
+        "icon": { "type": "string", "maxLength": 32 }
+      },
+      "required": ["id", "userId", "name", "nameAr", "type", "balance", "currency"]
+    },
+    "transaction": {
+      "title": "Transaction",
+      "description": "Financial income, expense, or transfer transaction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "enum": ["income", "expense", "transfer"] },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 10 },
+        "accountId": { "type": "string", "maxLength": 64 },
+        "toAccountId": { "type": "string", "maxLength": 64 },
+        "categoryId": { "type": "string", "maxLength": 64 },
+        "description": { "type": "string", "maxLength": 256 },
+        "date": { "type": "string", "maxLength": 32 },
+        "time": { "type": "string", "maxLength": 32 },
+        "dateTime": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "userId", "type", "amount", "currency", "accountId", "date", "description"]
+    },
+    "category": {
+      "title": "Category",
+      "description": "Spending or income category",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 64 },
+        "nameAr": { "type": "string", "maxLength": 64 },
+        "icon": { "type": "string", "maxLength": 32 },
+        "color": { "type": "string", "maxLength": 32 },
+        "type": { "type": "string", "enum": ["income", "expense"] }
+      },
+      "required": ["id", "userId", "name", "nameAr", "type"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "userProfile",
+      "description": "User profile details"
+    },
+    "/users/{userId}/accounts/{accountId}": {
+      "schema": "financialAccount",
+      "description": "Financial accounts belonging to the user"
+    },
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": "transaction",
+      "description": "Transactions belonging to the user"
+    },
+    "/users/{userId}/categories/{categoryId}": {
+      "schema": "category",
+      "description": "Custom or synchronized categories belonging to the user"
+    }
+  }
+}

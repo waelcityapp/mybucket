@@ -1,0 +1,7 @@
+{
+  "name": "My Bucket",
+  "description": "Simple personal finance and money tracking app - تطبيق بسيط لإدارة المصاريف والمال الشخصي",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

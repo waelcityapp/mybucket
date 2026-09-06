@@ -1,6 +1,6 @@
 import { FinancialAccount, Category, TransactionType, CurrencyCode, Transaction } from '../../types';
 
-export type AIIntent = 'CREATE_TRANSACTION' | 'FINANCIAL_QUERY' | 'CORRECT_PROPOSAL' | 'UNKNOWN';
+export type AIIntent = 'CREATE_TRANSACTION' | 'FINANCIAL_QUERY' | 'CORRECT_PROPOSAL' | 'SAVE_REQUEST' | 'UNKNOWN';
 
 export interface AITransactionProposal {
   type: TransactionType | null;
@@ -82,6 +82,13 @@ export interface AIInterpretationRequest {
   userTimezone: string;
   lang: 'ar' | 'en';
   currentProposal?: Partial<Transaction> | null;
+  learnedMemory?: Array<{
+    keyword: string;
+    categoryId?: string | null;
+    categoryNameAr?: string | null;
+    accountId?: string | null;
+    type?: string | null;
+  }>;
 }
 
 export interface DeterministicBreakdownItem {

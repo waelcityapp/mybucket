@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Send, Sparkles, Loader2, HelpCircle } from 'lucide-react';
+import { Mic, MicOff, Send, Sparkles, Loader2, HelpCircle, AlertTriangle } from 'lucide-react';
 import { Language, FinancialAccount, Category, Transaction, CurrencyCode } from '../types';
 import { translations } from '../data/translations';
 import { aiClient } from '../services/ai/aiClient';
@@ -155,21 +155,25 @@ export function VoiceNaturalInput({
     if (SpeechRecognition) {
       try {
         const recognition = new SpeechRecognition() as SpeechRecognitionLike;
-        recognition.continuous = false;
-        recognition.interimResults = false;
+        recognition.continuous = true;
+        recognition.interimResults = true;
         recognition.lang = lang === 'ar' ? 'ar-EG' : 'en-US';
 
         recognition.onstart = () => {
           setIsListening(true);
           setSpeechError(null);
+          // Optional: clear previous input text when starting a new session
+          // setInputText(''); 
         };
 
-        recognition.onresult = (event: SpeechRecognitionEventLike) => {
-          const transcript = event.results[0][0]?.transcript;
-          if (transcript) {
-            setInputText(transcript);
-            // Route spoken sentence directly into unified AI pipeline
-            processInputWithAI(transcript);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        recognition.onresult = (event: any) => {
+          let currentTranscript = '';
+          for (let i = 0; i < event.results.length; ++i) {
+            currentTranscript += event.results[i][0].transcript;
+          }
+          if (currentTranscript) {
+            setInputText(currentTranscript);
           }
         };
 
@@ -223,12 +227,22 @@ export function VoiceNaturalInput({
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isListening && recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {}
+    }
     if (!inputText.trim() || isProcessingAI) return;
     processInputWithAI(inputText);
   };
 
   const handleExampleClick = (example: string) => {
     if (isProcessingAI) return;
+    if (isListening && recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {}
+    }
     setInputText(example);
     processInputWithAI(example);
   };
@@ -271,7 +285,7 @@ export function VoiceNaturalInput({
             {isListening ? (
               <span className="text-emerald-600 font-bold flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
-                {t.listening}
+                {isAr ? 'تحدث الآن، واضغط إرسال عند الانتهاء...' : 'Speak now, and press send when finished...'}
               </span>
             ) : isProcessingAI ? (
               <span className="text-indigo-600 font-bold flex items-center gap-1">
@@ -403,6 +417,19 @@ export function VoiceNaturalInput({
         >
           {isAr ? '⚠️ 300 بمطعم (بدون تحديد حساب)' : '⚠️ 300 restaurant (missing account)'}
         </button>
+      </div>
+
+      {/* Important AI Disclaimer Notice */}
+      <div className="flex items-start gap-2 p-2.5 rounded-xl bg-amber-50/90 border border-amber-200/80 text-amber-950 text-xs leading-relaxed shadow-2xs">
+        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+        <p className="text-xs leading-relaxed font-medium">
+          <strong className="font-black text-amber-900 ml-1">
+            {isAr ? 'تنبيه هام:' : 'Important Notice:'}
+          </strong>
+          {isAr
+            ? 'قد يخطئ الذكاء الاصطناعي في الفهم وإجابة استفساراتكم، لذا يرجى مراجعة كل شيء يدوياً قبل الحفظ.'
+            : 'AI may make mistakes in understanding and answering your queries, so please review everything manually before saving.'}
+        </p>
       </div>
     </div>
   );

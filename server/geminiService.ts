@@ -1,6 +1,15 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import { AIInterpretationRequest, AIInterpretationResult } from '../src/services/ai/types';
+import { getFormattedSlangPromptContext } from '../src/services/ai/aiKnowledgeBase';
 import { isFinancialQueryText, parseSemanticNumberRoles } from '../src/utils/semanticParser';
+import {
+  matchCategoryFromText,
+  matchAccountFromText,
+  matchDescriptionEdit,
+  matchAmountEdit,
+  matchTransactionType,
+  matchTransferAccountsFromText,
+} from '../src/utils/entityMatcher';
 
 let genAIClient: GoogleGenAI | null = null;
 
@@ -43,8 +52,20 @@ export async function interpretNaturalLanguageWithGemini(
     type: c.type,
   }));
 
+  const slangKnowledge = getFormattedSlangPromptContext();
+  const learnedMemoryContext = req.learnedMemory && req.learnedMemory.length > 0
+    ? `\n\nUSER'S PERSONAL LEARNED VOCABULARY & PAST ASSOCIATIONS:\n${JSON.stringify(req.learnedMemory, null, 2)}`
+    : '';
+
   const systemInstruction = `
 You are the natural language understanding and intent detection core of "My Bucket" (ماي باكت), an Arabic and English personal finance assistant.
+You possess deep, native mastery of Egyptian Arabic, Gulf dialects, Levantine, and Modern Standard Arabic colloquial financial terminology.
+
+============================================================
+KNOWLEDGE BASE: COLLOQUIAL ARABIC FINANCIAL PHRASES & SLANG
+============================================================
+${slangKnowledge}
+${learnedMemoryContext}
 
 CRITICAL INSTRUCTIONS & STRICT RULES:
 1. INTENT CLASSIFICATION:
@@ -83,7 +104,21 @@ CRITICAL INSTRUCTIONS & STRICT RULES:
      * "دفعت كام بنزين يوم 3 مارس؟" -> FINANCIAL_QUERY, day = 3, category = fuel, NO amount!
      * "أنا صرفت قد إيه بنزين من يوم 3 ليوم 18 في شهر مارس؟" -> FINANCIAL_QUERY, startDate = YYYY-03-03, endDate = YYYY-03-18, category = fuel, NO amount!
      * "يوم 15 مارس الساعة 3 دفعت 600 جنيه بنزين من الفيزا" -> CREATE_TRANSACTION, day = 15, time = 03:00 / 15:00, amount = 600, account = Visa.
-   - "CORRECT_PROPOSAL": When the user is modifying a currently open transaction draft (e.g. "لا خليها 400" or "عدل الحساب للبنك").
+   - "CORRECT_PROPOSAL": When the user is modifying or correcting a currently open transaction draft in the modal (e.g. "عدل خانة التصنيف الى بنزين", "غير التصنيف لبنزين", "التصنيف بنزين", "انا صرفت من الكاش", "صرفت من الكاش", "غير الحساب لكاش", "لا خلي العملية صرف مش دخل", "غير خانة الملاحظات إلى ...", "خلي المبلغ 500", "التصنيف مواصلات").
+     When intent is CORRECT_PROPOSAL:
+     * Take the CURRENT TRANSACTION DRAFT provided in the prompt and apply the user's requested edits to it.
+     * "transaction" MUST BE A COMPLETE, CLEAN OBJECT containing all draft fields (type, amount, currency, accountId, toAccountId, categoryId, description, date, time).
+     * "type" MUST be strictly one of: "expense", "income", or "transfer". NEVER concatenate other properties into "type"!
+     * If user mentions a category (e.g. "بنزين", "وقود", "مواصلات", "فواتير", "اكل"), match to categoryId and set in transaction.categoryId.
+     * If user mentions an account (e.g. "كاش", "انا صرفت من الكاش", "بنك", "فيزا"), match to accountId and set in transaction.accountId.
+     * In "correction", return { "fieldToUpdate": "<name_of_field>", "newValue": "<new_value>" }.
+     * In "rawInterpretationSummary", provide a concise friendly summary in Arabic explaining what changed (e.g. "تم تعديل التصنيف إلى مواصلات وبنزين" or "تم تعديل الحساب إلى كاش").
+
+   - "SAVE_REQUEST": When the user attempts to confirm or save the transaction by voice (e.g. "احفظ العملية", "احفظ", "سجلها", "تأكيد وحفظ", "تمام احفظ", "save", "confirm"):
+     * Intent MUST BE "SAVE_REQUEST".
+     * "clarificationNeeded" MUST BE: "من فضلك اضغط على زر تأكيد وحفظ" (or in English: "Please click on the Confirm & Save button").
+     * "transaction" must be null.
+
    - "UNKNOWN": When the sentence cannot be understood or is completely unrelated. Provide a polite clarification in user's language.
 
 2. NEVER INVENT REQUIRED FINANCIAL INFORMATION:
@@ -96,14 +131,11 @@ CRITICAL INSTRUCTIONS & STRICT RULES:
 ${JSON.stringify(accountsContext, null, 2)}
    - Available User Categories:
 ${JSON.stringify(categoriesContext, null, 2)}
-   - When resolving "الكاش" or "نقدي", match to the user's cash account ID.
-   - When resolving "البنك", match to the user's bank account ID.
-   - When resolving "الفيزا" or "كارت", match to the user's card account ID.
-   - When resolving "بنزين", match to fuel/transport category ID.
+   - Use the Colloquial Knowledge Base and User's Personal Learned Vocabulary above to match slang terms to categoryId accurately (e.g., "فولت بنزين" -> category: transport; "دليفري بيتزا" -> category: food; "كازيون خضار" -> category: groceries; "باقة فودافون" -> category: bills; "صيدلية العزبي" -> category: health; "مرتب الشهر" -> category: salary).
 
 4. DESCRIPTION EXTRACTION:
    - DO NOT place the user's full spoken sentence into "description".
-   - Extract a clean, concise description (e.g., "بنزين" or "غداء مطعم" or "فاتورة كهرباء" or "راتب").
+   - Extract a clean, concise description (e.g., "بنزين وطنية" or "غداء كشري التحرير" or "فاتورة كهرباء" or "راتب الشهر").
 
 5. DATE AND TIME RESOLUTION:
    - Current user local date/time: ${req.currentDateTime}
@@ -120,7 +152,10 @@ ${JSON.stringify(categoriesContext, null, 2)}
 Return strictly structured JSON matching the defined schema.
 `;
 
-  const prompt = `User Input: "${req.text}"`;
+  let prompt = `User Input: "${req.text}"`;
+  if (req.currentProposal) {
+    prompt += `\n\nCURRENT TRANSACTION DRAFT OPEN IN MODAL:\n${JSON.stringify(req.currentProposal, null, 2)}`;
+  }
 
   const config = {
     systemInstruction,
@@ -130,7 +165,7 @@ Return strictly structured JSON matching the defined schema.
       properties: {
         intent: {
           type: Type.STRING,
-          description: 'Detected intent: CREATE_TRANSACTION, FINANCIAL_QUERY, CORRECT_PROPOSAL, or UNKNOWN',
+          description: 'Detected intent: CREATE_TRANSACTION, FINANCIAL_QUERY, CORRECT_PROPOSAL, SAVE_REQUEST, or UNKNOWN',
         },
         confidence: {
           type: Type.NUMBER,
@@ -138,11 +173,12 @@ Return strictly structured JSON matching the defined schema.
         },
         transaction: {
           type: Type.OBJECT,
-          description: 'Transaction details if intent is CREATE_TRANSACTION',
+          description: 'Transaction details if intent is CREATE_TRANSACTION or CORRECT_PROPOSAL',
           properties: {
             type: {
               type: Type.STRING,
-              description: 'expense, income, or transfer',
+              enum: ['expense', 'income', 'transfer'],
+              description: 'Must strictly be expense, income, or transfer',
             },
             amount: {
               type: Type.NUMBER,
@@ -269,8 +305,23 @@ Return strictly structured JSON matching the defined schema.
   }
 
   // Deterministic Guardrails: Semantic Intent and Number Role Verification
-  const isQuery = isFinancialQueryText(req.text);
-  const semanticRoles = parseSemanticNumberRoles(req.text, new Date(req.currentDateTime));
+  const rawText = req.text.trim();
+  const isSaveRequest = /احفظ|سجل|أكد|اكد|تمام احفظ|تأكيد|حفظ العملية|احفظها|سجلها|اعتمد|اعتمدها|save|confirm/i.test(rawText);
+  if (isSaveRequest || parsed.intent === 'SAVE_REQUEST') {
+    const msg = req.lang === 'ar' ? 'من فضلك اضغط على زر تأكيد وحفظ' : 'Please click on the Confirm & Save button';
+    return {
+      intent: 'SAVE_REQUEST',
+      confidence: 1.0,
+      transaction: null,
+      query: null,
+      correction: null,
+      clarificationNeeded: msg,
+      rawInterpretationSummary: msg,
+    } as AIInterpretationResult;
+  }
+
+  const isQuery = isFinancialQueryText(rawText);
+  const semanticRoles = parseSemanticNumberRoles(rawText, new Date(req.currentDateTime));
 
   if (isQuery) {
     // Force intent to FINANCIAL_QUERY and ensure transaction is strictly null
@@ -302,6 +353,124 @@ Return strictly structured JSON matching the defined schema.
       parsed.query.categoryName = 'بنزين';
       parsed.query.metric = 'category_spent';
       parsed.query.transactionType = 'expense';
+    }
+  } else if (req.currentProposal || parsed.intent === 'CORRECT_PROPOSAL') {
+    parsed.intent = 'CORRECT_PROPOSAL';
+    const baseProposal = req.currentProposal || {};
+
+    // Repair any malformed transaction object from model
+    if (!parsed.transaction || typeof parsed.transaction !== 'object') {
+      parsed.transaction = { ...baseProposal };
+    } else {
+      // If type had concatenated properties (e.g. "expense,amount: 200..."), fix it
+      if (typeof parsed.transaction.type === 'string' && parsed.transaction.type.includes(',')) {
+        parsed.transaction.type = parsed.transaction.type.split(',')[0].trim() || baseProposal.type || 'expense';
+      }
+      // Merge missing fields from baseProposal
+      parsed.transaction = {
+        type: parsed.transaction.type || baseProposal.type || 'expense',
+        amount: typeof parsed.transaction.amount === 'number' ? parsed.transaction.amount : baseProposal.amount,
+        currency: parsed.transaction.currency || baseProposal.currency || 'EGP',
+        accountId: parsed.transaction.accountId || baseProposal.accountId || null,
+        toAccountId: parsed.transaction.toAccountId || baseProposal.toAccountId || null,
+        categoryId: parsed.transaction.categoryId || baseProposal.categoryId || null,
+        description: parsed.transaction.description ?? baseProposal.description ?? '',
+        date: parsed.transaction.date || baseProposal.date || req.currentDateTime.slice(0, 10),
+        time: parsed.transaction.time || baseProposal.time || req.currentDateTime.slice(11, 16),
+        missingFields: parsed.transaction.accountId ? [] : ['accountId'],
+      };
+    }
+
+    const changes: string[] = [];
+
+    // 1. Intelligent Category Detection (handles "عدل خانة التصنيف الى بنزين", "بنزين", "مواصلات", etc.)
+    const matchedCat = matchCategoryFromText(req.text, req.categories);
+    if (matchedCat) {
+      parsed.transaction.categoryId = matchedCat.id;
+      if (!parsed.correction || parsed.correction.fieldToUpdate !== 'categoryId') {
+        parsed.correction = { fieldToUpdate: 'categoryId', newValue: matchedCat.id };
+      }
+      changes.push(`التصنيف إلى ${matchedCat.nameAr}`);
+    }
+
+    // 2. Type Detection
+    const matchedType = matchTransactionType(req.text);
+    if (matchedType) {
+      parsed.transaction.type = matchedType;
+      if (!parsed.correction || parsed.correction.fieldToUpdate !== 'type') {
+        parsed.correction = { fieldToUpdate: 'type', newValue: matchedType };
+      }
+      changes.push(`النوع إلى ${matchedType === 'expense' ? 'مصروف' : matchedType === 'income' ? 'دخل' : 'تحويل'}`);
+
+      // If type changed and no category was explicitly specified in text, adapt category to compatible type
+      if (!matchedCat && matchedType !== 'transfer' && parsed.transaction.categoryId) {
+        const catObj = req.categories.find((c) => c.id === parsed.transaction.categoryId);
+        if (catObj && catObj.type !== (matchedType === 'income' ? 'income' : 'expense')) {
+          const compatibleCat = req.categories.find((c) => c.type === (matchedType === 'income' ? 'income' : 'expense'));
+          if (compatibleCat) {
+            parsed.transaction.categoryId = compatibleCat.id;
+            changes.push(`التصنيف إلى ${compatibleCat.nameAr}`);
+          }
+        }
+      }
+    }
+
+    const currentType = parsed.transaction.type || baseProposal?.type || 'expense';
+
+    // 3. Intelligent Account Detection (Single Account for Expense/Income, Two Accounts for Transfer)
+    if (currentType === 'transfer') {
+      const transferAccs = matchTransferAccountsFromText(req.text, req.accounts, parsed.transaction.accountId);
+      if (transferAccs.fromAccount) {
+        parsed.transaction.accountId = transferAccs.fromAccount.id;
+        parsed.transaction.currency = transferAccs.fromAccount.currency;
+        changes.push(`الحساب المصدر إلى ${transferAccs.fromAccount.nameAr}`);
+      }
+      if (transferAccs.toAccount) {
+        parsed.transaction.toAccountId = transferAccs.toAccount.id;
+        changes.push(`إلى حساب ${transferAccs.toAccount.nameAr}`);
+      } else if (!parsed.transaction.toAccountId || parsed.transaction.toAccountId === parsed.transaction.accountId) {
+        const otherAcc = req.accounts.find((a) => a.id !== parsed.transaction.accountId);
+        if (otherAcc) {
+          parsed.transaction.toAccountId = otherAcc.id;
+          changes.push(`إلى حساب ${otherAcc.nameAr}`);
+        }
+      }
+    } else {
+      const matchedAcc = matchAccountFromText(req.text, req.accounts);
+      if (matchedAcc) {
+        parsed.transaction.accountId = matchedAcc.id;
+        parsed.transaction.currency = matchedAcc.currency;
+        if (!parsed.correction || parsed.correction.fieldToUpdate !== 'accountId') {
+          parsed.correction = { fieldToUpdate: 'accountId', newValue: matchedAcc.id };
+        }
+        changes.push(`الحساب إلى ${matchedAcc.nameAr}`);
+      }
+    }
+
+    // 4. Amount Detection
+    const matchedAmount = matchAmountEdit(req.text) ?? semanticRoles.amount;
+    if (matchedAmount !== null && matchedAmount > 0) {
+      parsed.transaction.amount = matchedAmount;
+      if (!parsed.correction || parsed.correction.fieldToUpdate !== 'amount') {
+        parsed.correction = { fieldToUpdate: 'amount', newValue: String(matchedAmount) };
+      }
+      changes.push(`المبلغ إلى ${matchedAmount}`);
+    }
+
+    // 5. Description / Notes Detection
+    const matchedDesc = matchDescriptionEdit(req.text);
+    if (matchedDesc) {
+      parsed.transaction.description = matchedDesc;
+      if (!parsed.correction || parsed.correction.fieldToUpdate !== 'description') {
+        parsed.correction = { fieldToUpdate: 'description', newValue: matchedDesc };
+      }
+      changes.push(`الملاحظات إلى "${matchedDesc}"`);
+    }
+
+    if (changes.length > 0) {
+      parsed.rawInterpretationSummary = `تم تعديل ${changes.join(' و')}`;
+    } else if (!parsed.rawInterpretationSummary) {
+      parsed.rawInterpretationSummary = 'تم تحديث بيانات العملية';
     }
   } else if (parsed.intent === 'CREATE_TRANSACTION' && parsed.transaction) {
     // Number role verification for CREATE_TRANSACTION:

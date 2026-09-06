@@ -5,6 +5,7 @@ import {
   signInWithPopup,
   signOut,
   onAuthStateChanged,
+  updateProfile,
   User,
 } from 'firebase/auth';
 import {
@@ -17,8 +18,19 @@ import {
   writeBatch,
   getDocFromServer,
 } from 'firebase/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
 import { FinancialAccount, Transaction, Category } from '../types';
+import localFirebaseConfig from '../../firebase-applet-config.json';
+
+// Support both Vercel / Production Environment Variables (VITE_FIREBASE_*) and local config fallback
+const firebaseConfig = {
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || (localFirebaseConfig as any)?.projectId || '',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || (localFirebaseConfig as any)?.appId || '',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || (localFirebaseConfig as any)?.apiKey || '',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || (localFirebaseConfig as any)?.authDomain || '',
+  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || (localFirebaseConfig as any)?.firestoreDatabaseId || '',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || (localFirebaseConfig as any)?.storageBucket || '',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || (localFirebaseConfig as any)?.messagingSenderId || '',
+};
 
 // Initialize Firebase App
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
@@ -74,6 +86,33 @@ export async function loginWithGoogle(): Promise<User> {
 // Sign out
 export async function logoutUser(): Promise<void> {
   await signOut(auth);
+}
+
+// Update user display name in Firebase Auth and Firestore
+export async function updateUserNameInFirebase(userId: string, newDisplayName: string): Promise<void> {
+  if (auth.currentUser) {
+    try {
+      await updateProfile(auth.currentUser, {
+        displayName: newDisplayName.trim(),
+      });
+    } catch (e) {
+      console.warn('Auth updateProfile notice:', e);
+    }
+  }
+
+  try {
+    const userRef = doc(db, 'users', userId);
+    await setDoc(
+      userRef,
+      {
+        displayName: newDisplayName.trim(),
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.error('Error updating user name in Firestore:', err);
+  }
 }
 
 // Listen to Auth State
@@ -187,3 +226,34 @@ export async function saveAllCategoriesToFirestore(userId: string, categories: C
   });
   await batch.commit();
 }
+
+// Save learned AI memory to Firestore
+export async function saveLearnedMemoryToFirestore(userId: string, memory: any[]) {
+  try {
+    const memoryRef = doc(db, 'users', userId, 'preferences', 'learned_memory');
+    await setDoc(memoryRef, { items: memory, updatedAt: new Date().toISOString() }, { merge: true });
+  } catch (err) {
+    console.error('Error saving learned memory to Firestore:', err);
+  }
+}
+
+// Subscribe to learned AI memory from Firestore
+export function subscribeLearnedMemory(
+  userId: string,
+  onUpdate: (memory: any[]) => void
+) {
+  const memoryRef = doc(db, 'users', userId, 'preferences', 'learned_memory');
+  return onSnapshot(
+    memoryRef,
+    (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        onUpdate(data?.items || []);
+      }
+    },
+    (err) => {
+      console.warn('Firestore learned memory subscription notice:', err);
+    }
+  );
+}
+

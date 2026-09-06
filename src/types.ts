@@ -1,6 +1,6 @@
 export type CurrencyCode = 'EGP' | 'USD' | 'SAR' | 'AED' | 'EUR';
 
-export type AccountType = 'cash' | 'bank' | 'card' | 'savings' | 'wallet';
+export type AccountType = 'cash' | 'bank' | 'card' | 'savings' | 'wallet' | 'other' | 'custom';
 
 export interface FinancialAccount {
   id: string;
@@ -38,7 +38,7 @@ export interface Transaction {
   createdAt: string;
 }
 
-export type ActiveTab = 'home' | 'transactions' | 'accounts' | 'categories' | 'settings';
+export type ActiveTab = 'home' | 'transactions' | 'search' | 'accounts' | 'categories' | 'settings';
 export type Language = 'ar' | 'en';
 
 export interface AuthUser {
@@ -46,4 +46,5 @@ export interface AuthUser {
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
+  createdAt?: string;
 }

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Globe, Smartphone, Cloud, LogOut, Check, ChevronDown } from 'lucide-react';
+import { Globe, Smartphone, Cloud, LogOut, Check, ChevronDown, Edit2, X, User as UserIcon } from 'lucide-react';
 import { Language, AuthUser } from '../types';
 import { translations } from '../data/translations';
 
@@ -10,6 +10,7 @@ interface HeaderProps {
   onLogin: () => void;
   onLogout: () => void;
   onOpenMobileLink: () => void;
+  onUpdateUserName?: (newName: string) => Promise<void>;
 }
 
 export function Header({
@@ -19,10 +20,43 @@ export function Header({
   onLogin,
   onLogout,
   onOpenMobileLink,
+  onUpdateUserName,
 }: HeaderProps) {
   const t = translations[lang];
+  const isAr = lang === 'ar';
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Sync editedName with user displayName when user changes
+  useEffect(() => {
+    if (user?.displayName) {
+      setEditedName(user.displayName);
+    }
+  }, [user?.displayName]);
+
+  const handleStartEditing = () => {
+    setEditedName(user?.displayName || '');
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = async () => {
+    if (!editedName.trim() || !onUpdateUserName) {
+      setIsEditingName(false);
+      return;
+    }
+    setIsSavingName(true);
+    try {
+      await onUpdateUserName(editedName.trim());
+      setIsEditingName(false);
+    } catch (e) {
+      console.error('Failed to update name:', e);
+    } finally {
+      setIsSavingName(false);
+    }
+  };
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -127,24 +161,76 @@ export function Header({
                     lang === 'ar' ? 'left-0' : 'right-0'
                   } top-full mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 p-3 z-50 text-right animate-in fade-in`}
                 >
-                  <div className="flex items-center gap-2.5 pb-2.5 border-b border-slate-100">
+                  <div className="flex items-start gap-2.5 pb-2.5 border-b border-slate-100">
                     {user.photoURL ? (
                       <img
                         src={user.photoURL}
                         alt=""
-                        className="w-9 h-9 rounded-full object-cover"
+                        className="w-9 h-9 rounded-full object-cover shrink-0 mt-0.5"
                         referrerPolicy="no-referrer"
                       />
                     ) : (
-                      <div className="w-9 h-9 rounded-full bg-emerald-600 text-white font-bold text-sm flex items-center justify-center">
+                      <div className="w-9 h-9 rounded-full bg-emerald-600 text-white font-bold text-sm flex items-center justify-center shrink-0 mt-0.5">
                         {(user.displayName || user.email || 'U')[0].toUpperCase()}
                       </div>
                     )}
                     <div className="flex-1 min-w-0 text-start">
-                      <div className="font-bold text-xs text-slate-900 truncate">
-                        {user.displayName || (lang === 'ar' ? 'مستخدم مسجل' : 'Signed User')}
-                      </div>
-                      <div className="text-[10px] text-slate-400 truncate">{user.email}</div>
+                      {isEditingName ? (
+                        <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="text"
+                              value={editedName}
+                              onChange={(e) => setEditedName(e.target.value)}
+                              placeholder={isAr ? 'اسم المستخدم' : 'User name'}
+                              autoFocus
+                              className="w-full px-2 py-1 bg-slate-50 border border-emerald-400 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveName();
+                                if (e.key === 'Escape') setIsEditingName(false);
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={handleSaveName}
+                              disabled={isSavingName}
+                              className="p-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                              title={isAr ? 'حفظ الاسم' : 'Save name'}
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setIsEditingName(false)}
+                              disabled={isSavingName}
+                              className="p-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 transition-colors cursor-pointer shrink-0"
+                              title={isAr ? 'إلغاء' : 'Cancel'}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <span className="text-[10px] text-slate-400 block">{user.email}</span>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="flex items-center justify-between gap-1 group">
+                            <div className="font-bold text-xs text-slate-900 truncate">
+                              {user.displayName || (isAr ? 'مستخدم مسجل' : 'Signed User')}
+                            </div>
+                            {onUpdateUserName && (
+                              <button
+                                type="button"
+                                onClick={handleStartEditing}
+                                className="p-1 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer shrink-0"
+                                title={isAr ? 'تعديل اسم المستخدم' : 'Edit display name'}
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-slate-400 truncate">{user.email}</div>
+                        </div>
+                      )}
                     </div>
                   </div>
 

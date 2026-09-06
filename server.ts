@@ -23,7 +23,7 @@ async function startServer() {
   // 2. Gemini AI Interpretation Endpoint (Provider-independent API)
   app.post('/api/ai/interpret', async (req, res) => {
     try {
-      const { text, accounts, categories, currentDateTime, userTimezone, lang, currentProposal } = req.body;
+      const { text, accounts, categories, currentDateTime, userTimezone, lang, currentProposal, learnedMemory } = req.body;
 
       if (!text || typeof text !== 'string') {
         return res.status(400).json({ error: 'Missing or invalid "text" field' });
@@ -37,6 +37,7 @@ async function startServer() {
         userTimezone: userTimezone || 'Africa/Cairo',
         lang: lang || 'ar',
         currentProposal,
+        learnedMemory: learnedMemory || [],
       });
 
       res.json(result);

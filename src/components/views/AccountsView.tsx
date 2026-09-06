@@ -1,5 +1,5 @@
 import { useState, FormEvent } from 'react';
-import { Plus, CreditCard, Banknote, Building2, PiggyBank, ShieldCheck, X, Pencil } from 'lucide-react';
+import { Plus, CreditCard, Banknote, Building2, PiggyBank, Smartphone, ArrowLeftRight, FolderKanban, ShieldCheck, X, Pencil } from 'lucide-react';
 import { FinancialAccount, CurrencyCode, AccountType, Language } from '../../types';
 import { translations } from '../../data/translations';
 
@@ -32,6 +32,12 @@ export function AccountsView({ accounts, lang, onAddAccount, onEditBalance }: Ac
         return <Building2 className="w-5 h-5 text-blue-600" />;
       case 'card':
         return <CreditCard className="w-5 h-5 text-purple-600" />;
+      case 'wallet':
+        return <Smartphone className="w-5 h-5 text-cyan-600" />;
+      case 'other':
+        return <ArrowLeftRight className="w-5 h-5 text-amber-600" />;
+      case 'custom':
+        return <FolderKanban className="w-5 h-5 text-indigo-600" />;
       case 'savings':
         return <PiggyBank className="w-5 h-5 text-amber-600" />;
       default:
@@ -207,6 +213,9 @@ export function AccountsView({ accounts, lang, onAddAccount, onEditBalance }: Ac
                     <option value="cash">{lang === 'ar' ? 'كاش' : 'Cash'}</option>
                     <option value="bank">{lang === 'ar' ? 'بنك' : 'Bank'}</option>
                     <option value="card">{lang === 'ar' ? 'بطاقة/فيزا' : 'Card'}</option>
+                    <option value="wallet">{lang === 'ar' ? 'محفظة إلكترونية' : 'E-Wallet'}</option>
+                    <option value="other">{lang === 'ar' ? 'وسائل دفع واستلام أخرى' : 'Other Methods'}</option>
+                    <option value="custom">{lang === 'ar' ? 'حسابات أخرى' : 'Other Accounts'}</option>
                     <option value="savings">{lang === 'ar' ? 'ادخار' : 'Savings'}</option>
                   </select>
                 </div>

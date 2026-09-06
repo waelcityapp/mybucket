@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { X, Check, Banknote, Building2, CreditCard, PiggyBank, RotateCcw } from 'lucide-react';
+import { X, Check, Banknote, Building2, CreditCard, PiggyBank, Smartphone, ArrowLeftRight, FolderKanban, RotateCcw } from 'lucide-react';
 import { FinancialAccount, Language } from '../types';
 import { translations } from '../data/translations';
 
@@ -56,6 +56,12 @@ export function EditBalanceModal({
         return <Building2 className="w-5 h-5 text-blue-600" />;
       case 'card':
         return <CreditCard className="w-5 h-5 text-purple-600" />;
+      case 'wallet':
+        return <Smartphone className="w-5 h-5 text-cyan-600" />;
+      case 'other':
+        return <ArrowLeftRight className="w-5 h-5 text-amber-600" />;
+      case 'custom':
+        return <FolderKanban className="w-5 h-5 text-indigo-600" />;
       case 'savings':
         return <PiggyBank className="w-5 h-5 text-amber-600" />;
       default:
@@ -124,23 +130,36 @@ export function EditBalanceModal({
         {/* Form: Single Account */}
         {selectedAccount ? (
           <form onSubmit={handleSingleSubmit} className="space-y-4">
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center shadow-2xs">
-                {getAccountIcon(selectedAccount.type)}
+            {/* 1. الرصيد الحالي */}
+            <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center shadow-2xs">
+                  {getAccountIcon(selectedAccount.type)}
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">
+                    {lang === 'ar' ? '1. الرصيد الحالي' : '1. Current Balance'}
+                  </span>
+                  <span className="text-base font-black text-slate-900 block">
+                    {lang === 'ar' ? selectedAccount.nameAr : selectedAccount.name}
+                  </span>
+                </div>
               </div>
-              <div className="flex-1">
-                <span className="text-sm font-bold text-slate-900 block">
-                  {lang === 'ar' ? selectedAccount.nameAr : selectedAccount.name}
-                </span>
-                <span className="text-xs text-slate-500 font-mono">
-                  {selectedAccount.type} · {selectedAccount.currency}
-                </span>
+
+              <div className="text-end">
+                <div className="text-xl sm:text-2xl font-black text-emerald-700 font-mono tracking-tight">
+                  {selectedAccount.balance.toLocaleString()}
+                </div>
+                <div className="text-[11px] font-bold text-slate-500">
+                  {selectedAccount.currency}
+                </div>
               </div>
             </div>
 
+            {/* 2. تعديل الرصيد */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                {lang === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'} ({selectedAccount.currency})
+              <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                {lang === 'ar' ? '2. تعديل الرصيد' : '2. Edit Balance'} ({selectedAccount.currency})
               </label>
               <div className="relative">
                 <input
@@ -151,7 +170,7 @@ export function EditBalanceModal({
                   placeholder="0.00"
                   value={singleAmount}
                   onChange={(e) => setSingleAmount(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-lg font-black text-slate-900 focus:bg-white focus:border-emerald-500 focus:outline-hidden"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-xl font-black text-slate-900 focus:bg-white focus:border-emerald-500 focus:outline-hidden transition-colors"
                 />
                 <span className="absolute end-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 font-mono">
                   {selectedAccount.currency}
@@ -160,7 +179,10 @@ export function EditBalanceModal({
             </div>
 
             {/* Quick Presets for Convenience */}
-            <div className="flex flex-wrap gap-2 pt-1">
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <span className="text-[11px] font-bold text-slate-400">
+                {lang === 'ar' ? 'خيارات سريعة:' : 'Quick:'}
+              </span>
               <button
                 type="button"
                 onClick={() => setSingleAmount('0')}
@@ -168,7 +190,7 @@ export function EditBalanceModal({
               >
                 0 ({lang === 'ar' ? 'تصفير' : 'Zero'})
               </button>
-              {[100, 500, 1000, 5000, 10000].map((preset) => (
+              {[100, 500, 1000, 5000].map((preset) => (
                 <button
                   key={preset}
                   type="button"
@@ -180,6 +202,7 @@ export function EditBalanceModal({
               ))}
             </div>
 
+            {/* زر حفظ و إلغاء */}
             <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-100">
               <button
                 type="button"
@@ -190,10 +213,10 @@ export function EditBalanceModal({
               </button>
               <button
                 type="submit"
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 transition-colors"
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 transition-colors active:scale-95"
               >
-                <Check className="w-4 h-4" />
-                <span>{t.saveBalance}</span>
+                <Check className="w-4 h-4 stroke-[3]" />
+                <span>{lang === 'ar' ? 'حفظ' : 'Save'}</span>
               </button>
             </div>
           </form>

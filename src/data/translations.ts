@@ -6,7 +6,7 @@ export const translations = {
     greeting: 'صباح الخير 👋',
     morningGreeting: 'صباح الخير 👋',
     eveningGreeting: 'مساء الخير 👋',
-    homePrompt: 'إيه الجديد في فلوسك النهاردة؟',
+    homePrompt: 'من النهاردة متقولش فلوسي راحت فين',
     voiceInputPlaceholder: 'اكتب أو قل لي أي عملية...',
     voiceInputExample: 'مثال: دفعت 350 جنيه بنزين من الكاش',
     listening: 'جاري الاستماع... تحدّث الآن',
@@ -30,9 +30,11 @@ export const translations = {
     // Quick Actions
     addTransaction: '+ إضافة عملية',
     addTransactionManually: '+ إنشاء عملية جديدة يدويًا',
+    manualFinancialSearch: 'استعلام مالي',
     quickExpense: 'مصروف',
     quickIncome: 'دخل',
     quickTransfer: 'تحويل',
+    quickInquiry: 'استعلام',
     
     // Accounts
     accountsTitle: 'الحسابات ومصادر المال',
@@ -60,7 +62,7 @@ export const translations = {
     recentTransactions: 'العمليات الأخيرة',
     allTransactions: 'سجل العمليات',
     noTransactionsYet: 'لا توجد عمليات مسجلة حتى الآن.',
-    searchPlaceholder: 'بحث في العمليات...',
+    searchPlaceholder: 'استعلام في العمليات...',
     filterAll: 'الكل',
     filterExpenses: 'المصاريف',
     filterIncome: 'الدخل',
@@ -74,9 +76,30 @@ export const translations = {
     // Navigation
     navHome: 'الرئيسية',
     navTransactions: 'العمليات',
+    navSearch: 'استعلام',
     navAccounts: 'الحسابات',
-    navCategories: 'التصنيفات',
-    navSettings: 'الإعدادات',
+    navCategories: 'التقارير',
+    navSettings: 'المزيد',
+    
+    // Search View
+    searchTitle: 'استعلام مالي',
+    searchSubtitle: 'استعلم عن عملياتك المالية واعثر على ما تحتاجه بسهولة',
+    searchFilters: 'فلاتر الاستعلام',
+    clearFilters: 'مسح الفلاتر',
+    txTypeAll: 'الكل',
+    dateFrom: 'من تاريخ',
+    dateTo: 'إلى تاريخ',
+    keywordSearch: 'ملاحظات / كلمة الاستعلام',
+    keywordPlaceholder: 'مثال: مشوار المطار',
+    sortBy: 'الترتيب',
+    newestFirst: 'الأحدث أولاً',
+    oldestFirst: 'الأقدم أولاً',
+    advancedFilters: 'فلاتر متقدمة',
+    searchBtn: 'استعلام',
+    searchResults: 'نتائج الاستعلام',
+    foundTxCount: 'تم العثور على {count} عملية',
+    totalAmount: 'الإجمالي',
+    txCountLabel: 'عدد العمليات',
     
     // Transaction Modal & Form
     newTransactionTitle: 'إضافة عملية جديدة',
@@ -98,6 +121,15 @@ export const translations = {
     btnConfirm: 'تأكيد وحفظ',
     btnEdit: 'تعديل',
     btnCancel: 'إلغاء',
+    
+    // Voice Edit in Modal
+    voiceEditModalTitle: 'تعديل بالذكاء الاصطناعي والصوت',
+    voiceEditModalPlaceholder: 'تحدث لتعديل أي حقل: "خليها صرف"، "المبلغ 500"، "غير الملاحظات"...',
+    voiceEditListening: 'جاري الاستماع... تحدث ثم اضغط إرسال',
+    voiceEditSendBtn: 'إرسال التعديل',
+    voiceEditMicBtn: 'تحدث للتعديل',
+    voiceEditNoticeSaveAttempt: 'من فضلك اضغط على زر تأكيد وحفظ',
+    voiceEditSuccess: 'تم تعديل الحقول المطلوبة بنجاح',
     
     // Preview
     previewTitle: 'معاينة العملية قبل الحفظ',
@@ -180,9 +212,11 @@ export const translations = {
     // Quick Actions
     addTransaction: '+ Add Transaction',
     addTransactionManually: '+ Add Transaction Manually',
+    manualFinancialSearch: 'Financial Inquiry',
     quickExpense: 'Expense',
     quickIncome: 'Income',
     quickTransfer: 'Transfer',
+    quickInquiry: 'Inquiry',
     
     // Accounts
     accountsTitle: 'Money Sources & Accounts',
@@ -224,9 +258,30 @@ export const translations = {
     // Navigation
     navHome: 'Home',
     navTransactions: 'Transactions',
+    navSearch: 'Search',
     navAccounts: 'Accounts',
-    navCategories: 'Categories',
-    navSettings: 'Settings',
+    navCategories: 'Reports',
+    navSettings: 'More',
+    
+    // Search View
+    searchTitle: 'Financial Search',
+    searchSubtitle: 'Search your financial transactions and find what you need easily',
+    searchFilters: 'Search Filters',
+    clearFilters: 'Clear Filters',
+    txTypeAll: 'All',
+    dateFrom: 'Date From',
+    dateTo: 'Date To',
+    keywordSearch: 'Notes / Keyword',
+    keywordPlaceholder: 'e.g. Airport ride',
+    sortBy: 'Sort By',
+    newestFirst: 'Newest First',
+    oldestFirst: 'Oldest First',
+    advancedFilters: 'Advanced Filters',
+    searchBtn: 'Search',
+    searchResults: 'Search Results',
+    foundTxCount: 'Found {count} transactions',
+    totalAmount: 'Total Amount',
+    txCountLabel: 'Transactions Count',
     
     // Transaction Modal & Form
     newTransactionTitle: 'Add New Transaction',
@@ -248,6 +303,15 @@ export const translations = {
     btnConfirm: 'Confirm & Save',
     btnEdit: 'Edit',
     btnCancel: 'Cancel',
+    
+    // Voice Edit in Modal
+    voiceEditModalTitle: 'Edit with Voice & AI',
+    voiceEditModalPlaceholder: 'Speak to edit: "make it expense", "amount 500", "change note"...',
+    voiceEditListening: 'Listening... Speak and press send',
+    voiceEditSendBtn: 'Apply Edit',
+    voiceEditMicBtn: 'Speak to Edit',
+    voiceEditNoticeSaveAttempt: 'Please click on the Confirm & Save button',
+    voiceEditSuccess: 'Fields updated successfully',
     
     // Preview
     previewTitle: 'Transaction Preview',

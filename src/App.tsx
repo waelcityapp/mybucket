@@ -18,12 +18,20 @@ import { MonthSummaryCard } from './components/MonthSummaryCard';
 import { RecentTransactions } from './components/RecentTransactions';
 import { TransactionModal } from './components/TransactionModal';
 import { EditBalanceModal } from './components/EditBalanceModal';
+import { BankAccountModal } from './components/BankAccountModal';
+import { CardAccountModal } from './components/CardAccountModal';
+import { WalletAccountModal } from './components/WalletAccountModal';
+import { OtherAccountModal } from './components/OtherAccountModal';
+import { ExtraAccountModal } from './components/ExtraAccountModal';
+import { ExpenseCategoriesModal } from './components/ExpenseCategoriesModal';
+import { CategoryDetailModal } from './components/CategoryDetailModal';
 import { MobileLinkModal } from './components/MobileLinkModal';
 import { BottomNav } from './components/BottomNav';
 import { TransactionsView } from './components/views/TransactionsView';
 import { AccountsView } from './components/views/AccountsView';
 import { CategoriesView } from './components/views/CategoriesView';
 import { SettingsView } from './components/views/SettingsView';
+import { SearchView } from './components/views/SearchView';
 import { CheckCircle2, Smartphone, Cloud, ArrowRight } from 'lucide-react';
 import { AIFinancialQuery, AICorrection } from './services/ai/types';
 import {
@@ -44,7 +52,11 @@ import {
   saveTransactionToFirestore,
   deleteTransactionFromFirestore,
   saveAllCategoriesToFirestore,
+  saveLearnedMemoryToFirestore,
+  subscribeLearnedMemory,
+  updateUserNameInFirebase,
 } from './lib/firebase';
+import { aiLearnedMemory } from './services/ai/aiLearnedMemory';
 
 const STORAGE_KEY_PREFIX = 'mybucket_';
 
@@ -61,6 +73,73 @@ export default function App() {
   // Check if zero initialization was done
   const isZeroInitDone = !!localStorage.getItem(`${STORAGE_KEY_PREFIX}zero_initialized_v2`);
 
+  // Helper to migrate legacy 'acc_savings_usd' / 'مدخرات دولار' to 'acc_wallet' / 'محافظ إلكترونية' and ensure 'acc_other' exists
+  const migrateLegacyAccounts = (accs: FinancialAccount[]): { updated: FinancialAccount[]; migrated: boolean } => {
+    let migrated = false;
+    let updated = accs.map((acc) => {
+      if (acc.id === 'acc_savings_usd' || acc.nameAr === 'مدخرات دولار' || acc.name === 'USD Savings') {
+        migrated = true;
+        return {
+          ...acc,
+          id: 'acc_wallet',
+          name: 'E-Wallets',
+          nameAr: 'محافظ إلكترونية',
+          type: 'wallet' as const,
+          currency: 'EGP' as const,
+          color: '#06b6d4',
+        };
+      }
+      return acc;
+    });
+
+    const hasOther = updated.some((a) => a.id === 'acc_other' || a.type === 'other');
+    if (!hasOther) {
+      migrated = true;
+      updated.push({
+        id: 'acc_other',
+        name: 'Other Methods',
+        nameAr: 'وسائل دفع واستلام أخرى',
+        type: 'other' as const,
+        balance: 0,
+        currency: 'EGP' as const,
+        color: '#f59e0b',
+      });
+    }
+
+    const hasExtra = updated.some((a) => a.id === 'acc_extra' || a.type === 'custom');
+    if (!hasExtra) {
+      migrated = true;
+      updated.push({
+        id: 'acc_extra',
+        name: 'Other Accounts',
+        nameAr: 'حسابات أخرى',
+        type: 'custom' as const,
+        balance: 0,
+        currency: 'EGP' as const,
+        color: '#6366f1',
+      });
+    }
+
+    return { updated, migrated };
+  };
+
+  const migrateLegacyTransactions = (txs: Transaction[]): Transaction[] => {
+    return txs.map((tx) => {
+      let updated = false;
+      let newAcc = tx.accountId;
+      let newToAcc = tx.toAccountId;
+      if (tx.accountId === 'acc_savings_usd') {
+        newAcc = 'acc_wallet';
+        updated = true;
+      }
+      if (tx.toAccountId === 'acc_savings_usd') {
+        newToAcc = 'acc_wallet';
+        updated = true;
+      }
+      return updated ? { ...tx, accountId: newAcc, toAccountId: newToAcc } : tx;
+    });
+  };
+
   // 3. Financial Accounts State
   const [accounts, setAccounts] = useState<FinancialAccount[]>(() => {
     if (!isZeroInitDone) {
@@ -70,7 +149,10 @@ export default function App() {
     const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}accounts`);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return migrateLegacyAccounts(parsed).updated;
+        }
       } catch {
         // fallback
       }
@@ -99,7 +181,10 @@ export default function App() {
     const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}transactions`);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return migrateLegacyTransactions(parsed);
+        }
       } catch {
         // fallback
       }
@@ -118,6 +203,19 @@ export default function App() {
   const [activeFinancialQueryResult, setActiveFinancialQueryResult] = useState<DeterministicQueryResult | null>(null);
   const [isEditBalanceModalOpen, setIsEditBalanceModalOpen] = useState(false);
   const [selectedAccountForBalance, setSelectedAccountForBalance] = useState<string | null>(null);
+  const [isBankAccountModalOpen, setIsBankAccountModalOpen] = useState(false);
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);
+  const [isCardAccountModalOpen, setIsCardAccountModalOpen] = useState(false);
+  const [selectedCardAccountId, setSelectedCardAccountId] = useState<string | null>(null);
+  const [isWalletAccountModalOpen, setIsWalletAccountModalOpen] = useState(false);
+  const [selectedWalletAccountId, setSelectedWalletAccountId] = useState<string | null>(null);
+  const [isOtherAccountModalOpen, setIsOtherAccountModalOpen] = useState(false);
+  const [selectedOtherAccountId, setSelectedOtherAccountId] = useState<string | null>(null);
+  const [isExtraAccountModalOpen, setIsExtraAccountModalOpen] = useState(false);
+  const [selectedExtraAccountId, setSelectedExtraAccountId] = useState<string | null>(null);
+  const [isExpenseCategoriesModalOpen, setIsExpenseCategoriesModalOpen] = useState(false);
+  const [isCategoryDetailModalOpen, setIsCategoryDetailModalOpen] = useState(false);
+  const [selectedCategoryForDetail, setSelectedCategoryForDetail] = useState<Category | null>(null);
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
 
   // 8. Success Toast Notification
@@ -170,7 +268,11 @@ export default function App() {
     // 1. Subscribe to User's Accounts
     const unsubAccounts = subscribeUserAccounts(authUser.uid, (cloudAccounts) => {
       if (cloudAccounts && cloudAccounts.length > 0) {
-        setAccounts(cloudAccounts);
+        const { updated, migrated } = migrateLegacyAccounts(cloudAccounts);
+        setAccounts(updated);
+        if (migrated) {
+          saveAllAccountsToFirestore(authUser.uid, updated);
+        }
       } else {
         // If user has no accounts in cloud yet, seed with current local accounts
         saveAllAccountsToFirestore(authUser.uid, accounts);
@@ -180,7 +282,8 @@ export default function App() {
     // 2. Subscribe to User's Transactions
     const unsubTransactions = subscribeUserTransactions(authUser.uid, (cloudTx) => {
       if (cloudTx) {
-        setTransactions(cloudTx);
+        const migratedTx = migrateLegacyTransactions(cloudTx);
+        setTransactions(migratedTx);
       }
     });
 
@@ -193,10 +296,18 @@ export default function App() {
       }
     });
 
+    // 4. Subscribe to User's Learned AI Memory
+    const unsubLearnedMemory = subscribeLearnedMemory(authUser.uid, (cloudMemory) => {
+      if (cloudMemory && cloudMemory.length > 0) {
+        aiLearnedMemory.setMemoryFromRemote(cloudMemory);
+      }
+    });
+
     return () => {
       unsubAccounts();
       unsubTransactions();
       unsubCategories();
+      unsubLearnedMemory();
     };
   }, [authUser?.uid]);
 
@@ -249,6 +360,21 @@ export default function App() {
     }
   };
 
+  // Update User Display Name Handler
+  const handleUpdateUserName = async (newName: string) => {
+    if (!authUser || !newName.trim()) return;
+    try {
+      await updateUserNameInFirebase(authUser.uid, newName.trim());
+      setAuthUser((prev) => (prev ? { ...prev, displayName: newName.trim() } : null));
+      setToastMessage(lang === 'ar' ? 'تم تحديث اسم المستخدم بنجاح' : 'Display name updated successfully');
+      setTimeout(() => setToastMessage(null), 3000);
+    } catch (err) {
+      console.error('Update display name error:', err);
+      setToastMessage(lang === 'ar' ? 'تعذر حفظ الاسم' : 'Could not save name');
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
+
   // Toggle Language Handler
   const handleToggleLanguage = () => {
     setLang((prev) => (prev === 'ar' ? 'en' : 'ar'));
@@ -283,6 +409,19 @@ export default function App() {
       
       const updatedDraft = { ...prefilledDraft, [correction.fieldToUpdate]: val };
       setPrefilledDraft(updatedDraft);
+
+      // Adaptive learning from correction
+      if (prefilledDraft.description) {
+        aiLearnedMemory.recordLearning(prefilledDraft.description, {
+          categoryId: correction.fieldToUpdate === 'categoryId' ? String(val) : updatedDraft.categoryId,
+          accountId: correction.fieldToUpdate === 'accountId' ? String(val) : updatedDraft.accountId,
+          type: updatedDraft.type,
+          description: updatedDraft.description,
+        });
+        if (authUser) {
+          saveLearnedMemoryToFirestore(authUser.uid, aiLearnedMemory.getLearnedList());
+        }
+      }
       
       // Ensure modal is open to show the correction
       if (!isAddModalOpen) {
@@ -317,6 +456,20 @@ export default function App() {
       createdAt: new Date().toISOString(),
     };
 
+    // Record user confirmed transaction in AI Continuous Learned Memory
+    if (newTx.description) {
+      const catObj = categories.find((c) => c.id === newTx.categoryId);
+      const accObj = accounts.find((a) => a.id === newTx.accountId);
+      aiLearnedMemory.recordLearning(newTx.description, {
+        categoryId: newTx.categoryId,
+        categoryNameAr: catObj?.nameAr,
+        accountId: newTx.accountId,
+        accountNameAr: accObj?.nameAr,
+        type: newTx.type,
+        description: newTx.description,
+      });
+    }
+
     // Calculate updated accounts
     const updatedAccounts = accounts.map((acc) => {
       // Source account
@@ -349,6 +502,7 @@ export default function App() {
       try {
         await saveTransactionToFirestore(authUser.uid, newTx);
         await saveAllAccountsToFirestore(authUser.uid, updatedAccounts);
+        await saveLearnedMemoryToFirestore(authUser.uid, aiLearnedMemory.getLearnedList());
       } catch (err) {
         console.error('Firestore save transaction error:', err);
       }
@@ -400,6 +554,55 @@ export default function App() {
     }
   };
 
+  // Edit Existing Transaction Handler (re-calculate account balance impact)
+  const handleEditTransaction = async (updatedTx: Transaction) => {
+    const oldTx = transactions.find((t) => t.id === updatedTx.id);
+    if (!oldTx) return;
+
+    // Recalculate account balances: first reverse oldTx, then apply updatedTx
+    const updatedAccounts = accounts.map((acc) => {
+      let balance = acc.balance;
+
+      // 1. Reverse oldTx effect
+      if (acc.id === oldTx.accountId) {
+        if (oldTx.type === 'expense') balance += oldTx.amount;
+        if (oldTx.type === 'income') balance -= oldTx.amount;
+        if (oldTx.type === 'transfer') balance += oldTx.amount;
+      }
+      if (oldTx.type === 'transfer' && acc.id === oldTx.toAccountId) {
+        balance -= oldTx.amount;
+      }
+
+      // 2. Apply updatedTx effect
+      if (acc.id === updatedTx.accountId) {
+        if (updatedTx.type === 'expense') balance -= updatedTx.amount;
+        if (updatedTx.type === 'income') balance += updatedTx.amount;
+        if (updatedTx.type === 'transfer') balance -= updatedTx.amount;
+      }
+      if (updatedTx.type === 'transfer' && acc.id === updatedTx.toAccountId) {
+        balance += updatedTx.amount;
+      }
+
+      return { ...acc, balance };
+    });
+
+    setAccounts(updatedAccounts);
+    setTransactions((prev) => prev.map((t) => (t.id === updatedTx.id ? updatedTx : t)));
+
+    // Save to Firestore
+    if (authUser) {
+      try {
+        await saveTransactionToFirestore(authUser.uid, updatedTx);
+        await saveAllAccountsToFirestore(authUser.uid, updatedAccounts);
+      } catch (err) {
+        console.error('Firestore edit transaction error:', err);
+      }
+    }
+
+    setToastMessage(lang === 'ar' ? 'تم تحديث المعاملة بنجاح!' : 'Transaction updated successfully!');
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
   // Add New Account Handler
   const handleAddAccount = async (accData: Omit<FinancialAccount, 'id'>) => {
     const newAccount: FinancialAccount = {
@@ -432,10 +635,213 @@ export default function App() {
     }
   };
 
+  // Bulk update or modify categories handler (from ExpenseCategoriesModal)
+  const handleUpdateCategories = async (updatedList: Category[]) => {
+    setCategories(updatedList);
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}categories`, JSON.stringify(updatedList));
+
+    if (authUser) {
+      try {
+        await saveAllCategoriesToFirestore(authUser.uid, updatedList);
+      } catch (err) {
+        console.error('Firestore save all categories error:', err);
+      }
+    }
+
+    setToastMessage(lang === 'ar' ? 'تم حفظ بنود الصرف بنجاح!' : 'Spending categories saved successfully!');
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
   // Open Edit Balance Modal
   const handleOpenEditBalance = (accId: string | null = null) => {
+    const target = accounts.find((a) => a.id === accId);
+    if (target?.type === 'bank' || target?.id === 'acc_bank') {
+      handleOpenBankAccountModal(accId);
+      return;
+    }
+    if (target?.type === 'card' || target?.id === 'acc_card') {
+      handleOpenCardAccountModal(accId);
+      return;
+    }
+    if (target?.type === 'wallet' || target?.id === 'acc_wallet') {
+      handleOpenWalletAccountModal(accId);
+      return;
+    }
+    if (target?.type === 'other' || target?.id === 'acc_other') {
+      handleOpenOtherAccountModal(accId);
+      return;
+    }
+    if (target?.type === 'custom' || target?.id === 'acc_extra') {
+      handleOpenExtraAccountModal(accId);
+      return;
+    }
     setSelectedAccountForBalance(accId);
     setIsEditBalanceModalOpen(true);
+  };
+
+  // Open Bank Account Management Modal
+  const handleOpenBankAccountModal = (accId: string | null = null) => {
+    const bankAcc = (accId ? accounts.find((a) => a.id === accId) : null) || accounts.find((a) => a.type === 'bank') || accounts.find((a) => a.id === 'acc_bank');
+    setSelectedBankAccountId(bankAcc ? bankAcc.id : (accId || 'acc_bank'));
+    setIsBankAccountModalOpen(true);
+  };
+
+  // Save Bank Account Changes (Name & Balance)
+  const handleSaveBankAccount = async (accountId: string, newNameAr: string, newBalance: number) => {
+    const updated = accounts.map((acc) => {
+      if (acc.id === accountId) {
+        return {
+          ...acc,
+          nameAr: newNameAr,
+          name: newNameAr,
+          balance: newBalance,
+        };
+      }
+      return acc;
+    });
+    setAccounts(updated);
+
+    if (authUser) {
+      const target = updated.find((a) => a.id === accountId);
+      if (target) {
+        await saveAccountToFirestore(authUser.uid, target);
+      }
+    }
+
+    setToastMessage(lang === 'ar' ? `تم حفظ بيانات ${newNameAr} بنجاح` : 'Bank account updated successfully');
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Open Card / Visa Account Management Modal
+  const handleOpenCardAccountModal = (accId: string | null = null) => {
+    const cardAcc = (accId ? accounts.find((a) => a.id === accId) : null) || accounts.find((a) => a.type === 'card') || accounts.find((a) => a.id === 'acc_card');
+    setSelectedCardAccountId(cardAcc ? cardAcc.id : (accId || 'acc_card'));
+    setIsCardAccountModalOpen(true);
+  };
+
+  // Save Card Account Changes (Name & Balance)
+  const handleSaveCardAccount = async (accountId: string, newNameAr: string, newBalance: number) => {
+    const updated = accounts.map((acc) => {
+      if (acc.id === accountId) {
+        return {
+          ...acc,
+          nameAr: newNameAr,
+          name: newNameAr,
+          balance: newBalance,
+        };
+      }
+      return acc;
+    });
+    setAccounts(updated);
+
+    if (authUser) {
+      const target = updated.find((a) => a.id === accountId);
+      if (target) {
+        await saveAccountToFirestore(authUser.uid, target);
+      }
+    }
+
+    setToastMessage(lang === 'ar' ? `تم حفظ بيانات ${newNameAr} بنجاح` : 'Card updated successfully');
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Open Wallet / E-Wallet Management Modal
+  const handleOpenWalletAccountModal = (accId: string | null = null) => {
+    const walletAcc = (accId ? accounts.find((a) => a.id === accId) : null) || accounts.find((a) => a.type === 'wallet') || accounts.find((a) => a.id === 'acc_wallet');
+    setSelectedWalletAccountId(walletAcc ? walletAcc.id : (accId || 'acc_wallet'));
+    setIsWalletAccountModalOpen(true);
+  };
+
+  // Save Wallet Account Changes (Name & Balance)
+  const handleSaveWalletAccount = async (accountId: string, newNameAr: string, newBalance: number) => {
+    const updated = accounts.map((acc) => {
+      if (acc.id === accountId) {
+        return {
+          ...acc,
+          nameAr: newNameAr,
+          name: newNameAr,
+          balance: newBalance,
+        };
+      }
+      return acc;
+    });
+    setAccounts(updated);
+
+    if (authUser) {
+      const target = updated.find((a) => a.id === accountId);
+      if (target) {
+        await saveAccountToFirestore(authUser.uid, target);
+      }
+    }
+
+    setToastMessage(lang === 'ar' ? `تم حفظ بيانات ${newNameAr} بنجاح` : 'Wallet updated successfully');
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Open Other Payment/Receiving Methods Modal
+  const handleOpenOtherAccountModal = (accId: string | null = null) => {
+    const otherAcc = (accId ? accounts.find((a) => a.id === accId) : null) || accounts.find((a) => a.type === 'other') || accounts.find((a) => a.id === 'acc_other');
+    setSelectedOtherAccountId(otherAcc ? otherAcc.id : (accId || 'acc_other'));
+    setIsOtherAccountModalOpen(true);
+  };
+
+  // Save Other Payment/Receiving Methods Changes (Name & Balance)
+  const handleSaveOtherAccount = async (accountId: string, newNameAr: string, newBalance: number) => {
+    const updated = accounts.map((acc) => {
+      if (acc.id === accountId) {
+        return {
+          ...acc,
+          nameAr: newNameAr,
+          name: newNameAr,
+          balance: newBalance,
+        };
+      }
+      return acc;
+    });
+    setAccounts(updated);
+
+    if (authUser) {
+      const target = updated.find((a) => a.id === accountId);
+      if (target) {
+        await saveAccountToFirestore(authUser.uid, target);
+      }
+    }
+
+    setToastMessage(lang === 'ar' ? `تم حفظ بيانات ${newNameAr} بنجاح` : 'Payment method updated successfully');
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Open Extra / Other Accounts Modal
+  const handleOpenExtraAccountModal = (accId: string | null = null) => {
+    const extraAcc = (accId ? accounts.find((a) => a.id === accId) : null) || accounts.find((a) => a.type === 'custom') || accounts.find((a) => a.id === 'acc_extra');
+    setSelectedExtraAccountId(extraAcc ? extraAcc.id : (accId || 'acc_extra'));
+    setIsExtraAccountModalOpen(true);
+  };
+
+  // Save Extra / Other Accounts Changes (Name & Balance)
+  const handleSaveExtraAccount = async (accountId: string, newNameAr: string, newBalance: number) => {
+    const updated = accounts.map((acc) => {
+      if (acc.id === accountId) {
+        return {
+          ...acc,
+          nameAr: newNameAr,
+          name: newNameAr,
+          balance: newBalance,
+        };
+      }
+      return acc;
+    });
+    setAccounts(updated);
+
+    if (authUser) {
+      const target = updated.find((a) => a.id === accountId);
+      if (target) {
+        await saveAccountToFirestore(authUser.uid, target);
+      }
+    }
+
+    setToastMessage(lang === 'ar' ? `تم حفظ بيانات ${newNameAr} بنجاح` : 'Account updated successfully');
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
   // Update Single Account Balance
@@ -505,9 +911,14 @@ export default function App() {
 
   const t = translations[lang];
 
-  // Dynamic greeting based on current time
+  // Dynamic greeting based on current time and user name
   const currentHour = new Date().getHours();
-  const greetingText = currentHour < 12 ? t.morningGreeting : t.eveningGreeting;
+  const userName = authUser?.displayName 
+    ? authUser.displayName.trim().split(' ')[0] 
+    : (lang === 'ar' ? 'صديقي' : 'Friend');
+
+  const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
+  const greetingText = `${greetingPrefix} ${userName} 👋`;
 
   return (
     <div
@@ -530,6 +941,7 @@ export default function App() {
         onLogin={handleGoogleLogin}
         onLogout={handleGoogleLogout}
         onOpenMobileLink={() => setIsMobileModalOpen(true)}
+        onUpdateUserName={handleUpdateUserName}
       />
 
       {/* Main Content Area - Mobile First proportions matching reference */}
@@ -578,9 +990,11 @@ export default function App() {
             {/* 1. Soft Greeting Section Matching Reference */}
             <div className="pt-1 pb-1 px-1">
               <div className="flex items-center justify-between">
-                <h1 className="text-base sm:text-lg font-black text-slate-800 tracking-tight">
-                  {greetingText}
-                </h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-base sm:text-lg font-black text-slate-800 tracking-tight">
+                    {greetingText}
+                  </h1>
+                </div>
                 {authUser && (
                   <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold">
                     <Cloud className="w-3 h-3 text-emerald-600" />
@@ -613,7 +1027,11 @@ export default function App() {
             )}
 
             {/* 3. 3 Quick Transaction Action Buttons: مصروف, دخل, تحويل */}
-            <QuickActions lang={lang} onOpenAddModal={handleOpenAddModal} />
+            <QuickActions 
+              lang={lang} 
+              onOpenAddModal={handleOpenAddModal} 
+              onOpenSearchModal={() => setActiveTab('search')}
+            />
 
             {/* 4. "حساباتك" - Money Sources / Accounts Grid */}
             <MoneySources
@@ -621,7 +1039,25 @@ export default function App() {
               lang={lang}
               onViewAll={() => setActiveTab('accounts')}
               onAddAccountClick={() => setActiveTab('accounts')}
-              onSelectAccount={() => setActiveTab('transactions')}
+              onOpenExpenseCategories={() => setIsExpenseCategoriesModalOpen(true)}
+              onSelectAccount={(accId) => {
+                const target = accounts.find((a) => a.id === accId);
+                if (target?.type === 'cash' || target?.id === 'acc_cash') {
+                  handleOpenEditBalance(accId);
+                } else if (target?.type === 'bank' || target?.id === 'acc_bank') {
+                  handleOpenBankAccountModal(accId);
+                } else if (target?.type === 'card' || target?.id === 'acc_card') {
+                  handleOpenCardAccountModal(accId);
+                } else if (target?.type === 'wallet' || target?.id === 'acc_wallet') {
+                  handleOpenWalletAccountModal(accId);
+                } else if (target?.type === 'other' || target?.id === 'acc_other') {
+                  handleOpenOtherAccountModal(accId);
+                } else if (target?.type === 'custom' || target?.id === 'acc_extra') {
+                  handleOpenExtraAccountModal(accId);
+                } else {
+                  setActiveTab('transactions');
+                }
+              }}
               onEditBalance={handleOpenEditBalance}
             />
 
@@ -660,11 +1096,26 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'search' && (
+          <SearchView
+            transactions={transactions}
+            categories={categories}
+            accounts={accounts}
+            lang={lang}
+            authUser={authUser}
+          />
+        )}
+
         {activeTab === 'categories' && (
           <CategoriesView
             categories={categories}
             transactions={transactions}
             lang={lang}
+            authUser={authUser}
+            onSelectCategory={(cat) => {
+              setSelectedCategoryForDetail(cat);
+              setIsCategoryDetailModalOpen(true);
+            }}
           />
         )}
 
@@ -705,6 +1156,82 @@ export default function App() {
         onClose={() => setIsEditBalanceModalOpen(false)}
         onUpdateSingleBalance={handleUpdateSingleBalance}
         onUpdateBulkBalances={handleUpdateBulkBalances}
+      />
+
+      {/* Bank Account Management & Plus/Pro Plans Modal */}
+      <BankAccountModal
+        isOpen={isBankAccountModalOpen}
+        account={accounts.find((a) => a.id === selectedBankAccountId) || accounts.find((a) => a.type === 'bank') || null}
+        lang={lang}
+        onClose={() => setIsBankAccountModalOpen(false)}
+        onSave={handleSaveBankAccount}
+      />
+
+      {/* Visa / Card Account Management & Plus/Pro Plans Modal */}
+      <CardAccountModal
+        isOpen={isCardAccountModalOpen}
+        account={accounts.find((a) => a.id === selectedCardAccountId) || accounts.find((a) => a.type === 'card') || null}
+        lang={lang}
+        onClose={() => setIsCardAccountModalOpen(false)}
+        onSave={handleSaveCardAccount}
+      />
+
+      {/* E-Wallet Account Management & Plus/Pro Plans Modal */}
+      <WalletAccountModal
+        isOpen={isWalletAccountModalOpen}
+        account={accounts.find((a) => a.id === selectedWalletAccountId) || accounts.find((a) => a.type === 'wallet') || null}
+        lang={lang}
+        onClose={() => setIsWalletAccountModalOpen(false)}
+        onSave={handleSaveWalletAccount}
+      />
+
+      {/* Other Payment & Receiving Methods Management & Plus/Pro Plans Modal */}
+      <OtherAccountModal
+        isOpen={isOtherAccountModalOpen}
+        account={accounts.find((a) => a.id === selectedOtherAccountId) || accounts.find((a) => a.type === 'other') || null}
+        lang={lang}
+        onClose={() => setIsOtherAccountModalOpen(false)}
+        onSave={handleSaveOtherAccount}
+      />
+
+      {/* Extra / Other Accounts Management & Plus/Pro Plans Modal */}
+      <ExtraAccountModal
+        isOpen={isExtraAccountModalOpen}
+        account={accounts.find((a) => a.id === selectedExtraAccountId) || accounts.find((a) => a.type === 'custom') || null}
+        lang={lang}
+        onClose={() => setIsExtraAccountModalOpen(false)}
+        onSave={handleSaveExtraAccount}
+      />
+
+      {/* Spending Categories Management Modal */}
+      <ExpenseCategoriesModal
+        isOpen={isExpenseCategoriesModalOpen}
+        categories={categories}
+        lang={lang}
+        onClose={() => setIsExpenseCategoriesModalOpen(false)}
+        onUpdateCategories={handleUpdateCategories}
+      />
+
+      {/* Category Transactions & Period Statement Modal */}
+      <CategoryDetailModal
+        isOpen={isCategoryDetailModalOpen}
+        category={selectedCategoryForDetail}
+        categories={categories}
+        accounts={accounts}
+        transactions={transactions}
+        lang={lang}
+        authUser={authUser}
+        onClose={() => {
+          setIsCategoryDetailModalOpen(false);
+          setSelectedCategoryForDetail(null);
+        }}
+        onEditTransaction={handleEditTransaction}
+        onDeleteTransaction={handleDeleteTransaction}
+        onOpenAddTransaction={(prefilledCatId, type) => {
+          setAddModalInitialType(type);
+          setPrefilledDraft({ categoryId: prefilledCatId, type });
+          setIsAddModalOpen(true);
+        }}
       />
 
       {/* Mobile Link & QR Modal */}

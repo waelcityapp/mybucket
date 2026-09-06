@@ -29,13 +29,31 @@ export const INITIAL_ACCOUNTS: FinancialAccount[] = [
     color: '#8b5cf6', // purple
   },
   {
-    id: 'acc_savings_usd',
-    name: 'USD Savings',
-    nameAr: 'مدخرات دولار',
-    type: 'savings',
+    id: 'acc_wallet',
+    name: 'E-Wallets',
+    nameAr: 'محافظ إلكترونية',
+    type: 'wallet',
     balance: 0,
-    currency: 'USD',
+    currency: 'EGP',
+    color: '#06b6d4', // cyan
+  },
+  {
+    id: 'acc_other',
+    name: 'Other Methods',
+    nameAr: 'وسائل دفع واستلام أخرى',
+    type: 'other',
+    balance: 0,
+    currency: 'EGP',
     color: '#f59e0b', // amber
+  },
+  {
+    id: 'acc_extra',
+    name: 'Other Accounts',
+    nameAr: 'حسابات أخرى',
+    type: 'custom',
+    balance: 0,
+    currency: 'EGP',
+    color: '#6366f1', // indigo
   },
 ];
 

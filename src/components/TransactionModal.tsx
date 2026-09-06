@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   ArrowDown,
@@ -11,6 +11,12 @@ import {
   AlertTriangle,
   Sparkles,
   ArrowRightLeft,
+  Mic,
+  MicOff,
+  Send,
+  Loader2,
+  CheckCircle2,
+  Volume2,
 } from 'lucide-react';
 import {
   FinancialAccount,
@@ -28,6 +34,15 @@ import {
   formatDateTimeDisplay,
 } from '../utils/dateTime';
 import { CategoryAutocomplete } from './CategoryAutocomplete';
+import { aiClient } from '../services/ai/aiClient';
+import {
+  matchCategoryFromText,
+  matchAccountFromText,
+  matchDescriptionEdit,
+  matchAmountEdit,
+  matchTransactionType,
+  matchTransferAccountsFromText,
+} from '../utils/entityMatcher';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -76,6 +91,19 @@ export function TransactionModal({
   const [showToAccountDropdown, setShowToAccountDropdown] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [isAiProposal, setIsAiProposal] = useState<boolean>(false);
+
+  // Voice & AI Edit within Modal States
+  const [voiceInputText, setVoiceInputText] = useState<string>('');
+  const [isVoiceListening, setIsVoiceListening] = useState<boolean>(false);
+  const [isProcessingVoiceEdit, setIsProcessingVoiceEdit] = useState<boolean>(false);
+  const [aiVoiceNotice, setAiVoiceNotice] = useState<string | null>(null);
+  const [aiVoiceNoticeType, setAiVoiceNoticeType] = useState<'save_warning' | 'success' | 'info' | null>(null);
+  const [highlightSaveBtn, setHighlightSaveBtn] = useState<boolean>(false);
+  const [fieldUpdated, setFieldUpdated] = useState<string | null>(null);
+
+  const saveButtonRef = useRef<HTMLButtonElement | null>(null);
+  const recognitionRef = useRef<any>(null);
+  const voiceInputRef = useRef<HTMLInputElement | null>(null);
 
   // Synchronize on modal open or when initialValues change
   useEffect(() => {
@@ -169,6 +197,14 @@ export function TransactionModal({
       if (matchCat) {
         setCategoryId(matchCat.id);
       }
+    } else {
+      // Transfer: Ensure destination account is set and distinct from source account
+      if (!toAccountId || toAccountId === accountId) {
+        const otherAcc = accounts.find((a) => a.id !== accountId);
+        if (otherAcc) {
+          setToAccountId(otherAcc.id);
+        }
+      }
     }
   };
 
@@ -177,6 +213,319 @@ export function TransactionModal({
     const temp = accountId;
     setAccountId(toAccountId);
     setToAccountId(temp);
+  };
+
+  // Stop Speech Recognition
+  const stopListening = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        console.warn('Error stopping speech recognition in modal:', e);
+      }
+      recognitionRef.current = null;
+    }
+    setIsVoiceListening(false);
+  };
+
+  // Start Speech Recognition with Arabic ar-EG or English
+  const startListening = () => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setAiVoiceNotice(
+        isAr
+          ? 'المتصفح لا يدعم التسجيل الصوتي المباشر، يمكنك كتابة التعديل في الخانة.'
+          : 'Speech recognition is not supported in this browser. You can type instead.'
+      );
+      setAiVoiceNoticeType('info');
+      voiceInputRef.current?.focus();
+      return;
+    }
+
+    try {
+      stopListening();
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = isAr ? 'ar-EG' : 'en-US';
+
+      recognition.onstart = () => {
+        setIsVoiceListening(true);
+        setAiVoiceNotice(null);
+      };
+
+      recognition.onresult = (event: any) => {
+        let transcript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        setVoiceInputText(transcript);
+      };
+
+      recognition.onerror = (err: any) => {
+        console.warn('Speech recognition error in modal:', err);
+        setIsVoiceListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsVoiceListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (e) {
+      console.error('Failed to start speech recognition in modal:', e);
+      setIsVoiceListening(false);
+    }
+  };
+
+  // Text-to-Speech audio response (e.g. for "من فضلك اضغط على زر تأكيد وحفظ")
+  const speakFeedback = (msg: string) => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(msg);
+        utterance.lang = isAr ? 'ar-SA' : 'en-US';
+        utterance.rate = 1.0;
+        window.speechSynthesis.speak(utterance);
+      } catch (e) {
+        console.warn('SpeechSynthesis error:', e);
+      }
+    }
+  };
+
+  // Process Voice/Text Edit with Gemini AI
+  const handleProcessVoiceEdit = async (explicitText?: string) => {
+    const text = (explicitText !== undefined ? explicitText : voiceInputText).trim();
+    if (!text) return;
+
+    stopListening();
+    setIsProcessingVoiceEdit(true);
+    setAiVoiceNotice(null);
+    setHighlightSaveBtn(false);
+
+    // CRITICAL DIRECTIVE:
+    // If the customer asks to save or confirm the transaction by voice (e.g. "احفظ العملية", "سجلها", "تأكيد", "save", etc.):
+    // The assistant MUST NOT save automatically, but tell the user: "من فضلك اضغط على زر تأكيد وحفظ"
+    const isSaveIntent = /احفظ|سجل|أكد|اكد|تمام احفظ|تأكيد|حفظ العملية|احفظها|سجلها|اعتمد|اعتمدها|save|confirm/i.test(text);
+
+    if (isSaveIntent) {
+      setIsProcessingVoiceEdit(false);
+      setVoiceInputText('');
+      const warningMsg = isAr ? 'من فضلك اضغط على زر تأكيد وحفظ' : 'Please click on the Confirm & Save button';
+      setAiVoiceNotice(warningMsg);
+      setAiVoiceNoticeType('save_warning');
+      setHighlightSaveBtn(true);
+      speakFeedback(warningMsg);
+
+      setTimeout(() => {
+        saveButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+      return;
+    }
+
+    try {
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Cairo';
+      const now = new Date();
+      const localISO = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();
+
+      const result = await aiClient.interpret({
+        text,
+        accounts: accounts.map((a) => ({
+          id: a.id,
+          name: a.name,
+          nameAr: a.nameAr,
+          type: a.type,
+          currency: a.currency,
+        })),
+        categories: categories.map((c) => ({
+          id: c.id,
+          name: c.name,
+          nameAr: c.nameAr,
+          type: c.type,
+        })),
+        currentDateTime: localISO,
+        userTimezone,
+        lang,
+        currentProposal: {
+          type,
+          amount: parseFloat(amount) || null,
+          currency,
+          accountId: accountId || null,
+          toAccountId: toAccountId || null,
+          categoryId: categoryId || null,
+          description: description || null,
+          date,
+          time,
+        },
+      });
+
+      if (result.intent === 'SAVE_REQUEST') {
+        const warningMsg = isAr ? 'من فضلك اضغط على زر تأكيد وحفظ' : 'Please click on the Confirm & Save button';
+        setAiVoiceNotice(warningMsg);
+        setAiVoiceNoticeType('save_warning');
+        setHighlightSaveBtn(true);
+        speakFeedback(warningMsg);
+        setVoiceInputText('');
+        setTimeout(() => {
+          saveButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+        return;
+      }
+
+      const changesSummary: string[] = [];
+
+      if (result.transaction) {
+        const t = result.transaction;
+
+        // 1. Transaction Type (مصروف، دخل، تحويل)
+        let resolvedType: TransactionType | null =
+          (t.type as TransactionType) ||
+          (result.correction?.fieldToUpdate === 'type' ? (result.correction.newValue as TransactionType) : null);
+        if (!resolvedType) {
+          const matched = matchTransactionType(text);
+          if (matched) resolvedType = matched;
+        }
+
+        if (resolvedType && resolvedType !== type) {
+          setType(resolvedType);
+          setFieldUpdated('type');
+          changesSummary.push(
+            isAr
+              ? `النوع: ${resolvedType === 'expense' ? 'مصروف' : resolvedType === 'income' ? 'دخل' : 'تحويل'}`
+              : `Type: ${resolvedType}`
+          );
+        }
+
+        // 2. Amount
+        if (typeof t.amount === 'number' && t.amount > 0) {
+          setAmount(String(t.amount));
+          setFieldUpdated('amount');
+          changesSummary.push(isAr ? `المبلغ: ${t.amount}` : `Amount: ${t.amount}`);
+        }
+
+        // 3. Description / Notes
+        if (t.description !== null && t.description !== undefined && t.description !== description) {
+          setDescription(t.description);
+          setFieldUpdated('description');
+          changesSummary.push(isAr ? `الملاحظات: "${t.description}"` : `Note: "${t.description}"`);
+        }
+
+        // 4. Source Account
+        let resolvedAccountId = t.accountId || (result.correction?.fieldToUpdate === 'accountId' ? result.correction.newValue : null);
+        if (!resolvedAccountId) {
+          const matchedAcc = matchAccountFromText(text, accounts);
+          if (matchedAcc) resolvedAccountId = matchedAcc.id;
+        }
+
+        if (resolvedAccountId) {
+          const acc = accounts.find((a) => a.id === resolvedAccountId);
+          if (acc) {
+            setAccountId(acc.id);
+            setCurrency(acc.currency);
+            setFieldUpdated('accountId');
+            changesSummary.push(isAr ? `الحساب: ${acc.nameAr}` : `Account: ${acc.name}`);
+          }
+        }
+
+        // 5. Destination Account for Transfers
+        let resolvedToAccountId = t.toAccountId;
+        const currentActiveType = resolvedType || type;
+        if (currentActiveType === 'transfer') {
+          if (!resolvedToAccountId) {
+            const transferAccs = matchTransferAccountsFromText(text, accounts, resolvedAccountId || accountId);
+            if (transferAccs.toAccount) {
+              resolvedToAccountId = transferAccs.toAccount.id;
+            }
+          }
+          if (!resolvedToAccountId || resolvedToAccountId === (resolvedAccountId || accountId)) {
+            const otherAcc = accounts.find((a) => a.id !== (resolvedAccountId || accountId));
+            if (otherAcc) {
+              resolvedToAccountId = otherAcc.id;
+            }
+          }
+        }
+
+        if (resolvedToAccountId && resolvedToAccountId !== toAccountId) {
+          const toAcc = accounts.find((a) => a.id === resolvedToAccountId);
+          if (toAcc) {
+            setToAccountId(toAcc.id);
+            setFieldUpdated('toAccountId');
+            changesSummary.push(isAr ? `إلى حساب: ${toAcc.nameAr}` : `To Account: ${toAcc.name}`);
+          }
+        }
+
+        // 6. Category
+        let resolvedCategoryId = t.categoryId || (result.correction?.fieldToUpdate === 'categoryId' ? result.correction.newValue : null);
+        if (!resolvedCategoryId) {
+          const matchedCat = matchCategoryFromText(text, categories);
+          if (matchedCat) resolvedCategoryId = matchedCat.id;
+        }
+
+        // If type changed and no category was explicitly specified in text, adapt category to compatible type
+        const activeType = resolvedType || type;
+        if (!resolvedCategoryId && resolvedType && resolvedType !== 'transfer') {
+          const currentCat = categories.find((c) => c.id === categoryId);
+          if (!currentCat || currentCat.type !== (activeType === 'income' ? 'income' : 'expense')) {
+            const compatibleCat = categories.find((c) => c.type === (activeType === 'income' ? 'income' : 'expense'));
+            if (compatibleCat) {
+              resolvedCategoryId = compatibleCat.id;
+            }
+          }
+        }
+
+        if (resolvedCategoryId) {
+          const cat = categories.find((c) => c.id === resolvedCategoryId);
+          if (cat) {
+            setCategoryId(cat.id);
+            setFieldUpdated('categoryId');
+            changesSummary.push(isAr ? `التصنيف: ${cat.nameAr}` : `Category: ${cat.name}`);
+          }
+        }
+
+        // 7. Date
+        if (t.date && t.date !== date) {
+          setDate(t.date);
+          setFieldUpdated('date');
+          changesSummary.push(isAr ? `التاريخ: ${t.date}` : `Date: ${t.date}`);
+        }
+
+        // 8. Time
+        if (t.time && t.time !== time) {
+          setTime(t.time);
+          setFieldUpdated('time');
+        }
+      }
+
+      setVoiceInputText('');
+      setError('');
+
+      if (changesSummary.length > 0) {
+        const successMsg = isAr
+          ? `تم التعديل: ${changesSummary.join(' • ')}`
+          : `Updated: ${changesSummary.join(' • ')}`;
+        setAiVoiceNotice(successMsg);
+        setAiVoiceNoticeType('success');
+      } else if (result.rawInterpretationSummary) {
+        setAiVoiceNotice(result.rawInterpretationSummary);
+        setAiVoiceNoticeType('success');
+      } else {
+        setAiVoiceNotice(isAr ? 'تم تطبيق التعديل بنجاح' : 'Edit applied successfully');
+        setAiVoiceNoticeType('success');
+      }
+
+      setTimeout(() => {
+        setFieldUpdated(null);
+      }, 3500);
+    } catch (err) {
+      console.error('Failed to process voice edit:', err);
+      setAiVoiceNotice(isAr ? 'حدث خطأ في معالجة التعديل' : 'Error processing edit');
+      setAiVoiceNoticeType('save_warning');
+    } finally {
+      setIsProcessingVoiceEdit(false);
+    }
   };
 
   const handleSave = (e?: React.FormEvent) => {
@@ -328,9 +677,174 @@ export function TransactionModal({
             </div>
           )}
 
+          {/* Voice & AI Dynamic Edit Bar inside Modal */}
+          <div className="bg-gradient-to-r from-indigo-50/95 via-sky-50/70 to-indigo-50/95 border border-indigo-200/90 rounded-2xl p-3 shadow-2xs space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                <span>{isAr ? 'تعديل العملية بالصوت والذكاء الاصطناعي' : 'Edit with Voice & AI'}</span>
+              </div>
+              <span className="text-[10px] text-indigo-700 font-bold bg-indigo-100/90 px-2 py-0.5 rounded-full">
+                {isAr ? 'تحدث لتعديل أي حقل' : 'Speak to edit any field'}
+              </span>
+            </div>
+
+            {/* Active Speech / Edit Input with Mic & Send Buttons */}
+            <div className="flex items-center gap-1.5">
+              {/* Microphone Button */}
+              <button
+                type="button"
+                onClick={isVoiceListening ? stopListening : startListening}
+                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all shrink-0 cursor-pointer shadow-xs ${
+                  isVoiceListening
+                    ? 'bg-rose-600 text-white animate-pulse ring-4 ring-rose-200'
+                    : 'bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white'
+                }`}
+                title={isVoiceListening ? (isAr ? 'إيقاف الاستماع' : 'Stop Listening') : (isAr ? 'تحدث للتعديل' : 'Speak to Edit')}
+              >
+                {isVoiceListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
+
+              {/* Live Text Field */}
+              <div className="relative flex-1">
+                <input
+                  ref={voiceInputRef}
+                  type="text"
+                  value={voiceInputText}
+                  onChange={(e) => setVoiceInputText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleProcessVoiceEdit();
+                    }
+                  }}
+                  placeholder={
+                    isVoiceListening
+                      ? isAr
+                        ? 'جاري الاستماع... تحدث الآن، واضغط إرسال'
+                        : 'Listening... Speak now and press Send'
+                      : isAr
+                      ? 'تحدث أو اكتب: "خليها صرف"، "المبلغ 500"...'
+                      : 'Speak or type: "make it expense", "500"...'
+                  }
+                  className="w-full bg-white border border-indigo-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-xl py-2 px-3 text-xs text-slate-800 placeholder:text-indigo-300 outline-none transition-all shadow-2xs"
+                />
+              </div>
+
+              {/* Send / Apply Button */}
+              <button
+                type="button"
+                disabled={isProcessingVoiceEdit || (!voiceInputText.trim() && !isVoiceListening)}
+                onClick={() => handleProcessVoiceEdit()}
+                className="h-10 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1 transition-all shrink-0 cursor-pointer shadow-xs active:scale-95"
+              >
+                {isProcessingVoiceEdit ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">{isAr ? 'إرسال' : 'Send'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Quick Suggestion Chips */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5 text-[11px]">
+              <span className="text-[10px] text-indigo-400 font-semibold shrink-0">
+                {isAr ? 'أمثلة سريعة:' : 'Quick:'}
+              </span>
+              <button
+                type="button"
+                onClick={() => handleProcessVoiceEdit(isAr ? 'معلش خليه تحويل' : 'Make it transfer')}
+                className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-800 rounded-lg shrink-0 font-medium cursor-pointer transition-colors shadow-2xs"
+              >
+                {isAr ? 'معلش خليه تحويل' : 'Make transfer'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleProcessVoiceEdit(isAr ? 'لا خلي العملية صرف مش دخل' : 'Make it expense')}
+                className="px-2 py-0.5 bg-white/90 hover:bg-white border border-indigo-100 text-indigo-800 rounded-lg shrink-0 font-medium cursor-pointer transition-colors shadow-2xs"
+              >
+                {isAr ? 'لا خليها صرف مش دخل' : 'Make expense'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleProcessVoiceEdit(isAr ? 'غير خانة الملاحظات إلى مشوار سريع' : 'Change notes to quick trip')}
+                className="px-2 py-0.5 bg-white/90 hover:bg-white border border-indigo-100 text-indigo-800 rounded-lg shrink-0 font-medium cursor-pointer transition-colors shadow-2xs"
+              >
+                {isAr ? 'غير الملاحظات' : 'Change notes'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleProcessVoiceEdit(isAr ? 'خلي المبلغ 500' : 'Change amount to 500')}
+                className="px-2 py-0.5 bg-white/90 hover:bg-white border border-indigo-100 text-indigo-800 rounded-lg shrink-0 font-medium cursor-pointer transition-colors shadow-2xs"
+              >
+                {isAr ? 'المبلغ 500' : 'Amount 500'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleProcessVoiceEdit(isAr ? 'احفظ العملية' : 'Save transaction')}
+                className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 rounded-lg shrink-0 font-bold cursor-pointer transition-colors shadow-2xs"
+                title={isAr ? 'تجربة قاعدة تأكيد الحفظ يدوياً' : 'Test manual save confirmation'}
+              >
+                {isAr ? 'احفظ العملية' : 'Save'}
+              </button>
+            </div>
+
+            {/* AI Voice Feedback Banner */}
+            {aiVoiceNotice && (
+              <div
+                className={`p-2.5 rounded-xl text-xs font-bold flex items-center justify-between gap-2 animate-in fade-in ${
+                  aiVoiceNoticeType === 'save_warning'
+                    ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-300'
+                    : aiVoiceNoticeType === 'success'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'bg-indigo-600 text-white shadow-sm'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {aiVoiceNoticeType === 'save_warning' ? (
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-amber-100" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-100" />
+                  )}
+                  <span>{aiVoiceNotice}</span>
+                </div>
+                {aiVoiceNoticeType === 'save_warning' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      saveButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      saveButtonRef.current?.focus();
+                    }}
+                    className="px-2.5 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-[11px] font-black cursor-pointer shrink-0"
+                  >
+                    {isAr ? 'انتقل لزر الحفظ ⬇' : 'Go to Save ⬇'}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Important AI Disclaimer Notice */}
+            <div className="flex items-start gap-2 p-2.5 rounded-xl bg-amber-50/95 border border-amber-200/90 text-amber-950 text-xs leading-relaxed shadow-2xs">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-xs leading-relaxed font-medium">
+                <strong className="font-black text-amber-900 ml-1">
+                  {isAr ? 'تنبيه هام:' : 'Important Notice:'}
+                </strong>
+                {isAr
+                  ? 'قد يخطئ الذكاء الاصطناعي في الفهم وإجابة استفساراتكم، لذا يرجى مراجعة كل شيء يدوياً قبل الحفظ.'
+                  : 'AI may make mistakes in understanding and answering your queries, so please review everything manually before saving.'}
+              </p>
+            </div>
+          </div>
+
           <form onSubmit={handleSave} className="space-y-3.5">
             {/* 1. Transaction Type Segmented Toggle (مصروف, دخل, تحويل) */}
-            <div className="grid grid-cols-3 gap-2 bg-slate-100/80 p-1 rounded-2xl">
+            <div className={`grid grid-cols-3 gap-2 bg-slate-100/80 p-1 rounded-2xl transition-all duration-300 ${
+              fieldUpdated === 'type' ? 'ring-2 ring-indigo-500 bg-indigo-50/70 scale-[1.01]' : ''
+            }`}>
               {/* Expense */}
               <button
                 type="button"
@@ -379,7 +893,9 @@ export function TransactionModal({
               <label className="text-xs font-bold text-slate-700 block">
                 {t.labelAmount}
               </label>
-              <div className="flex items-center rounded-2xl border border-slate-200 bg-white p-1.5 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/10 shadow-2xs">
+              <div className={`flex items-center rounded-2xl border bg-white p-1.5 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/10 shadow-2xs transition-all duration-300 ${
+                fieldUpdated === 'amount' ? 'border-indigo-500 ring-2 ring-indigo-300 bg-indigo-50/30' : 'border-slate-200'
+              }`}>
                 <div className="px-3 py-1.5 bg-slate-100 rounded-xl text-xs font-mono font-bold text-slate-700 border border-slate-200/70 shrink-0">
                   {selectedAccount?.currency || currency}
                 </div>
@@ -421,6 +937,12 @@ export function TransactionModal({
                             ? '🏛️'
                             : selectedAccount.type === 'card'
                             ? '💳'
+                            : selectedAccount.type === 'wallet'
+                            ? '📱'
+                            : selectedAccount.type === 'other'
+                            ? '🔄'
+                            : selectedAccount.type === 'custom'
+                            ? '💼'
                             : '💲'}
                         </span>
                         <span>{getAccountDisplayName(selectedAccount)}</span>
@@ -462,6 +984,12 @@ export function TransactionModal({
                                 ? '🏛️'
                                 : acc.type === 'card'
                                 ? '💳'
+                                : acc.type === 'wallet'
+                                ? '📱'
+                                : acc.type === 'other'
+                                ? '🔄'
+                                : acc.type === 'custom'
+                                ? '💼'
                                 : '💲'}
                             </span>
                             <span>{getAccountDisplayName(acc)}</span>
@@ -498,6 +1026,12 @@ export function TransactionModal({
                               ? '🏛️'
                               : selectedAccount?.type === 'card'
                               ? '💳'
+                              : selectedAccount?.type === 'wallet'
+                              ? '📱'
+                              : selectedAccount?.type === 'other'
+                              ? '🔄'
+                              : selectedAccount?.type === 'custom'
+                              ? '💼'
                               : '💲'}
                           </span>
                           <span className="truncate">{getAccountDisplayName(selectedAccount) || (isAr ? 'اختر المصدر' : 'Select Source')}</span>
@@ -547,6 +1081,12 @@ export function TransactionModal({
                               ? '🏛️'
                               : selectedToAccount?.type === 'card'
                               ? '💳'
+                              : selectedToAccount?.type === 'wallet'
+                              ? '📱'
+                              : selectedToAccount?.type === 'other'
+                              ? '🔄'
+                              : selectedToAccount?.type === 'custom'
+                              ? '💼'
                               : '💲'}
                           </span>
                           <span className="truncate">{getAccountDisplayName(selectedToAccount) || (isAr ? 'اختر الوجهة' : 'Select Dest')}</span>
@@ -618,7 +1158,9 @@ export function TransactionModal({
                     ? getCategoryDisplayName(selectedCategory)
                     : t.descPlaceholder
                 }
-                className="w-full p-2.5 sm:p-3 rounded-2xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:border-emerald-500 shadow-2xs"
+                className={`w-full p-2.5 sm:p-3 rounded-2xl border bg-white text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:border-emerald-500 shadow-2xs transition-all duration-300 ${
+                  fieldUpdated === 'description' ? 'border-indigo-500 ring-2 ring-indigo-300 bg-indigo-50/30' : 'border-slate-200'
+                }`}
               />
             </div>
 
@@ -737,9 +1279,22 @@ export function TransactionModal({
 
             {/* Action Buttons: "✓ تأكيد وحفظ العملية" & "إلغاء" */}
             <div className="pt-2 space-y-2">
+              {/* Highlight Save Directional Callout when voice save is requested */}
+              {highlightSaveBtn && (
+                <div className="p-3 bg-amber-500 text-white rounded-2xl text-xs font-black text-center shadow-lg animate-bounce flex items-center justify-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-amber-100" />
+                  <span>{isAr ? 'من فضلك اضغط على زر تأكيد وحفظ أدناه 👇' : 'Please click Confirm & Save below 👇'}</span>
+                </div>
+              )}
+
               <button
+                ref={saveButtonRef}
                 type="submit"
                 className={`w-full py-3.5 px-4 active:scale-[0.99] text-white text-xs sm:text-sm font-black rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md ${
+                  highlightSaveBtn
+                    ? 'ring-4 ring-amber-400 ring-offset-2 animate-pulse scale-[1.02] shadow-xl'
+                    : ''
+                } ${
                   !selectedAccount || (type === 'transfer' && !selectedToAccount)
                     ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/20'
                     : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'

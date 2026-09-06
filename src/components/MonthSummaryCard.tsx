@@ -1,4 +1,4 @@
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, TrendingDown, CheckCircle2 } from 'lucide-react';
 import { Transaction, Language } from '../types';
 import { translations } from '../data/translations';
 
@@ -24,12 +24,43 @@ export function MonthSummaryCard({ transactions, lang }: MonthSummaryCardProps) 
     else if (tx.type === 'income') incomeTotal += tx.amount;
   });
 
-  // If no transactions yet, show the reference aesthetic baseline (3,250 / 12,000 / 8,750) or live calculations
+  // Calculate previous month's stats to compute real comparative trend
+  const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevYearMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+  const prevMonthTx = transactions.filter((tx) => tx.date.startsWith(prevYearMonth));
+
+  let prevExpenses = 0;
+  prevMonthTx.forEach((tx) => {
+    if (tx.type === 'expense') prevExpenses += tx.amount;
+  });
+
   const hasTx = transactions.length > 0;
-  const displayExpenses = hasTx ? expensesTotal : 3250;
-  const displayIncome = hasTx ? incomeTotal : 12000;
-  const displayNet = hasTx ? displayIncome - displayExpenses : 8750;
+  const displayExpenses = expensesTotal;
+  const displayIncome = incomeTotal;
+  const displayNet = displayIncome - displayExpenses;
   const displayTotal = displayIncome + displayExpenses;
+
+  // Real comparison calculation
+  let comparisonLabel = '';
+  let comparisonIsPositiveForBudget = true; // less expenses is good
+
+  if (prevExpenses > 0 && expensesTotal > 0) {
+    const diff = Math.round(((expensesTotal - prevExpenses) / prevExpenses) * 100);
+    if (diff > 0) {
+      comparisonLabel = lang === 'ar' ? `+${diff}% مصاريف بالمقارنة مع الشهر الماضي` : `+${diff}% expenses compared to last month`;
+      comparisonIsPositiveForBudget = false;
+    } else if (diff < 0) {
+      comparisonLabel = lang === 'ar' ? `${diff}% مصاريف بالمقارنة مع الشهر الماضي` : `${diff}% expenses compared to last month`;
+      comparisonIsPositiveForBudget = true;
+    } else {
+      comparisonLabel = lang === 'ar' ? `نفس مستوى المصاريف بالمقارنة مع الشهر الماضي` : `Same expenses level compared to last month`;
+      comparisonIsPositiveForBudget = true;
+    }
+  } else if (hasTx) {
+    comparisonLabel = lang === 'ar' ? 'محسوب ومحدث تلقائياً من عملياتك الحالية' : 'Calculated automatically from your real transactions';
+  } else {
+    comparisonLabel = lang === 'ar' ? 'لا توجد عمليات بعد لهذا الشهر' : 'No transactions recorded yet this month';
+  }
 
   const formatNumber = (num: number) => {
     return new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US', {
@@ -166,11 +197,23 @@ export function MonthSummaryCard({ transactions, lang }: MonthSummaryCardProps) 
           </div>
         </div>
 
-        {/* Comparison Badge matching reference: +12% بالمقارنة مع الشهر الماضي */}
-        <div className="pt-2 border-t border-slate-100 flex items-center justify-start text-[11px] font-bold text-emerald-700">
-          <div className="flex items-center gap-1">
-            <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-            <span>{t.monthComparison}</span>
+        {/* Dynamic Comparison / Tracking Badge */}
+        <div className={`pt-2 border-t border-slate-100 flex items-center justify-start text-[11px] font-bold ${
+          prevExpenses > 0 && expensesTotal > 0
+            ? (comparisonIsPositiveForBudget ? 'text-emerald-700' : 'text-amber-700')
+            : 'text-slate-600'
+        }`}>
+          <div className="flex items-center gap-1.5">
+            {prevExpenses > 0 && expensesTotal > 0 ? (
+              comparisonIsPositiveForBudget ? (
+                <TrendingDown className="w-3.5 h-3.5 text-emerald-600" />
+              ) : (
+                <TrendingUp className="w-3.5 h-3.5 text-amber-600" />
+              )
+            ) : (
+              <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />
+            )}
+            <span>{comparisonLabel}</span>
           </div>
         </div>
       </div>

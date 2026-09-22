@@ -7,6 +7,7 @@ import { parseNaturalLanguageInput } from '../../utils/naturalLanguageParser';
 import { isFinancialQueryText, parseSemanticNumberRoles } from '../../utils/semanticParser';
 import { FinancialAccount, Category } from '../../types';
 import { aiLearnedMemory } from './aiLearnedMemory';
+import { auth } from '../../lib/firebase';
 import {
   matchCategoryFromText,
   matchAccountFromText,
@@ -24,20 +25,30 @@ export class GeminiAIClient implements AIInterpretationProvider {
         learnedMemory: request.learnedMemory || aiLearnedMemory.getLearnedList().slice(0, 50),
       };
 
-      const response = await fetch('/api/ai/interpret', {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error('Google authentication is required for AI operations');
+      }
+      const idToken = await currentUser.getIdToken();
+
+      const response = await fetch('/api/gateway', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ action: 'ai.interpret', payload }),
       });
 
       if (!response.ok) {
         throw new Error(`Server returned status ${response.status}`);
       }
 
-      const data: AIInterpretationResult = await response.json();
-      return this.validateAndSanitize(data, request);
+      const gatewayResponse = await response.json();
+      if (!gatewayResponse?.ok || !gatewayResponse?.data) {
+        throw new Error(gatewayResponse?.message || 'Gateway returned an invalid response');
+      }
+      return this.validateAndSanitize(gatewayResponse.data as AIInterpretationResult, request);
     } catch (err) {
       console.warn('AI Server call failed or offline, using safe fallback parser:', err);
       return this.fallbackInterpretation(request);

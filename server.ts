@@ -26,61 +26,53 @@ async function startServer() {
     res.json({ status: 'ok', time: new Date().toISOString() });
   });
 
-  // Server-owned subscription status. Creates the base 10-day trial once.
-  app.get('/api/subscription/me', async (req, res) => {
+  // Unified authenticated backend gateway for all product operations.
+  app.post('/api/gateway', async (req, res) => {
     try {
       const user = await verifyAuthenticatedUser(req);
-      const subscription = await getOrCreateSubscription(user.uid);
-      res.json({ subscription });
-    } catch (error) {
-      const known = error instanceof SubscriptionError ? error : null;
-      res.status(known?.statusCode || 500).json({
-        error: known?.code || 'subscription_service_error',
-        message: known?.message || 'Could not load the subscription.',
-      });
-    }
-  });
+      const action = req.body?.action;
+      const payload = req.body?.payload || {};
 
-  // Applies one protected marketer code per account without restarting the trial clock.
-  app.post('/api/subscription/apply-affiliate', async (req, res) => {
-    try {
-      const user = await verifyAuthenticatedUser(req);
-      const subscription = await applyAffiliateCode(user.uid, req.body?.code);
-      res.json({ subscription });
-    } catch (error) {
-      const known = error instanceof SubscriptionError ? error : null;
-      res.status(known?.statusCode || 500).json({
-        error: known?.code || 'subscription_service_error',
-        message: known?.message || 'Could not apply the marketer code.',
-      });
-    }
-  });
-
-  // 2. Gemini AI Interpretation Endpoint (Provider-independent API)
-  app.post('/api/ai/interpret', async (req, res) => {
-    try {
-      const { text, accounts, categories, currentDateTime, userTimezone, lang, currentProposal, learnedMemory } = req.body;
-
-      if (!text || typeof text !== 'string') {
-        return res.status(400).json({ error: 'Missing or invalid "text" field' });
+      if (typeof action !== 'string') {
+        return res.status(400).json({ ok: false, error: 'invalid_gateway_action', message: 'A valid gateway action is required.' });
       }
 
-      const result = await interpretNaturalLanguageWithGemini({
-        text,
-        accounts: accounts || [],
-        categories: categories || [],
-        currentDateTime: currentDateTime || new Date().toISOString(),
-        userTimezone: userTimezone || 'Africa/Cairo',
-        lang: lang || 'ar',
-        currentProposal,
-        learnedMemory: learnedMemory || [],
-      });
-
-      res.json(result);
+      switch (action) {
+        case 'subscription.get': {
+          const subscription = await getOrCreateSubscription(user.uid);
+          return res.json({ ok: true, data: { subscription } });
+        }
+        case 'subscription.applyAffiliate': {
+          const subscription = await applyAffiliateCode(user.uid, payload.code);
+          return res.json({ ok: true, data: { subscription } });
+        }
+        case 'ai.interpret': {
+          const { text, accounts, categories, currentDateTime, userTimezone, lang, currentProposal, learnedMemory } = payload;
+          if (!text || typeof text !== 'string') {
+            return res.status(400).json({ ok: false, error: 'invalid_ai_input', message: 'Missing or invalid text.' });
+          }
+          const result = await interpretNaturalLanguageWithGemini({
+            text,
+            accounts: Array.isArray(accounts) ? accounts : [],
+            categories: Array.isArray(categories) ? categories : [],
+            currentDateTime: currentDateTime || new Date().toISOString(),
+            userTimezone: userTimezone || 'Africa/Cairo',
+            lang: lang || 'ar',
+            currentProposal,
+            learnedMemory: Array.isArray(learnedMemory) ? learnedMemory : [],
+          });
+          return res.json({ ok: true, data: result });
+        }
+        default:
+          return res.status(404).json({ ok: false, error: 'gateway_action_not_found', message: 'The requested gateway action is not available.' });
+      }
     } catch (err: any) {
-      console.error('AI Interpretation Error:', err);
-      res.status(500).json({
-        error: err?.message || 'Failed to interpret natural language with AI',
+      const known = err instanceof SubscriptionError ? err : null;
+      console.error('Gateway operation error:', known?.code || err?.message || err);
+      res.status(known?.statusCode || 500).json({
+        ok: false,
+        error: known?.code || 'gateway_operation_failed',
+        message: known?.message || 'The gateway operation could not be completed.',
       });
     }
   });
@@ -96,6 +88,16 @@ async function startServer() {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.use((req, res) => {
+      if (req.path.startsWith('/api/')) {
+        return res.status(404).json({
+          ok: false,
+          error: 'api_route_not_found',
+          message: 'Use the unified /api/gateway endpoint.',
+        });
+      }
+      if (req.method !== 'GET') {
+        return res.status(404).end();
+      }
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

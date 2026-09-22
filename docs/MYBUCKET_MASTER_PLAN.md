@@ -10,7 +10,10 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 - Before each implementation: inspect the latest `main` and list the files that will change.
 - After each implementation: run TypeScript validation and a production build before pushing.
 - Preserve unrelated code and never replace the repository wholesale with an exported prototype.
-- Increment the visible mobile revision counter in `src/App.tsx` on every implemented request.
+- Increment the revision only with a tested GitHub upload and display it only to the approved administrator.
+- Major workflows use full routed pages; modal dialogs are reserved for small confirmations and minor choices.
+- Registration and sign-in are Google-only.
+- All product backend operations use the single authenticated `POST /api/gateway` endpoint.
 
 ## Google AI Studio reference export
 
@@ -61,6 +64,21 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 
 - Admin email currently approved for the UI: `waelvts@gmail.com`.
 - Sensitive admin operations must ultimately be verified on the server, not only hidden in the client UI.
+- Marketers are promoted users with a unique code, active/inactive state, wallet, attribution, and commission ledger.
+- A marketer-specific rule overrides the general marketer rule and may be scoped to a plan or offer.
+- Pausing a marketer never deletes historical attribution or commission records.
+
+### Backend and provider credentials
+
+- The browser never calls Gemini or another paid provider directly.
+- One server-side credential per external provider is stored in Vercel; never create a key per feature.
+- New backend functions are validated actions inside `/api/gateway`, not new public endpoints.
+- Firebase client configuration and Firebase Admin credentials are distinct, but all server secrets remain in Vercel and out of GitHub.
+
+### Product navigation
+
+- Authentication, subscriptions, marketer codes, admin, users, marketers, wallets, reports, transactions, and accounts are full pages with stable routes.
+- Existing major modals are replaced incrementally when their feature is edited.
 - Admin tools will manage users, subscriptions, marketer codes, allowances, AI routing, and operational reporting.
 
 ## Implementation phases
@@ -78,13 +96,14 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 - [x] Extend the total trial to the code-configured period (normally 35 days) from the original start date.
 - [x] Prevent more than one marketer code per account.
 - [x] Deny client writes to subscription and marketer-code records.
+- [x] Route subscription and AI operations through one authenticated API gateway.
 - [ ] Configure Firebase Admin credentials in the deployment environment.
 - [ ] Seed the first real marketer code through an approved admin operation in Phase 4.
 
 ### Phase 2 — Authentication and subscription experience
 
 - [ ] Build the dedicated sign-in/onboarding page.
-- [ ] Support Google and approved email authentication flows.
+- [ ] Support Google authentication only.
 - [ ] Allow marketer-code entry during onboarding or later from account settings.
 - [ ] Display plan status, trial dates, and remaining days.
 
@@ -130,7 +149,8 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 
 ## Current implementation status
 
-- Current visible revision after Phase 1: `#2`.
+- Current admin-only revision after the unified gateway update: `#3`.
 - Admin-only UI page exists on `main` and is visible to `waelvts@gmail.com`.
 - Phase 1 adds protected server endpoints but does not yet change the user-facing subscription UI.
-- Next planned work: Phase 2, after Firebase Admin deployment credentials are configured and the first real marketer code is created through a protected admin flow.
+- Vercel inspection is pending renewed authorization for team `waelcityapps-projects`; no environment variable was changed.
+- Next planned work: Phase 2, after Firebase Admin deployment credentials are verified and the first real marketer code is created through a protected admin flow.

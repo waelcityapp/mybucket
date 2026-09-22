@@ -38,7 +38,7 @@ export interface Transaction {
   createdAt: string;
 }
 
-export type ActiveTab = 'home' | 'transactions' | 'search' | 'accounts' | 'categories' | 'settings';
+export type ActiveTab = 'home' | 'transactions' | 'search' | 'accounts' | 'categories' | 'settings' | 'admin';
 export type Language = 'ar' | 'en';
 
 export interface AuthUser {

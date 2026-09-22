@@ -1,63 +1,38 @@
-import { useState } from 'react';
 import {
   Globe,
-  RotateCcw,
-  ShieldCheck,
-  ChevronDown,
-  ChevronUp,
-  Database,
   CheckCircle2,
   Smartphone,
   Cloud,
   LogOut,
-  User as UserIcon,
-  ExternalLink,
+  ShieldCheck,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Language, AuthUser } from '../../types';
 import { translations } from '../../data/translations';
-import { storageService } from '../../services/storage/storageManager';
 
 interface SettingsViewProps {
   lang: Language;
   onSetLanguage: (lang: Language) => void;
-  onResetDemoData: () => void;
-  onZeroAllBalances?: () => void;
   user: AuthUser | null;
   onLogin: () => void;
   onLogout: () => void;
   onOpenMobileLink: () => void;
+  isAdmin: boolean;
+  onOpenAdmin: () => void;
 }
 
 export function SettingsView({
   lang,
   onSetLanguage,
-  onResetDemoData,
-  onZeroAllBalances,
   user,
   onLogin,
   onLogout,
   onOpenMobileLink,
+  isAdmin,
+  onOpenAdmin,
 }: SettingsViewProps) {
   const t = translations[lang];
-  const [showDevAccordion, setShowDevAccordion] = useState(false);
-  const [resetConfirmed, setResetConfirmed] = useState(false);
-  const [zeroConfirmed, setZeroConfirmed] = useState(false);
-
-  const activeProvider = storageService.getProvider().name;
-
-  const handleReset = () => {
-    onResetDemoData();
-    setResetConfirmed(true);
-    setTimeout(() => setResetConfirmed(false), 3000);
-  };
-
-  const handleZeroBalances = () => {
-    if (onZeroAllBalances) {
-      onZeroAllBalances();
-      setZeroConfirmed(true);
-      setTimeout(() => setZeroConfirmed(false), 3000);
-    }
-  };
 
   return (
     <div className="space-y-5 pb-20">
@@ -69,6 +44,29 @@ export function SettingsView({
           {lang === 'ar' ? 'إدارة حسابك والمزامنة السحابية وتفضيلات التطبيق' : 'Manage your account, cloud sync, and preferences'}
         </p>
       </div>
+
+      {isAdmin ? (
+        <button
+          type="button"
+          onClick={onOpenAdmin}
+          className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-2xl p-4 shadow-sm transition-colors cursor-pointer flex items-center justify-between gap-3 text-start"
+        >
+          <span className="flex items-center gap-3 min-w-0">
+            <span className="w-10 h-10 rounded-xl bg-amber-400/15 text-amber-300 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-extrabold">
+                {lang === 'ar' ? 'لوحة الإدارة' : 'Admin dashboard'}
+              </span>
+              <span className="block text-[11px] text-slate-300 mt-0.5">
+                {lang === 'ar' ? 'التحكم والأدوات الخاصة بالأدمن' : 'Admin-only controls and tools'}
+              </span>
+            </span>
+          </span>
+          {lang === 'ar' ? <ChevronLeft className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />}
+        </button>
+      ) : null}
 
       {/* 1. Google Account & Cloud Sync Section */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">
@@ -231,86 +229,6 @@ export function SettingsView({
         </div>
       </div>
 
-      {/* 4. Data Management */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">
-        <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
-          <RotateCcw className="w-4 h-4 text-slate-600" />
-          <span>{t.dataManagement}</span>
-        </div>
-        <p className="text-xs text-slate-500">{t.resetNotice}</p>
-
-        <div className="flex flex-col gap-2 pt-1">
-          <button
-            type="button"
-            onClick={handleZeroBalances}
-            className="w-full py-2.5 px-4 rounded-xl border border-rose-200 hover:border-rose-300 bg-rose-50/50 hover:bg-rose-50 text-rose-700 text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-2"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>{t.zeroAllBalances}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleReset}
-            className="w-full py-2.5 px-4 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-2"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>{t.resetDemoData}</span>
-          </button>
-        </div>
-
-        {zeroConfirmed && (
-          <div className="p-2.5 bg-emerald-50 text-emerald-800 text-xs font-bold rounded-xl flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>{lang === 'ar' ? 'تم تصفير جميع الأرصدة بنجاح' : 'All balances set to zero successfully'}</span>
-          </div>
-        )}
-
-        {resetConfirmed && (
-          <div className="p-2.5 bg-emerald-50 text-emerald-800 text-xs font-bold rounded-xl flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>{lang === 'ar' ? 'تمت استعادة البيانات الافتراضية بنجاح' : 'Demo data reset successfully'}</span>
-          </div>
-        )}
-      </div>
-
-      {/* 5. Technical Diagnostics */}
-      <div className="bg-slate-100/70 border border-slate-200/60 rounded-2xl overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setShowDevAccordion(!showDevAccordion)}
-          className="w-full p-3.5 flex items-center justify-between text-xs font-bold text-slate-500 hover:text-slate-700 cursor-pointer"
-        >
-          <span className="flex items-center gap-2">
-            <Database className="w-3.5 h-3.5 text-slate-400" />
-            <span>{t.devDiagnostics}</span>
-          </span>
-          {showDevAccordion ? (
-            <ChevronUp className="w-4 h-4" />
-          ) : (
-            <ChevronDown className="w-4 h-4" />
-          )}
-        </button>
-
-        {showDevAccordion && (
-          <div className="p-4 pt-0 border-t border-slate-200/50 space-y-2.5 text-xs text-slate-600">
-            <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 font-medium flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>{t.storageEnforcementBadge}</span>
-            </div>
-
-            <div className="space-y-1 bg-white p-3 rounded-xl border border-slate-200 font-mono text-[11px]">
-              <div>Active Auth: <strong>{user ? `Logged in (${user.email})` : 'Anonymous / Local'}</strong></div>
-              <div>Firestore Database: <strong>ai-studio-mybucket-8e5dde08...</strong></div>
-              <div>Storage Mode: Structured Firestore Documents Only</div>
-            </div>
-
-            <p className="text-[11px] text-slate-400">
-              {t.devNote}
-            </p>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

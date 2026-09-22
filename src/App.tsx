@@ -31,6 +31,7 @@ import { TransactionsView } from './components/views/TransactionsView';
 import { AccountsView } from './components/views/AccountsView';
 import { CategoriesView } from './components/views/CategoriesView';
 import { SettingsView } from './components/views/SettingsView';
+import { AdminView } from './components/views/AdminView';
 import { SearchView } from './components/views/SearchView';
 import { CheckCircle2, Smartphone, Cloud, ArrowRight } from 'lucide-react';
 import { AIFinancialQuery, AICorrection } from './services/ai/types';
@@ -59,6 +60,7 @@ import {
 import { aiLearnedMemory } from './services/ai/aiLearnedMemory';
 
 const STORAGE_KEY_PREFIX = 'mybucket_';
+const ADMIN_EMAIL = 'waelvts@gmail.com';
 
 export default function App() {
   // 1. Language State (Arabic is default)
@@ -194,6 +196,7 @@ export default function App() {
 
   // 6. User Auth State (Google Authentication)
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const isAdmin = authUser?.email?.trim().toLowerCase() === ADMIN_EMAIL;
 
   // 7. Modals State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -260,6 +263,12 @@ export default function App() {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'admin' && !isAdmin) {
+      setActiveTab('settings');
+    }
+  }, [activeTab, isAdmin]);
 
   // Real-time Cloud Synchronization with Firestore when user is authenticated
   useEffect(() => {
@@ -918,7 +927,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋`;
+  const greetingText = `${greetingPrefix} ${userName} 👋 #1`;
 
   return (
     <div
@@ -1123,14 +1132,24 @@ export default function App() {
           <SettingsView
             lang={lang}
             onSetLanguage={(newLang) => setLang(newLang)}
-            onResetDemoData={handleResetDemoData}
-            onZeroAllBalances={handleZeroAllBalances}
             user={authUser}
             onLogin={handleGoogleLogin}
             onLogout={handleGoogleLogout}
             onOpenMobileLink={() => setIsMobileModalOpen(true)}
+            isAdmin={isAdmin}
+            onOpenAdmin={() => setActiveTab('admin')}
           />
         )}
+
+        {activeTab === 'admin' && isAdmin && authUser ? (
+          <AdminView
+            lang={lang}
+            user={authUser}
+            onBack={() => setActiveTab('settings')}
+            onResetDemoData={handleResetDemoData}
+            onZeroAllBalances={handleZeroAllBalances}
+          />
+        ) : null}
       </main>
 
       {/* Unified Transaction Form Component */}

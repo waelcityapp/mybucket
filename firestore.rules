@@ -47,6 +47,22 @@ service cloud.firestore {
         allow create, update: if isOwner(userId) && isValidId(categoryId);
         allow delete: if isOwner(userId);
       }
+
+      // Subscription and billing data is server-owned.
+      // The user may read their own status but all writes go through authenticated server endpoints.
+      match /billing/{docId} {
+        allow get, list: if isOwner(userId);
+        allow create, update, delete: if false;
+      }
+    }
+
+    // Marketer-code configuration and redemption logs are never exposed to clients.
+    match /affiliateCodes/{codeId} {
+      allow read, write: if false;
+
+      match /redemptions/{userId} {
+        allow read, write: if false;
+      }
     }
   }
 }

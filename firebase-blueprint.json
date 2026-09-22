@@ -65,6 +65,41 @@
         "type": { "type": "string", "enum": ["income", "expense"] }
       },
       "required": ["id", "userId", "name", "nameAr", "type"]
+    },
+    "userSubscription": {
+      "title": "UserSubscription",
+      "description": "Server-owned subscription and trial status",
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["trial", "paid", "expired"] },
+        "trialStartedAt": { "type": "string", "maxLength": 64 },
+        "trialExpiresAt": { "type": "string", "maxLength": 64 },
+        "totalTrialDays": { "type": "number" },
+        "affiliateCode": { "type": ["string", "null"], "maxLength": 32 },
+        "hasAppliedAffiliateCode": { "type": "boolean" },
+        "isPaid": { "type": "boolean" },
+        "monthlyPriceEgp": { "type": ["number", "null"] },
+        "dailyAiEntryLimit": { "type": "number" },
+        "dailyAiInquiryLimit": { "type": "number" },
+        "maxHistoricalQueryDays": { "type": "number" }
+      },
+      "required": ["status", "trialStartedAt", "trialExpiresAt", "totalTrialDays", "hasAppliedAffiliateCode", "isPaid"]
+    },
+    "affiliateCode": {
+      "title": "AffiliateCode",
+      "description": "Protected marketer-code configuration",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "maxLength": 32 },
+        "active": { "type": "boolean" },
+        "totalTrialDays": { "type": "number" },
+        "monthlyPriceEgp": { "type": ["number", "null"] },
+        "maxRedemptions": { "type": ["number", "null"] },
+        "redemptionCount": { "type": "number" },
+        "validFrom": { "type": ["string", "null"], "maxLength": 64 },
+        "validUntil": { "type": ["string", "null"], "maxLength": 64 }
+      },
+      "required": ["code", "active", "totalTrialDays", "redemptionCount"]
     }
   },
   "firestore": {
@@ -83,6 +118,14 @@
     "/users/{userId}/categories/{categoryId}": {
       "schema": "category",
       "description": "Custom or synchronized categories belonging to the user"
+    },
+    "/users/{userId}/billing/subscription": {
+      "schema": "userSubscription",
+      "description": "Server-owned user subscription status"
+    },
+    "/affiliateCodes/{codeId}": {
+      "schema": "affiliateCode",
+      "description": "Protected marketer-code settings and counters"
     }
   }
 }

@@ -3,6 +3,12 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { interpretNaturalLanguageWithGemini } from './server/geminiService';
+import {
+  applyAffiliateCode,
+  getOrCreateSubscription,
+  SubscriptionError,
+  verifyAuthenticatedUser,
+} from './server/subscriptionService';
 
 dotenv.config();
 
@@ -18,6 +24,36 @@ async function startServer() {
   // 1. Health Check Route
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
+  });
+
+  // Server-owned subscription status. Creates the base 10-day trial once.
+  app.get('/api/subscription/me', async (req, res) => {
+    try {
+      const user = await verifyAuthenticatedUser(req);
+      const subscription = await getOrCreateSubscription(user.uid);
+      res.json({ subscription });
+    } catch (error) {
+      const known = error instanceof SubscriptionError ? error : null;
+      res.status(known?.statusCode || 500).json({
+        error: known?.code || 'subscription_service_error',
+        message: known?.message || 'Could not load the subscription.',
+      });
+    }
+  });
+
+  // Applies one protected marketer code per account without restarting the trial clock.
+  app.post('/api/subscription/apply-affiliate', async (req, res) => {
+    try {
+      const user = await verifyAuthenticatedUser(req);
+      const subscription = await applyAffiliateCode(user.uid, req.body?.code);
+      res.json({ subscription });
+    } catch (error) {
+      const known = error instanceof SubscriptionError ? error : null;
+      res.status(known?.statusCode || 500).json({
+        error: known?.code || 'subscription_service_error',
+        message: known?.message || 'Could not apply the marketer code.',
+      });
+    }
   });
 
   // 2. Gemini AI Interpretation Endpoint (Provider-independent API)

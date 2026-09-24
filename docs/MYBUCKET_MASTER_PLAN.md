@@ -151,8 +151,8 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 
 ## Current implementation status
 
-- Current admin-only revision: `#6` (Vercel built the gateway Function, but live requests failed with FUNCTION_INVOCATION_FAILED; runtime verification is in progress).
+- Current admin-only revision: `#6` (gateway Function responds with JSON; unauthenticated production request correctly returns 401).
 - Admin-only UI page exists on `main` and is visible to `waelvts@gmail.com`.
 - Phase 1 provides the protected backend foundation; Phase 2 now includes Google onboarding, marketer-code entry, and the home subscription status and remaining-days card.
-- Vercel build succeeded for the subscription UI commit. Firebase Admin deployment credentials and an active marketer code still need configuration before live subscription retrieval and code redemption can be verified.
-- Next planned work: verify the deployed gateway responds with JSON and repair any remaining runtime issue, then verify subscription retrieval and code redemption.
+- Vercel build and the gateway runtime's unauthenticated 401 response were verified. Firebase Admin deployment credentials and a real marketer code remain unverified, so the signed-in days counter and redemption still need end-to-end testing.
+- Next planned work: verify live subscription retrieval with a signed-in account and check Firebase Admin deployment credentials; then verify actual marketer-code redemption against a real code.

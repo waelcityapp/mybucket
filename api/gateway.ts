@@ -20,15 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    let subscriptionService: typeof import('../server/subscriptionService.js');
-    try {
-      subscriptionService = await import('../server/subscriptionService.js');
-    } catch (loadError: unknown) {
-      console.error('Gateway subscription module load error:', loadError);
-      const detail = loadError instanceof Error ? `${loadError.name}: ${loadError.message}` : String(loadError);
-      return res.status(500).json({ ok: false, error: 'gateway_module_load_failed', message: detail.slice(0, 200) });
-    }
-    const { applyAffiliateCode, getOrCreateSubscription, verifyAuthenticatedUser } = subscriptionService;
+    const { applyAffiliateCode, getOrCreateSubscription, verifyAuthenticatedUser } = await import('../server/subscriptionService.js');
     const authorizationHeader = req.headers.authorization;
     const authorization = Array.isArray(authorizationHeader)
       ? authorizationHeader[0] || ''

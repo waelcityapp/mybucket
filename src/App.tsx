@@ -333,8 +333,8 @@ export default function App() {
       setAffiliateFeedback({
         type: 'success',
         message: lang === 'ar'
-          ? `تم تفعيل الكود: ${nextSubscription.totalTrialDays} يوم تجربة، والسعر ${nextSubscription.monthlyPriceEgp ?? 180} جنيهًا لكل 30 يومًا.`
-          : `Code applied: ${nextSubscription.totalTrialDays} trial days, then EGP ${nextSubscription.monthlyPriceEgp ?? 180} per 30 days.`,
+          ? `تم حساب ${nextSubscription.totalTrialDays} يومًا من بداية تجربتك. ${nextSubscription.temporaryLocalOnly ? 'الكود محفوظ على هذا المتصفح مؤقتًا.' : ''}`
+          : `Trial calculated from your original start date: ${nextSubscription.totalTrialDays} days. ${nextSubscription.temporaryLocalOnly ? 'Code saved in this browser temporarily.' : ''}`,
       });
     } catch (error: unknown) {
       setAffiliateFeedback({
@@ -422,9 +422,9 @@ export default function App() {
           setAffiliateCode('');
           setAffiliateFeedback({
             type: 'success',
-            message: lang === 'ar'
-              ? `تم تفعيل الكود: ${nextSubscription.totalTrialDays} يوم تجربة، والسعر ${nextSubscription.monthlyPriceEgp ?? 180} جنيهًا لكل 30 يومًا.`
-              : `Code applied: ${nextSubscription.totalTrialDays} trial days, then EGP ${nextSubscription.monthlyPriceEgp ?? 180} per 30 days.`,
+              message: lang === 'ar'
+                ? `تم حساب ${nextSubscription.totalTrialDays} يومًا من بداية تجربتك. ${nextSubscription.temporaryLocalOnly ? 'الكود محفوظ على هذا المتصفح مؤقتًا.' : ''}`
+                : `Trial calculated from your original start date: ${nextSubscription.totalTrialDays} days. ${nextSubscription.temporaryLocalOnly ? 'Code saved in this browser temporarily.' : ''}`,
           });
         } catch (affiliateError: unknown) {
           setAffiliateFeedback({
@@ -1035,7 +1035,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const revisionLabel = isAdmin ? ' #6' : '';
+  const revisionLabel = isAdmin ? ' #7' : '';
   const greetingText = `${greetingPrefix} ${userName} 👋${revisionLabel}`;
 
   if (isAuthLoading) {

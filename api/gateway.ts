@@ -58,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           categories: Array.isArray(categories) ? categories : [],
           currentDateTime: typeof currentDateTime === 'string' ? currentDateTime : new Date().toISOString(),
           userTimezone: typeof userTimezone === 'string' ? userTimezone : 'Africa/Cairo',
-          lang: typeof lang === 'string' ? lang : 'ar',
+          lang: lang === 'en' ? 'en' : 'ar',
           currentProposal: payload.currentProposal as never,
           learnedMemory: Array.isArray(learnedMemory) ? learnedMemory : [],
         });

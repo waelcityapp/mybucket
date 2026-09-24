@@ -125,6 +125,12 @@ export function SubscriptionStatusCard({
         </div>
       )}
 
+      {subscription.temporaryLocalOnly && (
+        <p className="mt-3 text-xs leading-5 text-amber-800">
+          {isArabic ? 'تفعيل الكود محفوظ مؤقتًا على هذا المتصفح فقط حتى يكتمل ربط الاشتراكات.' : 'The code is saved temporarily in this browser until subscriptions are connected.'}
+        </p>
+      )}
+
       {!subscription.hasAppliedAffiliateCode && (
         <div className="mt-4 border-t border-slate-200/70 pt-4">
           <label htmlFor="home-marketer-code" className="mb-2 block text-sm font-bold text-slate-700">

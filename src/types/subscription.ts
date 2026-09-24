@@ -16,6 +16,8 @@ export interface UserSubscription {
   maxHistoricalQueryDays: number;
   createdAt: string;
   updatedAt: string;
+  // Prototype-only marketer code saved on this browser until backend redemption is enabled.
+  temporaryLocalOnly?: boolean;
 }
 
 export interface AffiliateCodeRecord {

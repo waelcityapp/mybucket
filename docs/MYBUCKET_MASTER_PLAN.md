@@ -103,7 +103,7 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 ### Phase 2 — Authentication and subscription experience
 
 - [x] Build the dedicated sign-in page with Google-only authentication.
-- [ ] Verify Google sign-in and responsive behavior on the deployed site.
+- [ ] Verify responsive behavior on the deployed site; Google sign-in was tested by the project owner.
 - [x] Support Google authentication only.
 - [x] Allow marketer-code entry during Google onboarding and retry from the home subscription card.
 - [x] Display plan status, trial expiry date, configured price, and remaining days.
@@ -151,8 +151,8 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 
 ## Current implementation status
 
-- Current admin-only revision: `#4` (the marketer-code and subscription-counter implementation is awaiting verification).
+- Current admin-only revision: `#5` (the marketer-code entry and subscription remaining-days card are implemented; Vercel build passed).
 - Admin-only UI page exists on `main` and is visible to `waelvts@gmail.com`.
-- Phase 1 adds protected server endpoints but does not yet change the user-facing subscription UI.
-- Vercel inspection is pending renewed authorization for team `waelcityapps-projects`; no environment variable was changed.
-- Next planned work: Phase 2, after Firebase Admin deployment credentials are verified and the first real marketer code is created through a protected admin flow.
+- Phase 1 provides the protected backend foundation; Phase 2 now includes Google onboarding, marketer-code entry, and the home subscription status and remaining-days card.
+- Vercel build succeeded for the subscription UI commit. Firebase Admin deployment credentials and an active marketer code still need configuration before live subscription retrieval and code redemption can be verified.
+- Next planned work: configure Firebase Admin deployment credentials, then create the first real marketer code through a protected admin flow and verify live subscription retrieval/redemption.

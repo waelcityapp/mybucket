@@ -1035,7 +1035,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const revisionLabel = isAdmin ? ' #4' : '';
+  const revisionLabel = isAdmin ? ' #5' : '';
   const greetingText = `${greetingPrefix} ${userName} 👋${revisionLabel}`;
 
   if (isAuthLoading) {

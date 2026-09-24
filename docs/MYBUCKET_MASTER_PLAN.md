@@ -150,7 +150,7 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 
 ## Current implementation status
 
-- Current admin-only revision after the unified gateway update: `#3`.
+- Current admin-only revision after the Google-only login page update: `#4`.
 - Admin-only UI page exists on `main` and is visible to `waelvts@gmail.com`.
 - Phase 1 adds protected server endpoints but does not yet change the user-facing subscription UI.
 - Vercel inspection is pending renewed authorization for team `waelcityapps-projects`; no environment variable was changed.

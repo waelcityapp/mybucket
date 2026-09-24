@@ -1,11 +1,4 @@
 import type { Request } from 'express';
-import { interpretNaturalLanguageWithGemini } from '../server/geminiService';
-import {
-  applyAffiliateCode,
-  getOrCreateSubscription,
-  SubscriptionError,
-  verifyAuthenticatedUser,
-} from '../server/subscriptionService';
 
 type VercelRequest = {
   method?: string;
@@ -27,6 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const { applyAffiliateCode, getOrCreateSubscription, verifyAuthenticatedUser } = await import('../server/subscriptionService');
     const authorizationHeader = req.headers.authorization;
     const authorization = Array.isArray(authorizationHeader)
       ? authorizationHeader[0] || ''
@@ -57,6 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ ok: false, error: 'invalid_ai_input', message: 'Missing or invalid text.' });
         }
 
+        const { interpretNaturalLanguageWithGemini } = await import('../server/geminiService');
         const result = await interpretNaturalLanguageWithGemini({
           text,
           accounts: Array.isArray(accounts) ? accounts : [],
@@ -73,8 +68,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).json({ ok: false, error: 'gateway_action_not_found', message: 'The requested gateway action is not available.' });
     }
   } catch (err: unknown) {
-    const known = err instanceof SubscriptionError ? err : null;
-    console.error('Gateway operation error:', known?.code || (err instanceof Error ? err.message : err));
+    console.error('Gateway operation error:', err);
+    const known = err && typeof err === 'object' && 'statusCode' in err && 'code' in err
+      ? err as { statusCode: number; code: string; message: string }
+      : null;
     return res.status(known?.statusCode || 500).json({
       ok: false,
       error: known?.code || 'gateway_operation_failed',

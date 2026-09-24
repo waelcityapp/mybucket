@@ -97,7 +97,7 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 - [x] Prevent more than one marketer code per account.
 - [x] Deny client writes to subscription and marketer-code records.
 - [x] Route subscription and AI operations through one authenticated API gateway.
-- [ ] Configure Firebase Admin credentials in the deployment environment.
+- [ ] Configure Firebase Admin credentials and matching Firestore database ID in the deployment environment.
 - [ ] Seed the first real marketer code through an approved admin operation in Phase 4.
 
 ### Phase 2 — Authentication and subscription experience
@@ -156,4 +156,4 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 - Admin-only UI page exists on `main` and is visible to `waelvts@gmail.com`.
 - Phase 1 provides the protected backend foundation; Phase 2 now includes Google onboarding, marketer-code entry, and the home subscription status and remaining-days card.
 - Vercel build and the gateway runtime's unauthenticated 401 response were verified. Firebase Admin deployment credentials and a real marketer code remain unverified, so the signed-in days counter and redemption still need end-to-end testing.
-- Next planned work: verify live subscription retrieval with a signed-in account and check Firebase Admin deployment credentials; then verify actual marketer-code redemption against a real code.
+- Next planned work: confirm Firebase Admin credentials and database ID match the client project, verify live subscription retrieval with a signed-in account, then verify real marketer-code redemption.

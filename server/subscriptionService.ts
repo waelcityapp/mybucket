@@ -26,6 +26,40 @@ export async function verifyAuthenticatedUser(req: Request): Promise<{ uid: stri
     throw new SubscriptionError(401, 'authentication_required', 'A Firebase ID token is required.');
   }
 
+  // A Vercel Function has no Google Cloud Application Default Credentials.
+  // Check the server configuration before attempting token verification.
+  if (process.env.VERCEL === '1') {
+    const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
+    const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
+    if (!projectId || !clientEmail || !privateKey) {
+      throw new SubscriptionError(
+        503,
+        'firebase_admin_not_configured',
+        'خدمة الاشتراكات تحتاج ضبط بيانات Firebase Admin على Vercel.'
+      );
+    }
+
+    const browserProjectId = process.env.VITE_FIREBASE_PROJECT_ID;
+    if (browserProjectId && projectId !== browserProjectId) {
+      throw new SubscriptionError(
+        503,
+        'firebase_project_mismatch',
+        'إعدادات Firebase على الخادم لا تطابق مشروع تسجيل الدخول.'
+      );
+    }
+
+    const browserDatabaseId = process.env.VITE_FIREBASE_DATABASE_ID || '(default)';
+    const adminDatabaseId = process.env.FIREBASE_ADMIN_DATABASE_ID || '(default)';
+    if (browserDatabaseId !== adminDatabaseId) {
+      throw new SubscriptionError(
+        503,
+        'firebase_database_mismatch',
+        'إعداد قاعدة بيانات الاشتراكات على الخادم لا يطابق قاعدة بيانات التطبيق.'
+      );
+    }
+  }
+
   try {
     const decoded = await getAdminAuth().verifyIdToken(match[1], true);
     return { uid: decoded.uid, email: decoded.email || null };

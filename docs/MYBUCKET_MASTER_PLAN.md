@@ -107,6 +107,7 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 - [x] Support Google authentication only.
 - [x] Allow marketer-code entry during Google onboarding and retry from the home subscription card.
 - [x] Display plan status, trial expiry date, configured price, and remaining days.
+- [x] Read an existing server-owned Firestore subscription as a fallback if the gateway fails; never invent trial days locally.
 - [ ] Verify live subscription retrieval and code redemption after Firebase Admin credentials and a real marketer code are configured.
 
 ### Phase 3 — Enforced AI allowances

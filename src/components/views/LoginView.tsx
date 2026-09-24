@@ -4,9 +4,11 @@ import type { Language } from '../../types';
 type LoginViewProps = {
   lang: Language;
   onToggleLanguage: () => void;
-  onLogin: () => Promise<void> | void;
+  onLogin: (affiliateCode: string) => Promise<void> | void;
   isLoading: boolean;
   error: string | null;
+  affiliateCode: string;
+  onAffiliateCodeChange: (code: string) => void;
 };
 
 function GoogleMark() {
@@ -20,7 +22,7 @@ function GoogleMark() {
   );
 }
 
-export function LoginView({ lang, onToggleLanguage, onLogin, isLoading, error }: LoginViewProps) {
+export function LoginView({ lang, onToggleLanguage, onLogin, isLoading, error, affiliateCode, onAffiliateCodeChange }: LoginViewProps) {
   const isArabic = lang === 'ar';
 
   return (
@@ -69,9 +71,31 @@ export function LoginView({ lang, onToggleLanguage, onLogin, isLoading, error }:
                 <p className="mt-2 text-sm leading-6 text-slate-500">{isArabic ? 'استخدم حساب Google للمتابعة إلى MyBucket.' : 'Use your Google account to continue to MyBucket.'}</p>
               </div>
 
+              <div className="mb-5">
+                <label htmlFor="marketer-code" className="mb-2 block text-sm font-bold text-slate-700">
+                  {isArabic ? 'كود المسوّق (اختياري)' : 'Marketer code (optional)'}
+                </label>
+                <input
+                  id="marketer-code"
+                  type="text"
+                  value={affiliateCode}
+                  onChange={(event) => onAffiliateCodeChange(event.target.value)}
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  maxLength={32}
+                  dir="ltr"
+                  placeholder={isArabic ? 'اكتب الكود هنا' : 'Enter code'}
+                  disabled={isLoading}
+                  className="min-h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-left font-semibold uppercase tracking-wide text-slate-800 outline-none transition placeholder:normal-case placeholder:tracking-normal placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 disabled:opacity-60"
+                />
+                <p className="mt-2 text-xs leading-5 text-slate-500">
+                  {isArabic ? 'أدخل الكود قبل المتابعة؛ وسيتم التحقق منه عند تسجيل الدخول. يمكنك أيضًا إدخاله لاحقًا.' : 'Enter it before continuing. The code is checked after Google sign-in, and you can also add it later.'}
+                </p>
+              </div>
+
               {error && <div role="alert" className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-800">{error}</div>}
 
-              <button type="button" onClick={onLogin} disabled={isLoading} className="flex min-h-14 w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 disabled:cursor-wait disabled:opacity-70">
+              <button type="button" onClick={() => onLogin(affiliateCode)} disabled={isLoading} className="flex min-h-14 w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 disabled:cursor-wait disabled:opacity-70">
                 {isLoading ? <span aria-hidden="true" className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" /> : <GoogleMark />}
                 <span>{isLoading ? (isArabic ? 'جارٍ الاتصال بحساب Google...' : 'Connecting to Google...') : (isArabic ? 'المتابعة باستخدام Google' : 'Continue with Google')}</span>
               </button>

@@ -41,6 +41,9 @@ import {
 } from './services/ai/deterministicQueryEngine';
 import { FinancialQueryResultCard } from './components/FinancialQueryResultCard';
 import { LoginView } from './components/views/LoginView';
+import { SubscriptionStatusCard } from './components/views/SubscriptionStatusCard';
+import { requestSubscription } from './services/subscriptionClient';
+import type { UserSubscription } from './types/subscription';
 import {
   loginWithGoogle,
   logoutUser,
@@ -200,6 +203,12 @@ export default function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isGoogleLoginPending, setIsGoogleLoginPending] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
+  const [isSubscriptionLoading, setIsSubscriptionLoading] = useState(false);
+  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
+  const [affiliateCode, setAffiliateCode] = useState('');
+  const [isApplyingAffiliateCode, setIsApplyingAffiliateCode] = useState(false);
+  const [affiliateFeedback, setAffiliateFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const isAdmin = authUser?.email?.trim().toLowerCase() === ADMIN_EMAIL;
 
   // 7. Modals State
@@ -270,6 +279,76 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!authUser || isGoogleLoginPending) {
+      if (!authUser) {
+        setSubscription(null);
+        setSubscriptionError(null);
+        setIsSubscriptionLoading(false);
+      }
+      return;
+    }
+
+    let isCurrent = true;
+    setIsSubscriptionLoading(true);
+    setSubscriptionError(null);
+    requestSubscription('subscription.get')
+      .then((nextSubscription) => {
+        if (isCurrent) setSubscription(nextSubscription);
+      })
+      .catch((error: unknown) => {
+        if (isCurrent) {
+          setSubscriptionError(
+            error instanceof Error
+              ? error.message
+              : (lang === 'ar' ? 'تعذر تحميل حالة الاشتراك.' : 'Could not load subscription status.')
+          );
+        }
+      })
+      .finally(() => {
+        if (isCurrent) setIsSubscriptionLoading(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [authUser?.uid, isGoogleLoginPending]);
+
+  const handleApplyAffiliateCode = async () => {
+    const code = affiliateCode.trim().toUpperCase();
+    if (!code) {
+      setAffiliateFeedback({
+        type: 'error',
+        message: lang === 'ar' ? 'اكتب كود المسوّق أولاً.' : 'Enter a marketer code first.',
+      });
+      return;
+    }
+
+    setIsApplyingAffiliateCode(true);
+    setAffiliateFeedback(null);
+    try {
+      const nextSubscription = await requestSubscription('subscription.applyAffiliate', { code });
+      setSubscription(nextSubscription);
+      setSubscriptionError(null);
+      setAffiliateCode('');
+      setAffiliateFeedback({
+        type: 'success',
+        message: lang === 'ar'
+          ? `تم تفعيل الكود: ${nextSubscription.totalTrialDays} يوم تجربة، والسعر ${nextSubscription.monthlyPriceEgp ?? 180} جنيهًا لكل 30 يومًا.`
+          : `Code applied: ${nextSubscription.totalTrialDays} trial days, then EGP ${nextSubscription.monthlyPriceEgp ?? 180} per 30 days.`,
+      });
+    } catch (error: unknown) {
+      setAffiliateFeedback({
+        type: 'error',
+        message: error instanceof Error
+          ? error.message
+          : (lang === 'ar' ? 'تعذر تفعيل الكود. حاول مرة أخرى.' : 'Could not apply the code. Try again.'),
+      });
+    } finally {
+      setIsApplyingAffiliateCode(false);
+    }
+  };
+
+  useEffect(() => {
     if (activeTab === 'admin' && !isAdmin) {
       setActiveTab('settings');
     }
@@ -326,12 +405,37 @@ export default function App() {
   }, [authUser?.uid]);
 
   // Google Login Handler
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = async (rawAffiliateCode = affiliateCode) => {
     setIsGoogleLoginPending(true);
     setLoginError(null);
+    setAffiliateFeedback(null);
 
     try {
       const user = await loginWithGoogle();
+      const code = rawAffiliateCode.trim().toUpperCase();
+
+      if (code) {
+        setAffiliateCode(code);
+        try {
+          const nextSubscription = await requestSubscription('subscription.applyAffiliate', { code }, user);
+          setSubscription(nextSubscription);
+          setAffiliateCode('');
+          setAffiliateFeedback({
+            type: 'success',
+            message: lang === 'ar'
+              ? `تم تفعيل الكود: ${nextSubscription.totalTrialDays} يوم تجربة، والسعر ${nextSubscription.monthlyPriceEgp ?? 180} جنيهًا لكل 30 يومًا.`
+              : `Code applied: ${nextSubscription.totalTrialDays} trial days, then EGP ${nextSubscription.monthlyPriceEgp ?? 180} per 30 days.`,
+          });
+        } catch (affiliateError: unknown) {
+          setAffiliateFeedback({
+            type: 'error',
+            message: affiliateError instanceof Error
+              ? affiliateError.message
+              : (lang === 'ar' ? 'تعذر تفعيل الكود. يمكنك المحاولة من بطاقة الاشتراك.' : 'Could not apply the code. You can retry from the subscription card.'),
+          });
+        }
+      }
+
       setToastMessage(
         lang === 'ar'
           ? `أهلاً بك، تم تسجيل الدخول بنجاح (${user.displayName || user.email})`
@@ -945,12 +1049,14 @@ export default function App() {
     );
   }
 
-  if (!authUser) {
+  if (!authUser || isGoogleLoginPending) {
     return (
       <LoginView
         lang={lang}
         onToggleLanguage={handleToggleLanguage}
-        onLogin={handleGoogleLogin}
+        onLogin={(code) => handleGoogleLogin(code)}
+        affiliateCode={affiliateCode}
+        onAffiliateCodeChange={(code) => { setAffiliateCode(code.toUpperCase()); setAffiliateFeedback(null); }}
         isLoading={isGoogleLoginPending}
         error={loginError}
       />
@@ -985,6 +1091,25 @@ export default function App() {
       <main className="flex-1 max-w-md sm:max-w-xl w-full mx-auto p-4 pb-24">
         {activeTab === 'home' && (
           <div className="space-y-4">
+            <SubscriptionStatusCard
+              lang={lang}
+              subscription={subscription}
+              isLoading={isSubscriptionLoading}
+              error={subscriptionError}
+              affiliateCode={affiliateCode}
+              onAffiliateCodeChange={(code) => { setAffiliateCode(code.toUpperCase()); setAffiliateFeedback(null); }}
+              isApplyingCode={isApplyingAffiliateCode}
+              feedback={affiliateFeedback}
+              onApplyCode={handleApplyAffiliateCode}
+              onRetry={() => {
+                setSubscriptionError(null);
+                setIsSubscriptionLoading(true);
+                requestSubscription('subscription.get')
+                  .then(setSubscription)
+                  .catch((error: unknown) => setSubscriptionError(error instanceof Error ? error.message : (lang === 'ar' ? 'تعذر تحميل حالة الاشتراك.' : 'Could not load subscription status.')))
+                  .finally(() => setIsSubscriptionLoading(false));
+              }}
+            />
             {/* Quick Mobile & Google Account Banner (if not logged in) */}
             {!authUser && (
               <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200/80 rounded-2xl p-3 shadow-2xs flex items-center justify-between gap-2.5 animate-in fade-in">

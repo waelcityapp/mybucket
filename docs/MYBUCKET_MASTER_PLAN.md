@@ -104,9 +104,10 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 
 - [x] Build the dedicated sign-in page with Google-only authentication.
 - [ ] Verify Google sign-in and responsive behavior on the deployed site.
-- [ ] Support Google authentication only.
-- [ ] Allow marketer-code entry during onboarding or later from account settings.
-- [ ] Display plan status, trial dates, and remaining days.
+- [x] Support Google authentication only.
+- [x] Allow marketer-code entry during Google onboarding and retry from the home subscription card.
+- [x] Display plan status, trial expiry date, configured price, and remaining days.
+- [ ] Verify live subscription retrieval and code redemption after Firebase Admin credentials and a real marketer code are configured.
 
 ### Phase 3 — Enforced AI allowances
 
@@ -150,7 +151,7 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 
 ## Current implementation status
 
-- Current admin-only revision after the Google-only login page update: `#4`.
+- Current admin-only revision: `#4` (the marketer-code and subscription-counter implementation is awaiting verification).
 - Admin-only UI page exists on `main` and is visible to `waelvts@gmail.com`.
 - Phase 1 adds protected server endpoints but does not yet change the user-facing subscription UI.
 - Vercel inspection is pending renewed authorization for team `waelcityapps-projects`; no environment variable was changed.

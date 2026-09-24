@@ -1,6 +1,6 @@
 import type { Request } from 'express';
 import { FieldValue } from 'firebase-admin/firestore';
-import { getAdminAuth, getAdminFirestore } from './firebaseAdmin';
+import { getAdminAuth, getAdminFirestore } from './firebaseAdmin.js';
 import type { AffiliateCodeRecord, UserSubscription } from '../src/types/subscription';
 
 const BASE_TRIAL_DAYS = 10;

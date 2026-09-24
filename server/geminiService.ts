@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from '@google/genai';
-import { AIInterpretationRequest, AIInterpretationResult } from '../src/services/ai/types';
-import { getFormattedSlangPromptContext } from '../src/services/ai/aiKnowledgeBase';
-import { isFinancialQueryText, parseSemanticNumberRoles } from '../src/utils/semanticParser';
+import { AIInterpretationRequest, AIInterpretationResult } from '../src/services/ai/types.js';
+import { getFormattedSlangPromptContext } from '../src/services/ai/aiKnowledgeBase.js';
+import { isFinancialQueryText, parseSemanticNumberRoles } from '../src/utils/semanticParser.js';
 import {
   matchCategoryFromText,
   matchAccountFromText,
@@ -9,7 +9,7 @@ import {
   matchAmountEdit,
   matchTransactionType,
   matchTransferAccountsFromText,
-} from '../src/utils/entityMatcher';
+} from '../src/utils/entityMatcher.js';
 
 let genAIClient: GoogleGenAI | null = null;
 

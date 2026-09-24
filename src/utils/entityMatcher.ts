@@ -1,5 +1,5 @@
-import { ARABIC_FINANCIAL_SLANG_BASE } from '../services/ai/aiKnowledgeBase';
-import { aiLearnedMemory } from '../services/ai/aiLearnedMemory';
+import { ARABIC_FINANCIAL_SLANG_BASE } from '../services/ai/aiKnowledgeBase.js';
+import { aiLearnedMemory } from '../services/ai/aiLearnedMemory.js';
 
 export interface MatchableCategory {
   id: string;

@@ -102,7 +102,8 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 
 ### Phase 2 — Authentication and subscription experience
 
-- [ ] Build the dedicated sign-in/onboarding page.
+- [x] Build the dedicated sign-in page with Google-only authentication.
+- [ ] Verify Google sign-in and responsive behavior on the deployed site.
 - [ ] Support Google authentication only.
 - [ ] Allow marketer-code entry during onboarding or later from account settings.
 - [ ] Display plan status, trial dates, and remaining days.

@@ -40,6 +40,7 @@ import {
   DeterministicQueryResult,
 } from './services/ai/deterministicQueryEngine';
 import { FinancialQueryResultCard } from './components/FinancialQueryResultCard';
+import { LoginView } from './components/views/LoginView';
 import {
   loginWithGoogle,
   logoutUser,
@@ -196,6 +197,9 @@ export default function App() {
 
   // 6. User Auth State (Google Authentication)
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isGoogleLoginPending, setIsGoogleLoginPending] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const isAdmin = authUser?.email?.trim().toLowerCase() === ADMIN_EMAIL;
 
   // 7. Modals State
@@ -259,6 +263,7 @@ export default function App() {
       } else {
         setAuthUser(null);
       }
+      setIsAuthLoading(false);
     });
 
     return () => unsubscribe();
@@ -322,9 +327,11 @@ export default function App() {
 
   // Google Login Handler
   const handleGoogleLogin = async () => {
+    setIsGoogleLoginPending(true);
+    setLoginError(null);
+
     try {
       const user = await loginWithGoogle();
-      const t = translations[lang];
       setToastMessage(
         lang === 'ar'
           ? `أهلاً بك، تم تسجيل الدخول بنجاح (${user.displayName || user.email})`
@@ -332,7 +339,6 @@ export default function App() {
       );
       setTimeout(() => setToastMessage(null), 3500);
     } catch (err: any) {
-      // User closed popup or cancelled - normal user interaction, do not treat as error
       if (
         err?.code === 'auth/popup-closed-by-user' ||
         err?.code === 'auth/cancelled-popup-request'
@@ -340,21 +346,19 @@ export default function App() {
         return;
       }
 
-      if (err?.code === 'auth/popup-blocked') {
-        setToastMessage(
-          lang === 'ar'
-            ? 'تم حظر النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة أو فتح التطبيق في تبويب جديد.'
-            : 'Popup was blocked by the browser. Please allow popups or open in a new tab.'
-        );
-      } else {
-        console.warn('Google Sign-In notice:', err?.message || err);
-        setToastMessage(
-          lang === 'ar'
-            ? 'تعذر تسجيل الدخول حالياً، يرجى المحاولة لاحقاً'
-            : 'Could not sign in right now. Please try again later.'
-        );
-      }
+      const message = err?.code === 'auth/popup-blocked'
+        ? (lang === 'ar'
+          ? 'المتصفح منع نافذة تسجيل الدخول. اسمح بالنوافذ المنبثقة ثم حاول مرة أخرى.'
+          : 'The browser blocked the sign-in window. Allow popups and try again.')
+        : (lang === 'ar'
+          ? 'تعذر تسجيل الدخول حالياً. تحقق من اتصالك بالإنترنت وحاول مرة أخرى.'
+          : 'Could not sign in right now. Check your internet connection and try again.');
+
+      setLoginError(message);
+      setToastMessage(message);
       setTimeout(() => setToastMessage(null), 4000);
+    } finally {
+      setIsGoogleLoginPending(false);
     }
   };
 
@@ -929,6 +933,29 @@ export default function App() {
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
   const revisionLabel = isAdmin ? ' #3' : '';
   const greetingText = `${greetingPrefix} ${userName} 👋${revisionLabel}`;
+
+  if (isAuthLoading) {
+    return (
+      <div dir={lang === 'ar' ? 'rtl' : 'ltr'} className="min-h-screen bg-[#f5f7f6] flex items-center justify-center font-sans">
+        <div className="flex flex-col items-center gap-3 text-slate-500">
+          <div className="h-10 w-10 rounded-2xl bg-emerald-600 animate-pulse" />
+          <span className="text-sm">{lang === 'ar' ? 'جارٍ تجهيز حسابك...' : 'Preparing your account...'}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authUser) {
+    return (
+      <LoginView
+        lang={lang}
+        onToggleLanguage={handleToggleLanguage}
+        onLogin={handleGoogleLogin}
+        isLoading={isGoogleLoginPending}
+        error={loginError}
+      />
+    );
+  }
 
   return (
     <div

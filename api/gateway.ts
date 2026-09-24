@@ -20,9 +20,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    let subscriptionService: typeof import('../server/subscriptionService');
+    let subscriptionService: typeof import('../server/subscriptionService.js');
     try {
-      subscriptionService = await import('../server/subscriptionService');
+      subscriptionService = await import('../server/subscriptionService.js');
     } catch (loadError: unknown) {
       console.error('Gateway subscription module load error:', loadError);
       const detail = loadError instanceof Error ? `${loadError.name}: ${loadError.message}` : String(loadError);
@@ -59,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ ok: false, error: 'invalid_ai_input', message: 'Missing or invalid text.' });
         }
 
-        const { interpretNaturalLanguageWithGemini } = await import('../server/geminiService');
+        const { interpretNaturalLanguageWithGemini } = await import('../server/geminiService.js');
         const result = await interpretNaturalLanguageWithGemini({
           text,
           accounts: Array.isArray(accounts) ? accounts : [],

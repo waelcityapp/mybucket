@@ -97,7 +97,7 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 - [x] Prevent more than one marketer code per account.
 - [x] Deny client writes to subscription and marketer-code records.
 - [x] Route subscription and AI operations through one authenticated API gateway.
-- [ ] Configure Firebase Admin credentials and matching Firestore database ID in the deployment environment.
+- [ ] Configure Firebase Admin credentials and matching Firestore database ID in the deployment environment. A live production gateway probe on 2026-09-24 returned `firebase_admin_not_configured` (HTTP 503).
 - [ ] Seed the first real marketer code through an approved admin operation in Phase 4.
 
 ### Phase 2 — Authentication and subscription experience
@@ -109,6 +109,7 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 - [x] Display plan status, trial expiry date, configured price, and remaining days.
 - [x] Read an existing server-owned Firestore subscription as a fallback if the gateway fails; never invent trial days locally.
 - [ ] Verify live subscription retrieval and code redemption after Firebase Admin credentials and a real marketer code are configured.
+- [ ] Inspect and safely migrate any legacy subscription document from the Google export before establishing a fresh trial; preserve valid original start/expiry timestamps and do not treat client-authored marketer flags as verified entitlements.
 
 ### Phase 3 — Enforced AI allowances
 
@@ -156,4 +157,5 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 - Admin-only UI page exists on `main` and is visible to `waelvts@gmail.com`.
 - Phase 1 provides the protected backend foundation; Phase 2 now includes Google onboarding, marketer-code entry, and the home subscription status and remaining-days card.
 - Vercel build and the gateway runtime's unauthenticated 401 response were verified. Firebase Admin deployment credentials and a real marketer code remain unverified, so the signed-in days counter and redemption still need end-to-end testing.
-- Next planned work: confirm Firebase Admin credentials and database ID match the client project, verify live subscription retrieval with a signed-in account, then verify real marketer-code redemption.
+- The Google export was inspected: its sample marketer codes were validated in the browser and its prototype saved `users/{uid}/billing/subscription` from the client. Old records may exist in the custom Firestore database; their schema uses `tier` and `discountPricePerMonth`, and the Google login handler could also save an `updatedSubscription` wrapper. Preserve any real timestamps during migration.
+- Next planned work: add Firebase Admin service account credentials and the matching custom Firestore database ID in Vercel, redeploy, inspect the signed-in user's existing subscription document, then verify real marketer-code redemption.

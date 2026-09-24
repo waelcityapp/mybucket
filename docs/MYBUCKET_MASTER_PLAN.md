@@ -111,7 +111,7 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 - [ ] Verify live subscription retrieval and code redemption after Firebase Admin credentials and a real marketer code are configured.
 - [ ] Inspect and safely migrate any legacy subscription document from the Google export before establishing a fresh trial; preserve valid original start/expiry timestamps and do not treat client-authored marketer flags as verified entitlements.
 - [x] Temporarily restore the Google prototype's remaining-days display by reading both legacy Firestore record shapes; if no record exists, anchor the 10-day display to Firebase Auth account creation time.
-- [x] Temporarily accept the original prototype marketer codes in this browser and calculate 35 days from the original start. Mark locally applied codes as browser-only; this is UI preview state, not a verified subscription entitlement.
+- [x] Temporarily accept the original prototype marketer codes and calculate 35 days from the original start. Save newly entered codes on the user's own Firebase profile after a successful write, then read them on subsequent visits. These are UI preview fields, not verified subscription entitlements.
 
 ### Phase 3 — Enforced AI allowances
 
@@ -155,10 +155,10 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 
 ## Current implementation status
 
-- Current admin-only revision: `#7` (prototype subscription counter restored using legacy Firestore dates and Firebase Auth registration time).
+- Current admin-only revision: `#8` (prototype codes persisted in the user's Firebase profile and subscription display labels its actual data source).
 - Admin-only UI page exists on `main` and is visible to `waelvts@gmail.com`.
 - Phase 1 provides the protected backend foundation; Phase 2 now includes Google onboarding, marketer-code entry, and the home subscription status and remaining-days card.
 - Vercel build and the gateway runtime's unauthenticated 401 response were verified. Firebase Admin deployment credentials and a real marketer code remain unverified, so the signed-in days counter and redemption still need end-to-end testing.
 - The Google export was inspected: its sample marketer codes were validated in the browser and its prototype saved `users/{uid}/billing/subscription` from the client. Old records may exist in the custom Firestore database; their schema uses `tier` and `discountPricePerMonth`, and the Google login handler could also save an `updatedSubscription` wrapper. Preserve any real timestamps during migration.
 - Next planned work: add Firebase Admin service account credentials and the matching custom Firestore database ID in Vercel, redeploy, inspect the signed-in user's existing subscription document, then verify real marketer-code redemption.
-- The owner deferred backend work. The current UI reads the original Firestore subscription directly and calculates remaining days from its dates. A prototype code newly applied in this version remains on the current browser only. Before launch, restore server-side code validation and persistence across devices.
+- The owner deferred backend work. The UI reads the original Firestore subscription directly and calculates remaining days from its dates. The original Google sign-in code accepted a marketer code visually but used stale React auth state during its save callback, while the Firestore save helper swallowed write errors; therefore a previously accepted code may never have been persisted. The existing record may contain only a 10-day trial. For now, re-entering that code writes `prototypeAffiliateCode` to the owner's `users/{uid}` profile; the UI recalculates 35 days from the original trial start and reads it across devices. Treat this client-writable profile field only as prototype display state; never use it to authorize paid features or migrate it as a verified redemption. Before launch, restore server-side code validation and atomic redemption.

@@ -18,6 +18,7 @@ export interface UserSubscription {
   updatedAt: string;
   // Prototype-only marketer code saved on this browser until backend redemption is enabled.
   temporaryLocalOnly?: boolean;
+  recordSource?: 'billing' | 'account';
 }
 
 export interface AffiliateCodeRecord {

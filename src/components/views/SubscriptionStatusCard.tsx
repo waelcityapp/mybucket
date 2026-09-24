@@ -117,6 +117,18 @@ export function SubscriptionStatusCard({
         </div>
       </div>
 
+      {subscription.recordSource === 'account' && (
+        <p className="mt-4 text-xs leading-5 text-amber-800">
+          {isArabic ? 'لا يوجد سجل اشتراك محفوظ لهذا الحساب؛ المدة المعروضة محسوبة من تاريخ إنشاء حساب Firebase.' : 'No saved subscription record was found; this period is calculated from your Firebase account creation date.'}
+        </p>
+      )}
+
+      {subscription.recordSource === 'billing' && !subscription.hasAppliedAffiliateCode && (
+        <p className="mt-4 text-xs leading-5 text-slate-500">
+          {isArabic ? 'سجل الاشتراك موجود في Firebase، لكن لا يوجد فيه كود مسوّق محفوظ.' : 'Your subscription is in Firebase, but it has no saved marketer code.'}
+        </p>
+      )}
+
       {subscription.hasAppliedAffiliateCode && subscription.affiliateCode && (
         <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-200/70 pt-3 text-xs text-slate-600">
           <span>{isArabic ? 'كود المسوّق المفعّل:' : 'Applied marketer code:'}</span>

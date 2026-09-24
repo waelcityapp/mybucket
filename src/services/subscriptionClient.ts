@@ -1,5 +1,5 @@
 import type { User } from 'firebase/auth';
-import { doc, getDocFromServer } from 'firebase/firestore';
+import { doc, getDocFromServer, runTransaction } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import type { UserSubscription } from '../types/subscription';
 
@@ -58,6 +58,7 @@ function normalizeSubscription(raw: LegacySubscription): UserSubscription | null
     maxHistoricalQueryDays: typeof source.maxHistoricalQueryDays === 'number' ? source.maxHistoricalQueryDays : 35,
     createdAt: validDate(source.createdAt) ? source.createdAt : source.trialStartedAt,
     updatedAt: validDate(source.updatedAt) ? source.updatedAt : source.trialStartedAt,
+    recordSource: 'billing',
   };
 }
 
@@ -65,22 +66,20 @@ function fromGoogleRegistration(user: User): UserSubscription {
   const start = user.metadata.creationTime;
   if (!validDate(start)) throw new Error('تعذر تحديد تاريخ إنشاء حساب Google.');
   const trialStartedAt = new Date(start).toISOString();
-  return normalizeSubscription({
+  return { ...normalizeSubscription({
     trialStartedAt,
     trialExpiresAt: new Date(Date.parse(trialStartedAt) + 10 * DAY_MS).toISOString(),
     totalTrialDays: 10,
     isPaid: false,
-  })!;
+  })!, recordSource: 'account' };
 }
 
 function localCodeKey(uid: string): string {
   return `${LOCAL_CODE_PREFIX}${uid}`;
 }
 
-function withLocalCode(subscription: UserSubscription, uid: string): UserSubscription {
+function withCode(subscription: UserSubscription, code: string, temporaryLocalOnly: boolean): UserSubscription {
   if (subscription.hasAppliedAffiliateCode || subscription.isPaid) return subscription;
-  const code = localStorage.getItem(localCodeKey(uid));
-  if (!code || !PROTOTYPE_CODES.has(code)) return subscription;
   const trialExpiresAt = new Date(Date.parse(subscription.trialStartedAt) + 35 * DAY_MS).toISOString();
   return {
     ...subscription,
@@ -90,19 +89,55 @@ function withLocalCode(subscription: UserSubscription, uid: string): UserSubscri
     affiliateCode: code,
     hasAppliedAffiliateCode: true,
     monthlyPriceEgp: 120,
-    temporaryLocalOnly: true,
+    temporaryLocalOnly,
   };
+}
+
+async function persistPrototypeCode(uid: string, code: string): Promise<void> {
+  const profileRef = doc(db, 'users', uid);
+  await runTransaction(db, async (transaction) => {
+    const profile = await transaction.get(profileRef);
+    if (profile.data()?.prototypeAffiliateCode) {
+      throw new Error('تم تسجيل كود مسوّق مسبقًا لهذا الحساب.');
+    }
+    transaction.set(profileRef, {
+      prototypeAffiliateCode: code,
+      prototypeAffiliateAppliedAt: new Date().toISOString(),
+    }, { merge: true });
+  });
 }
 
 async function readSubscription(user: User): Promise<UserSubscription> {
   const snapshot = await getDocFromServer(doc(db, 'users', user.uid, 'billing', 'subscription'));
+  let subscription: UserSubscription;
   if (snapshot.exists()) {
     const existing = normalizeSubscription(snapshot.data());
     if (!existing) throw new Error('سجل الاشتراك المحفوظ لا يحتوي على تاريخ صالح لحساب الأيام.');
-    return withLocalCode(existing, user.uid);
+    subscription = existing;
+  } else {
+    // The account creation time is stable across browsers; never start a new trial on refresh.
+    subscription = fromGoogleRegistration(user);
   }
-  // The account creation time is stable across browsers; never start a new trial on refresh.
-  return withLocalCode(fromGoogleRegistration(user), user.uid);
+
+  if (subscription.hasAppliedAffiliateCode || subscription.isPaid) return subscription;
+  const profile = await getDocFromServer(doc(db, 'users', user.uid));
+  const savedCode = profile.data()?.prototypeAffiliateCode;
+  if (typeof savedCode === 'string' && PROTOTYPE_CODES.has(savedCode)) {
+    localStorage.removeItem(localCodeKey(user.uid));
+    return withCode(subscription, savedCode, false);
+  }
+
+  const localCode = localStorage.getItem(localCodeKey(user.uid));
+  if (localCode && PROTOTYPE_CODES.has(localCode)) {
+    try {
+      await persistPrototypeCode(user.uid, localCode);
+      localStorage.removeItem(localCodeKey(user.uid));
+      return withCode(subscription, localCode, false);
+    } catch {
+      return withCode(subscription, localCode, true);
+    }
+  }
+  return subscription;
 }
 
 export async function requestSubscription(
@@ -119,6 +154,10 @@ export async function requestSubscription(
   const code = typeof payload.code === 'string' ? payload.code.trim().toUpperCase() : '';
   if (!PROTOTYPE_CODES.has(code)) throw new Error('كود المسوّق غير صحيح أو غير مفعل حالياً.');
   if (current.hasAppliedAffiliateCode) throw new Error('تم تفعيل كود مسوّق مسبقًا لهذا الحساب.');
-  localStorage.setItem(localCodeKey(user.uid), code);
-  return withLocalCode(current, user.uid);
+  try {
+    await persistPrototypeCode(user.uid, code);
+  } catch {
+    throw new Error('تعذر حفظ كود المسوّق في Firebase. لم يتم تفعيله؛ حاول مرة أخرى.');
+  }
+  return withCode(current, code, false);
 }

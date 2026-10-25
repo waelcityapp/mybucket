@@ -141,7 +141,7 @@ export function OtherAccountModal({
             {/* 2. الرصيد الحالي */}
             <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
               <div>
-                <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-slate-500 block uppercase ">
                   {lang === 'ar' ? 'الرصيد الحالي' : 'Current Balance'}
                 </span>
                 <span className="text-xs font-bold text-slate-700 block mt-0.5">
@@ -149,7 +149,7 @@ export function OtherAccountModal({
                 </span>
               </div>
               <div className="text-end">
-                <div className="text-xl sm:text-2xl font-black text-amber-700 font-mono tracking-tight">
+                <div className="text-xl sm:text-2xl font-black text-amber-700 font-mono ">
                   {account.balance.toLocaleString()}
                 </div>
                 <div className="text-[11px] font-bold text-slate-500 font-mono">
@@ -244,7 +244,7 @@ export function OtherAccountModal({
                   {lang === 'ar' ? 'إضافة وسيلة دفع واستلام أخرى' : 'Add Another Method'}
                 </span>
               </div>
-              <span className="text-[10px] font-black uppercase tracking-wider bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-full">
+              <span className="text-[10px] font-black uppercase  bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-full">
                 Plus / Pro
               </span>
             </div>

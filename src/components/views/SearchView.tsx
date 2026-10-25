@@ -415,7 +415,7 @@ export function SearchView({ transactions, categories, accounts, lang, authUser 
                   {/* Top Row: Date & Amount */}
                   <div className="flex items-start justify-between">
                     <div className="flex flex-col">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase  mb-0.5">
                         {new Date(tx.date).toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long' })}
                       </span>
                       <div className="flex items-center gap-1.5 text-slate-800 font-bold text-sm">
@@ -426,7 +426,7 @@ export function SearchView({ transactions, categories, accounts, lang, authUser 
                     </div>
 
                     <div className="flex flex-col items-end">
-                       <span className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 px-2 py-0.5 rounded-full ${
+                       <span className={`text-[10px] font-bold uppercase  mb-0.5 px-2 py-0.5 rounded-full ${
                           isExpense ? 'bg-red-50 text-red-600' : 
                           isIncome ? 'bg-emerald-50 text-emerald-600' : 
                           'bg-slate-100 text-slate-600'

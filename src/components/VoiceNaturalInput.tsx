@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Send, Sparkles, Loader2, HelpCircle, AlertTriangle } from 'lucide-react';
+import { Mic, MicOff, Send, Sparkles, Loader2, HelpCircle } from 'lucide-react';
 import { Language, FinancialAccount, Category, Transaction, CurrencyCode } from '../types';
+import { UserSubscription, UserDailyUsage } from '../types/prototypeSubscription';
 import { translations } from '../data/translations';
 import { aiClient } from '../services/ai/aiClient';
 import { AIFinancialQuery, AIInterpretationResult, AICorrection } from '../services/ai/types';
@@ -9,9 +10,14 @@ interface VoiceNaturalInputProps {
   lang: Language;
   accounts: FinancialAccount[];
   categories: Category[];
+  userDailyUsage?: UserDailyUsage;
+  userSubscription?: UserSubscription | null;
   onTransactionDraft: (draft: Partial<Transaction>, missingFields: string[]) => void;
   onFinancialQuery: (query: AIFinancialQuery, questionText: string) => void;
   onAICorrection?: (correction: AICorrection) => void;
+  onAiEntryUsed?: () => void;
+  onAiQueryUsed?: () => void;
+  onOpenManualAdd?: () => void;
 }
 
 // Typing helper for Web Speech API
@@ -41,9 +47,14 @@ export function VoiceNaturalInput({
   lang,
   accounts,
   categories,
+  userDailyUsage,
+  userSubscription,
   onTransactionDraft,
   onFinancialQuery,
   onAICorrection,
+  onAiEntryUsed,
+  onAiQueryUsed,
+  onOpenManualAdd,
 }: VoiceNaturalInputProps) {
   const t = translations[lang];
   const isAr = lang === 'ar';
@@ -52,6 +63,16 @@ export function VoiceNaturalInput({
   const [isListening, setIsListening] = useState(false);
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [showSoftLandingModal, setShowSoftLandingModal] = useState<'entry' | 'inquiry' | null>(null);
+
+  const isPaid = userSubscription?.isPaid;
+  const maxEntries = userSubscription?.dailyExpenseAiLimit || 15;
+  const maxQueries = userSubscription?.dailyInquiryAiLimit || 5;
+  const usedEntries = userDailyUsage?.expenseAiCount || 0;
+  const usedQueries = userDailyUsage?.inquiryAiCount || 0;
+
+  const entriesRemaining = isPaid ? 999 : Math.max(0, maxEntries - usedEntries);
+  const queriesRemaining = isPaid ? 999 : Math.max(0, maxQueries - usedQueries);
   const [speechError, setSpeechError] = useState<string | null>(null);
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -96,13 +117,43 @@ export function VoiceNaturalInput({
 
       // Handle Result based on classified INTENT
       if (result.intent === 'FINANCIAL_QUERY') {
+        // Check Daily Inquiry Limit (5/day for trial)
+        if (!isPaid && queriesRemaining <= 0) {
+          setShowSoftLandingModal('inquiry');
+          setStatusMessage(
+            isAr
+              ? 'لقد استهلكت حد الأسئلة الذكية لليوم (5 استفسارات). يمكنك البحث اليدوي في شاشة التقارير أو الترقية للنسخة الاحترافية.'
+              : 'You have reached your daily AI query limit (5 queries). You can review records manually in Reports.'
+          );
+          setTimeout(() => setStatusMessage(null), 6000);
+          return;
+        }
+
         setStatusMessage(null);
+        if (onAiQueryUsed) {
+          onAiQueryUsed();
+        }
         onFinancialQuery(
           result.query || { metric: 'total_spent', period: 'all_time', transactionType: 'expense' },
           text
         );
       } else if (result.intent === 'CREATE_TRANSACTION' && result.transaction) {
+        // Check Daily Entry Limit (15/day for trial)
+        if (!isPaid && entriesRemaining <= 0) {
+          setShowSoftLandingModal('entry');
+          setStatusMessage(
+            isAr
+              ? 'لقد استهلكت حد الإدخال الذكي لليوم (15 عملية). جاري نقلك للإدخال اليدوي المباشر بدون قيود!'
+              : 'Daily AI entry limit reached (15 entries). You can continue entering transactions manually!'
+          );
+          setTimeout(() => setStatusMessage(null), 6000);
+          return;
+        }
+
         setStatusMessage(null);
+        if (onAiEntryUsed) {
+          onAiEntryUsed();
+        }
         const tx = result.transaction;
 
         // Build transaction draft
@@ -155,25 +206,36 @@ export function VoiceNaturalInput({
     if (SpeechRecognition) {
       try {
         const recognition = new SpeechRecognition() as SpeechRecognitionLike;
-        recognition.continuous = true;
+        // Using continuous = false fixes the severe duplication bug on Android Chrome
+        // where it repeats the transcript multiple times (e.g. "انااناانااناانا")
+        recognition.continuous = false;
         recognition.interimResults = true;
         recognition.lang = lang === 'ar' ? 'ar-EG' : 'en-US';
+
+        let finalTranscript = '';
 
         recognition.onstart = () => {
           setIsListening(true);
           setSpeechError(null);
-          // Optional: clear previous input text when starting a new session
-          // setInputText(''); 
+          // We can optionally clear the input, but keeping it allows the user to edit
         };
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         recognition.onresult = (event: any) => {
-          let currentTranscript = '';
+          let interimTranscript = '';
+          finalTranscript = ''; // Reset and rebuild from results
+
           for (let i = 0; i < event.results.length; ++i) {
-            currentTranscript += event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript;
+            } else {
+              interimTranscript += event.results[i][0].transcript;
+            }
           }
-          if (currentTranscript) {
-            setInputText(currentTranscript);
+
+          const fullTranscript = finalTranscript + interimTranscript;
+          if (fullTranscript) {
+            setInputText(fullTranscript);
           }
         };
 
@@ -279,7 +341,7 @@ export function VoiceNaturalInput({
                 ? 'اكتب أو قل أي عملية أو سؤال مالي...'
                 : 'Type or speak any transaction or question...'
             }
-            className="w-full text-sm sm:text-base font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-hidden bg-transparent tracking-tight disabled:opacity-60"
+            className="w-full text-sm sm:text-base font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-hidden bg-transparent  disabled:opacity-60"
           />
           <p className="text-[11px] sm:text-xs text-slate-400 font-medium mt-1 truncate">
             {isListening ? (
@@ -378,59 +440,92 @@ export function VoiceNaturalInput({
           type="button"
           disabled={isProcessingAI}
           onClick={() =>
-            handleExampleClick(isAr ? 'أنا صرفت كام الأسبوع ده؟' : 'How much did I spend this week?')
+            handleExampleClick(
+              isAr ? 'دفعت 350 جنيه بنزين من الكاش' : 'Paid 350 for fuel from Cash'
+            )
           }
-          className="px-2.5 py-1 rounded-full bg-indigo-50/70 border border-indigo-200 text-indigo-800 hover:bg-indigo-100 transition-colors whitespace-nowrap cursor-pointer shadow-2xs font-bold"
+          className="px-2.5 py-1 rounded-full bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 hover:text-emerald-700 transition-colors whitespace-nowrap cursor-pointer shadow-2xs font-medium"
         >
-          {isAr ? '🔍 صرفت كام الأسبوع ده؟' : '🔍 Spent this week?'}
+          {isAr ? '⛽ 350 بنزين كاش' : '⛽ 350 fuel from cash'}
         </button>
         <button
           type="button"
           disabled={isProcessingAI}
           onClick={() =>
             handleExampleClick(
-              isAr ? 'استلمت 20 ألف جنيه مرتب على حساب البنك' : 'Received 20k salary to Bank'
+              isAr ? 'اشتريت طلبات بـ 200 جنيه' : 'Bought groceries for 200'
             )
           }
           className="px-2.5 py-1 rounded-full bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 hover:text-emerald-700 transition-colors whitespace-nowrap cursor-pointer shadow-2xs font-medium"
         >
-          {isAr ? '💼 20 ألف مرتب على البنك' : '💼 20k salary to Bank'}
+          {isAr ? '🛒 200 مشتريات' : '🛒 200 groceries'}
         </button>
         <button
           type="button"
           disabled={isProcessingAI}
           onClick={() =>
-            handleExampleClick(isAr ? 'حولت 500 جنيه من البنك للكاش' : 'Transferred 500 from Bank to Cash')
+            handleExampleClick(isAr ? 'أنا صرفت كام الأسبوع ده؟' : 'How much did I spend this week?')
           }
-          className="px-2.5 py-1 rounded-full bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 hover:text-blue-700 transition-colors whitespace-nowrap cursor-pointer shadow-2xs font-medium"
+          className="px-2.5 py-1 rounded-full bg-indigo-50/80 border border-indigo-200 text-indigo-800 hover:bg-indigo-100 transition-colors whitespace-nowrap cursor-pointer shadow-2xs font-bold"
         >
-          {isAr ? '⇄ 500 تحويل من البنك للكاش' : '⇄ 500 Bank to Cash'}
-        </button>
-        <button
-          type="button"
-          disabled={isProcessingAI}
-          onClick={() =>
-            handleExampleClick(isAr ? 'دفعت 300 جنيه في مطعم' : 'Paid 300 in a restaurant')
-          }
-          className="px-2.5 py-1 rounded-full bg-amber-50/80 border border-amber-200 text-amber-800 hover:bg-amber-100 transition-colors whitespace-nowrap cursor-pointer shadow-2xs font-medium"
-          title={isAr ? 'تجربة حقل حساب مفقود' : 'Test missing account field'}
-        >
-          {isAr ? '⚠️ 300 بمطعم (بدون تحديد حساب)' : '⚠️ 300 restaurant (missing account)'}
+          {isAr ? '🔍 صرفت كام الأسبوع ده؟' : '🔍 Spent this week?'}
         </button>
       </div>
 
-      {/* Important AI Disclaimer Notice */}
-      <div className="flex items-start gap-2 p-2.5 rounded-xl bg-amber-50/90 border border-amber-200/80 text-amber-950 text-xs leading-relaxed shadow-2xs">
-        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-        <p className="text-xs leading-relaxed font-medium">
-          <strong className="font-black text-amber-900 ml-1">
-            {isAr ? 'تنبيه هام:' : 'Important Notice:'}
-          </strong>
-          {isAr
-            ? 'قد يخطئ الذكاء الاصطناعي في الفهم وإجابة استفساراتكم، لذا يرجى مراجعة كل شيء يدوياً قبل الحفظ.'
-            : 'AI may make mistakes in understanding and answering your queries, so please review everything manually before saving.'}
-        </p>
-      </div>
+      {/* Soft Landing Quota Limit Modal */}
+      {showSoftLandingModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-sm w-full border border-slate-100 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-600 mx-auto">
+              <Sparkles className="w-6 h-6" />
+            </div>
+
+            <div className="text-center space-y-1">
+              <h3 className="font-bold text-base text-slate-800">
+                {showSoftLandingModal === 'entry'
+                  ? isAr
+                    ? 'وصلت للحد اليومي للإدخال الذكي (15 عملية)'
+                    : 'Daily AI Entry Limit Reached (15)'
+                  : isAr
+                  ? 'وصلت للحد اليومي للاستفسارات الذكية (5 أسئلة)'
+                  : 'Daily AI Query Limit Reached (5)'}
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                {showSoftLandingModal === 'entry'
+                  ? isAr
+                    ? 'فترة التجربة توفر 15 إدخال بالذكاء الاصطناعي يومياً. يمكنك الآن إتمام عمليتك بالإدخال اليدوي المباشر بدون أي انقطاع وبدون حدود!'
+                    : 'Trial includes 15 AI entries per day. You can continue effortlessly with manual entry with no limits!'
+                  : isAr
+                  ? 'فترة التجربة توفر 5 استفسارات بالذكاء الاصطناعي يومياً. يمكنك مراجعة تقاريرك وحساباتك مباشرة في تبويب التقارير.'
+                  : 'Trial includes 5 AI queries per day. You can review all records directly in the Reports tab.'}
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              {showSoftLandingModal === 'entry' && onOpenManualAdd && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSoftLandingModal(null);
+                    onOpenManualAdd();
+                  }}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <span>{isAr ? 'المتابعة بالإدخال اليدوي المباشر ✍️' : 'Continue with Manual Entry ✍️'}</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowSoftLandingModal(null)}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold text-xs transition-colors cursor-pointer"
+              >
+                {isAr ? 'حسناً، فهمت' : 'Got it'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

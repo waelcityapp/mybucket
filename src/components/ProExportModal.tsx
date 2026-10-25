@@ -157,10 +157,10 @@ export function ProExportModal({
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-lg font-black text-white tracking-wide">
+                  <h2 className="text-lg font-black text-white ">
                     {isAr ? 'تصدير التقارير وكشوف الحسابات' : 'Export Reports & Statements'}
                   </h2>
-                  <span className="inline-flex items-center gap-1 bg-white text-amber-800 text-[11px] font-black px-2.5 py-0.5 rounded-full shadow-xs uppercase tracking-wider">
+                  <span className="inline-flex items-center gap-1 bg-white text-amber-800 text-[11px] font-black px-2.5 py-0.5 rounded-full shadow-xs uppercase ">
                     <Sparkles className="w-3 h-3 text-amber-600" />
                     {isAr ? 'الخطة البرو PRO' : 'PRO Plan'}
                   </span>

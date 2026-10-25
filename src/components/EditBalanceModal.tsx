@@ -106,7 +106,7 @@ export function EditBalanceModal({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
           <div>
-            <h2 className="text-lg font-black text-slate-900 tracking-tight">
+            <h2 className="text-lg font-black text-slate-900 ">
               {selectedAccount
                 ? (lang === 'ar' ? `تعديل رصيد: ${selectedAccount.nameAr}` : `Edit Balance: ${selectedAccount.name}`)
                 : t.setInitialBalances}
@@ -137,7 +137,7 @@ export function EditBalanceModal({
                   {getAccountIcon(selectedAccount.type)}
                 </div>
                 <div>
-                  <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">
+                  <span className="text-[11px] font-bold text-slate-500 block uppercase ">
                     {lang === 'ar' ? '1. الرصيد الحالي' : '1. Current Balance'}
                   </span>
                   <span className="text-base font-black text-slate-900 block">
@@ -147,7 +147,7 @@ export function EditBalanceModal({
               </div>
 
               <div className="text-end">
-                <div className="text-xl sm:text-2xl font-black text-emerald-700 font-mono tracking-tight">
+                <div className="text-xl sm:text-2xl font-black text-emerald-700 font-mono ">
                   {selectedAccount.balance.toLocaleString()}
                 </div>
                 <div className="text-[11px] font-bold text-slate-500">

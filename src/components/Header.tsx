@@ -105,11 +105,11 @@ export function Header({
                 <path d="M8 9V6a4 4 0 0 1 8 0v3" />
               </svg>
             </div>
-            <span className="font-extrabold text-slate-900 tracking-tight text-base sm:text-lg leading-none">
+            <span className="font-extrabold text-slate-900  text-base sm:text-lg leading-none">
               {t.appName}
             </span>
           </div>
-          <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium tracking-tight mt-0.5">
+          <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium  mt-0.5">
             {t.headerSubtitle}
           </span>
         </div>

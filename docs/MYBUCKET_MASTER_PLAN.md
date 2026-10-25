@@ -155,10 +155,31 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 
 ## Current implementation status
 
-- Current admin-only revision: `#8` (prototype codes persisted in the user's Firebase profile and subscription display labels its actual data source).
+- Current admin-only revision: `#9` (Google reference UI restored by owner request, retaining Google-only authentication and existing Firebase/backend connections).
 - Admin-only UI page exists on `main` and is visible to `waelvts@gmail.com`.
 - Phase 1 provides the protected backend foundation; Phase 2 now includes Google onboarding, marketer-code entry, and the home subscription status and remaining-days card.
 - Vercel build and the gateway runtime's unauthenticated 401 response were verified. Firebase Admin deployment credentials and a real marketer code remain unverified, so the signed-in days counter and redemption still need end-to-end testing.
 - The Google export was inspected: its sample marketer codes were validated in the browser and its prototype saved `users/{uid}/billing/subscription` from the client. Old records may exist in the custom Firestore database; their schema uses `tier` and `discountPricePerMonth`, and the Google login handler could also save an `updatedSubscription` wrapper. Preserve any real timestamps during migration.
 - Next planned work: add Firebase Admin service account credentials and the matching custom Firestore database ID in Vercel, redeploy, inspect the signed-in user's existing subscription document, then verify real marketer-code redemption.
 - The owner deferred backend work. The UI reads the original Firestore subscription directly and calculates remaining days from its dates. The original Google sign-in code accepted a marketer code visually but used stale React auth state during its save callback, while the Firestore save helper swallowed write errors; therefore a previously accepted code may never have been persisted. The existing record may contain only a 10-day trial. For now, re-entering that code writes `prototypeAffiliateCode` to the owner's `users/{uid}` profile; the UI recalculates 35 days from the original trial start and reads it across devices. Treat this client-writable profile field only as prototype display state; never use it to authorize paid features or migrate it as a verified redemption. Before launch, restore server-side code validation and atomic redemption.
+
+
+## Owner-directed Google reference restoration — 2026-10-25
+
+This section supersedes the selective UI rebuild plan above. The owner explicitly requested restoring everything from the Google export before starting further changes. The source archive `my-bucket.zip` was recovered and its SHA-256 verified against the fingerprint recorded above.
+
+Restored the exported home financial overview, sponsored banner and deals, quick transaction confirmation, subscription card, usage display, account/category/transaction/search screens, settings and original visual styling. Preserved the owner's Google-only authentication requirement, the existing administrator page and administrator-only revision counter, existing Firebase configuration, database contents, deployed rules, provider credentials and authenticated API gateway. No Firebase data or deployed rules were changed during this restoration.
+
+Compatibility differences from the archive:
+
+- Restored subscription UI types are isolated in `src/types/prototypeSubscription.ts`; the gateway retains its current contract.
+- `src/services/prototypeSubscriptionClient.ts` adapts existing Firebase records and saved prototype marketer codes to the original UI. Existing trial start/expiry timestamps are preserved. Missing subscription records use the stable Firebase account creation time through the existing client, not the current date.
+- The original Google login code saved a result wrapper and relied on stale React auth state. The restored login callback now passes the actual signed-in UID and waits for code persistence. Subscription-card success is shown only after saving succeeds.
+- The original exported daily quota callbacks passed a usage object where the helper expects a user ID; callbacks now use the signed-in UID and load that user's saved daily counts.
+- The exported history-limit property typo is corrected. Removing an already-recorded affiliate code remains blocked by the existing one-code account rule; the restored UI shows the actual save error instead of a false success.
+- Original email/password login options were omitted to preserve the Google-only agreement. Existing backend/AI transport is preserved rather than restoring the export's obsolete endpoint.
+- Deals and the AI operations dashboard retain their original sample/simulated content; this restoration does not turn them into live partner offers or actual provider telemetry. The dashboard remains administrator-only.
+
+Validation: TypeScript check and production build passed. Server health returned HTTP 200; an unauthenticated gateway request returned HTTP 401. Static React rendering checked Arabic/English Google-only sign-in, financial overview and subscription/code display. Logic checks covered 10-day trials, a code granting 35 days from the original start (31 remaining after four elapsed days), invalid and duplicate codes, and user-scoped daily usage. Browser visual/mobile checks were blocked: no Chromium binary was installed and the browser download returned an invalid archive. No live Google sign-in or authenticated production database operation was performed.
+
+Next work: the owner reviews the restored interface first, then requests individual changes. Backend completion stays deferred as requested.

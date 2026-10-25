@@ -90,7 +90,7 @@ export function MoneySources({
       {/* Header Row: "حساباتك" with black + button on start, "عرض الكل" on end */}
       <div className="flex items-center justify-between px-0.5">
         <div className="flex items-center gap-2">
-          <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+          <h2 className="text-sm sm:text-base font-black text-slate-900 ">
             {t.yourAccounts}
           </h2>
           <button
@@ -159,7 +159,7 @@ export function MoneySources({
               </span>
 
               {/* Balance & Currency */}
-              <div className="text-[11px] sm:text-xs font-black text-slate-900 tracking-tight flex items-baseline justify-center gap-0.5 w-full">
+              <div className="text-[11px] sm:text-xs font-black text-slate-900  flex items-baseline justify-center gap-0.5 w-full">
                 <span className="text-[10px] text-slate-400 font-bold font-mono">
                   {acc.currency}
                 </span>

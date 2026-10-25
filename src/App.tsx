@@ -9,12 +9,15 @@ import {
   AuthUser,
 } from './types';
 import { INITIAL_ACCOUNTS, INITIAL_CATEGORIES, INITIAL_TRANSACTIONS } from './data/initialData';
+import { INITIAL_PROMO_BANNER, INITIAL_PERK_DEALS } from './data/dealsData';
+import { PromoBannerData, PerkDealItem } from './types/deals';
+import { PromoBanner } from './components/PromoBanner';
+import { DealsModal } from './components/DealsModal';
 import { translations } from './data/translations';
 import { Header } from './components/Header';
 import { VoiceNaturalInput } from './components/VoiceNaturalInput';
 import { QuickActions } from './components/QuickActions';
 import { MoneySources } from './components/MoneySources';
-import { MonthSummaryCard } from './components/MonthSummaryCard';
 import { RecentTransactions } from './components/RecentTransactions';
 import { TransactionModal } from './components/TransactionModal';
 import { EditBalanceModal } from './components/EditBalanceModal';
@@ -31,19 +34,26 @@ import { TransactionsView } from './components/views/TransactionsView';
 import { AccountsView } from './components/views/AccountsView';
 import { CategoriesView } from './components/views/CategoriesView';
 import { SettingsView } from './components/views/SettingsView';
-import { AdminView } from './components/views/AdminView';
 import { SearchView } from './components/views/SearchView';
-import { CheckCircle2, Smartphone, Cloud, ArrowRight } from 'lucide-react';
+import { CheckCircle2, Smartphone, Cloud, ArrowRight, Sparkles, Clock, Check, Pencil, X } from 'lucide-react';
 import { AIFinancialQuery, AICorrection } from './services/ai/types';
 import {
   executeDeterministicQuery,
   DeterministicQueryResult,
 } from './services/ai/deterministicQueryEngine';
 import { FinancialQueryResultCard } from './components/FinancialQueryResultCard';
-import { LoginView } from './components/views/LoginView';
-import { SubscriptionStatusCard } from './components/views/SubscriptionStatusCard';
-import { requestSubscription } from './services/subscriptionClient';
-import type { UserSubscription } from './types/subscription';
+import { HomeFinancialOverview } from './components/HomeFinancialOverview';
+import { AdminView } from './components/views/AdminView';
+import { AuthPage } from './components/views/AuthPage';
+import { UserSubscription, UserDailyUsage } from './types/prototypeSubscription';
+import {
+  createInitialSubscription,
+  applyAffiliateCodeToExistingSubscription,
+  calculateRemainingTrialDays,
+  getTodayUsage,
+  incrementExpenseAiUsage,
+  incrementInquiryAiUsage,
+} from './utils/subscriptionUtils';
 import {
   loginWithGoogle,
   logoutUser,
@@ -63,8 +73,9 @@ import {
 } from './lib/firebase';
 import { aiLearnedMemory } from './services/ai/aiLearnedMemory';
 
+import { saveUserSubscriptionToFirestore, subscribeUserSubscription } from './services/prototypeSubscriptionClient';
+
 const STORAGE_KEY_PREFIX = 'mybucket_';
-const ADMIN_EMAIL = 'waelvts@gmail.com';
 
 export default function App() {
   // 1. Language State (Arabic is default)
@@ -79,10 +90,10 @@ export default function App() {
   // Check if zero initialization was done
   const isZeroInitDone = !!localStorage.getItem(`${STORAGE_KEY_PREFIX}zero_initialized_v2`);
 
-  // Helper to migrate legacy 'acc_savings_usd' / 'مدخرات دولار' to 'acc_wallet' / 'محافظ إلكترونية' and ensure 'acc_other' exists
+  // Helper to migrate legacy 'acc_savings_usd' / 'مدخرات دولار' to 'acc_wallet' / 'محافظ إلكترونية' and ensure unique account IDs
   const migrateLegacyAccounts = (accs: FinancialAccount[]): { updated: FinancialAccount[]; migrated: boolean } => {
     let migrated = false;
-    let updated = accs.map((acc) => {
+    let mapped = accs.map((acc) => {
       if (acc.id === 'acc_savings_usd' || acc.nameAr === 'مدخرات دولار' || acc.name === 'USD Savings') {
         migrated = true;
         return {
@@ -98,10 +109,22 @@ export default function App() {
       return acc;
     });
 
-    const hasOther = updated.some((a) => a.id === 'acc_other' || a.type === 'other');
+    // Deduplicate accounts by ID to ensure no duplicate keys occur (e.g. if acc_wallet and acc_savings_usd both existed)
+    const seenIds = new Set<string>();
+    const deduplicated: FinancialAccount[] = [];
+    for (const acc of mapped) {
+      if (!seenIds.has(acc.id)) {
+        seenIds.add(acc.id);
+        deduplicated.push(acc);
+      } else {
+        migrated = true;
+      }
+    }
+
+    const hasOther = deduplicated.some((a) => a.id === 'acc_other' || a.type === 'other');
     if (!hasOther) {
       migrated = true;
-      updated.push({
+      deduplicated.push({
         id: 'acc_other',
         name: 'Other Methods',
         nameAr: 'وسائل دفع واستلام أخرى',
@@ -112,10 +135,10 @@ export default function App() {
       });
     }
 
-    const hasExtra = updated.some((a) => a.id === 'acc_extra' || a.type === 'custom');
+    const hasExtra = deduplicated.some((a) => a.id === 'acc_extra' || a.type === 'custom');
     if (!hasExtra) {
       migrated = true;
-      updated.push({
+      deduplicated.push({
         id: 'acc_extra',
         name: 'Other Accounts',
         nameAr: 'حسابات أخرى',
@@ -126,7 +149,7 @@ export default function App() {
       });
     }
 
-    return { updated, migrated };
+    return { updated: deduplicated, migrated };
   };
 
   const migrateLegacyTransactions = (txs: Transaction[]): Transaction[] => {
@@ -198,24 +221,24 @@ export default function App() {
     return INITIAL_TRANSACTIONS;
   });
 
-  // 6. User Auth State (Google Authentication)
+  // 6. User Auth State & Subscription
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [isGoogleLoginPending, setIsGoogleLoginPending] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
-  const [isSubscriptionLoading, setIsSubscriptionLoading] = useState(false);
-  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
-  const [affiliateCode, setAffiliateCode] = useState('');
-  const [isApplyingAffiliateCode, setIsApplyingAffiliateCode] = useState(false);
-  const [affiliateFeedback, setAffiliateFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const isAdmin = authUser?.email?.trim().toLowerCase() === ADMIN_EMAIL;
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
+  const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
+  const [dailyUsage, setDailyUsage] = useState<UserDailyUsage>({
+    date: new Date().toISOString().slice(0, 10),
+    expenseAiCount: 0,
+    inquiryAiCount: 0,
+  });
+
+  const isAdmin = authUser?.email?.trim().toLowerCase() === 'waelvts@gmail.com';
 
   // 7. Modals State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addModalInitialType, setAddModalInitialType] = useState<TransactionType>('expense');
   const [prefilledDraft, setPrefilledDraft] = useState<Partial<Transaction> | null>(null);
   const [draftMissingFields, setDraftMissingFields] = useState<string[]>([]);
+  const [quickDraft, setQuickDraft] = useState<Partial<Transaction> | null>(null);
   const [activeFinancialQueryResult, setActiveFinancialQueryResult] = useState<DeterministicQueryResult | null>(null);
   const [isEditBalanceModalOpen, setIsEditBalanceModalOpen] = useState(false);
   const [selectedAccountForBalance, setSelectedAccountForBalance] = useState<string | null>(null);
@@ -233,6 +256,9 @@ export default function App() {
   const [isCategoryDetailModalOpen, setIsCategoryDetailModalOpen] = useState(false);
   const [selectedCategoryForDetail, setSelectedCategoryForDetail] = useState<Category | null>(null);
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
+  const [isDealsModalOpen, setIsDealsModalOpen] = useState(false);
+  const [promoBanner, setPromoBanner] = useState<PromoBannerData>(INITIAL_PROMO_BANNER);
+  const [perkDeals, setPerkDeals] = useState<PerkDealItem[]>(INITIAL_PERK_DEALS);
 
   // 8. Success Toast Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -272,91 +298,17 @@ export default function App() {
       } else {
         setAuthUser(null);
       }
-      setIsAuthLoading(false);
+      setIsAuthChecking(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (!authUser || isGoogleLoginPending) {
-      if (!authUser) {
-        setSubscription(null);
-        setSubscriptionError(null);
-        setIsSubscriptionLoading(false);
-      }
-      return;
-    }
-
-    let isCurrent = true;
-    setIsSubscriptionLoading(true);
-    setSubscriptionError(null);
-    requestSubscription('subscription.get')
-      .then((nextSubscription) => {
-        if (isCurrent) setSubscription(nextSubscription);
-      })
-      .catch((error: unknown) => {
-        if (isCurrent) {
-          setSubscriptionError(
-            error instanceof Error
-              ? error.message
-              : (lang === 'ar' ? 'تعذر تحميل حالة الاشتراك.' : 'Could not load subscription status.')
-          );
-        }
-      })
-      .finally(() => {
-        if (isCurrent) setIsSubscriptionLoading(false);
-      });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [authUser?.uid, isGoogleLoginPending]);
-
-  const handleApplyAffiliateCode = async () => {
-    const code = affiliateCode.trim().toUpperCase();
-    if (!code) {
-      setAffiliateFeedback({
-        type: 'error',
-        message: lang === 'ar' ? 'اكتب كود المسوّق أولاً.' : 'Enter a marketer code first.',
-      });
-      return;
-    }
-
-    setIsApplyingAffiliateCode(true);
-    setAffiliateFeedback(null);
-    try {
-      const nextSubscription = await requestSubscription('subscription.applyAffiliate', { code });
-      setSubscription(nextSubscription);
-      setSubscriptionError(null);
-      setAffiliateCode('');
-      setAffiliateFeedback({
-        type: 'success',
-        message: lang === 'ar'
-          ? `تم حفظ الكود في Firebase وحساب ${nextSubscription.totalTrialDays} يومًا من بداية تجربتك.`
-          : `Code saved in Firebase. Trial calculated from your original start date: ${nextSubscription.totalTrialDays} days.`,
-      });
-    } catch (error: unknown) {
-      setAffiliateFeedback({
-        type: 'error',
-        message: error instanceof Error
-          ? error.message
-          : (lang === 'ar' ? 'تعذر تفعيل الكود. حاول مرة أخرى.' : 'Could not apply the code. Try again.'),
-      });
-    } finally {
-      setIsApplyingAffiliateCode(false);
-    }
-  };
-
-  useEffect(() => {
-    if (activeTab === 'admin' && !isAdmin) {
-      setActiveTab('settings');
-    }
-  }, [activeTab, isAdmin]);
-
   // Real-time Cloud Synchronization with Firestore when user is authenticated
   useEffect(() => {
     if (!authUser) return;
+
+    setDailyUsage(getTodayUsage(authUser.uid));
 
     // 1. Subscribe to User's Accounts
     const unsubAccounts = subscribeUserAccounts(authUser.uid, (cloudAccounts) => {
@@ -396,46 +348,30 @@ export default function App() {
       }
     });
 
+    // 5. Subscribe to User's Subscription & Trial Status
+    const unsubSubscription = subscribeUserSubscription(authUser.uid, (sub) => {
+      if (sub) {
+        setUserSubscription(sub);
+      } else {
+        // Existing account dates are resolved by the subscription adapter.
+        setUserSubscription(null);
+      }
+    });
+
     return () => {
       unsubAccounts();
       unsubTransactions();
       unsubCategories();
       unsubLearnedMemory();
+      unsubSubscription();
     };
   }, [authUser?.uid]);
 
   // Google Login Handler
-  const handleGoogleLogin = async (rawAffiliateCode = affiliateCode) => {
-    setIsGoogleLoginPending(true);
-    setLoginError(null);
-    setAffiliateFeedback(null);
-
+  const handleGoogleLogin = async () => {
     try {
       const user = await loginWithGoogle();
-      const code = rawAffiliateCode.trim().toUpperCase();
-
-      if (code) {
-        setAffiliateCode(code);
-        try {
-          const nextSubscription = await requestSubscription('subscription.applyAffiliate', { code }, user);
-          setSubscription(nextSubscription);
-          setAffiliateCode('');
-          setAffiliateFeedback({
-            type: 'success',
-              message: lang === 'ar'
-                ? `تم حفظ الكود في Firebase وحساب ${nextSubscription.totalTrialDays} يومًا من بداية تجربتك.`
-                : `Code saved in Firebase. Trial calculated from your original start date: ${nextSubscription.totalTrialDays} days.`,
-          });
-        } catch (affiliateError: unknown) {
-          setAffiliateFeedback({
-            type: 'error',
-            message: affiliateError instanceof Error
-              ? affiliateError.message
-              : (lang === 'ar' ? 'تعذر تفعيل الكود. يمكنك المحاولة من بطاقة الاشتراك.' : 'Could not apply the code. You can retry from the subscription card.'),
-          });
-        }
-      }
-
+      const t = translations[lang];
       setToastMessage(
         lang === 'ar'
           ? `أهلاً بك، تم تسجيل الدخول بنجاح (${user.displayName || user.email})`
@@ -443,6 +379,7 @@ export default function App() {
       );
       setTimeout(() => setToastMessage(null), 3500);
     } catch (err: any) {
+      // User closed popup or cancelled - normal user interaction, do not treat as error
       if (
         err?.code === 'auth/popup-closed-by-user' ||
         err?.code === 'auth/cancelled-popup-request'
@@ -450,19 +387,21 @@ export default function App() {
         return;
       }
 
-      const message = err?.code === 'auth/popup-blocked'
-        ? (lang === 'ar'
-          ? 'المتصفح منع نافذة تسجيل الدخول. اسمح بالنوافذ المنبثقة ثم حاول مرة أخرى.'
-          : 'The browser blocked the sign-in window. Allow popups and try again.')
-        : (lang === 'ar'
-          ? 'تعذر تسجيل الدخول حالياً. تحقق من اتصالك بالإنترنت وحاول مرة أخرى.'
-          : 'Could not sign in right now. Check your internet connection and try again.');
-
-      setLoginError(message);
-      setToastMessage(message);
+      if (err?.code === 'auth/popup-blocked') {
+        setToastMessage(
+          lang === 'ar'
+            ? 'تم حظر النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة أو فتح التطبيق في تبويب جديد.'
+            : 'Popup was blocked by the browser. Please allow popups or open in a new tab.'
+        );
+      } else {
+        console.warn('Google Sign-In notice:', err?.message || err);
+        setToastMessage(
+          lang === 'ar'
+            ? 'تعذر تسجيل الدخول حالياً، يرجى المحاولة لاحقاً'
+            : 'Could not sign in right now. Please try again later.'
+        );
+      }
       setTimeout(() => setToastMessage(null), 4000);
-    } finally {
-      setIsGoogleLoginPending(false);
     }
   };
 
@@ -505,8 +444,38 @@ export default function App() {
     setIsAddModalOpen(true);
   };
 
+  // Usage quota tracking for AI entries & inquiries
+  const handleAiEntryUsed = () => {
+    const updated = incrementExpenseAiUsage(authUser!.uid);
+    setDailyUsage(updated);
+  };
+
+  const handleAiQueryUsed = () => {
+    const updated = incrementInquiryAiUsage(authUser!.uid);
+    setDailyUsage(updated);
+  };
+
   // Handle Natural Language / Voice input parsed draft via Gemini AI
   const handleTransactionDraft = (draft: Partial<Transaction>, missingFields: string[]) => {
+    // If draft has a valid amount, provide a frictionless inline confirmation card first
+    if (draft.amount && draft.amount > 0 && (!missingFields || missingFields.length === 0 || !missingFields.includes('amount'))) {
+      const resolvedDraft: Partial<Transaction> = {
+        ...draft,
+        type: draft.type || 'expense',
+        accountId: draft.accountId || accounts[0]?.id || 'acc_cash',
+        categoryId: draft.categoryId || categories[0]?.id || 'cat_other',
+        currency: draft.currency || accounts[0]?.currency || 'EGP',
+        date: draft.date || new Date().toISOString().slice(0, 10),
+        time: draft.time || new Date().toTimeString().slice(0, 5),
+        description: draft.description || (lang === 'ar' ? 'معاملة جديدة' : 'New Transaction'),
+      };
+      setQuickDraft(resolvedDraft);
+      setPrefilledDraft(resolvedDraft);
+      setDraftMissingFields(missingFields || []);
+      return;
+    }
+
+    // Otherwise if amount is missing or user needs manual selection, open the modal
     setPrefilledDraft(draft);
     setDraftMissingFields(missingFields);
     if (draft.type) {
@@ -515,21 +484,46 @@ export default function App() {
     setIsAddModalOpen(true);
   };
 
+  // Instant 1-tap confirmation from inline Quick Save card
+  const handleConfirmQuickDraft = async () => {
+    if (!quickDraft || !quickDraft.amount) return;
+    const finalTx: Omit<Transaction, 'id' | 'createdAt'> = {
+      type: quickDraft.type || 'expense',
+      amount: quickDraft.amount,
+      currency: quickDraft.currency || accounts[0]?.currency || 'EGP',
+      accountId: quickDraft.accountId || accounts[0]?.id || 'acc_cash',
+      toAccountId: quickDraft.toAccountId,
+      categoryId: quickDraft.categoryId || categories[0]?.id || 'cat_other',
+      description: quickDraft.description || (lang === 'ar' ? 'معاملة جديدة' : 'New Transaction'),
+      date: quickDraft.date || new Date().toISOString().slice(0, 10),
+      time: quickDraft.time || new Date().toTimeString().slice(0, 5),
+    };
+    await handleSaveTransaction(finalTx);
+    setQuickDraft(null);
+    setPrefilledDraft(null);
+    setToastMessage(lang === 'ar' ? 'تم حفظ العملية بنجاح! ✨' : 'Transaction saved successfully! ✨');
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
   // Handle AI Correction (e.g. user says "make it 400" after a draft was generated)
   const handleAICorrection = (correction: AICorrection) => {
-    if (prefilledDraft && correction.fieldToUpdate) {
+    const targetDraft = quickDraft || prefilledDraft;
+    if (targetDraft && correction.fieldToUpdate) {
       let val: any = correction.newValue;
       if (correction.fieldToUpdate === 'amount' && val != null) {
         val = typeof val === 'string' ? parseFloat(val) : val;
         val = val || undefined;
       }
       
-      const updatedDraft = { ...prefilledDraft, [correction.fieldToUpdate]: val };
+      const updatedDraft = { ...targetDraft, [correction.fieldToUpdate]: val };
+      if (quickDraft) {
+        setQuickDraft(updatedDraft);
+      }
       setPrefilledDraft(updatedDraft);
 
       // Adaptive learning from correction
-      if (prefilledDraft.description) {
-        aiLearnedMemory.recordLearning(prefilledDraft.description, {
+      if (updatedDraft.description) {
+        aiLearnedMemory.recordLearning(updatedDraft.description, {
           categoryId: correction.fieldToUpdate === 'categoryId' ? String(val) : updatedDraft.categoryId,
           accountId: correction.fieldToUpdate === 'accountId' ? String(val) : updatedDraft.accountId,
           type: updatedDraft.type,
@@ -540,12 +534,6 @@ export default function App() {
         }
       }
       
-      // Ensure modal is open to show the correction
-      if (!isAddModalOpen) {
-        setIsAddModalOpen(true);
-      }
-      
-      const t = translations[lang];
       setToastMessage(lang === 'ar' ? 'تم تعديل العملية' : 'Transaction updated');
       setTimeout(() => setToastMessage(null), 3000);
     }
@@ -553,13 +541,18 @@ export default function App() {
 
   // Handle AI Financial Query with Deterministic Math Engine
   const handleFinancialQuery = (query: AIFinancialQuery, questionText: string) => {
+    const isPaid = userSubscription?.isPaid;
+    // For free/trial users: clamp query history window to max 35 days as per business rule
+    const maxDaysHistory = isPaid ? undefined : (userSubscription?.maxHistoricalQueryDays || 35);
+
     const result = executeDeterministicQuery(
       query,
       questionText,
       transactions,
       accounts,
       categories,
-      lang
+      lang,
+      maxDaysHistory
     );
     setActiveFinancialQueryResult(result);
   };
@@ -1035,30 +1028,40 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const revisionLabel = isAdmin ? ' #8' : '';
-  const greetingText = `${greetingPrefix} ${userName} 👋${revisionLabel}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #9' : ''}`;
 
-  if (isAuthLoading) {
+  // The authentication callback passes the signed-in UID directly, avoiding stale React state.
+  const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {
+    if (!signedInUid || !appliedCode) return;
+    try {
+      await saveUserSubscriptionToFirestore(signedInUid, { affiliateCode: appliedCode });
+    } catch (error) {
+      setToastMessage(error instanceof Error ? error.message : 'تعذر حفظ الكود');
+      throw error;
+    }
+  };
+
+  // 1. Splash / Auth Checking State
+  if (isAuthChecking) {
     return (
-      <div dir={lang === 'ar' ? 'rtl' : 'ltr'} className="min-h-screen bg-[#f5f7f6] flex items-center justify-center font-sans">
-        <div className="flex flex-col items-center gap-3 text-slate-500">
-          <div className="h-10 w-10 rounded-2xl bg-emerald-600 animate-pulse" />
-          <span className="text-sm">{lang === 'ar' ? 'جارٍ تجهيز حسابك...' : 'Preparing your account...'}</span>
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-6 text-slate-800">
+        <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600 animate-pulse mb-3">
+          <Sparkles className="w-6 h-6" />
         </div>
+        <p className="text-sm font-bold text-slate-600">
+          {lang === 'ar' ? 'جاري تهيئة MyBucket...' : 'Initializing MyBucket...'}
+        </p>
       </div>
     );
   }
 
-  if (!authUser || isGoogleLoginPending) {
+  // 2. Dedicated Full-Page Auth & Registration (No popups / No modals)
+  if (!authUser) {
     return (
-      <LoginView
+      <AuthPage
         lang={lang}
+        onSuccess={handleAuthGateSuccess}
         onToggleLanguage={handleToggleLanguage}
-        onLogin={(code) => handleGoogleLogin(code)}
-        affiliateCode={affiliateCode}
-        onAffiliateCodeChange={(code) => { setAffiliateCode(code.toUpperCase()); setAffiliateFeedback(null); }}
-        isLoading={isGoogleLoginPending}
-        error={loginError}
       />
     );
   }
@@ -1091,25 +1094,6 @@ export default function App() {
       <main className="flex-1 max-w-md sm:max-w-xl w-full mx-auto p-4 pb-24">
         {activeTab === 'home' && (
           <div className="space-y-4">
-            <SubscriptionStatusCard
-              lang={lang}
-              subscription={subscription}
-              isLoading={isSubscriptionLoading}
-              error={subscriptionError}
-              affiliateCode={affiliateCode}
-              onAffiliateCodeChange={(code) => { setAffiliateCode(code.toUpperCase()); setAffiliateFeedback(null); }}
-              isApplyingCode={isApplyingAffiliateCode}
-              feedback={affiliateFeedback}
-              onApplyCode={handleApplyAffiliateCode}
-              onRetry={() => {
-                setSubscriptionError(null);
-                setIsSubscriptionLoading(true);
-                requestSubscription('subscription.get')
-                  .then(setSubscription)
-                  .catch((error: unknown) => setSubscriptionError(error instanceof Error ? error.message : (lang === 'ar' ? 'تعذر تحميل حالة الاشتراك.' : 'Could not load subscription status.')))
-                  .finally(() => setIsSubscriptionLoading(false));
-              }}
-            />
             {/* Quick Mobile & Google Account Banner (if not logged in) */}
             {!authUser && (
               <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200/80 rounded-2xl p-3 shadow-2xs flex items-center justify-between gap-2.5 animate-in fade-in">
@@ -1153,31 +1137,140 @@ export default function App() {
             <div className="pt-1 pb-1 px-1">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <h1 className="text-base sm:text-lg font-black text-slate-800 tracking-tight">
+                  <h1 className="text-base sm:text-lg font-black text-slate-800 ">
                     {greetingText}
                   </h1>
                 </div>
                 {authUser && (
-                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold">
-                    <Cloud className="w-3 h-3 text-emerald-600" />
-                    <span>{lang === 'ar' ? 'سحابي متزامن' : 'Cloud Synced'}</span>
-                  </div>
+                  (() => {
+                    const remainingDays = userSubscription ? calculateRemainingTrialDays(userSubscription) : null;
+                    const isPaid = userSubscription?.isPaid;
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('settings')}
+                        className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full font-bold transition-all shadow-2xs cursor-pointer ${
+                          isPaid
+                            ? 'text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100'
+                            : remainingDays <= 3
+                            ? 'text-amber-800 bg-amber-50 border border-amber-300 hover:bg-amber-100'
+                            : 'text-emerald-800 bg-emerald-50 border border-emerald-300/80 hover:bg-emerald-100'
+                        }`}
+                        title={lang === 'ar' ? 'عرض تفاصيل الاشتراك والتجربة' : 'View subscription details'}
+                      >
+                        <Clock className={`w-3.5 h-3.5 ${remainingDays <= 3 && !isPaid ? 'text-amber-600' : 'text-emerald-600'}`} />
+                        <span>
+                          {remainingDays === null
+                            ? (lang === 'ar' ? 'جارٍ تحميل الاشتراك…' : 'Loading subscription…')
+                            : isPaid
+                            ? (lang === 'ar' ? 'مشترك نشط ✨' : 'Active Pro ✨')
+                            : (lang === 'ar'
+                                ? `متبقي ${remainingDays} ${remainingDays === 1 ? 'يوم' : remainingDays === 2 ? 'يومان' : remainingDays <= 10 ? 'أيام' : 'يوم'} للتجربة`
+                                : `${remainingDays} trial days left`)}
+                        </span>
+                      </button>
+                    );
+                  })()
                 )}
               </div>
-              <p className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight mt-0.5">
-                {t.homePrompt}
-              </p>
             </div>
 
-            {/* 2. THE PRIMARY INTERACTION: "اكتب أو قل لي أي عملية..." Large Card */}
+            {/* 2. Top Clear Financial Summary: Net Balance + Today/Month expenses */}
+            <HomeFinancialOverview
+              accounts={accounts}
+              transactions={transactions}
+              lang={lang}
+              onViewTransactions={() => setActiveTab('transactions')}
+              onViewAccounts={() => setActiveTab('accounts')}
+            />
+
+            {/* 3. THE PRIMARY INTERACTION: "اكتب أو قل لي أي عملية..." Large Card */}
             <VoiceNaturalInput
               lang={lang}
               accounts={accounts}
               categories={categories}
+              userDailyUsage={dailyUsage}
+              userSubscription={userSubscription}
               onTransactionDraft={handleTransactionDraft}
               onFinancialQuery={handleFinancialQuery}
               onAICorrection={handleAICorrection}
+              onAiEntryUsed={handleAiEntryUsed}
+              onAiQueryUsed={handleAiQueryUsed}
+              onOpenManualAdd={() => handleOpenAddModal('expense')}
             />
+
+            {/* Inline Quick Save Confirmation Card */}
+            {quickDraft && (
+              <div className="bg-emerald-50/90 border-2 border-emerald-400/80 rounded-3xl p-4 sm:p-5 shadow-xs space-y-3 animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-xs font-black text-emerald-900">
+                      {lang === 'ar' ? 'جاهز للتسجيل والحفظ السريع:' : 'Ready for Quick Save:'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuickDraft(null);
+                      setPrefilledDraft(null);
+                    }}
+                    className="p-1 rounded-full text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                    title={lang === 'ar' ? 'إلغاء' : 'Cancel'}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="bg-white rounded-2xl p-3 sm:p-4 border border-emerald-200/80 flex items-center justify-between gap-3 shadow-2xs">
+                  <div className="space-y-0.5 min-w-0">
+                    <p className="font-extrabold text-slate-900 text-sm sm:text-base truncate">
+                      {quickDraft.description || (lang === 'ar' ? 'معاملة جديدة' : 'New Transaction')}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                      <span>
+                        {categories.find((c) => c.id === quickDraft.categoryId)?.[lang === 'ar' ? 'nameAr' : 'name'] ||
+                          (lang === 'ar' ? 'عام' : 'General')}
+                      </span>
+                      <span>•</span>
+                      <span className="text-emerald-700 font-bold">
+                        {accounts.find((a) => a.id === quickDraft.accountId)?.[lang === 'ar' ? 'nameAr' : 'name'] ||
+                          (lang === 'ar' ? 'كاش' : 'Cash')}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-xl sm:text-2xl font-black text-emerald-700">
+                      {quickDraft.amount?.toLocaleString()}
+                    </span>
+                    <span className="text-xs font-bold text-slate-600 mr-1 ml-1">
+                      {lang === 'ar' ? 'ج.م' : quickDraft.currency}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={handleConfirmQuickDraft}
+                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs sm:text-sm shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>{lang === 'ar' ? 'تأكيد وحفظ الآن' : 'Confirm & Save Now'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddModalOpen(true);
+                    }}
+                    className="px-3.5 py-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    <span>{lang === 'ar' ? 'تعديل بالتفصيل' : 'Edit Details'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* AI Financial Query Result Card */}
             {activeFinancialQueryResult && (
@@ -1223,10 +1316,7 @@ export default function App() {
               onEditBalance={handleOpenEditBalance}
             />
 
-            {/* 5. "ملخص هذا الشهر" - Donut Chart & Monthly Breakdown Card */}
-            <MonthSummaryCard transactions={transactions} lang={lang} />
-
-            {/* 6. "أحدث العمليات" - Recent Transactions List */}
+            {/* 5. "أحدث العمليات" - Recent Transactions List */}
             <RecentTransactions
               transactions={transactions}
               accounts={accounts}
@@ -1234,6 +1324,13 @@ export default function App() {
               lang={lang}
               onViewAll={() => setActiveTab('transactions')}
               onDeleteTransaction={handleDeleteTransaction}
+            />
+
+            {/* 6. Sponsored Promo Banner & Exclusive Deals Bar */}
+            <PromoBanner
+              banner={promoBanner}
+              lang={lang}
+              onOpenDeals={() => setIsDealsModalOpen(true)}
             />
           </div>
         )}
@@ -1285,24 +1382,26 @@ export default function App() {
           <SettingsView
             lang={lang}
             onSetLanguage={(newLang) => setLang(newLang)}
-            user={authUser}
-            onLogin={handleGoogleLogin}
-            onLogout={handleGoogleLogout}
-            onOpenMobileLink={() => setIsMobileModalOpen(true)}
-            isAdmin={isAdmin}
-            onOpenAdmin={() => setActiveTab('admin')}
-          />
-        )}
-
-        {activeTab === 'admin' && isAdmin && authUser ? (
-          <AdminView
-            lang={lang}
-            user={authUser}
-            onBack={() => setActiveTab('settings')}
             onResetDemoData={handleResetDemoData}
             onZeroAllBalances={handleZeroAllBalances}
+            user={authUser}
+            subscription={userSubscription}
+            onUpdateSubscription={async (updatedSub) => {
+              if (authUser) {
+                const saved = await saveUserSubscriptionToFirestore(authUser.uid, updatedSub);
+                setUserSubscription(saved);
+              }
+            }}
+            onLogin={handleGoogleLogin}
+            onLogout={handleGoogleLogout}
+            isAdmin={isAdmin}
+            onOpenAdmin={() => setActiveTab('admin')}
+            onOpenMobileLink={() => setIsMobileModalOpen(true)}
           />
-        ) : null}
+        )}
+        {activeTab === 'admin' && isAdmin && authUser && (
+          <AdminView lang={lang} user={authUser} onBack={() => setActiveTab('settings')} onResetDemoData={handleResetDemoData} onZeroAllBalances={handleZeroAllBalances} />
+        )}
       </main>
 
       {/* Unified Transaction Form Component */}
@@ -1413,6 +1512,14 @@ export default function App() {
         lang={lang}
         user={authUser}
         onLogin={handleGoogleLogin}
+      />
+
+      {/* Exclusive Deals & Discounts Modal */}
+      <DealsModal
+        isOpen={isDealsModalOpen}
+        onClose={() => setIsDealsModalOpen(false)}
+        deals={perkDeals}
+        lang={lang}
       />
 
       {/* Bottom Navigation Bar */}

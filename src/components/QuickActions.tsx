@@ -23,7 +23,7 @@ export function QuickActions({ lang, onOpenAddModal, onOpenSearchModal }: QuickA
           className="py-2.5 px-1.5 sm:px-2 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white rounded-2xl transition-all active:scale-[0.98] cursor-pointer shadow-xs flex flex-col sm:flex-row items-center justify-center gap-1 font-black text-xs sm:text-sm group"
         >
           <ArrowDownRight className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
-          <span className="tracking-tight">{t.quickExpense}</span>
+          <span className="">{t.quickExpense}</span>
         </button>
 
         {/* 2. دخل */}
@@ -34,7 +34,7 @@ export function QuickActions({ lang, onOpenAddModal, onOpenSearchModal }: QuickA
           className="py-2.5 px-1.5 sm:px-2 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white rounded-2xl transition-all active:scale-[0.98] cursor-pointer shadow-xs flex flex-col sm:flex-row items-center justify-center gap-1 font-black text-xs sm:text-sm group"
         >
           <ArrowUpRight className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
-          <span className="tracking-tight">{t.quickIncome}</span>
+          <span className="">{t.quickIncome}</span>
         </button>
 
         {/* 3. تحويل */}
@@ -45,7 +45,7 @@ export function QuickActions({ lang, onOpenAddModal, onOpenSearchModal }: QuickA
           className="py-2.5 px-1.5 sm:px-2 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white rounded-2xl transition-all active:scale-[0.98] cursor-pointer shadow-xs flex flex-col sm:flex-row items-center justify-center gap-1 font-black text-xs sm:text-sm group"
         >
           <ArrowLeftRight className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
-          <span className="tracking-tight">{t.quickTransfer}</span>
+          <span className="">{t.quickTransfer}</span>
         </button>
 
         {/* 4. استعلام */}
@@ -56,7 +56,7 @@ export function QuickActions({ lang, onOpenAddModal, onOpenSearchModal }: QuickA
           className="py-2.5 px-1.5 sm:px-2 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white rounded-2xl transition-all active:scale-[0.98] cursor-pointer shadow-xs flex flex-col sm:flex-row items-center justify-center gap-1 font-black text-xs sm:text-sm group"
         >
           <Search className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
-          <span className="tracking-tight">{t.quickInquiry || (lang === 'ar' ? 'استعلام' : 'Inquiry')}</span>
+          <span className="">{t.quickInquiry || (lang === 'ar' ? 'استعلام' : 'Inquiry')}</span>
         </button>
       </div>
 
@@ -68,7 +68,7 @@ export function QuickActions({ lang, onOpenAddModal, onOpenSearchModal }: QuickA
         className="w-full py-2.5 px-4 bg-emerald-500/90 hover:bg-emerald-600 active:bg-emerald-700 text-white rounded-2xl transition-all active:scale-[0.99] cursor-pointer shadow-xs flex items-center justify-center gap-2 group font-bold text-xs sm:text-sm"
       >
         <PlusCircle className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
-        <span className="tracking-tight">
+        <span className="">
           {t.addTransactionManually}
         </span>
       </button>

@@ -74,7 +74,7 @@ export function AccountsView({ accounts, lang, onAddAccount, onEditBalance }: Ac
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className="text-xl font-extrabold text-slate-900 ">
             {t.accountsTitle}
           </h1>
           <p className="text-xs text-slate-500">{t.accountsSubtitle}</p>

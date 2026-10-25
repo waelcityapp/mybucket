@@ -107,7 +107,7 @@ export function RecentTransactions({
     <section className="space-y-2.5">
       {/* Header Row: "أحدث العمليات" on start, "عرض الكل" on end */}
       <div className="flex items-center justify-between px-0.5">
-        <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+        <h2 className="text-sm sm:text-base font-black text-slate-900 ">
           {t.recentTransactions}
         </h2>
 
@@ -145,7 +145,7 @@ export function RecentTransactions({
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="shrink-0">{getTransactionIcon(tx)}</div>
                   <div className="min-w-0">
-                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight truncate">
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-900  truncate">
                       {tx.description}
                     </h4>
                     <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">
@@ -160,7 +160,7 @@ export function RecentTransactions({
                 <div className="flex items-center gap-2 shrink-0">
                   <div className="text-end">
                     <div
-                      className={`text-xs sm:text-sm font-black tracking-tight ${
+                      className={`text-xs sm:text-sm font-black  ${
                         isExpense
                           ? 'text-rose-500'
                           : isIncome

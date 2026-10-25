@@ -47,7 +47,7 @@ export function MobileLinkModal({
               <Smartphone className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="font-extrabold text-slate-900 text-sm tracking-tight">
+              <h2 className="font-extrabold text-slate-900 text-sm ">
                 {t.mobileLinkTitle}
               </h2>
               <p className="text-[11px] text-slate-500">

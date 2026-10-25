@@ -19,6 +19,7 @@ import { Category, Transaction, Language, AuthUser } from '../../types';
 import { translations } from '../../data/translations';
 import { getCurrentLocalDate } from '../../utils/dateTime';
 import { getUserDateLimits, getAvailableMonthsForYear } from '../../utils/userRegistration';
+import { MonthSummaryCard } from '../MonthSummaryCard';
 
 interface CategoriesViewProps {
   categories: Category[];
@@ -101,12 +102,11 @@ export function CategoriesView({
     }
   };
 
-  // Filter transactions according to selected period
-  const getCategoryPeriodTotal = (catId: string) => {
-    const matching = transactions.filter((tx) => {
-      if (tx.categoryId !== catId) return false;
+  // Filter all transactions according to selected period
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((tx) => {
       const txDateStr = tx.date || tx.createdAt?.split('T')[0] || '';
-      if (!txDateStr) return period === 'all_time';
+      if (!txDateStr) return false;
 
       const txDate = new Date(txDateStr);
       const txYear = txDate.getFullYear();
@@ -133,7 +133,11 @@ export function CategoriesView({
           return txYear === currentYear && txMonth === currentMonth;
       }
     });
+  }, [transactions, period, currentYear, currentMonth, selectedYear, selectedMonth, customStart, customEnd]);
 
+  // Filter transactions according to selected period for specific category
+  const getCategoryPeriodTotal = (catId: string) => {
+    const matching = filteredTransactions.filter((tx) => tx.categoryId === catId);
     const sum = matching.reduce((acc, tx) => acc + tx.amount, 0);
     return { sum, count: matching.length };
   };
@@ -149,7 +153,7 @@ export function CategoriesView({
       {/* Header */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className="text-xl font-extrabold text-slate-900 ">
             {t.categoriesTitle}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -326,6 +330,9 @@ export function CategoriesView({
           </div>
         )}
       </div>
+
+      {/* Monthly Financial Breakdown & Donut Chart Summary */}
+      <MonthSummaryCard transactions={filteredTransactions} lang={lang} />
 
       {/* Expense Categories */}
       <div className="space-y-3">

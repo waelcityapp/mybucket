@@ -68,7 +68,7 @@ export function TransactionsView({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className="text-xl font-extrabold text-slate-900 ">
             {t.allTransactions}
           </h1>
           <p className="text-xs text-slate-500">
@@ -185,7 +185,7 @@ export function TransactionsView({
                   </div>
 
                   <div className="min-w-0">
-                    <div className="font-bold text-slate-900 text-sm tracking-tight truncate">
+                    <div className="font-bold text-slate-900 text-sm  truncate">
                       {tx.description}
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-slate-500 flex-wrap">
@@ -209,7 +209,7 @@ export function TransactionsView({
                 <div className="flex items-center gap-3 shrink-0">
                   <div className="text-right">
                     <div
-                      className={`text-sm sm:text-base font-extrabold tracking-tight ${
+                      className={`text-sm sm:text-base font-extrabold  ${
                         isExpense
                           ? 'text-slate-900'
                           : isIncome

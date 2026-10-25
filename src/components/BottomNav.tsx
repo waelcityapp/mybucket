@@ -67,7 +67,7 @@ export function BottomNav({ activeTab, onChangeTab, lang }: BottomNavProps) {
                     {item.icon}
                   </div>
                 </div>
-                <span className={`text-[10px] tracking-tight font-bold transition-colors ${isActive ? 'text-blue-600' : 'text-slate-500'}`}>
+                <span className={`text-[10px]  font-bold transition-colors ${isActive ? 'text-blue-600' : 'text-slate-500'}`}>
                   {item.label}
                 </span>
                 {isActive && <div className="absolute -bottom-1.5 w-8 h-1 bg-blue-600 rounded-t-md" />}
@@ -94,7 +94,7 @@ export function BottomNav({ activeTab, onChangeTab, lang }: BottomNavProps) {
               >
                 {item.icon}
               </div>
-              <span className="text-[10px] tracking-tight font-bold">
+              <span className="text-[10px]  font-bold">
                 {item.label}
               </span>
             </button>

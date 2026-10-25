@@ -631,7 +631,7 @@ export function TransactionModal({
         {/* Unified Form Top Bar */}
         <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
           <div className="flex items-center gap-2">
-            <h3 className="font-black text-slate-900 text-sm sm:text-base tracking-tight">
+            <h3 className="font-black text-slate-900 text-sm sm:text-base ">
               {isAr ? 'إضافة عملية جديدة' : 'New Transaction'}
             </h3>
             {isAiProposal && (

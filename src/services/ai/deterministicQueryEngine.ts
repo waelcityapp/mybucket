@@ -17,7 +17,8 @@ export function executeDeterministicQuery(
   transactions: Transaction[],
   accounts: FinancialAccount[],
   categories: Category[],
-  lang: Language
+  lang: Language,
+  maxDaysHistory?: number
 ): DeterministicQueryResult {
   const isAr = lang === 'ar';
   const now = new Date();
@@ -115,6 +116,15 @@ export function executeDeterministicQuery(
     default: {
       periodLabel = isAr ? 'كافة السجلات' : 'All time records';
       break;
+    }
+  }
+
+  // If maxDaysHistory is provided (e.g. 35 days for AI queries limit), clamp startTimestamp
+  if (typeof maxDaysHistory === 'number' && maxDaysHistory > 0) {
+    const historyBoundary = new Date(now.getTime() - maxDaysHistory * 24 * 60 * 60 * 1000).getTime();
+    if (startTimestamp < historyBoundary) {
+      startTimestamp = historyBoundary;
+      periodLabel += isAr ? ` (بحد أقصى ${maxDaysHistory} يوماً)` : ` (up to ${maxDaysHistory} days)`;
     }
   }
 

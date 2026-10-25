@@ -85,7 +85,7 @@ export function MonthSummaryCard({ transactions, lang }: MonthSummaryCardProps) 
     <section className="space-y-2.5">
       {/* Title */}
       <div className="flex items-center justify-between px-0.5">
-        <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+        <h2 className="text-sm sm:text-base font-black text-slate-900 ">
           {t.thisMonthSummary}
         </h2>
       </div>

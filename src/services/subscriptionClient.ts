@@ -15,6 +15,19 @@ const PROTOTYPE_CODES = new Set([
 
 type LegacySubscription = Record<string, unknown>;
 
+function dateString(value: unknown): string | null {
+  if (typeof value === 'string' && Number.isFinite(Date.parse(value))) return value;
+  if (value instanceof Date && Number.isFinite(value.getTime())) return value.toISOString();
+  if (value && typeof value === 'object' && 'seconds' in value) {
+    const seconds = (value as { seconds: unknown }).seconds;
+    if (typeof seconds === 'number' && Number.isFinite(seconds)) {
+      const date = new Date(seconds * 1000);
+      if (Number.isFinite(date.getTime())) return date.toISOString();
+    }
+  }
+  return null;
+}
+
 function validDate(value: unknown): value is string {
   return typeof value === 'string' && Number.isFinite(Date.parse(value));
 }
@@ -23,12 +36,13 @@ function normalizeSubscription(raw: LegacySubscription): UserSubscription | null
   // An older Google login flow accidentally saved { success, updatedSubscription, message }.
   const nested = raw.updatedSubscription;
   const source = nested && typeof nested === 'object' && !Array.isArray(nested)
-    ? nested as LegacySubscription
+    ? { ...raw, ...nested as LegacySubscription }
     : raw;
-  if (!validDate(source.trialStartedAt)) return null;
+  const trialStartedAt = dateString(source.trialStartedAt);
+  if (!trialStartedAt) return null;
 
-  const start = Date.parse(source.trialStartedAt);
-  const expiry = validDate(source.trialExpiresAt) ? source.trialExpiresAt : null;
+  const start = Date.parse(trialStartedAt);
+  const expiry = dateString(source.trialExpiresAt);
   if (!expiry) return null;
   const code = typeof source.affiliateCode === 'string' && source.affiliateCode.trim()
     ? source.affiliateCode.trim().toUpperCase()
@@ -37,12 +51,12 @@ function normalizeSubscription(raw: LegacySubscription): UserSubscription | null
     ? source.totalTrialDays
     : Math.max(10, Math.round((Date.parse(expiry) - start) / DAY_MS));
   const isPaid = source.isPaid === true;
-  const paidExpiresAt = validDate(source.paidExpiresAt) ? source.paidExpiresAt : null;
+  const paidExpiresAt = dateString(source.paidExpiresAt);
   const effectiveExpiry = isPaid && paidExpiresAt ? paidExpiresAt : expiry;
 
   return {
     status: Date.parse(effectiveExpiry) <= Date.now() ? 'expired' : isPaid ? 'paid' : 'trial',
-    trialStartedAt: source.trialStartedAt,
+    trialStartedAt,
     trialExpiresAt: expiry,
     totalTrialDays: totalDays,
     affiliateCode: code,
@@ -56,8 +70,8 @@ function normalizeSubscription(raw: LegacySubscription): UserSubscription | null
     dailyAiEntryLimit: typeof source.dailyAiEntryLimit === 'number' ? source.dailyAiEntryLimit : 15,
     dailyAiInquiryLimit: typeof source.dailyAiInquiryLimit === 'number' ? source.dailyAiInquiryLimit : 5,
     maxHistoricalQueryDays: typeof source.maxHistoricalQueryDays === 'number' ? source.maxHistoricalQueryDays : 35,
-    createdAt: validDate(source.createdAt) ? source.createdAt : source.trialStartedAt,
-    updatedAt: validDate(source.updatedAt) ? source.updatedAt : source.trialStartedAt,
+    createdAt: dateString(source.createdAt) || trialStartedAt,
+    updatedAt: dateString(source.updatedAt) || trialStartedAt,
     recordSource: 'billing',
   };
 }
@@ -91,6 +105,22 @@ function withCode(subscription: UserSubscription, code: string, temporaryLocalOn
     monthlyPriceEgp: 120,
     temporaryLocalOnly,
   };
+}
+
+// Resolve data already delivered by Firestore listeners without starting another network read.
+export function resolveSubscriptionRecords(
+  user: User,
+  billing: LegacySubscription | null,
+  profile: LegacySubscription | null
+): UserSubscription {
+  const subscription = billing ? normalizeSubscription(billing) : fromGoogleRegistration(user);
+  if (!subscription) throw new Error('سجل الاشتراك المحفوظ لا يحتوي على تاريخ صالح لحساب الأيام.');
+  if (subscription.hasAppliedAffiliateCode || subscription.isPaid) return subscription;
+  const savedCode = profile?.prototypeAffiliateCode;
+  if (typeof savedCode === 'string' && PROTOTYPE_CODES.has(savedCode)) {
+    return withCode(subscription, savedCode, false);
+  }
+  return subscription;
 }
 
 async function persistPrototypeCode(uid: string, code: string): Promise<void> {

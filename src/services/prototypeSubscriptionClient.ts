@@ -1,6 +1,6 @@
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
-import { requestSubscription } from './subscriptionClient';
+import { requestSubscription, resolveSubscriptionRecords } from './subscriptionClient';
 import type { UserSubscription as StoredSubscription } from '../types/subscription';
 import type { UserSubscription } from '../types/prototypeSubscription';
 
@@ -22,21 +22,55 @@ function toPrototype(sub: StoredSubscription): UserSubscription {
 }
 
 // Keep the original UI while preserving the existing records, dates and Firebase rules.
-export function subscribeUserSubscription(uid: string, onUpdate: (sub: UserSubscription) => void) {
+export function subscribeUserSubscription(
+  uid: string,
+  onUpdate: (sub: UserSubscription) => void,
+  onError: (message: string) => void
+) {
   let active = true;
-  const refresh = async () => {
+  let billing: Record<string, unknown> | null | undefined;
+  let profile: Record<string, unknown> | null | undefined;
+  const timeout = setTimeout(() => {
+    if (active && (billing === undefined || profile === undefined)) {
+      onError('تعذر قراءة حالة الاشتراك. اضغط لإعادة المحاولة.');
+    }
+  }, 12000);
+  const fail = (error: unknown) => {
+    if (!active) return;
+    clearTimeout(timeout);
+    console.warn('Subscription could not be loaded:', error);
+    onError('تعذر قراءة حالة الاشتراك. اضغط لإعادة المحاولة.');
+  };
+  const refresh = () => {
+    if (!active || billing === undefined || profile === undefined) return;
     try {
       const user = auth.currentUser;
-      if (!user || user.uid !== uid) return;
-      const sub = await requestSubscription('subscription.get', {}, user);
-      if (active) onUpdate(toPrototype(sub));
+      if (!user || user.uid !== uid) throw new Error('The signed-in account changed.');
+      const sub = resolveSubscriptionRecords(user, billing, profile);
+      clearTimeout(timeout);
+      onUpdate(toPrototype(sub));
     } catch (error) {
-      console.warn('Subscription could not be loaded:', error);
+      fail(error);
     }
   };
-  const unsubscribeProfile = onSnapshot(doc(db, 'users', uid), refresh, refresh);
-  const unsubscribeBilling = onSnapshot(doc(db, 'users', uid, 'billing', 'subscription'), refresh, refresh);
-  return () => { active = false; unsubscribeProfile(); unsubscribeBilling(); };
+  const unsubscribeProfile = onSnapshot(doc(db, 'users', uid), { includeMetadataChanges: true }, (snapshot) => {
+    const fromCache = snapshot.metadata.fromCache;
+    if (!snapshot.exists() && fromCache) return;
+    profile = snapshot.exists() ? snapshot.data() : null;
+    refresh();
+  }, fail);
+  const unsubscribeBilling = onSnapshot(doc(db, 'users', uid, 'billing', 'subscription'), { includeMetadataChanges: true }, (snapshot) => {
+    const fromCache = snapshot.metadata.fromCache;
+    if (!snapshot.exists() && fromCache) return;
+    billing = snapshot.exists() ? snapshot.data() : null;
+    refresh();
+  }, fail);
+  return () => {
+    active = false;
+    clearTimeout(timeout);
+    unsubscribeProfile();
+    unsubscribeBilling();
+  };
 }
 
 export async function saveUserSubscriptionToFirestore(uid: string, proposed: Partial<UserSubscription>) {

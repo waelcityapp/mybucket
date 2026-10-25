@@ -155,7 +155,7 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 
 ## Current implementation status
 
-- Current admin-only revision: `#9` (Google reference UI restored by owner request, retaining Google-only authentication and existing Firebase/backend connections).
+- Current admin-only revision: `#10` (Google reference UI restored by owner request, retaining Google-only authentication and existing Firebase/backend connections).
 - Admin-only UI page exists on `main` and is visible to `waelvts@gmail.com`.
 - Phase 1 provides the protected backend foundation; Phase 2 now includes Google onboarding, marketer-code entry, and the home subscription status and remaining-days card.
 - Vercel build and the gateway runtime's unauthenticated 401 response were verified. Firebase Admin deployment credentials and a real marketer code remain unverified, so the signed-in days counter and redemption still need end-to-end testing.
@@ -183,3 +183,12 @@ Compatibility differences from the archive:
 Validation: TypeScript check and production build passed. Server health returned HTTP 200; an unauthenticated gateway request returned HTTP 401. Static React rendering checked Arabic/English Google-only sign-in, financial overview and subscription/code display. Logic checks covered 10-day trials, a code granting 35 days from the original start (31 remaining after four elapsed days), invalid and duplicate codes, and user-scoped daily usage. Browser visual/mobile checks were blocked: no Chromium binary was installed and the browser download returned an invalid archive. No live Google sign-in or authenticated production database operation was performed.
 
 Next work: the owner reviews the restored interface first, then requests individual changes. Backend completion stays deferred as requested.
+
+
+## Subscription badge read fix — revision #10, 2026-10-25
+
+The owner reported the home badge stuck on loading after restoration. The adapter discarded Firestore snapshot payloads and started fresh server reads; any failed read only logged an error, leaving the subscription null indefinitely. It now resolves the two delivered billing/profile snapshots directly, including metadata-only cache-to-server changes. Confirmed missing records use the stable Google account creation timestamp; cache-only missing records do not create a new trial. Original ISO dates, Firestore Timestamp values, and the legacy result wrapper are supported. Persisted prototype marketer codes still calculate 35 days from the original start.
+
+The badge displays remaining trial days or `انتهت التجربة` / `Trial expired` at zero days. While the first records are being read, no indefinite loading badge is shown. Failed reads/timeouts produce an explicit retry action rather than an invented expiry; subscriptions can still recover from later listener updates. The subscription listener is separate from financial-data listeners, so retries do not resubscribe or reseed accounts. No live records, Firebase rules, backend transport, or settings were modified.
+
+Validation for #10: TypeScript and production build passed. Mocked Firestore listener regression checks passed for direct snapshot reads without follow-up network requests or writes, 31 remaining days after four elapsed days with a saved marketer code, expired trial, ISO/Timestamp/wrapped legacy records, missing-cache versus confirmed-missing documents, listener errors and recovery, timeout retry, and unsubscribe cleanup. Live signed-in account and browser visual checks were not performed.

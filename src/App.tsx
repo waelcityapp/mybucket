@@ -225,6 +225,8 @@ export default function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
+  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
+  const [subscriptionRetry, setSubscriptionRetry] = useState(0);
   const [dailyUsage, setDailyUsage] = useState<UserDailyUsage>({
     date: new Date().toISOString().slice(0, 10),
     expenseAiCount: 0,
@@ -348,24 +350,23 @@ export default function App() {
       }
     });
 
-    // 5. Subscribe to User's Subscription & Trial Status
-    const unsubSubscription = subscribeUserSubscription(authUser.uid, (sub) => {
-      if (sub) {
-        setUserSubscription(sub);
-      } else {
-        // Existing account dates are resolved by the subscription adapter.
-        setUserSubscription(null);
-      }
-    });
-
     return () => {
       unsubAccounts();
       unsubTransactions();
       unsubCategories();
       unsubLearnedMemory();
-      unsubSubscription();
     };
   }, [authUser?.uid]);
+
+  useEffect(() => {
+    setUserSubscription(null);
+    setSubscriptionError(null);
+    if (!authUser) return;
+    return subscribeUserSubscription(authUser.uid, (subscription) => {
+      setUserSubscription(subscription);
+      setSubscriptionError(null);
+    }, setSubscriptionError);
+  }, [authUser?.uid, subscriptionRetry]);
 
   // Google Login Handler
   const handleGoogleLogin = async () => {
@@ -1028,7 +1029,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #9' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #10' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {
@@ -1141,14 +1142,14 @@ export default function App() {
                     {greetingText}
                   </h1>
                 </div>
-                {authUser && (
+                {authUser && (userSubscription || subscriptionError) && (
                   (() => {
                     const remainingDays = userSubscription ? calculateRemainingTrialDays(userSubscription) : null;
                     const isPaid = userSubscription?.isPaid;
                     return (
                       <button
                         type="button"
-                        onClick={() => setActiveTab('settings')}
+                        onClick={() => subscriptionError ? setSubscriptionRetry((attempt) => attempt + 1) : setActiveTab('settings')}
                         className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full font-bold transition-all shadow-2xs cursor-pointer ${
                           isPaid
                             ? 'text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100'
@@ -1160,8 +1161,10 @@ export default function App() {
                       >
                         <Clock className={`w-3.5 h-3.5 ${remainingDays <= 3 && !isPaid ? 'text-amber-600' : 'text-emerald-600'}`} />
                         <span>
-                          {remainingDays === null
-                            ? (lang === 'ar' ? 'جارٍ تحميل الاشتراك…' : 'Loading subscription…')
+                          {subscriptionError
+                            ? (lang === 'ar' ? 'تعذر قراءة الاشتراك — أعد المحاولة' : 'Could not read subscription — retry')
+                            : remainingDays === 0
+                            ? (lang === 'ar' ? 'انتهت التجربة' : 'Trial expired')
                             : isPaid
                             ? (lang === 'ar' ? 'مشترك نشط ✨' : 'Active Pro ✨')
                             : (lang === 'ar'

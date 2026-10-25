@@ -73,7 +73,7 @@ import {
 } from './lib/firebase';
 import { aiLearnedMemory } from './services/ai/aiLearnedMemory';
 
-import { saveUserSubscriptionToFirestore, subscribeUserSubscription } from './services/prototypeSubscriptionClient';
+import { saveUserSubscriptionToFirestore, subscribeUserSubscription, type SubscriptionReadIssue } from './services/prototypeSubscriptionClient';
 
 const STORAGE_KEY_PREFIX = 'mybucket_';
 
@@ -225,7 +225,7 @@ export default function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
-  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
+  const [subscriptionError, setSubscriptionError] = useState<SubscriptionReadIssue | null>(null);
   const [subscriptionRetry, setSubscriptionRetry] = useState(0);
   const [dailyUsage, setDailyUsage] = useState<UserDailyUsage>({
     date: new Date().toISOString().slice(0, 10),
@@ -1029,7 +1029,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #10' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #11' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {
@@ -1177,6 +1177,18 @@ export default function App() {
                 )}
               </div>
             </div>
+
+            {subscriptionError && (
+              <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950 space-y-1 break-words">
+                <p>{lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn}</p>
+                {isAdmin && (
+                  <div className="text-[11px] text-amber-800 font-mono" dir="ltr">
+                    <p>{subscriptionError.readErrors?.join(' • ') || `${subscriptionError.source}: ${subscriptionError.code}`}</p>
+                    {subscriptionError.fields && <p>Fields: {subscriptionError.fields.join(', ') || '(empty)'}</p>}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* 2. Top Clear Financial Summary: Net Balance + Today/Month expenses */}
             <HomeFinancialOverview

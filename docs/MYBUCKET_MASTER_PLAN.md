@@ -155,7 +155,7 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 
 ## Current implementation status
 
-- Current admin-only revision: `#10` (Google reference UI restored by owner request, retaining Google-only authentication and existing Firebase/backend connections).
+- Current admin-only revision: `#11` (Google reference UI restored by owner request, retaining Google-only authentication and existing Firebase/backend connections).
 - Admin-only UI page exists on `main` and is visible to `waelvts@gmail.com`.
 - Phase 1 provides the protected backend foundation; Phase 2 now includes Google onboarding, marketer-code entry, and the home subscription status and remaining-days card.
 - Vercel build and the gateway runtime's unauthenticated 401 response were verified. Firebase Admin deployment credentials and a real marketer code remain unverified, so the signed-in days counter and redemption still need end-to-end testing.
@@ -192,3 +192,16 @@ The owner reported the home badge stuck on loading after restoration. The adapte
 The badge displays remaining trial days or `انتهت التجربة` / `Trial expired` at zero days. While the first records are being read, no indefinite loading badge is shown. Failed reads/timeouts produce an explicit retry action rather than an invented expiry; subscriptions can still recover from later listener updates. The subscription listener is separate from financial-data listeners, so retries do not resubscribe or reseed accounts. No live records, Firebase rules, backend transport, or settings were modified.
 
 Validation for #10: TypeScript and production build passed. Mocked Firestore listener regression checks passed for direct snapshot reads without follow-up network requests or writes, 31 remaining days after four elapsed days with a saved marketer code, expired trial, ISO/Timestamp/wrapped legacy records, missing-cache versus confirmed-missing documents, listener errors and recovery, timeout retry, and unsubscribe cleanup. Live signed-in account and browser visual checks were not performed.
+
+
+## Subscription diagnosis and independent billing read — revision #11, 2026-10-25
+
+The owner's live account still reports a read error after #10. No signed-in owner session is available in this environment, so the actual Firebase error has not yet been observed. Do not claim a live fix based only on fixtures or a successful build.
+
+The listener now accepts a valid billing record containing its own affiliate code or paid status without waiting for the unrelated profile listener. Profile failures do not block a self-contained billing record. A trial without a billing code still waits for the profile, so a saved prototype code is not silently ignored. No fallback days are invented after a denied billing/profile read.
+
+Read failures are now distinguished by billing, profile, date parsing, or account change. The page shows a precise Arabic/English explanation. Only the administrator sees the underlying Firebase/local error code and, for invalid dates, the record's field names (no field values, credentials, or financial data). Timeouts are explicitly identified, and retry remains available. Firebase data, deployed rules, configuration and backend connections remain unchanged.
+
+Next verification requires the owner's actual Firebase error or a successful signed-in read on #11. This remains a live-verification blocker, not proof that permissions or dates are the cause.
+
+Validation for #11: TypeScript, production build, and regression fixtures passed. Checks include the original countdown/date/cache/cleanup cases, a complete billing record surviving profile permission denial, separate billing permission errors, exact invalid-date classification with field names only, no raw error values in UI diagnostics, and paid records resolving independently. Multiple failing read sources are retained in the administrator diagnostic. These checks do not establish the live owner-account error or prove it resolved.

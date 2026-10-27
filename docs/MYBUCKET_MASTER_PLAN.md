@@ -249,3 +249,7 @@ New operations require a user-specified source account. AI drafts cannot use a g
 ## AI transaction review — revision #20
 
 AI-created transactions open a full review form at /transactions/new rather than a quick-save card. Users review and edit fields before saving; no financial transaction is created at interpretation time.
+
+## Atomic transaction deletion — revision #21
+
+Deleting a transaction atomically reverses its effect using current server balances: expenses return funds to their source; transfers return funds to the source and deduct them from the destination; income is reversed from its account. If reversal would overdraw an account or account data is invalid, deletion is rejected without changing balances or the record. Repeated deletion does not reverse twice.

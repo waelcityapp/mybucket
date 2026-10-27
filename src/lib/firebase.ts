@@ -14,7 +14,6 @@ import {
   setDoc,
   collection,
   onSnapshot,
-  deleteDoc,
   writeBatch,
   runTransaction,
   getDocFromServer,
@@ -270,10 +269,33 @@ export async function saveTransactionToFirestore(userId: string, transaction: Tr
   await setDoc(txRef, { ...transaction, userId }, { merge: true });
 }
 
-// Delete transaction from Firestore
-export async function deleteTransactionFromFirestore(userId: string, transactionId: string) {
+// Delete and reverse the financial effect together, based on current server values.
+export async function deleteTransactionFromFirestore(userId: string, transactionId: string): Promise<'deleted' | 'already-deleted'> {
+  if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
   const txRef = doc(db, 'users', userId, 'transactions', transactionId);
-  await deleteDoc(txRef);
+  return runTransaction(db, async transaction => {
+    const savedTx = await transaction.get(txRef);
+    if (!savedTx.exists()) return 'already-deleted';
+    const tx = savedTx.data() as Transaction;
+    if (!Number.isFinite(tx.amount) || tx.amount <= 0 || !tx.accountId || !['expense', 'income', 'transfer'].includes(tx.type)) throw new Error('invalid-transaction');
+    if (tx.type === 'transfer' && (!tx.toAccountId || tx.toAccountId === tx.accountId)) throw new Error('invalid-transfer');
+    const fromRef = doc(db, 'users', userId, 'accounts', tx.accountId);
+    const toRef = tx.type === 'transfer' && tx.toAccountId ? doc(db, 'users', userId, 'accounts', tx.toAccountId) : null;
+    const [from, to] = await Promise.all([transaction.get(fromRef), toRef ? transaction.get(toRef) : Promise.resolve(null)]);
+    if (!from.exists() || (toRef && !to?.exists())) throw new Error('account-not-found');
+    const source = from.data();
+    const destination = to?.data();
+    if (!Number.isFinite(source.balance) || (destination && !Number.isFinite(destination.balance))) throw new Error('invalid-balance');
+    if (source.currency !== tx.currency || (destination && destination.currency !== tx.currency)) throw new Error('currency-mismatch');
+    const debitedAccount = tx.type === 'income' ? source : tx.type === 'transfer' ? destination : null;
+    if (debitedAccount && tx.amount > debitedAccount.balance) {
+      throw new InsufficientBalanceError(debitedAccount.balance, debitedAccount.currency, debitedAccount.nameAr || 'الحساب', debitedAccount.name || 'account');
+    }
+    transaction.update(fromRef, { balance: source.balance + (tx.type === 'income' ? -tx.amount : tx.amount) });
+    if (toRef && destination) transaction.update(toRef, { balance: destination.balance - tx.amount });
+    transaction.delete(txRef);
+    return 'deleted';
+  });
 }
 
 // Save all categories (batch)

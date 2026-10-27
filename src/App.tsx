@@ -188,6 +188,7 @@ export default function App() {
   const [transactionReadError, setTransactionReadError] = useState(false);
   const lastUserId = useRef<string | null>(null);
   const saveInFlight = useRef(false);
+  const deleteInFlight = useRef(new Set<string>());
   const pendingTransaction = useRef<{ key: string; tx: Transaction } | null>(null);
 
   // 6. User Auth State & Subscription
@@ -570,41 +571,27 @@ export default function App() {
     }
   };
 
-  // Delete Transaction Handler
+  // Reverse and delete as one confirmed server operation; never overwrite other balances.
   const handleDeleteTransaction = async (txId: string) => {
-    const tx = transactions.find((t) => t.id === txId);
-    if (!tx) return;
-
-    // Reverse balance impact
-    const updatedAccounts = accounts.map((acc) => {
-      if (acc.id === tx.accountId) {
-        if (tx.type === 'expense') {
-          return { ...acc, balance: acc.balance + tx.amount };
-        }
-        if (tx.type === 'income') {
-          return { ...acc, balance: acc.balance - tx.amount };
-        }
-        if (tx.type === 'transfer') {
-          return { ...acc, balance: acc.balance + tx.amount };
-        }
-      }
-      if (tx.type === 'transfer' && acc.id === tx.toAccountId) {
-        return { ...acc, balance: acc.balance - tx.amount };
-      }
-      return acc;
-    });
-
-    setAccounts(updatedAccounts);
-    setTransactions((prev) => prev.filter((t) => t.id !== txId));
-
-    // Delete from Firestore
-    if (authUser) {
-      try {
-        await deleteTransactionFromFirestore(authUser.uid, txId);
-        await saveAllAccountsToFirestore(authUser.uid, updatedAccounts);
-      } catch (err) {
-        console.error('Firestore delete transaction error:', err);
-      }
+    if (!authUser || deleteInFlight.current.has(txId)) return;
+    const uid = authUser.uid;
+    deleteInFlight.current.add(txId);
+    try {
+      const result = await deleteTransactionFromFirestore(uid, txId);
+      if (auth.currentUser?.uid !== uid) return;
+      setToastMessage(result === 'deleted'
+        ? (lang === 'ar' ? 'تم حذف العملية وتحديث الأرصدة بنجاح.' : 'Transaction deleted and balances updated.')
+        : (lang === 'ar' ? 'العملية محذوفة بالفعل. راجع قائمة العمليات.' : 'Transaction was already deleted. Check the list.'));
+    } catch (error) {
+      console.error('Firestore delete transaction error:', error);
+      if (auth.currentUser?.uid !== uid) return;
+      setToastMessage(error instanceof InsufficientBalanceError
+        ? (lang === 'ar'
+          ? `لا يمكن حذف العملية: رصيد ${error.accountNameAr} الحالي ${new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency} ولا يكفي لعكس العملية.`
+          : `Cannot delete: ${error.accountName} has ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency}, which is insufficient to reverse the transaction.`)
+        : (lang === 'ar' ? 'تعذر حذف العملية وتحديث الأرصدة. تحقق من الاتصال والحسابات ثم حاول مجددًا.' : 'Could not delete the transaction and update balances. Check your connection and accounts.'));
+    } finally {
+      deleteInFlight.current.delete(txId);
     }
   };
 
@@ -971,7 +958,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #20' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #21' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {

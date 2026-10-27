@@ -222,3 +222,8 @@ The owner approved dedicated pages for trial details and the monthly subscriptio
 ## Confirm subscription dates before display
 
 Trial dates are shown as recorded only when obtained from a valid billing record without a profile-code derived expiry. Missing or inferred dates show an unconfirmed state, without inventing a trial duration. Display waits for server-confirmed Firestore snapshots. No user data or Firebase rules were modified. Historical attribution remains unresolved where not recorded.
+
+
+## Financial save and account isolation — work in progress
+
+Prepared a server-confirmed Firestore transaction for new financial entries, and removed shared local financial state from the active session. Account snapshots must be server confirmed before initialization. The first validation used simulated Firestore and build checks only; signed-in, multi-account, multi-device and concurrency checks remain required before production. Editing and deleting transactions and application locking are outside this phase and remain unverified. No legacy browser data or Firebase data was deleted.

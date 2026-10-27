@@ -16,6 +16,7 @@ import {
   onSnapshot,
   deleteDoc,
   writeBatch,
+  runTransaction,
   getDocFromServer,
 } from 'firebase/firestore';
 import { FinancialAccount, Transaction, Category } from '../types';
@@ -121,7 +122,9 @@ export function subscribeUserAccounts(
   const accountsRef = collection(db, 'users', userId, 'accounts');
   return onSnapshot(
     accountsRef,
+    { includeMetadataChanges: true },
     (snapshot) => {
+      if (snapshot.metadata.fromCache) return;
       const accounts: FinancialAccount[] = [];
       snapshot.forEach((docSnap) => {
         accounts.push(docSnap.data() as FinancialAccount);
@@ -142,7 +145,9 @@ export function subscribeUserTransactions(
   const txRef = collection(db, 'users', userId, 'transactions');
   return onSnapshot(
     txRef,
+    { includeMetadataChanges: true },
     (snapshot) => {
+      if (snapshot.metadata.fromCache) return;
       const transactions: Transaction[] = [];
       snapshot.forEach((docSnap) => {
         transactions.push(docSnap.data() as Transaction);
@@ -169,7 +174,9 @@ export function subscribeUserCategories(
   const catRef = collection(db, 'users', userId, 'categories');
   return onSnapshot(
     catRef,
+    { includeMetadataChanges: true },
     (snapshot) => {
+      if (snapshot.metadata.fromCache) return;
       const categories: Category[] = [];
       snapshot.forEach((docSnap) => {
         categories.push(docSnap.data() as Category);
@@ -196,6 +203,45 @@ export async function saveAllAccountsToFirestore(userId: string, accounts: Finan
     batch.set(accRef, { ...acc, userId }, { merge: true });
   });
   await batch.commit();
+}
+
+// Create defaults only if still absent, preventing concurrent sign-ins from resetting data.
+export async function initializeDefaultDocuments(userId: string, group: 'accounts' | 'categories', items: Array<FinancialAccount | Category>): Promise<void> {
+  if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
+  const refs = items.map(item => doc(db, 'users', userId, group, item.id));
+  await runTransaction(db, async transaction => {
+    const snapshots = await Promise.all(refs.map(ref => transaction.get(ref)));
+    snapshots.forEach((snapshot, index) => {
+      if (!snapshot.exists()) transaction.set(refs[index], { ...items[index], userId });
+    });
+  });
+}
+
+// Atomically create a transaction and update its affected balances from current server values.
+export async function createFinancialTransaction(userId: string, tx: Transaction): Promise<void> {
+  if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
+  if (!Number.isFinite(tx.amount) || tx.amount <= 0 || !tx.accountId) throw new Error('invalid-transaction');
+  if (tx.type === 'transfer' && (!tx.toAccountId || tx.accountId === tx.toAccountId)) throw new Error('invalid-transfer');
+  const txRef = doc(db, 'users', userId, 'transactions', tx.id);
+  const fromRef = doc(db, 'users', userId, 'accounts', tx.accountId);
+  const toRef = tx.type === 'transfer' && tx.toAccountId ? doc(db, 'users', userId, 'accounts', tx.toAccountId) : null;
+  await runTransaction(db, async (transaction) => {
+    const [oldTx, from, to] = await Promise.all([transaction.get(txRef), transaction.get(fromRef), toRef ? transaction.get(toRef) : Promise.resolve(null)]);
+    if (oldTx.exists()) {
+      const saved = oldTx.data();
+      if (saved.userId === userId && Object.entries(tx).every(([key, value]) => saved[key] === value)) return;
+      throw new Error('duplicate-transaction');
+    }
+    if (!from.exists() || (toRef && !to?.exists())) throw new Error('account-not-found');
+    const source = from.data();
+    const destination = to?.data();
+    if (!Number.isFinite(source.balance) || (destination && !Number.isFinite(destination.balance))) throw new Error('invalid-balance');
+    if (source.currency !== tx.currency || (destination && destination.currency !== tx.currency)) throw new Error('currency-mismatch');
+    const sourceBalance = source.balance + (tx.type === 'income' ? tx.amount : -tx.amount);
+    transaction.set(txRef, { ...tx, userId });
+    transaction.update(fromRef, { balance: sourceBalance });
+    if (toRef && destination) transaction.update(toRef, { balance: destination.balance + tx.amount });
+  });
 }
 
 // Save single transaction to Firestore

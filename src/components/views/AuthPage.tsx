@@ -39,7 +39,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ lang, onSuccess, onToggleLan
     } catch (err: any) {
       console.error('Google Sign-in error:', err);
       if (err.code !== 'auth/popup-closed-by-user') {
-        setErrorMsg(isAr ? 'تعذر إتمام الدخول بحساب جوجل. برجاء المحاولة مرة أخرى.' : 'Google sign-in failed. Please try again.');
+        const code = typeof err?.code === 'string' && /^auth\/[a-z0-9-]+$/.test(err.code) ? err.code : null;
+        const detail = code === 'auth/unauthorized-domain'
+          ? (isAr ? 'عنوان نسخة الاختبار غير مضاف ضمن النطاقات المصرّح بها في Firebase.' : 'The preview domain is not authorized in Firebase.')
+          : code === 'auth/popup-blocked'
+          ? (isAr ? 'المتصفح منع نافذة تسجيل الدخول.' : 'The browser blocked the sign-in popup.')
+          : code === 'auth/network-request-failed'
+          ? (isAr ? 'تعذر الاتصال بخدمة تسجيل الدخول.' : 'Could not reach the sign-in service.')
+          : (isAr ? 'تعذر إتمام الدخول بحساب جوجل.' : 'Google sign-in failed.');
+        setErrorMsg(code ? `${detail} (${code})` : detail);
       }
     } finally {
       setIsLoading(false);

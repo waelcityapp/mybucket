@@ -2,7 +2,7 @@ export const translations = {
   ar: {
     appName: 'My Bucket',
     appTagline: 'ماي بوكيت - محفظتك المنظمة',
-    headerSubtitle: 'فلوسك .. أبسط مما تتخيل',
+    headerSubtitle: 'تنظيم فلوسك أبسط مما تتخيل مع My Bucket',
     greeting: 'صباح الخير 👋',
     morningGreeting: 'صباح الخير 👋',
     eveningGreeting: 'مساء الخير 👋',

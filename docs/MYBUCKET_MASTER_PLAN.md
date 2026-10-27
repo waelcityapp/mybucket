@@ -237,3 +237,7 @@ Manual entry requires an explicit account and category. New transactions and bal
 ## Cash expense balance check
 
 A new cash expense is rejected inside the Firestore transaction when its amount exceeds the current saved cash balance; the form displays the account balance and no write occurs. Exact-balance expenses remain allowed. Rules for credit cards, other account types, transfers and historical edits are not changed by this request. Live Firebase verification remains pending.
+
+## Balance checks for all accounts — revision #18
+
+New expenses and transfers must not exceed the current server balance of their source account, regardless of account type. Income remains allowed. This applies to new transactions; existing balances and past transactions are not modified.

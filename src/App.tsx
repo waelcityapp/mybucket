@@ -62,7 +62,7 @@ import {
   testFirestoreConnection,
   auth,
   createFinancialTransaction,
-  InsufficientCashBalanceError,
+  InsufficientBalanceError,
   initializeDefaultDocuments,
   subscribeUserAccounts,
   subscribeUserTransactions,
@@ -582,10 +582,10 @@ export default function App() {
       return { ok: true };
     } catch (error) {
       console.error('Transaction save failed:', error);
-      const message = error instanceof InsufficientCashBalanceError
+      const message = error instanceof InsufficientBalanceError
         ? (lang === 'ar'
-          ? `لا يمكن تسجيل المصروف: رصيد ${error.accountNameAr} هو ${new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency} فقط.`
-          : `Cannot record the expense: ${error.accountName} has only ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency}.`)
+          ? `لا يمكن ${newTx.type === 'transfer' ? 'التحويل' : 'تسجيل المصروف'}: رصيد ${error.accountNameAr} هو ${new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency} فقط.`
+          : `Cannot ${newTx.type === 'transfer' ? 'transfer' : 'record the expense'}: ${error.accountName} has only ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency}.`)
         : (lang === 'ar' ? 'تعذر تأكيد الحفظ. راجع قائمة العمليات قبل إعادة المحاولة حتى لا تتكرر.' : 'Could not confirm the transaction was saved. Check your connection and account.');
       if (auth.currentUser?.uid === uid) setToastMessage(message);
       return { ok: false, message };
@@ -995,7 +995,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #17' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #18' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {

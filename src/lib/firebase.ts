@@ -219,10 +219,10 @@ export async function initializeDefaultDocuments(userId: string, group: 'account
   });
 }
 
-export class InsufficientCashBalanceError extends Error {
+export class InsufficientBalanceError extends Error {
   constructor(public readonly balance: number, public readonly currency: string, public readonly accountNameAr: string, public readonly accountName: string) {
-    super('insufficient-cash-balance');
-    this.name = 'InsufficientCashBalanceError';
+    super('insufficient-balance');
+    this.name = 'InsufficientBalanceError';
   }
 }
 
@@ -246,8 +246,8 @@ export async function createFinancialTransaction(userId: string, tx: Transaction
     const destination = to?.data();
     if (!Number.isFinite(source.balance) || (destination && !Number.isFinite(destination.balance))) throw new Error('invalid-balance');
     if (source.currency !== tx.currency || (destination && destination.currency !== tx.currency)) throw new Error('currency-mismatch');
-    if (tx.type === 'expense' && source.type === 'cash' && tx.amount > source.balance) {
-      throw new InsufficientCashBalanceError(source.balance, source.currency, source.nameAr || 'الكاش', source.name || 'Cash');
+    if ((tx.type === 'expense' || tx.type === 'transfer') && tx.amount > source.balance) {
+      throw new InsufficientBalanceError(source.balance, source.currency, source.nameAr || 'الحساب', source.name || 'account');
     }
     const sourceBalance = source.balance + (tx.type === 'income' ? tx.amount : -tx.amount);
     transaction.set(txRef, { ...tx, userId });

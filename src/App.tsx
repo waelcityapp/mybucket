@@ -69,7 +69,7 @@ import {
   subscribeUserCategories,
   saveAccountToFirestore,
   saveAllAccountsToFirestore,
-  saveTransactionToFirestore,
+  updateFinancialTransaction,
   deleteTransactionFromFirestore,
   saveAllCategoriesToFirestore,
   saveLearnedMemoryToFirestore,
@@ -595,53 +595,25 @@ export default function App() {
     }
   };
 
-  // Edit Existing Transaction Handler (re-calculate account balance impact)
-  const handleEditTransaction = async (updatedTx: Transaction) => {
-    const oldTx = transactions.find((t) => t.id === updatedTx.id);
-    if (!oldTx) return;
-
-    // Recalculate account balances: first reverse oldTx, then apply updatedTx
-    const updatedAccounts = accounts.map((acc) => {
-      let balance = acc.balance;
-
-      // 1. Reverse oldTx effect
-      if (acc.id === oldTx.accountId) {
-        if (oldTx.type === 'expense') balance += oldTx.amount;
-        if (oldTx.type === 'income') balance -= oldTx.amount;
-        if (oldTx.type === 'transfer') balance += oldTx.amount;
-      }
-      if (oldTx.type === 'transfer' && acc.id === oldTx.toAccountId) {
-        balance -= oldTx.amount;
-      }
-
-      // 2. Apply updatedTx effect
-      if (acc.id === updatedTx.accountId) {
-        if (updatedTx.type === 'expense') balance -= updatedTx.amount;
-        if (updatedTx.type === 'income') balance += updatedTx.amount;
-        if (updatedTx.type === 'transfer') balance -= updatedTx.amount;
-      }
-      if (updatedTx.type === 'transfer' && acc.id === updatedTx.toAccountId) {
-        balance += updatedTx.amount;
-      }
-
-      return { ...acc, balance };
-    });
-
-    setAccounts(updatedAccounts);
-    setTransactions((prev) => prev.map((t) => (t.id === updatedTx.id ? updatedTx : t)));
-
-    // Save to Firestore
-    if (authUser) {
-      try {
-        await saveTransactionToFirestore(authUser.uid, updatedTx);
-        await saveAllAccountsToFirestore(authUser.uid, updatedAccounts);
-      } catch (err) {
-        console.error('Firestore edit transaction error:', err);
-      }
+  // Save an edit and all affected balances together using current server data.
+  const handleEditTransaction = async (expected: Transaction, updated: Transaction): Promise<{ ok: boolean; message?: string }> => {
+    if (!authUser) return { ok: false, message: lang === 'ar' ? 'يرجى تسجيل الدخول أولًا.' : 'Please sign in first.' };
+    const uid = authUser.uid;
+    try {
+      await updateFinancialTransaction(uid, expected, updated);
+      if (auth.currentUser?.uid !== uid) return { ok: false };
+      setToastMessage(lang === 'ar' ? 'تم حفظ التعديل وتحديث الأرصدة.' : 'Transaction and balances updated.');
+      setTimeout(() => setToastMessage(null), 3500);
+      return { ok: true };
+    } catch (error) {
+      console.error('Firestore edit transaction error:', error);
+      const message = error instanceof InsufficientBalanceError
+        ? (lang === 'ar' ? `لا يمكن حفظ التعديل: رصيد ${error.accountNameAr} الحالي ${new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency} لا يكفي لإتمامه.` : `Cannot save: ${error.accountName} has insufficient funds.`)
+        : error instanceof Error && error.message === 'transaction-changed'
+        ? (lang === 'ar' ? 'العملية تغيرت على جهاز آخر. أغلق التعديل وافتحها مجددًا.' : 'This transaction changed elsewhere. Reopen it to edit.')
+        : (lang === 'ar' ? 'تعذر حفظ التعديل وتحديث الأرصدة. تحقق من الاتصال والحسابات.' : 'Could not update the transaction and balances. Check your connection and accounts.');
+      return { ok: false, message };
     }
-
-    setToastMessage(lang === 'ar' ? 'تم تحديث المعاملة بنجاح!' : 'Transaction updated successfully!');
-    setTimeout(() => setToastMessage(null), 3500);
   };
 
   // Add New Account Handler
@@ -958,7 +930,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #21' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #22' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {

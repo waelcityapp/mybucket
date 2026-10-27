@@ -263,10 +263,44 @@ export async function createFinancialTransaction(userId: string, tx: Transaction
   }
 }
 
-// Save single transaction to Firestore
-export async function saveTransactionToFirestore(userId: string, transaction: Transaction) {
-  const txRef = doc(db, 'users', userId, 'transactions', transaction.id);
-  await setDoc(txRef, { ...transaction, userId }, { merge: true });
+// Apply the difference between the saved and edited transaction in one Firestore transaction.
+export async function updateFinancialTransaction(userId: string, expected: Transaction, updated: Transaction): Promise<void> {
+  if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
+  if (updated.id !== expected.id || updated.type !== expected.type || updated.currency !== expected.currency) throw new Error('invalid-transaction');
+  const valid = (tx: Transaction) => Number.isFinite(tx.amount) && tx.amount > 0 && !!tx.accountId && ['expense', 'income', 'transfer'].includes(tx.type) && (tx.type !== 'transfer' || (!!tx.toAccountId && tx.toAccountId !== tx.accountId));
+  if (!valid(expected) || !valid(updated)) throw new Error('invalid-transaction');
+  const txRef = doc(db, 'users', userId, 'transactions', expected.id);
+  await runTransaction(db, async transaction => {
+    const snapshot = await transaction.get(txRef);
+    if (!snapshot.exists()) throw new Error('transaction-not-found');
+    const saved = snapshot.data();
+    const matches = (tx: Transaction) => Object.entries(tx).every(([key, value]) => saved[key] === value);
+    if (matches(updated)) return; // A retry after a successful but unconfirmed commit must not apply twice.
+    if (!matches(expected)) throw new Error('transaction-changed');
+    const deltas = new Map<string, number>();
+    const add = (id: string, amount: number) => deltas.set(id, (deltas.get(id) || 0) + amount);
+    const apply = (tx: Transaction, factor: number) => {
+      add(tx.accountId, factor * (tx.type === 'income' ? tx.amount : -tx.amount));
+      if (tx.type === 'transfer' && tx.toAccountId) add(tx.toAccountId, factor * tx.amount);
+    };
+    apply(expected, -1);
+    apply(updated, 1);
+    const refs = Array.from(deltas.keys(), id => doc(db, 'users', userId, 'accounts', id));
+    const snapshots = await Promise.all(refs.map(ref => transaction.get(ref)));
+    const changes = snapshots.map((account, i) => {
+      if (!account.exists()) throw new Error('account-not-found');
+      const data = account.data();
+      if (!Number.isFinite(data.balance)) throw new Error('invalid-balance');
+      if (data.currency !== updated.currency) throw new Error('currency-mismatch');
+      const delta = deltas.get(refs[i].id)!;
+      const balance = data.balance + delta;
+      if (balance < 0 && delta < 0) throw new InsufficientBalanceError(data.balance, data.currency, data.nameAr || 'الحساب', data.name || 'account');
+      return { ref: refs[i], balance };
+    });
+    changes.forEach(({ ref, balance }) => transaction.update(ref, { balance }));
+    const cleanUpdated = Object.fromEntries(Object.entries(updated).filter(([, value]) => value !== undefined));
+    transaction.set(txRef, { ...cleanUpdated, userId });
+  });
 }
 
 // Delete and reverse the financial effect together, based on current server values.

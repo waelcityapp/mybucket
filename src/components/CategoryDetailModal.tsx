@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import { Category, Transaction, FinancialAccount, Language, AuthUser } from '../types';
 import { translations } from '../data/translations';
-import { formatDateTimeDisplay, getCurrentLocalDate } from '../utils/dateTime';
+import { formatDateTimeDisplay, getCurrentLocalDate, toDateTimeISO } from '../utils/dateTime';
 import { getUserDateLimits, getAvailableMonthsForYear } from '../utils/userRegistration';
 import { ProExportModal, ExportFormat } from './ProExportModal';
 
@@ -45,7 +45,7 @@ interface CategoryDetailModalProps {
   lang: Language;
   authUser?: AuthUser | null;
   onClose: () => void;
-  onEditTransaction: (tx: Transaction) => void;
+  onEditTransaction: (expected: Transaction, updated: Transaction) => Promise<{ ok: boolean; message?: string }>;
   onDeleteTransaction: (txId: string) => void;
   onOpenAddTransaction: (prefilledCatId: string, type: 'expense' | 'income') => void;
 }
@@ -96,6 +96,8 @@ export function CategoryDetailModal({
 
   // Editing inline state
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
   const [editAmount, setEditAmount] = useState<string>('');
   const [editDesc, setEditDesc] = useState<string>('');
   const [editDate, setEditDate] = useState<string>('');
@@ -212,6 +214,7 @@ export function CategoryDetailModal({
   // Start editing a transaction
   const handleStartEdit = (tx: Transaction) => {
     setEditingTx(tx);
+    setEditError('');
     setEditAmount(String(tx.amount));
     setEditDesc(tx.description);
     setEditDate(tx.date || tx.createdAt?.split('T')[0] || getCurrentLocalDate());
@@ -219,9 +222,10 @@ export function CategoryDetailModal({
   };
 
   // Save edited transaction
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingTx) return;
+    if (!editingTx || editSaving) return;
+    setEditError('');
 
     const parsedAmount = parseFloat(editAmount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
@@ -234,11 +238,18 @@ export function CategoryDetailModal({
       amount: parsedAmount,
       description: editDesc.trim() || category.nameAr,
       date: editDate,
+      dateTime: editDate === editingTx.date ? editingTx.dateTime : toDateTimeISO(editDate, editingTx.time),
       accountId: editAccountId,
     };
 
-    onEditTransaction(updated);
-    setEditingTx(null);
+    setEditSaving(true);
+    try {
+      const result = await onEditTransaction(editingTx, updated);
+      if (result.ok) setEditingTx(null);
+      else setEditError(result.message || (isAr ? 'تعذر حفظ التعديل.' : 'Could not save the changes.'));
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   return (
@@ -564,6 +575,7 @@ export function CategoryDetailModal({
                 </button>
               </div>
 
+              {editError && <p role="alert" className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-2">{editError}</p>}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 mb-0.5">
@@ -633,10 +645,11 @@ export function CategoryDetailModal({
                 </button>
                 <button
                   type="submit"
+                  disabled={editSaving}
                   className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-xs flex items-center gap-1 cursor-pointer"
                 >
                   <Check className="w-3.5 h-3.5 stroke-[3]" />
-                  <span>{isAr ? 'حفظ التعديل' : 'Save Changes'}</span>
+                  <span>{editSaving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (isAr ? 'حفظ التعديل' : 'Save Changes')}</span>
                 </button>
               </div>
             </form>

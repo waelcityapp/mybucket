@@ -253,3 +253,7 @@ AI-created transactions open a full review form at /transactions/new rather than
 ## Atomic transaction deletion — revision #21
 
 Deleting a transaction atomically reverses its effect using current server balances: expenses return funds to their source; transfers return funds to the source and deduct them from the destination; income is reversed from its account. If reversal would overdraw an account or account data is invalid, deletion is rejected without changing balances or the record. Repeated deletion does not reverse twice.
+
+## Atomic transaction editing — revision #22
+
+Editing an existing transaction reverses its previous financial effect and applies the new one against current server balances in one Firestore transaction. Stale edits, insufficient funds, invalid accounts and currency mismatches are rejected without partial writes.

@@ -1039,7 +1039,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #13' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #14' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {
@@ -1173,6 +1173,8 @@ export default function App() {
                         <span>
                           {subscriptionError
                             ? (lang === 'ar' ? 'تعذر قراءة الاشتراك — أعد المحاولة' : 'Could not read subscription — retry')
+                            : userSubscription?.trialDatesStored === false
+                            ? (lang === 'ar' ? 'بيانات التجربة غير مؤكدة' : 'Trial details unconfirmed')
                             : remainingDays === 0
                             ? (lang === 'ar' ? 'انتهت التجربة' : 'Trial expired')
                             : isPaid

@@ -183,7 +183,10 @@ export function SettingsView({
       </div>
 
       {/* 2. Subscription & Promo Code Card */}
-      {subscription && onUpdateSubscription && (
+      {subscription?.trialDatesStored === false && (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{lang === 'ar' ? 'تعذر تأكيد مدة التجربة من سجل محفوظ. راجع تفاصيل الاشتراك.' : 'The trial duration could not be confirmed from a saved record. Check subscription details.'}</p>
+      )}
+      {subscription && subscription.trialDatesStored !== false && onUpdateSubscription && (
         <SubscriptionCard
           subscription={subscription}
           lang={lang}

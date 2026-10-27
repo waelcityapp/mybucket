@@ -2,6 +2,7 @@ export type SubscriptionTier = 'trial' | 'pro' | 'expired';
 
 export interface UserSubscription {
   tier: SubscriptionTier;
+  trialDatesStored?: boolean;
   affiliateCode?: string | null;
   hasAppliedAffiliateCode: boolean;
   totalTrialDays: number; // 10 without code, 35 with code

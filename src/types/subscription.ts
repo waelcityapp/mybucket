@@ -19,6 +19,7 @@ export interface UserSubscription {
   // Prototype-only marketer code saved on this browser until backend redemption is enabled.
   temporaryLocalOnly?: boolean;
   recordSource?: 'billing' | 'account';
+  trialDatesStored?: boolean;
 }
 
 export interface AffiliateCodeRecord {

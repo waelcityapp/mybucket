@@ -15,6 +15,8 @@ interface Props {
 export function TrialSubscriptionPages({ lang, subscription, error, page, onBack, onSubscription }: Props) {
   const ar = lang === 'ar';
   const days = subscription ? calculateRemainingTrialDays(subscription) : null;
+  const start = subscription && Number.isFinite(Date.parse(subscription.trialStartedAt))
+    ? new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'long' }).format(new Date(subscription.trialStartedAt)) : null;
   const expiry = subscription && Number.isFinite(Date.parse(subscription.trialExpiresAt))
     ? new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'long' }).format(new Date(subscription.trialExpiresAt)) : null;
   return (
@@ -27,10 +29,17 @@ export function TrialSubscriptionPages({ lang, subscription, error, page, onBack
           <div className="inline-flex rounded-full bg-emerald-50 p-3 text-emerald-700"><CalendarDays className="h-6 w-6" /></div>
           <h1 id="subscription-page-title" className="text-xl sm:text-2xl font-black text-slate-900">{page === 'trial-details' ? (ar ? 'تفاصيل تجربتك' : 'Your trial details') : (ar ? 'الاشتراك الشهري' : 'Monthly subscription')}</h1>
         </div>
-        {error ? <p role="alert" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{error}</p> : !subscription ? <p className="text-sm text-slate-600">{ar ? 'جارٍ قراءة بيانات الاشتراك...' : 'Loading subscription details...'}</p> : page === 'trial-details' ? <>
+        {error ? <p role="alert" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{error}</p> : !subscription ? <p className="text-sm text-slate-600">{ar ? 'جارٍ قراءة بيانات الاشتراك...' : 'Loading subscription details...'}</p> : subscription.trialDatesStored === false && page === 'trial-details' ? <>
+          <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-950">
+            {ar ? 'لا يوجد تاريخ بداية ونهاية مؤكَّدان للتجربة في سجل الاشتراك المتاح. لا يمكن تحديد المدة أو الأيام المتبقية بدقة حاليًا.' : 'Confirmed trial start and end dates are not available in the subscription record. The duration and remaining days cannot be determined accurately.'}
+          </div>
+          <p className="text-sm text-slate-700">{subscription.hasAppliedAffiliateCode && subscription.affiliateCode ? (ar ? `كود المسوّق الموجود في البيانات: ${subscription.affiliateCode}` : `Marketer code found in available data: ${subscription.affiliateCode}`) : (ar ? 'لم يظهر كود مسوّق في البيانات المتاحة؛ قد يحتاج سجلك السابق إلى مراجعة.' : 'No marketer code appeared in the available data; your earlier record may require review.')}</p>
+          <button type="button" onClick={onSubscription} className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-black text-white hover:bg-emerald-800">{ar ? 'الانتقال إلى صفحة الاشتراك' : 'Go to subscription'}</button>
+        </> : page === 'trial-details' ? <>
           <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 space-y-3 text-sm text-slate-700">
             <p className="font-black text-slate-900">{subscription.isPaid ? (ar ? 'اشتراكك نشط' : 'Your subscription is active') : days === 0 ? (ar ? 'انتهت تجربتك المجانية' : 'Your free trial has ended') : (ar ? `متبقي ${days} يوم من تجربتك` : `${days} trial days remaining`)}</p>
             <p>{ar ? `إجمالي مدة التجربة: ${subscription.totalTrialDays} يومًا` : `Total trial duration: ${subscription.totalTrialDays} days`}</p>
+            {start && <p>{ar ? `تاريخ بداية التجربة: ${start}` : `Trial start date: ${start}`}</p>}
             {expiry && <p>{ar ? `تاريخ نهاية التجربة: ${expiry}` : `Trial end date: ${expiry}`}</p>}
             <p>{subscription.hasAppliedAffiliateCode && subscription.affiliateCode ? (ar ? `كود المسوّق المسجل: ${subscription.affiliateCode}` : `Recorded marketer code: ${subscription.affiliateCode}`) : (ar ? 'لا يوجد كود مسوّق مسجّل في البيانات المتاحة.' : 'No marketer code is recorded in the available data.')}</p>
           </div>

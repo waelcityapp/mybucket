@@ -7,6 +7,7 @@ import type { UserSubscription } from '../types/prototypeSubscription';
 function toPrototype(sub: StoredSubscription): UserSubscription {
   return {
     tier: sub.status === 'paid' ? 'pro' : sub.status,
+    trialDatesStored: sub.trialDatesStored === true,
     affiliateCode: sub.affiliateCode,
     hasAppliedAffiliateCode: sub.hasAppliedAffiliateCode,
     totalTrialDays: sub.totalTrialDays,
@@ -118,7 +119,7 @@ export function subscribeUserSubscription(
 
   const unsubscribeProfile = onSnapshot(doc(db, 'users', uid), { includeMetadataChanges: true }, (snapshot) => {
     const fromCache = snapshot.metadata.fromCache;
-    if (!snapshot.exists() && fromCache) return;
+    if (fromCache) return;
     profile = snapshot.exists() ? snapshot.data() : null;
     refresh();
   }, error => {
@@ -127,7 +128,7 @@ export function subscribeUserSubscription(
   });
   const unsubscribeBilling = onSnapshot(doc(db, 'users', uid, 'billing', 'subscription'), { includeMetadataChanges: true }, (snapshot) => {
     const fromCache = snapshot.metadata.fromCache;
-    if (!snapshot.exists() && fromCache) return;
+    if (fromCache) return;
     billing = snapshot.exists() ? snapshot.data() : null;
     refresh();
   }, error => {

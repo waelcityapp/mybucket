@@ -73,6 +73,7 @@ function normalizeSubscription(raw: LegacySubscription): UserSubscription | null
     createdAt: dateString(source.createdAt) || trialStartedAt,
     updatedAt: dateString(source.updatedAt) || trialStartedAt,
     recordSource: 'billing',
+    trialDatesStored: true,
   };
 }
 
@@ -85,7 +86,7 @@ function fromGoogleRegistration(user: User): UserSubscription {
     trialExpiresAt: new Date(Date.parse(trialStartedAt) + 10 * DAY_MS).toISOString(),
     totalTrialDays: 10,
     isPaid: false,
-  })!, recordSource: 'account' };
+  })!, recordSource: 'account', trialDatesStored: false };
 }
 
 function localCodeKey(uid: string): string {
@@ -104,6 +105,7 @@ function withCode(subscription: UserSubscription, code: string, temporaryLocalOn
     hasAppliedAffiliateCode: true,
     monthlyPriceEgp: 120,
     temporaryLocalOnly,
+    trialDatesStored: false,
   };
 }
 

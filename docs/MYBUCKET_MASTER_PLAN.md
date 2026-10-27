@@ -217,3 +217,8 @@ Validation: TypeScript validation and production build passed. Header translatio
 ## Trial details and subscription pages — 2026-10-27
 
 The owner approved dedicated pages for trial details and the monthly subscription. The home status opens /trial, and /subscription displays the regular or recorded-code price. Expired trials cannot be extended by entering a prototype code; subscription discount redemption and payment remain future work. No historical code is inferred when absent from the saved records. Existing Firebase configuration, rules, and user data are unchanged. Client-side checks are not secure entitlement enforcement; backend validation remains required before launch.
+
+
+## Confirm subscription dates before display
+
+Trial dates are shown as recorded only when obtained from a valid billing record without a profile-code derived expiry. Missing or inferred dates show an unconfirmed state, without inventing a trial duration. Display waits for server-confirmed Firestore snapshots. No user data or Firebase rules were modified. Historical attribution remains unresolved where not recorded.

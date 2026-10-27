@@ -453,11 +453,11 @@ export default function App() {
   // Handle Natural Language / Voice input parsed draft via Gemini AI
   const handleTransactionDraft = (draft: Partial<Transaction>, missingFields: string[]) => {
     // If draft has a valid amount, provide a frictionless inline confirmation card first
-    if (draft.amount && draft.amount > 0 && (!missingFields || missingFields.length === 0 || !missingFields.includes('amount'))) {
+    if (draft.amount && draft.amount > 0 && draft.accountId && !missingFields?.includes('accountId') && !missingFields?.includes('amount') && (draft.type !== 'transfer' || draft.toAccountId)) {
       const resolvedDraft: Partial<Transaction> = {
         ...draft,
         type: draft.type || 'expense',
-        accountId: draft.accountId || accounts[0]?.id || 'acc_cash',
+        accountId: draft.accountId,
         categoryId: draft.categoryId || categories[0]?.id || 'cat_other',
         currency: draft.currency || accounts[0]?.currency || 'EGP',
         date: draft.date || new Date().toISOString().slice(0, 10),
@@ -471,6 +471,7 @@ export default function App() {
     }
 
     // Otherwise if amount is missing or user needs manual selection, open the modal
+    setQuickDraft(null);
     setPrefilledDraft(draft);
     setDraftMissingFields(missingFields);
     if (draft.type) {
@@ -481,12 +482,15 @@ export default function App() {
 
   // Instant 1-tap confirmation from inline Quick Save card
   const handleConfirmQuickDraft = async () => {
-    if (!quickDraft || !quickDraft.amount) return;
+    if (!quickDraft || !quickDraft.amount || !quickDraft.accountId || !accounts.some(a => a.id === quickDraft.accountId)) {
+      setToastMessage(lang === 'ar' ? 'يرجى تحديد الحساب الذي ستتم منه العملية.' : 'Please select the source account.');
+      return;
+    }
     const finalTx: Omit<Transaction, 'id' | 'createdAt'> = {
       type: quickDraft.type || 'expense',
       amount: quickDraft.amount,
       currency: quickDraft.currency || accounts[0]?.currency || 'EGP',
-      accountId: quickDraft.accountId || accounts[0]?.id || 'acc_cash',
+      accountId: quickDraft.accountId,
       toAccountId: quickDraft.toAccountId,
       categoryId: quickDraft.categoryId || categories[0]?.id || 'cat_other',
       description: quickDraft.description || (lang === 'ar' ? 'معاملة جديدة' : 'New Transaction'),
@@ -502,6 +506,11 @@ export default function App() {
 
   // Handle AI Correction (e.g. user says "make it 400" after a draft was generated)
   const handleAICorrection = (correction: AICorrection) => {
+    if (correction.fieldToUpdate === 'accountId' || correction.fieldToUpdate === 'toAccountId') {
+      setIsAddModalOpen(true);
+      setToastMessage(lang === 'ar' ? 'يرجى اختيار الحساب بنفسك من شاشة العملية.' : 'Please select the account in the transaction form.');
+      return;
+    }
     const targetDraft = quickDraft || prefilledDraft;
     if (targetDraft && correction.fieldToUpdate) {
       let val: any = correction.newValue;
@@ -995,7 +1004,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #18' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #19' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {
@@ -1218,7 +1227,7 @@ export default function App() {
                       <span>•</span>
                       <span className="text-emerald-700 font-bold">
                         {accounts.find((a) => a.id === quickDraft.accountId)?.[lang === 'ar' ? 'nameAr' : 'name'] ||
-                          (lang === 'ar' ? 'كاش' : 'Cash')}
+                          (lang === 'ar' ? 'حدد الحساب' : 'Select account')}
                       </span>
                     </div>
                   </div>

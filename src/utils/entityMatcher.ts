@@ -118,13 +118,13 @@ export function matchCategoryFromText<T extends MatchableCategory>(text: string,
 /**
  * Intelligent account detection matching user's text against available accounts
  */
-export function matchAccountFromText<T extends MatchableAccount>(text: string, accounts: T[]): T | null {
+export function matchAccountFromText<T extends MatchableAccount>(text: string, accounts: T[], allowLearned = true): T | null {
   if (!text || !accounts || accounts.length === 0) return null;
 
   const normText = normalizeArabic(text);
 
   // 0. Check User's Personal Learned Memory for Account
-  const learned = aiLearnedMemory.findLearnedMatch(text);
+  const learned = allowLearned ? aiLearnedMemory.findLearnedMatch(text) : null;
   if (learned && learned.accountId) {
     const matchedLearned = accounts.find((a) => a.id === learned.accountId);
     if (matchedLearned) return matchedLearned;
@@ -132,7 +132,7 @@ export function matchAccountFromText<T extends MatchableAccount>(text: string, a
 
   // 1. Cash / نقدي
   if (
-    normText.includes('كاش') ||
+    (!/(فودافون|اتصالات|اورانج|محفظ|انستا)/.test(normText) && normText.includes('كاش')) ||
     normText.includes('نقدي') ||
     normText.includes('نقديه') ||
     normText.includes('cash') ||

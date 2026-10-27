@@ -215,14 +215,10 @@ export class GeminiAIClient implements AIInterpretationProvider {
         return this.fallbackInterpretation(request);
       }
 
-      // Check account validity against user's actual accounts
-      let matchedAccountId: string | null = null;
-      if (transaction.accountId) {
-        const found = request.accounts.find((a) => a.id === transaction?.accountId);
-        if (found) {
-          matchedAccountId = found.id;
-        }
-      }
+      // Only accept an account explicitly named by the user, never an AI guess or learned memory.
+      // For transfers, the form asks the user to choose both ends explicitly.
+      const explicitAccount = transaction.type === 'transfer' ? null : matchAccountFromText(raw, request.accounts, false);
+      const matchedAccountId: string | null = explicitAccount?.id || null;
 
       // Check category validity
       let matchedCategoryId: string | null = null;
@@ -250,7 +246,7 @@ export class GeminiAIClient implements AIInterpretationProvider {
         amount,
         currency: transaction.currency || request.accounts[0]?.currency || 'EGP',
         accountId: matchedAccountId,
-        toAccountId: transaction.toAccountId || null,
+        toAccountId: transaction.type === 'transfer' ? null : transaction.toAccountId || null,
         categoryId: matchedCategoryId,
         description: transaction.description ? transaction.description.trim() : null,
         date: semanticRoles.specificDateStr || transaction.date || request.currentDateTime.slice(0, 10),
@@ -489,22 +485,8 @@ export class GeminiAIClient implements AIInterpretationProvider {
 
     const draft = parseNaturalLanguageInput(raw, localAccounts, localCategories);
 
-    // If account was not mentioned explicitly in raw text, mark as missing!
-    const mentionedAccount =
-      lower.includes('كاش') ||
-      lower.includes('نقدي') ||
-      lower.includes('بنك') ||
-      lower.includes('فيزا') ||
-      lower.includes('كارت') ||
-      lower.includes('cash') ||
-      lower.includes('bank') ||
-      lower.includes('visa') ||
-      lower.includes('card');
-
-    const missingFields: string[] = [];
-    if (!mentionedAccount) {
-      missingFields.push('accountId');
-    }
+    const explicitAccount = draft.type === 'transfer' ? null : matchAccountFromText(raw, request.accounts, false);
+    const missingFields: string[] = explicitAccount ? [] : ['accountId'];
 
     const finalAmount = semanticRoles.amount !== null ? semanticRoles.amount : draft.amount;
     const finalDate = semanticRoles.specificDateStr || draft.date;
@@ -517,8 +499,8 @@ export class GeminiAIClient implements AIInterpretationProvider {
         type: draft.type,
         amount: finalAmount,
         currency: draft.currency,
-        accountId: mentionedAccount ? draft.accountId : null,
-        toAccountId: draft.toAccountId || null,
+        accountId: explicitAccount?.id || null,
+        toAccountId: draft.type === 'transfer' ? null : draft.toAccountId || null,
         categoryId: draft.categoryId || null,
         description: draft.description,
         date: finalDate,

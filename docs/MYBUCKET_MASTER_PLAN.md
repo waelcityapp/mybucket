@@ -241,3 +241,7 @@ A new cash expense is rejected inside the Firestore transaction when its amount 
 ## Balance checks for all accounts — revision #18
 
 New expenses and transfers must not exceed the current server balance of their source account, regardless of account type. Income remains allowed. This applies to new transactions; existing balances and past transactions are not modified.
+
+## Explicit financial account selection — revision #19
+
+New operations require a user-specified source account. AI drafts cannot use a guessed or learned source; an unspecified source is selected in the transaction form. AI-created transfer drafts require explicit source and destination selections.

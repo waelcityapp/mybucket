@@ -41,7 +41,6 @@ import {
   matchDescriptionEdit,
   matchAmountEdit,
   matchTransactionType,
-  matchTransferAccountsFromText,
 } from '../utils/entityMatcher';
 
 interface TransactionModalProps {
@@ -389,11 +388,7 @@ export function TransactionModal({
         }
 
         // 4. Source Account
-        let resolvedAccountId = t.accountId || (result.correction?.fieldToUpdate === 'accountId' ? result.correction.newValue : null);
-        if (!resolvedAccountId) {
-          const matchedAcc = matchAccountFromText(text, accounts);
-          if (matchedAcc) resolvedAccountId = matchedAcc.id;
-        }
+        let resolvedAccountId = matchAccountFromText(text, accounts, false)?.id || null;
 
         if (resolvedAccountId) {
           const acc = accounts.find((a) => a.id === resolvedAccountId);
@@ -402,33 +397,6 @@ export function TransactionModal({
             setCurrency(acc.currency);
             setFieldUpdated('accountId');
             changesSummary.push(isAr ? `الحساب: ${acc.nameAr}` : `Account: ${acc.name}`);
-          }
-        }
-
-        // 5. Destination Account for Transfers
-        let resolvedToAccountId = t.toAccountId;
-        const currentActiveType = resolvedType || type;
-        if (currentActiveType === 'transfer') {
-          if (!resolvedToAccountId) {
-            const transferAccs = matchTransferAccountsFromText(text, accounts, resolvedAccountId || accountId);
-            if (transferAccs.toAccount) {
-              resolvedToAccountId = transferAccs.toAccount.id;
-            }
-          }
-          if (!resolvedToAccountId || resolvedToAccountId === (resolvedAccountId || accountId)) {
-            const otherAcc = accounts.find((a) => a.id !== (resolvedAccountId || accountId));
-            if (otherAcc) {
-              resolvedToAccountId = otherAcc.id;
-            }
-          }
-        }
-
-        if (resolvedToAccountId && resolvedToAccountId !== toAccountId) {
-          const toAcc = accounts.find((a) => a.id === resolvedToAccountId);
-          if (toAcc) {
-            setToAccountId(toAcc.id);
-            setFieldUpdated('toAccountId');
-            changesSummary.push(isAr ? `إلى حساب: ${toAcc.nameAr}` : `To Account: ${toAcc.name}`);
           }
         }
 
@@ -522,7 +490,7 @@ export function TransactionModal({
             ? 'يرجى اختيار حساب المصدر (من حساب)'
             : 'Please select a source account'
           : isAr
-          ? 'يرجى اختيار الحساب المالي'
+          ? 'يرجى تحديد مصدر العملية: الكاش أو البنك أو المحفظة أو حساب آخر'
           : 'Please select a financial account'
       );
       return;

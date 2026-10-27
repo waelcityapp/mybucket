@@ -1,4 +1,4 @@
-import { ArrowDownRight, ArrowUpRight, ArrowLeftRight, Search, PlusCircle } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, ArrowLeftRight, Search } from 'lucide-react';
 import { TransactionType, Language } from '../types';
 import { translations } from '../data/translations';
 
@@ -60,18 +60,6 @@ export function QuickActions({ lang, onOpenAddModal, onOpenSearchModal }: QuickA
         </button>
       </div>
 
-      {/* Manual Full Add Button with light green background and white text */}
-      <button
-        id="btn-add-transaction-manually"
-        type="button"
-        onClick={() => onOpenAddModal('expense')}
-        className="w-full py-2.5 px-4 bg-emerald-500/90 hover:bg-emerald-600 active:bg-emerald-700 text-white rounded-2xl transition-all active:scale-[0.99] cursor-pointer shadow-xs flex items-center justify-center gap-2 group font-bold text-xs sm:text-sm"
-      >
-        <PlusCircle className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
-        <span className="">
-          {t.addTransactionManually}
-        </span>
-      </button>
     </div>
   );
 }

@@ -184,6 +184,7 @@ export async function requestSubscription(
   const code = typeof payload.code === 'string' ? payload.code.trim().toUpperCase() : '';
   if (!PROTOTYPE_CODES.has(code)) throw new Error('كود المسوّق غير صحيح أو غير مفعل حالياً.');
   if (current.hasAppliedAffiliateCode) throw new Error('تم تفعيل كود مسوّق مسبقًا لهذا الحساب.');
+  if (!current.isPaid && Date.parse(current.trialExpiresAt) <= Date.now()) throw new Error('انتهت التجربة المجانية. خصم الاشتراك قيد التجهيز ولا يمكن بدء تجربة جديدة.');
   try {
     await persistPrototypeCode(user.uid, code);
   } catch {

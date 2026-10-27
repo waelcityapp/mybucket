@@ -141,6 +141,8 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
             <span>{isAr ? 'إلغاء الكود' : 'Remove'}</span>
           </button>
         </div>
+      ) : remainingDays === 0 && !subscription.isPaid ? (
+        <p className="rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-900">{isAr ? 'انتهت التجربة المجانية. لا يمنح كود المسوّق تجربة جديدة؛ خصم الاشتراك قيد التجهيز.' : 'The free trial has ended. A marketer code cannot start another trial; subscription discounts are being prepared.'}</p>
       ) : (
         <form onSubmit={handleApplyPromo} className="space-y-2 pt-1">
           <label htmlFor="affiliate-redeem-input" className="block text-xs font-black text-slate-800 flex items-center gap-1.5">

@@ -212,3 +212,8 @@ Validation for #11: TypeScript, production build, and regression fixtures passed
 Updated the Arabic header slogan to «تنظيم فلوسك أبسط مما تتخيل مع My Bucket» at the owner’s request. Layout, English copy, authentication, subscriptions and connections are unchanged.
 
 Validation: TypeScript validation and production build passed. Header translation binding verified. No server behavior changed.
+
+
+## Trial details and subscription pages — 2026-10-27
+
+The owner approved dedicated pages for trial details and the monthly subscription. The home status opens /trial, and /subscription displays the regular or recorded-code price. Expired trials cannot be extended by entering a prototype code; subscription discount redemption and payment remain future work. No historical code is inferred when absent from the saved records. Existing Firebase configuration, rules, and user data are unchanged. Client-side checks are not secure entitlement enforcement; backend validation remains required before launch.

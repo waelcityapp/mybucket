@@ -1,3 +1,4 @@
+import { TrialSubscriptionPages } from './components/views/TrialSubscriptionPages';
 import { useState, useEffect } from 'react';
 import {
   FinancialAccount,
@@ -85,7 +86,16 @@ export default function App() {
   });
 
   // 2. Active Tab State
-  const [activeTab, setActiveTab] = useState<ActiveTab>('home');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : 'home');
+  const openSubscriptionPage = (page: 'trial-details' | 'subscription') => {
+    window.history.pushState({ subscriptionPage: page }, '', page === 'trial-details' ? '/trial' : '/subscription');
+    setActiveTab(page);
+  };
+  useEffect(() => {
+    const onPopState = () => setActiveTab(window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : 'home');
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   // Check if zero initialization was done
   const isZeroInitDone = !!localStorage.getItem(`${STORAGE_KEY_PREFIX}zero_initialized_v2`);
@@ -1029,7 +1039,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #12' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #13' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {
@@ -1149,7 +1159,7 @@ export default function App() {
                     return (
                       <button
                         type="button"
-                        onClick={() => subscriptionError ? setSubscriptionRetry((attempt) => attempt + 1) : setActiveTab('settings')}
+                        onClick={() => subscriptionError ? setSubscriptionRetry((attempt) => attempt + 1) : openSubscriptionPage('trial-details')}
                         className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full font-bold transition-all shadow-2xs cursor-pointer ${
                           isPaid
                             ? 'text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100'
@@ -1393,6 +1403,10 @@ export default function App() {
           />
         )}
 
+        {(activeTab === 'trial-details' || activeTab === 'subscription') && (
+          <TrialSubscriptionPages lang={lang} subscription={userSubscription} error={subscriptionError ? (lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn) : null} page={activeTab} onBack={() => { window.history.pushState({}, '', activeTab === 'subscription' ? '/trial' : '/'); setActiveTab(activeTab === 'subscription' ? 'trial-details' : 'home'); }} onSubscription={() => openSubscriptionPage('subscription')} />
+        )}
+
         {activeTab === 'settings' && (
           <SettingsView
             lang={lang}
@@ -1540,7 +1554,7 @@ export default function App() {
       {/* Bottom Navigation Bar */}
       <BottomNav
         activeTab={activeTab}
-        onChangeTab={(tab) => setActiveTab(tab)}
+        onChangeTab={(tab) => { if (window.location.pathname === '/trial' || window.location.pathname === '/subscription') window.history.pushState({}, '', '/'); setActiveTab(tab); }}
         lang={lang}
       />
     </div>

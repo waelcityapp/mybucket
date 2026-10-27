@@ -140,7 +140,8 @@ export function subscribeUserAccounts(
 // Sync User Transactions
 export function subscribeUserTransactions(
   userId: string,
-  onUpdate: (transactions: Transaction[]) => void
+  onUpdate: (transactions: Transaction[]) => void,
+  onError?: (error: unknown) => void
 ) {
   const txRef = collection(db, 'users', userId, 'transactions');
   return onSnapshot(
@@ -162,6 +163,7 @@ export function subscribeUserTransactions(
     },
     (err) => {
       console.error('Firestore transactions subscription error:', err);
+      onError?.(err);
     }
   );
 }
@@ -242,6 +244,14 @@ export async function createFinancialTransaction(userId: string, tx: Transaction
     transaction.update(fromRef, { balance: sourceBalance });
     if (toRef && destination) transaction.update(toRef, { balance: destination.balance + tx.amount });
   });
+  // A successful commit is followed by a server read, so the user sees success only
+  // after the exact transaction is visible in the signed-in user's collection.
+  if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
+  const confirmed = await getDocFromServer(txRef);
+  const saved = confirmed.data();
+  if (!confirmed.exists() || saved?.userId !== userId || !Object.entries(tx).every(([key, value]) => saved[key] === value)) {
+    throw new Error('transaction-verification-failed');
+  }
 }
 
 // Save single transaction to Firestore

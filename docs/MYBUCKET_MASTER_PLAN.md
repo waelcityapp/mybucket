@@ -227,3 +227,8 @@ Trial dates are shown as recorded only when obtained from a valid billing record
 ## Financial save and account isolation — initial phase
 
 Prepared a server-confirmed Firestore transaction for new financial entries, and removed shared local financial state from the active session. Account snapshots must be server confirmed before initialization. Validation used simulated Firestore and build checks; signed-in, multi-account, multi-device and concurrency checks remain required after deployment and before relying on the feature. Editing and deleting transactions and application locking are outside this phase and remain unverified. No legacy browser data or Firebase data was deleted.
+
+
+## Manual transaction verification
+
+Manual entry requires an explicit account and category. New transactions and balance changes remain atomic, followed by a server read to verify the exact saved transaction before reporting success. The transaction list distinguishes confirmed empty results from loading or read errors. Production Firebase and two-device verification remain pending; no user data or Firebase rules were changed. AI interpretation and querying are outside this phase.

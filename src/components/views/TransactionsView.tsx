@@ -8,6 +8,7 @@ interface TransactionsViewProps {
   accounts: FinancialAccount[];
   categories: Category[];
   lang: Language;
+  loadState: 'loading' | 'ready' | 'error';
   onOpenAddModal: () => void;
   onDeleteTransaction: (id: string) => void;
 }
@@ -17,6 +18,7 @@ export function TransactionsView({
   accounts,
   categories,
   lang,
+  loadState,
   onOpenAddModal,
   onDeleteTransaction,
 }: TransactionsViewProps) {
@@ -72,7 +74,7 @@ export function TransactionsView({
             {t.allTransactions}
           </h1>
           <p className="text-xs text-slate-500">
-            {filtered.length} {lang === 'ar' ? 'عملية مسجلة' : 'records found'}
+            {loadState === 'ready' ? `${filtered.length} ${lang === 'ar' ? 'عملية مسجلة' : 'records found'}` : ''}
           </p>
         </div>
 
@@ -149,7 +151,11 @@ export function TransactionsView({
       </div>
 
       {/* Transactions List */}
-      {filtered.length === 0 ? (
+      {loadState !== 'ready' ? (
+        <div role="status" className="p-6 text-center bg-white rounded-3xl border border-slate-200 text-slate-600 text-sm">
+          {loadState === 'loading' ? (lang === 'ar' ? 'جاري قراءة العمليات المحفوظة...' : 'Loading saved transactions...') : (lang === 'ar' ? 'تعذرت قراءة العمليات من قاعدة البيانات. تحقق من الاتصال وأعد فتح الموقع.' : 'Could not read transactions. Check your connection and reopen the site.')}
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 text-slate-400 text-xs font-medium">
           {t.noTransactionsYet}
         </div>

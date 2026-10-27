@@ -135,9 +135,7 @@ export function TransactionModal({
         if (initialValues.categoryId) {
           setCategoryId(initialValues.categoryId);
         } else {
-          // If no category passed, auto-select first category matching the type
-          const matched = categories.find((c) => c.type === (initialValues.type === 'income' ? 'income' : 'expense'));
-          setCategoryId(matched?.id || '');
+          setCategoryId('');
         }
 
         if (initialValues.description) {
@@ -157,21 +155,9 @@ export function TransactionModal({
         setDate(getCurrentLocalDate());
         setTime(getCurrentLocalTime());
         
-        if (accounts.length > 0) {
-          setAccountId(accounts[0].id);
-          setCurrency(accounts[0].currency);
-        } else {
-          setAccountId('');
-        }
-
-        if (accounts.length > 1) {
-          setToAccountId(accounts[1].id);
-        } else {
-          setToAccountId('');
-        }
-
-        const defaultCat = categories.find((c) => c.type === (initialType === 'income' ? 'income' : 'expense'));
-        setCategoryId(defaultCat?.id || '');
+        setAccountId('');
+        setToAccountId('');
+        setCategoryId('');
       }
 
       setError('');
@@ -179,7 +165,7 @@ export function TransactionModal({
       setShowAccountDropdown(false);
       setShowToAccountDropdown(false);
     }
-  }, [isOpen, initialType, initialValues, accounts, categories]);
+  }, [isOpen, initialType, initialValues]);
 
   if (!isOpen) return null;
 
@@ -189,24 +175,12 @@ export function TransactionModal({
 
   const parsedAmount = parseFloat(amount);
 
-  // Type switch handler - also updates default category for that type
+  // Switching type requires an explicit category or destination choice.
   const handleTypeChange = (newType: TransactionType) => {
     setType(newType);
     setError('');
-    if (newType !== 'transfer') {
-      const matchCat = categories.find((c) => c.type === (newType === 'income' ? 'income' : 'expense'));
-      if (matchCat) {
-        setCategoryId(matchCat.id);
-      }
-    } else {
-      // Transfer: Ensure destination account is set and distinct from source account
-      if (!toAccountId || toAccountId === accountId) {
-        const otherAcc = accounts.find((a) => a.id !== accountId);
-        if (otherAcc) {
-          setToAccountId(otherAcc.id);
-        }
-      }
-    }
+    setCategoryId('');
+    setToAccountId('');
   };
 
   // Swap Source and Destination Accounts in Transfer
@@ -566,12 +540,10 @@ export function TransactionModal({
       }
     }
 
-    // 4. Validate Category for Expense / Income
-    if (type !== 'transfer' && !categoryId && categories.length > 0) {
-      const matchCat = categories.find((c) => c.type === (type === 'income' ? 'income' : 'expense'));
-      if (matchCat) {
-        setCategoryId(matchCat.id);
-      }
+    // A missing category must never silently become the first available one.
+    if (type !== 'transfer' && !categories.some(c => c.id === categoryId && c.type === type)) {
+      setError(isAr ? 'يرجى اختيار البند المناسب للعملية.' : 'Please select a category for this transaction.');
+      return;
     }
 
     const isoString = toDateTimeISO(date, time);
@@ -605,7 +577,7 @@ export function TransactionModal({
 
     setIsSaving(false);
     if (saved) onClose();
-    else setError(isAr ? 'تعذر تأكيد الحفظ. تحقق من الاتصال وحاول مجددًا.' : 'Could not confirm the save. Check your connection and try again.');
+    else setError(isAr ? 'تعذر تأكيد الحفظ. راجع قائمة العمليات قبل إعادة المحاولة حتى لا تتكرر.' : 'Could not confirm the save. Check your connection and try again.');
   };
 
   const formatNumber = (num: number) => {

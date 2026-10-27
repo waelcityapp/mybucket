@@ -184,6 +184,7 @@ export default function App() {
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [financialLoaded, setFinancialLoaded] = useState({ accounts: false, transactions: false });
+  const [transactionReadError, setTransactionReadError] = useState(false);
   const lastUserId = useRef<string | null>(null);
   const saveInFlight = useRef(false);
   const pendingTransaction = useRef<{ key: string; tx: Transaction } | null>(null);
@@ -252,6 +253,7 @@ export default function App() {
         setCategories(INITIAL_CATEGORIES);
         setTransactions([]);
         setFinancialLoaded({ accounts: false, transactions: false });
+        setTransactionReadError(false);
         setUserSubscription(null);
         setQuickDraft(null);
         setPrefilledDraft(null);
@@ -305,10 +307,23 @@ export default function App() {
     });
 
     // 2. Subscribe to User's Transactions
+    let transactionReadComplete = false;
+    const transactionReadTimer = setTimeout(() => {
+      if (!transactionReadComplete && auth.currentUser?.uid === authUser.uid) setTransactionReadError(true);
+    }, 12000);
     const unsubTransactions = subscribeUserTransactions(authUser.uid, (cloudTx) => {
       if (auth.currentUser?.uid !== authUser.uid) return;
+      transactionReadComplete = true;
+      clearTimeout(transactionReadTimer);
+      setTransactionReadError(false);
       setTransactions(migrateLegacyTransactions(cloudTx));
       setFinancialLoaded(prev => ({ ...prev, transactions: true }));
+    }, () => {
+      if (auth.currentUser?.uid !== authUser.uid) return;
+      transactionReadComplete = true;
+      clearTimeout(transactionReadTimer);
+      setTransactionReadError(true);
+      setFinancialLoaded(prev => ({ ...prev, transactions: false }));
     });
 
     // 3. Subscribe to User's Categories
@@ -329,6 +344,7 @@ export default function App() {
 
     return () => {
       unsubAccounts();
+      clearTimeout(transactionReadTimer);
       unsubTransactions();
       unsubCategories();
       unsubLearnedMemory();
@@ -564,7 +580,7 @@ export default function App() {
       return true;
     } catch (error) {
       console.error('Transaction save failed:', error);
-      if (auth.currentUser?.uid === uid) setToastMessage(lang === 'ar' ? 'تعذر تأكيد حفظ العملية. تحقق من الاتصال وبيانات الحساب.' : 'Could not confirm the transaction was saved. Check your connection and account.');
+      if (auth.currentUser?.uid === uid) setToastMessage(lang === 'ar' ? 'تعذر تأكيد الحفظ. راجع قائمة العمليات قبل إعادة المحاولة حتى لا تتكرر.' : 'Could not confirm the transaction was saved. Check your connection and account.');
       return false;
     } finally {
       saveInFlight.current = false;
@@ -972,7 +988,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #15' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #16' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {
@@ -1301,6 +1317,7 @@ export default function App() {
             accounts={accounts}
             categories={categories}
             lang={lang}
+            loadState={transactionReadError ? 'error' : financialLoaded.transactions ? 'ready' : 'loading'}
             onOpenAddModal={() => handleOpenAddModal('expense')}
             onDeleteTransaction={handleDeleteTransaction}
           />

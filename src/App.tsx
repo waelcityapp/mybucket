@@ -1,5 +1,5 @@
 import { TrialSubscriptionPages } from './components/views/TrialSubscriptionPages';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   FinancialAccount,
   Category,
@@ -60,6 +60,9 @@ import {
   logoutUser,
   onAuthChange,
   testFirestoreConnection,
+  auth,
+  createFinancialTransaction,
+  initializeDefaultDocuments,
   subscribeUserAccounts,
   subscribeUserTransactions,
   subscribeUserCategories,
@@ -96,9 +99,6 @@ export default function App() {
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
-
-  // Check if zero initialization was done
-  const isZeroInitDone = !!localStorage.getItem(`${STORAGE_KEY_PREFIX}zero_initialized_v2`);
 
   // Helper to migrate legacy 'acc_savings_usd' / 'مدخرات دولار' to 'acc_wallet' / 'محافظ إلكترونية' and ensure unique account IDs
   const migrateLegacyAccounts = (accs: FinancialAccount[]): { updated: FinancialAccount[]; migrated: boolean } => {
@@ -179,57 +179,14 @@ export default function App() {
     });
   };
 
-  // 3. Financial Accounts State
-  const [accounts, setAccounts] = useState<FinancialAccount[]>(() => {
-    if (!isZeroInitDone) {
-      localStorage.setItem(`${STORAGE_KEY_PREFIX}zero_initialized_v2`, 'true');
-      return INITIAL_ACCOUNTS;
-    }
-    const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}accounts`);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return migrateLegacyAccounts(parsed).updated;
-        }
-      } catch {
-        // fallback
-      }
-    }
-    return INITIAL_ACCOUNTS;
-  });
-
-  // 4. Categories State
-  const [categories, setCategories] = useState<Category[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}categories`);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // fallback
-      }
-    }
-    return INITIAL_CATEGORIES;
-  });
-
-  // 5. Transactions State
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    if (!isZeroInitDone) {
-      return [];
-    }
-    const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}transactions`);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return migrateLegacyTransactions(parsed);
-        }
-      } catch {
-        // fallback
-      }
-    }
-    return INITIAL_TRANSACTIONS;
-  });
+  // Financial state is loaded from the signed-in user's confirmed cloud data.
+  const [accounts, setAccounts] = useState<FinancialAccount[]>(INITIAL_ACCOUNTS);
+  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [financialLoaded, setFinancialLoaded] = useState({ accounts: false, transactions: false });
+  const lastUserId = useRef<string | null>(null);
+  const saveInFlight = useRef(false);
+  const pendingTransaction = useRef<{ key: string; tx: Transaction } | null>(null);
 
   // 6. User Auth State & Subscription
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
@@ -282,24 +239,37 @@ export default function App() {
     localStorage.setItem(`${STORAGE_KEY_PREFIX}lang`, lang);
   }, [lang]);
 
-  // Persist State Changes in LocalStorage as local backup
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY_PREFIX}accounts`, JSON.stringify(accounts));
-  }, [accounts]);
-
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY_PREFIX}transactions`, JSON.stringify(transactions));
-  }, [transactions]);
-
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY_PREFIX}categories`, JSON.stringify(categories));
-  }, [categories]);
-
   // Initialize Firebase Auth & Test Firestore Connection
   useEffect(() => {
     testFirestoreConnection();
 
     const unsubscribe = onAuthChange((firebaseUser) => {
+      const nextId = firebaseUser?.uid || null;
+      if (lastUserId.current !== nextId) {
+        lastUserId.current = nextId;
+        pendingTransaction.current = null;
+        setAccounts(INITIAL_ACCOUNTS);
+        setCategories(INITIAL_CATEGORIES);
+        setTransactions([]);
+        setFinancialLoaded({ accounts: false, transactions: false });
+        setUserSubscription(null);
+        setQuickDraft(null);
+        setPrefilledDraft(null);
+        setActiveFinancialQueryResult(null);
+        setIsAddModalOpen(false);
+        setIsEditBalanceModalOpen(false);
+        setIsBankAccountModalOpen(false);
+        setIsCardAccountModalOpen(false);
+        setIsWalletAccountModalOpen(false);
+        setIsOtherAccountModalOpen(false);
+        setIsExtraAccountModalOpen(false);
+        setIsExpenseCategoriesModalOpen(false);
+        setIsCategoryDetailModalOpen(false);
+        setSelectedCategoryForDetail(null);
+        setActiveTab('home');
+        setToastMessage(null);
+        aiLearnedMemory.clear();
+      }
       if (firebaseUser) {
         setAuthUser({
           uid: firebaseUser.uid,
@@ -324,40 +294,37 @@ export default function App() {
 
     // 1. Subscribe to User's Accounts
     const unsubAccounts = subscribeUserAccounts(authUser.uid, (cloudAccounts) => {
-      if (cloudAccounts && cloudAccounts.length > 0) {
-        const { updated, migrated } = migrateLegacyAccounts(cloudAccounts);
-        setAccounts(updated);
-        if (migrated) {
-          saveAllAccountsToFirestore(authUser.uid, updated);
-        }
+      if (auth.currentUser?.uid !== authUser.uid) return;
+      if (cloudAccounts.length > 0) {
+        setAccounts(migrateLegacyAccounts(cloudAccounts).updated);
+        setFinancialLoaded(prev => ({ ...prev, accounts: true }));
       } else {
-        // If user has no accounts in cloud yet, seed with current local accounts
-        saveAllAccountsToFirestore(authUser.uid, accounts);
+        setAccounts(INITIAL_ACCOUNTS);
+        initializeDefaultDocuments(authUser.uid, 'accounts', INITIAL_ACCOUNTS).catch(() => setToastMessage(lang === 'ar' ? 'تعذر إعداد الحسابات. تحقق من الاتصال.' : 'Could not initialize accounts. Check your connection.'));
       }
     });
 
     // 2. Subscribe to User's Transactions
     const unsubTransactions = subscribeUserTransactions(authUser.uid, (cloudTx) => {
-      if (cloudTx) {
-        const migratedTx = migrateLegacyTransactions(cloudTx);
-        setTransactions(migratedTx);
-      }
+      if (auth.currentUser?.uid !== authUser.uid) return;
+      setTransactions(migrateLegacyTransactions(cloudTx));
+      setFinancialLoaded(prev => ({ ...prev, transactions: true }));
     });
 
     // 3. Subscribe to User's Categories
     const unsubCategories = subscribeUserCategories(authUser.uid, (cloudCats) => {
+      if (auth.currentUser?.uid !== authUser.uid) return;
       if (cloudCats && cloudCats.length > 0) {
         setCategories(cloudCats);
       } else {
-        saveAllCategoriesToFirestore(authUser.uid, categories);
+        initializeDefaultDocuments(authUser.uid, 'categories', INITIAL_CATEGORIES).catch(() => setToastMessage(lang === 'ar' ? 'تعذر إعداد التصنيفات.' : 'Could not initialize categories.'));
       }
     });
 
     // 4. Subscribe to User's Learned AI Memory
     const unsubLearnedMemory = subscribeLearnedMemory(authUser.uid, (cloudMemory) => {
-      if (cloudMemory && cloudMemory.length > 0) {
-        aiLearnedMemory.setMemoryFromRemote(cloudMemory);
-      }
+      if (auth.currentUser?.uid !== authUser.uid) return;
+      aiLearnedMemory.setMemoryFromRemote(cloudMemory || []);
     });
 
     return () => {
@@ -509,7 +476,7 @@ export default function App() {
       date: quickDraft.date || new Date().toISOString().slice(0, 10),
       time: quickDraft.time || new Date().toTimeString().slice(0, 5),
     };
-    await handleSaveTransaction(finalTx);
+    if (!(await handleSaveTransaction(finalTx))) return;
     setQuickDraft(null);
     setPrefilledDraft(null);
     setToastMessage(lang === 'ar' ? 'تم حفظ العملية بنجاح! ✨' : 'Transaction saved successfully! ✨');
@@ -568,73 +535,40 @@ export default function App() {
     setActiveFinancialQueryResult(result);
   };
 
-  // Save Confirmed Transaction Handler
-  const handleSaveTransaction = async (newTxData: Omit<Transaction, 'id' | 'createdAt'>) => {
-    const newId = `tx_${Date.now()}`;
-    const newTx: Transaction = {
-      ...newTxData,
-      id: newId,
-      createdAt: new Date().toISOString(),
-    };
-
-    // Record user confirmed transaction in AI Continuous Learned Memory
-    if (newTx.description) {
-      const catObj = categories.find((c) => c.id === newTx.categoryId);
-      const accObj = accounts.find((a) => a.id === newTx.accountId);
-      aiLearnedMemory.recordLearning(newTx.description, {
-        categoryId: newTx.categoryId,
-        categoryNameAr: catObj?.nameAr,
-        accountId: newTx.accountId,
-        accountNameAr: accObj?.nameAr,
-        type: newTx.type,
-        description: newTx.description,
-      });
+  // Save only after an atomic, server-confirmed transaction and balance update.
+  const handleSaveTransaction = async (newTxData: Omit<Transaction, 'id' | 'createdAt'>): Promise<boolean> => {
+    if (saveInFlight.current) return false;
+    if (!authUser || !financialLoaded.accounts || !financialLoaded.transactions) {
+      setToastMessage(lang === 'ar' ? 'انتظر تحميل بيانات حسابك وتأكد من الاتصال.' : 'Wait for your account data and check your connection.');
+      return false;
     }
-
-    // Calculate updated accounts
-    const updatedAccounts = accounts.map((acc) => {
-      // Source account
-      if (acc.id === newTx.accountId) {
-        if (newTx.type === 'expense') {
-          return { ...acc, balance: acc.balance - newTx.amount };
-        }
-        if (newTx.type === 'income') {
-          return { ...acc, balance: acc.balance + newTx.amount };
-        }
-        if (newTx.type === 'transfer') {
-          return { ...acc, balance: acc.balance - newTx.amount };
-        }
+    saveInFlight.current = true;
+    const uid = authUser.uid;
+    const key = JSON.stringify({ uid, ...newTxData });
+    const newTx: Transaction = pendingTransaction.current?.key === key ? pendingTransaction.current.tx : { ...newTxData, id: `tx_${crypto.randomUUID()}`, createdAt: new Date().toISOString() };
+    pendingTransaction.current = { key, tx: newTx };
+    try {
+      // Firestore rejects undefined fields; omit optional fields not selected by the user.
+      const cleanTx = Object.fromEntries(Object.entries(newTx).filter(([, value]) => value !== undefined)) as unknown as Transaction;
+      await createFinancialTransaction(uid, cleanTx);
+      if (auth.currentUser?.uid !== uid) return false;
+      pendingTransaction.current = null;
+      if (newTx.description) {
+        const category = categories.find(c => c.id === newTx.categoryId);
+        const account = accounts.find(a => a.id === newTx.accountId);
+        aiLearnedMemory.recordLearning(newTx.description, { categoryId: newTx.categoryId, categoryNameAr: category?.nameAr, accountId: newTx.accountId, accountNameAr: account?.nameAr, type: newTx.type, description: newTx.description });
+        void saveLearnedMemoryToFirestore(uid, aiLearnedMemory.getLearnedList());
       }
-
-      // Destination account for transfer
-      if (newTx.type === 'transfer' && acc.id === newTx.toAccountId) {
-        return { ...acc, balance: acc.balance + newTx.amount };
-      }
-
-      return acc;
-    });
-
-    // 1. Update local state
-    setTransactions((prev) => [newTx, ...prev]);
-    setAccounts(updatedAccounts);
-
-    // 2. Sync to Firestore if signed in
-    if (authUser) {
-      try {
-        await saveTransactionToFirestore(authUser.uid, newTx);
-        await saveAllAccountsToFirestore(authUser.uid, updatedAccounts);
-        await saveLearnedMemoryToFirestore(authUser.uid, aiLearnedMemory.getLearnedList());
-      } catch (err) {
-        console.error('Firestore save transaction error:', err);
-      }
+      setToastMessage(translations[lang].successSaved);
+      setTimeout(() => setToastMessage(null), 3500);
+      return true;
+    } catch (error) {
+      console.error('Transaction save failed:', error);
+      if (auth.currentUser?.uid === uid) setToastMessage(lang === 'ar' ? 'تعذر تأكيد حفظ العملية. تحقق من الاتصال وبيانات الحساب.' : 'Could not confirm the transaction was saved. Check your connection and account.');
+      return false;
+    } finally {
+      saveInFlight.current = false;
     }
-
-    // Show temporary toast
-    const t = translations[lang];
-    setToastMessage(t.successSaved);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3500);
   };
 
   // Delete Transaction Handler
@@ -759,7 +693,6 @@ export default function App() {
   // Bulk update or modify categories handler (from ExpenseCategoriesModal)
   const handleUpdateCategories = async (updatedList: Category[]) => {
     setCategories(updatedList);
-    localStorage.setItem(`${STORAGE_KEY_PREFIX}categories`, JSON.stringify(updatedList));
 
     if (authUser) {
       try {
@@ -1039,7 +972,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #14' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #15' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {

@@ -11,18 +11,11 @@ export interface LearnedKeywordEntity {
   lastUpdated: string;
 }
 
-const STORAGE_KEY = 'mybucket_ai_learned_memory_v1';
-
-/**
- * In-memory and local storage manager for user's adaptive AI learning.
- */
+/** In-memory learned data, scoped to the currently signed-in account. */
 class AILearnedMemoryService {
   private memory: Map<string, LearnedKeywordEntity> = new Map();
-  private isInitialized = false;
 
-  constructor() {
-    this.loadFromStorage();
-  }
+  public clear(): void { this.memory.clear(); }
 
   private normalizeKey(text: string): string {
     return text
@@ -35,38 +28,12 @@ class AILearnedMemoryService {
       .replace(/[\s\-_]+/g, ' ');
   }
 
-  public loadFromStorage(): void {
-    if (typeof window === 'undefined') return;
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed: LearnedKeywordEntity[] = JSON.parse(stored);
-        this.memory.clear();
-        parsed.forEach((item) => {
-          this.memory.set(this.normalizeKey(item.keyword), item);
-        });
-      }
-      this.isInitialized = true;
-    } catch (e) {
-      console.warn('Failed to load AI learned memory:', e);
-    }
-  }
-
-  public saveToStorage(): void {
-    if (typeof window === 'undefined') return;
-    try {
-      const array = Array.from(this.memory.values());
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(array));
-    } catch (e) {
-      console.warn('Failed to save AI learned memory to storage:', e);
-    }
-  }
-
   /**
    * Sets learned memory from a remote source (e.g. Firestore sync)
    */
   public setMemoryFromRemote(items: LearnedKeywordEntity[]): void {
     if (!items || !Array.isArray(items)) return;
+    this.memory.clear();
     items.forEach((item) => {
       if (item && item.keyword) {
         const key = this.normalizeKey(item.keyword);
@@ -82,16 +49,13 @@ class AILearnedMemoryService {
         }
       }
     });
-    this.saveToStorage();
+
   }
 
   /**
    * Returns all learned keyword associations
    */
   public getLearnedList(): LearnedKeywordEntity[] {
-    if (!this.isInitialized) {
-      this.loadFromStorage();
-    }
     return Array.from(this.memory.values()).sort((a, b) => b.frequency - a.frequency);
   }
 
@@ -141,7 +105,7 @@ class AILearnedMemoryService {
       }
     }
 
-    this.saveToStorage();
+
   }
 
   /**

@@ -53,7 +53,7 @@ interface TransactionModalProps {
   categories: Category[];
   lang: Language;
   onClose: () => void;
-  onSaveTransaction: (tx: Omit<Transaction, 'id' | 'createdAt'>) => void;
+  onSaveTransaction: (tx: Omit<Transaction, 'id' | 'createdAt'>) => Promise<boolean>;
   onAddCategory?: (category: Category) => void;
 }
 
@@ -90,6 +90,7 @@ export function TransactionModal({
   const [showAccountDropdown, setShowAccountDropdown] = useState<boolean>(false);
   const [showToAccountDropdown, setShowToAccountDropdown] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
   const [isAiProposal, setIsAiProposal] = useState<boolean>(false);
 
   // Voice & AI Edit within Modal States
@@ -528,7 +529,8 @@ export function TransactionModal({
     }
   };
 
-  const handleSave = (e?: React.FormEvent) => {
+  const handleSave = async (e?: React.FormEvent) => {
+    if (isSaving) return;
     if (e) e.preventDefault();
     setError('');
 
@@ -587,7 +589,8 @@ export function TransactionModal({
       }
     }
 
-    onSaveTransaction({
+    setIsSaving(true);
+    const saved = await onSaveTransaction({
       type,
       amount: parsedAmount,
       currency: selectedAccount ? selectedAccount.currency : currency,
@@ -600,7 +603,9 @@ export function TransactionModal({
       dateTime: isoString,
     });
 
-    onClose();
+    setIsSaving(false);
+    if (saved) onClose();
+    else setError(isAr ? 'تعذر تأكيد الحفظ. تحقق من الاتصال وحاول مجددًا.' : 'Could not confirm the save. Check your connection and try again.');
   };
 
   const formatNumber = (num: number) => {
@@ -1290,6 +1295,7 @@ export function TransactionModal({
               <button
                 ref={saveButtonRef}
                 type="submit"
+                disabled={isSaving}
                 className={`w-full py-3.5 px-4 active:scale-[0.99] text-white text-xs sm:text-sm font-black rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md ${
                   highlightSaveBtn
                     ? 'ring-4 ring-amber-400 ring-offset-2 animate-pulse scale-[1.02] shadow-xl'

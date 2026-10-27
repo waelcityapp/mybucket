@@ -155,7 +155,7 @@ This file is the durable source of truth for the MyBucket project. Update it aft
 
 ## Current implementation status
 
-- Current admin-only revision: `#11` (Google reference UI restored by owner request, retaining Google-only authentication and existing Firebase/backend connections).
+- Current admin-only revision: `#12` (Google reference UI restored by owner request, retaining Google-only authentication and existing Firebase/backend connections).
 - Admin-only UI page exists on `main` and is visible to `waelvts@gmail.com`.
 - Phase 1 provides the protected backend foundation; Phase 2 now includes Google onboarding, marketer-code entry, and the home subscription status and remaining-days card.
 - Vercel build and the gateway runtime's unauthenticated 401 response were verified. Firebase Admin deployment credentials and a real marketer code remain unverified, so the signed-in days counter and redemption still need end-to-end testing.
@@ -205,3 +205,10 @@ Read failures are now distinguished by billing, profile, date parsing, or accoun
 Next verification requires the owner's actual Firebase error or a successful signed-in read on #11. This remains a live-verification blocker, not proof that permissions or dates are the cause.
 
 Validation for #11: TypeScript, production build, and regression fixtures passed. Checks include the original countdown/date/cache/cleanup cases, a complete billing record surviving profile permission denial, separate billing permission errors, exact invalid-date classification with field names only, no raw error values in UI diagnostics, and paid records resolving independently. Multiple failing read sources are retained in the administrator diagnostic. These checks do not establish the live owner-account error or prove it resolved.
+
+
+## Header slogan — revision #12, 2026-10-27
+
+Updated the Arabic header slogan to «تنظيم فلوسك أبسط مما تتخيل مع My Bucket» at the owner’s request. Layout, English copy, authentication, subscriptions and connections are unchanged.
+
+Validation: TypeScript validation and production build passed. Header translation binding verified. No server behavior changed.

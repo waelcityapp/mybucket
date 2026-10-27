@@ -36,7 +36,7 @@ import { AccountsView } from './components/views/AccountsView';
 import { CategoriesView } from './components/views/CategoriesView';
 import { SettingsView } from './components/views/SettingsView';
 import { SearchView } from './components/views/SearchView';
-import { CheckCircle2, Smartphone, Cloud, ArrowRight, Sparkles, Clock, Check, Pencil, X } from 'lucide-react';
+import { CheckCircle2, Smartphone, Cloud, ArrowRight, Sparkles, Clock } from 'lucide-react';
 import { AIFinancialQuery, AICorrection } from './services/ai/types';
 import {
   executeDeterministicQuery,
@@ -205,11 +205,27 @@ export default function App() {
   const isAdmin = authUser?.email?.trim().toLowerCase() === 'waelvts@gmail.com';
 
   // 7. Modals State
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(() => window.location.pathname === '/transactions/new');
+  useEffect(() => {
+    const onNavigation = () => {
+      const isReview = window.location.pathname === '/transactions/new';
+      setIsAddModalOpen(isReview);
+      if (!isReview) setPrefilledDraft(null);
+    };
+    window.addEventListener('popstate', onNavigation);
+    return () => window.removeEventListener('popstate', onNavigation);
+  }, []);
+  const closeTransactionForm = () => {
+    setIsAddModalOpen(false);
+    setPrefilledDraft(null);
+    if (window.location.pathname === '/transactions/new') {
+      if (window.history.state?.transactionReview) window.history.back();
+      else window.history.replaceState({}, '', '/');
+    }
+  };
   const [addModalInitialType, setAddModalInitialType] = useState<TransactionType>('expense');
   const [prefilledDraft, setPrefilledDraft] = useState<Partial<Transaction> | null>(null);
   const [draftMissingFields, setDraftMissingFields] = useState<string[]>([]);
-  const [quickDraft, setQuickDraft] = useState<Partial<Transaction> | null>(null);
   const [activeFinancialQueryResult, setActiveFinancialQueryResult] = useState<DeterministicQueryResult | null>(null);
   const [isEditBalanceModalOpen, setIsEditBalanceModalOpen] = useState(false);
   const [selectedAccountForBalance, setSelectedAccountForBalance] = useState<string | null>(null);
@@ -256,10 +272,9 @@ export default function App() {
         setFinancialLoaded({ accounts: false, transactions: false });
         setTransactionReadError(false);
         setUserSubscription(null);
-        setQuickDraft(null);
         setPrefilledDraft(null);
         setActiveFinancialQueryResult(null);
-        setIsAddModalOpen(false);
+        setIsAddModalOpen(Boolean(firebaseUser) && window.location.pathname === '/transactions/new');
         setIsEditBalanceModalOpen(false);
         setIsBankAccountModalOpen(false);
         setIsCardAccountModalOpen(false);
@@ -452,56 +467,11 @@ export default function App() {
 
   // Handle Natural Language / Voice input parsed draft via Gemini AI
   const handleTransactionDraft = (draft: Partial<Transaction>, missingFields: string[]) => {
-    // If draft has a valid amount, provide a frictionless inline confirmation card first
-    if (draft.amount && draft.amount > 0 && draft.accountId && !missingFields?.includes('accountId') && !missingFields?.includes('amount') && (draft.type !== 'transfer' || draft.toAccountId)) {
-      const resolvedDraft: Partial<Transaction> = {
-        ...draft,
-        type: draft.type || 'expense',
-        accountId: draft.accountId,
-        categoryId: draft.categoryId || categories[0]?.id || 'cat_other',
-        currency: draft.currency || accounts[0]?.currency || 'EGP',
-        date: draft.date || new Date().toISOString().slice(0, 10),
-        time: draft.time || new Date().toTimeString().slice(0, 5),
-        description: draft.description || (lang === 'ar' ? 'معاملة جديدة' : 'New Transaction'),
-      };
-      setQuickDraft(resolvedDraft);
-      setPrefilledDraft(resolvedDraft);
-      setDraftMissingFields(missingFields || []);
-      return;
-    }
-
-    // Otherwise if amount is missing or user needs manual selection, open the modal
-    setQuickDraft(null);
     setPrefilledDraft(draft);
-    setDraftMissingFields(missingFields);
-    if (draft.type) {
-      setAddModalInitialType(draft.type);
-    }
+    setDraftMissingFields(missingFields || []);
+    if (draft.type) setAddModalInitialType(draft.type);
+    if (window.location.pathname !== '/transactions/new') window.history.pushState({ transactionReview: true }, '', '/transactions/new');
     setIsAddModalOpen(true);
-  };
-
-  // Instant 1-tap confirmation from inline Quick Save card
-  const handleConfirmQuickDraft = async () => {
-    if (!quickDraft || !quickDraft.amount || !quickDraft.accountId || !accounts.some(a => a.id === quickDraft.accountId)) {
-      setToastMessage(lang === 'ar' ? 'يرجى تحديد الحساب الذي ستتم منه العملية.' : 'Please select the source account.');
-      return;
-    }
-    const finalTx: Omit<Transaction, 'id' | 'createdAt'> = {
-      type: quickDraft.type || 'expense',
-      amount: quickDraft.amount,
-      currency: quickDraft.currency || accounts[0]?.currency || 'EGP',
-      accountId: quickDraft.accountId,
-      toAccountId: quickDraft.toAccountId,
-      categoryId: quickDraft.categoryId || categories[0]?.id || 'cat_other',
-      description: quickDraft.description || (lang === 'ar' ? 'معاملة جديدة' : 'New Transaction'),
-      date: quickDraft.date || new Date().toISOString().slice(0, 10),
-      time: quickDraft.time || new Date().toTimeString().slice(0, 5),
-    };
-    if (!(await handleSaveTransaction(finalTx)).ok) return;
-    setQuickDraft(null);
-    setPrefilledDraft(null);
-    setToastMessage(lang === 'ar' ? 'تم حفظ العملية بنجاح! ✨' : 'Transaction saved successfully! ✨');
-    setTimeout(() => setToastMessage(null), 3500);
   };
 
   // Handle AI Correction (e.g. user says "make it 400" after a draft was generated)
@@ -511,7 +481,7 @@ export default function App() {
       setToastMessage(lang === 'ar' ? 'يرجى اختيار الحساب بنفسك من شاشة العملية.' : 'Please select the account in the transaction form.');
       return;
     }
-    const targetDraft = quickDraft || prefilledDraft;
+    const targetDraft = prefilledDraft;
     if (targetDraft && correction.fieldToUpdate) {
       let val: any = correction.newValue;
       if (correction.fieldToUpdate === 'amount' && val != null) {
@@ -520,9 +490,6 @@ export default function App() {
       }
       
       const updatedDraft = { ...targetDraft, [correction.fieldToUpdate]: val };
-      if (quickDraft) {
-        setQuickDraft(updatedDraft);
-      }
       setPrefilledDraft(updatedDraft);
 
       // Adaptive learning from correction
@@ -1004,7 +971,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #19' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #20' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {
@@ -1191,79 +1158,6 @@ export default function App() {
               onOpenManualAdd={() => handleOpenAddModal('expense')}
             />
 
-            {/* Inline Quick Save Confirmation Card */}
-            {quickDraft && (
-              <div className="bg-emerald-50/90 border-2 border-emerald-400/80 rounded-3xl p-4 sm:p-5 shadow-xs space-y-3 animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-xs font-black text-emerald-900">
-                      {lang === 'ar' ? 'جاهز للتسجيل والحفظ السريع:' : 'Ready for Quick Save:'}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQuickDraft(null);
-                      setPrefilledDraft(null);
-                    }}
-                    className="p-1 rounded-full text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-                    title={lang === 'ar' ? 'إلغاء' : 'Cancel'}
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="bg-white rounded-2xl p-3 sm:p-4 border border-emerald-200/80 flex items-center justify-between gap-3 shadow-2xs">
-                  <div className="space-y-0.5 min-w-0">
-                    <p className="font-extrabold text-slate-900 text-sm sm:text-base truncate">
-                      {quickDraft.description || (lang === 'ar' ? 'معاملة جديدة' : 'New Transaction')}
-                    </p>
-                    <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                      <span>
-                        {categories.find((c) => c.id === quickDraft.categoryId)?.[lang === 'ar' ? 'nameAr' : 'name'] ||
-                          (lang === 'ar' ? 'عام' : 'General')}
-                      </span>
-                      <span>•</span>
-                      <span className="text-emerald-700 font-bold">
-                        {accounts.find((a) => a.id === quickDraft.accountId)?.[lang === 'ar' ? 'nameAr' : 'name'] ||
-                          (lang === 'ar' ? 'حدد الحساب' : 'Select account')}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-xl sm:text-2xl font-black text-emerald-700">
-                      {quickDraft.amount?.toLocaleString()}
-                    </span>
-                    <span className="text-xs font-bold text-slate-600 mr-1 ml-1">
-                      {lang === 'ar' ? 'ج.م' : quickDraft.currency}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 pt-0.5">
-                  <button
-                    type="button"
-                    onClick={handleConfirmQuickDraft}
-                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs sm:text-sm shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <Check className="w-4 h-4" />
-                    <span>{lang === 'ar' ? 'تأكيد وحفظ الآن' : 'Confirm & Save Now'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsAddModalOpen(true);
-                    }}
-                    className="px-3.5 py-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                    <span>{lang === 'ar' ? 'تعديل بالتفصيل' : 'Edit Details'}</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* AI Financial Query Result Card */}
             {activeFinancialQueryResult && (
               <FinancialQueryResultCard
@@ -1410,7 +1304,7 @@ export default function App() {
         accounts={accounts}
         categories={categories}
         lang={lang}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={closeTransactionForm}
         onSaveTransaction={handleSaveTransaction}
         onAddCategory={handleAddCategory}
       />

@@ -77,6 +77,7 @@ export function VoiceNaturalInput({
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const processOnSpeechEnd = useRef(false);
 
   /**
    * Unified AI Processing Pipeline
@@ -213,8 +214,12 @@ export function VoiceNaturalInput({
         recognition.lang = lang === 'ar' ? 'ar-EG' : 'en-US';
 
         let finalTranscript = '';
+        let lastTranscript = '';
 
         recognition.onstart = () => {
+          finalTranscript = '';
+          lastTranscript = '';
+          processOnSpeechEnd.current = false;
           setIsListening(true);
           setSpeechError(null);
           // We can optionally clear the input, but keeping it allows the user to edit
@@ -235,11 +240,13 @@ export function VoiceNaturalInput({
 
           const fullTranscript = finalTranscript + interimTranscript;
           if (fullTranscript) {
+            lastTranscript = fullTranscript;
             setInputText(fullTranscript);
           }
         };
 
         recognition.onerror = () => {
+          processOnSpeechEnd.current = false;
           setIsListening(false);
           setSpeechError(t.speechNotSupported);
           setTimeout(() => setSpeechError(null), 4000);
@@ -247,6 +254,11 @@ export function VoiceNaturalInput({
 
         recognition.onend = () => {
           setIsListening(false);
+          if (processOnSpeechEnd.current) {
+            processOnSpeechEnd.current = false;
+            const transcript = finalTranscript.trim() || lastTranscript.trim();
+            if (transcript) void processInputWithAI(transcript);
+          }
         };
 
         recognitionRef.current = recognition;
@@ -270,6 +282,7 @@ export function VoiceNaturalInput({
 
     if (isListening) {
       try {
+        processOnSpeechEnd.current = true;
         recognitionRef.current.stop();
       } catch {
         setIsListening(false);
@@ -291,8 +304,10 @@ export function VoiceNaturalInput({
     e.preventDefault();
     if (isListening && recognitionRef.current) {
       try {
+        processOnSpeechEnd.current = true;
         recognitionRef.current.stop();
       } catch {}
+      return;
     }
     if (!inputText.trim() || isProcessingAI) return;
     processInputWithAI(inputText);
@@ -390,7 +405,7 @@ export function VoiceNaturalInput({
                 ? 'bg-indigo-600 shadow-indigo-500/25'
                 : 'bg-emerald-500 hover:bg-emerald-600 active:scale-95 shadow-emerald-500/25'
             }`}
-            title={isAr ? 'تحدث للمساعد المالي' : 'Speak to AI Financial Assistant'}
+            title={isListening ? (isAr ? 'إنهاء التسجيل ومراجعة العملية' : 'Finish recording and review') : (isAr ? 'تحدث للمساعد المالي' : 'Speak to AI Financial Assistant')}
           >
             {isProcessingAI ? (
               <Loader2 className="w-5 h-5 animate-spin" />

@@ -245,3 +245,7 @@ New expenses and transfers must not exceed the current server balance of their s
 ## Explicit financial account selection — revision #19
 
 New operations require a user-specified source account. AI drafts cannot use a guessed or learned source; an unspecified source is selected in the transaction form. AI-created transfer drafts require explicit source and destination selections.
+
+## AI transaction review — revision #20
+
+AI-created transactions open a full review form at /transactions/new rather than a quick-save card. Users review and edit fields before saving; no financial transaction is created at interpretation time.

@@ -160,7 +160,7 @@ export function TransactionModal({
       }
 
       setError('');
-      setShowDateTimeEditor(false);
+      setShowDateTimeEditor(Boolean(initialValues));
       setShowAccountDropdown(false);
       setShowToAccountDropdown(false);
     }
@@ -564,12 +564,13 @@ export function TransactionModal({
     return isAr ? cat.nameAr : cat.name;
   };
 
-  const isMissingAccount = !accountId || missingFields.includes('accountId');
+  const isMissingAccount = !accountId;
+  const isReviewPage = window.location.pathname === '/transactions/new';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className={isReviewPage ? "fixed inset-0 z-50 bg-slate-50 overflow-y-auto" : "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200"}>
       <div
-        className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[88vh]"
+        className={isReviewPage ? "bg-white w-full min-h-full max-w-2xl mx-auto flex flex-col" : "bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[88vh]"}
         role="dialog"
         aria-modal="true"
       >
@@ -577,7 +578,7 @@ export function TransactionModal({
         <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
           <div className="flex items-center gap-2">
             <h3 className="font-black text-slate-900 text-sm sm:text-base ">
-              {isAr ? 'إضافة عملية جديدة' : 'New Transaction'}
+              {isReviewPage ? (isAr ? 'مراجعة العملية' : 'Review transaction') : (isAr ? 'إضافة عملية جديدة' : 'New Transaction')}
             </h3>
             {isAiProposal && (
               <span className="flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
@@ -622,7 +623,9 @@ export function TransactionModal({
             </div>
           )}
 
-          {/* Voice & AI Dynamic Edit Bar inside Modal */}
+          {isAiProposal && <p className="text-sm font-semibold text-slate-700">{isAr ? 'راجع البيانات وعدّل أي حقل قبل الضغط على حفظ.' : 'Review and edit all fields before saving.'}</p>}
+          {/* Optional voice editing */}
+          <details className="group"><summary className="cursor-pointer text-xs font-bold text-indigo-700 mb-2">{isAr ? 'تعديل بالصوت (اختياري)' : 'Edit by voice (optional)'}</summary>
           <div className="bg-gradient-to-r from-indigo-50/95 via-sky-50/70 to-indigo-50/95 border border-indigo-200/90 rounded-2xl p-3 shadow-2xs space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950">
@@ -785,6 +788,7 @@ export function TransactionModal({
             </div>
           </div>
 
+          </details>
           <form onSubmit={handleSave} className="space-y-3.5">
             {/* 1. Transaction Type Segmented Toggle (مصروف, دخل, تحويل) */}
             <div className={`grid grid-cols-3 gap-2 bg-slate-100/80 p-1 rounded-2xl transition-all duration-300 ${

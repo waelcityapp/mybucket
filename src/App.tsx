@@ -62,6 +62,7 @@ import {
   testFirestoreConnection,
   auth,
   createFinancialTransaction,
+  InsufficientCashBalanceError,
   initializeDefaultDocuments,
   subscribeUserAccounts,
   subscribeUserTransactions,
@@ -492,7 +493,7 @@ export default function App() {
       date: quickDraft.date || new Date().toISOString().slice(0, 10),
       time: quickDraft.time || new Date().toTimeString().slice(0, 5),
     };
-    if (!(await handleSaveTransaction(finalTx))) return;
+    if (!(await handleSaveTransaction(finalTx)).ok) return;
     setQuickDraft(null);
     setPrefilledDraft(null);
     setToastMessage(lang === 'ar' ? 'تم حفظ العملية بنجاح! ✨' : 'Transaction saved successfully! ✨');
@@ -552,11 +553,12 @@ export default function App() {
   };
 
   // Save only after an atomic, server-confirmed transaction and balance update.
-  const handleSaveTransaction = async (newTxData: Omit<Transaction, 'id' | 'createdAt'>): Promise<boolean> => {
-    if (saveInFlight.current) return false;
+  const handleSaveTransaction = async (newTxData: Omit<Transaction, 'id' | 'createdAt'>): Promise<{ ok: boolean; message?: string }> => {
+    if (saveInFlight.current) return { ok: false };
     if (!authUser || !financialLoaded.accounts || !financialLoaded.transactions) {
-      setToastMessage(lang === 'ar' ? 'انتظر تحميل بيانات حسابك وتأكد من الاتصال.' : 'Wait for your account data and check your connection.');
-      return false;
+      const message = lang === 'ar' ? 'انتظر تحميل بيانات حسابك وتأكد من الاتصال.' : 'Wait for your account data and check your connection.';
+      setToastMessage(message);
+      return { ok: false, message };
     }
     saveInFlight.current = true;
     const uid = authUser.uid;
@@ -567,7 +569,7 @@ export default function App() {
       // Firestore rejects undefined fields; omit optional fields not selected by the user.
       const cleanTx = Object.fromEntries(Object.entries(newTx).filter(([, value]) => value !== undefined)) as unknown as Transaction;
       await createFinancialTransaction(uid, cleanTx);
-      if (auth.currentUser?.uid !== uid) return false;
+      if (auth.currentUser?.uid !== uid) return { ok: false };
       pendingTransaction.current = null;
       if (newTx.description) {
         const category = categories.find(c => c.id === newTx.categoryId);
@@ -577,11 +579,16 @@ export default function App() {
       }
       setToastMessage(translations[lang].successSaved);
       setTimeout(() => setToastMessage(null), 3500);
-      return true;
+      return { ok: true };
     } catch (error) {
       console.error('Transaction save failed:', error);
-      if (auth.currentUser?.uid === uid) setToastMessage(lang === 'ar' ? 'تعذر تأكيد الحفظ. راجع قائمة العمليات قبل إعادة المحاولة حتى لا تتكرر.' : 'Could not confirm the transaction was saved. Check your connection and account.');
-      return false;
+      const message = error instanceof InsufficientCashBalanceError
+        ? (lang === 'ar'
+          ? `لا يمكن تسجيل المصروف: رصيد ${error.accountNameAr} هو ${new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency} فقط.`
+          : `Cannot record the expense: ${error.accountName} has only ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency}.`)
+        : (lang === 'ar' ? 'تعذر تأكيد الحفظ. راجع قائمة العمليات قبل إعادة المحاولة حتى لا تتكرر.' : 'Could not confirm the transaction was saved. Check your connection and account.');
+      if (auth.currentUser?.uid === uid) setToastMessage(message);
+      return { ok: false, message };
     } finally {
       saveInFlight.current = false;
     }
@@ -988,7 +995,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #16' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #17' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {

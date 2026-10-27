@@ -53,7 +53,7 @@ interface TransactionModalProps {
   categories: Category[];
   lang: Language;
   onClose: () => void;
-  onSaveTransaction: (tx: Omit<Transaction, 'id' | 'createdAt'>) => Promise<boolean>;
+  onSaveTransaction: (tx: Omit<Transaction, 'id' | 'createdAt'>) => Promise<{ ok: boolean; message?: string }>;
   onAddCategory?: (category: Category) => void;
 }
 
@@ -576,8 +576,8 @@ export function TransactionModal({
     });
 
     setIsSaving(false);
-    if (saved) onClose();
-    else setError(isAr ? 'تعذر تأكيد الحفظ. راجع قائمة العمليات قبل إعادة المحاولة حتى لا تتكرر.' : 'Could not confirm the save. Check your connection and try again.');
+    if (saved.ok) onClose();
+    else setError(saved.message || (isAr ? 'تعذر تأكيد الحفظ. راجع قائمة العمليات قبل إعادة المحاولة حتى لا تتكرر.' : 'Could not confirm the save. Check your connection and try again.'));
   };
 
   const formatNumber = (num: number) => {

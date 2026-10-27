@@ -232,3 +232,8 @@ Prepared a server-confirmed Firestore transaction for new financial entries, and
 ## Manual transaction verification
 
 Manual entry requires an explicit account and category. New transactions and balance changes remain atomic, followed by a server read to verify the exact saved transaction before reporting success. The transaction list distinguishes confirmed empty results from loading or read errors. Production Firebase and two-device verification remain pending; no user data or Firebase rules were changed. AI interpretation and querying are outside this phase.
+
+
+## Cash expense balance check
+
+A new cash expense is rejected inside the Firestore transaction when its amount exceeds the current saved cash balance; the form displays the account balance and no write occurs. Exact-balance expenses remain allowed. Rules for credit cards, other account types, transfers and historical edits are not changed by this request. Live Firebase verification remains pending.

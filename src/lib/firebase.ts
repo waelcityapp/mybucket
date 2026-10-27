@@ -219,6 +219,13 @@ export async function initializeDefaultDocuments(userId: string, group: 'account
   });
 }
 
+export class InsufficientCashBalanceError extends Error {
+  constructor(public readonly balance: number, public readonly currency: string, public readonly accountNameAr: string, public readonly accountName: string) {
+    super('insufficient-cash-balance');
+    this.name = 'InsufficientCashBalanceError';
+  }
+}
+
 // Atomically create a transaction and update its affected balances from current server values.
 export async function createFinancialTransaction(userId: string, tx: Transaction): Promise<void> {
   if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
@@ -239,6 +246,9 @@ export async function createFinancialTransaction(userId: string, tx: Transaction
     const destination = to?.data();
     if (!Number.isFinite(source.balance) || (destination && !Number.isFinite(destination.balance))) throw new Error('invalid-balance');
     if (source.currency !== tx.currency || (destination && destination.currency !== tx.currency)) throw new Error('currency-mismatch');
+    if (tx.type === 'expense' && source.type === 'cash' && tx.amount > source.balance) {
+      throw new InsufficientCashBalanceError(source.balance, source.currency, source.nameAr || 'الكاش', source.name || 'Cash');
+    }
     const sourceBalance = source.balance + (tx.type === 'income' ? tx.amount : -tx.amount);
     transaction.set(txRef, { ...tx, userId });
     transaction.update(fromRef, { balance: sourceBalance });

@@ -51,7 +51,7 @@ export function MonthSummaryCard({ transactions, lang }: MonthSummaryCardProps) 
               </div>
               <div className="flex-1 min-w-0 space-y-2.5 text-xs sm:text-sm">
                 <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-700">{isAr ? 'الدخل' : 'Income'}</span><span dir="ltr" className="font-extrabold text-emerald-700 text-end">{formatNumber(income)} {currency}</span></div>
-                <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-700">{isAr ? 'المصروفات' : 'Expenses'}</span><span dir="ltr" className="font-extrabold text-rose-600 text-end">{formatNumber(expenses)} {currency}</span></div>
+                <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-700">{isAr ? 'المصروفات' : 'Expenses'}</span><span dir="ltr" className="font-extrabold text-[#8e3a42] text-end">{formatNumber(expenses)} {currency}</span></div>
                 <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100"><span className="font-bold text-slate-700">{isAr ? 'فرق الفترة' : 'Period difference'}</span><span dir="ltr" className="font-extrabold text-slate-900 text-end">{formatNumber(net)} {currency}</span></div>
               </div>
             </div>

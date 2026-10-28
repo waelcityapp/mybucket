@@ -103,6 +103,10 @@ export function TransactionModal({
   const [fieldUpdated, setFieldUpdated] = useState<string | null>(null);
 
   const saveButtonRef = useRef<HTMLButtonElement | null>(null);
+  const errorRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [error]);
   const recognitionRef = useRef<any>(null);
   const voiceInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -531,22 +535,27 @@ export function TransactionModal({
     }
 
     setIsSaving(true);
-    const saved = await onSaveTransaction({
-      type,
-      amount: parsedAmount,
-      currency: selectedAccount ? selectedAccount.currency : currency,
-      accountId,
-      toAccountId: type === 'transfer' ? toAccountId : undefined,
-      categoryId: type !== 'transfer' ? categoryId : undefined,
-      description: finalDesc,
-      date,
-      time,
-      dateTime: isoString,
-    });
-
-    setIsSaving(false);
-    if (saved.ok) onClose();
-    else setError(saved.message || (isAr ? 'تعذر تأكيد الحفظ. راجع قائمة العمليات قبل إعادة المحاولة حتى لا تتكرر.' : 'Could not confirm the save. Check your connection and try again.'));
+    try {
+      const saved = await onSaveTransaction({
+        type,
+        amount: parsedAmount,
+        currency: selectedAccount ? selectedAccount.currency : currency,
+        accountId,
+        toAccountId: type === 'transfer' ? toAccountId : undefined,
+        categoryId: type !== 'transfer' ? categoryId : undefined,
+        description: finalDesc,
+        date,
+        time,
+        dateTime: isoString,
+      });
+      if (saved.ok) onClose();
+      else setError(saved.message || (isAr ? 'تعذر تأكيد الحفظ. راجع قائمة العمليات قبل إعادة المحاولة حتى لا تتكرر.' : 'Could not confirm the save. Check your connection and try again.'));
+    } catch (err) {
+      console.error('Transaction submission failed:', err);
+      setError(isAr ? 'تعذر تأكيد الحفظ. راجع قائمة العمليات قبل إعادة المحاولة حتى لا تتكرر.' : 'Could not confirm the save. Check the transactions list before retrying.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const formatNumber = (num: number) => {
@@ -600,13 +609,6 @@ export function TransactionModal({
 
         {/* Modal Form Body */}
         <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
-          {error && (
-            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-2xl flex items-center gap-2 animate-in fade-in">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
-              <span>{error}</span>
-            </div>
-          )}
-
           {/* Missing Account Warning Notice (from AI utterance) */}
           {isMissingAccount && isAiProposal && (
             <div className="p-3 rounded-2xl bg-amber-50/90 border border-amber-300 flex items-start gap-2.5 text-xs text-amber-900 animate-in fade-in">
@@ -1229,6 +1231,12 @@ export function TransactionModal({
 
             {/* Action Buttons: "✓ تأكيد وحفظ العملية" & "إلغاء" */}
             <div className="pt-2 space-y-2">
+              {error && (
+                <div ref={errorRef} role="alert" className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-2xl flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
               {/* Highlight Save Directional Callout when voice save is requested */}
               {highlightSaveBtn && (
                 <div className="p-3 bg-amber-500 text-white rounded-2xl text-xs font-black text-center shadow-lg animate-bounce flex items-center justify-center gap-2">

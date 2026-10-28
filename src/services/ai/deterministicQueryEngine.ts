@@ -173,6 +173,16 @@ export function executeDeterministicQuery(
       }
 
       if (targetAccount) {
+        if (targetAccount.linkedBankId) {
+          const bank = accounts.find(a => a.id === targetAccount.linkedBankId);
+          if (!bank) return { question, headline: isAr ? 'تعذر قراءة الحساب البنكي المرتبط.' : 'Could not read the linked bank account.', amount: null, currency: targetAccount.currency, details: '', periodText: '', transactionCount: 0 };
+          targetAccount = { ...targetAccount, balance: bank.balance };
+        }
+        if (targetAccount.type === 'credit') {
+          const owed = Math.max(0, -targetAccount.balance);
+          const available = (targetAccount.creditLimit || 0) + targetAccount.balance;
+          return { question, headline: isAr ? `المستحق على ${targetAccount.nameAr}: ${owed.toLocaleString()} ${targetAccount.currency}` : `Owed on ${targetAccount.name}: ${owed.toLocaleString()} ${targetAccount.currency}`, amount: owed, currency: targetAccount.currency, details: isAr ? `المتاح من الحد: ${available.toLocaleString()} ${targetAccount.currency}` : `Available credit: ${available.toLocaleString()} ${targetAccount.currency}`, periodText: isAr ? 'رصيد بطاقة الائتمان' : 'Credit card balance', transactionCount: inRangeTx.filter(tx => tx.accountId === targetAccount?.id || tx.toAccountId === targetAccount?.id || tx.balanceAccountId === targetAccount?.id || tx.toBalanceAccountId === targetAccount?.id).length };
+        }
         const accName = isAr ? targetAccount.nameAr : targetAccount.name;
         const curSym = isAr
           ? targetAccount.currency === 'EGP'
@@ -194,12 +204,13 @@ export function executeDeterministicQuery(
             : `Account is active with ${targetAccount.balance.toLocaleString()} ${curSym}`,
           periodText: isAr ? 'الرصيد الفعلي الحالي' : 'Current live balance',
           transactionCount: inRangeTx.filter(
-            (tx) => tx.accountId === targetAccount?.id || tx.toAccountId === targetAccount?.id
+            (tx) => tx.accountId === targetAccount?.id || tx.toAccountId === targetAccount?.id || tx.balanceAccountId === targetAccount?.id || tx.toBalanceAccountId === targetAccount?.id
           ).length,
         };
       } else {
         // Total balance across all accounts
-        const totalBal = accounts.reduce((sum, a) => sum + a.balance, 0);
+        const cashAccounts = accounts.filter(a => !a.linkedBankId && a.type !== 'credit' && a.currency === mainCurrency);
+        const totalBal = cashAccounts.reduce((sum, a) => sum + a.balance, 0);
         return {
           question,
           headline: isAr
@@ -208,10 +219,10 @@ export function executeDeterministicQuery(
           amount: totalBal,
           currency: mainCurrency,
           details: isAr
-            ? `موزع على ${accounts.length} حسابات`
-            : `Distributed across ${accounts.length} accounts`,
+            ? `موزع على ${cashAccounts.length} حسابات بنفس العملة`
+            : `Distributed across ${cashAccounts.length} accounts in the same currency`,
           periodText: isAr ? 'الرصيد الفعلي الحالي' : 'Current live balance',
-          breakdown: accounts.map((acc) => ({
+          breakdown: cashAccounts.map((acc) => ({
             id: acc.id,
             label: isAr ? acc.nameAr : acc.name,
             amount: acc.balance,

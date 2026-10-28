@@ -35,6 +35,7 @@ export function HomeFinancialOverview({
   const balancesByCurrency = useMemo(() => {
     const map: Record<string, number> = {};
     accounts.forEach((acc) => {
+      if (acc.linkedBankId || acc.type === 'credit') return;
       const curr = acc.currency || 'EGP';
       map[curr] = (map[curr] || 0) + (acc.balance || 0);
     });

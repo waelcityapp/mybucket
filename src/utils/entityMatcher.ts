@@ -132,12 +132,13 @@ export function matchAccountFromText<T extends MatchableAccount>(text: string, a
 
   // 1. Cash / نقدي
   if (
-    (!/(فودافون|اتصالات|اورانج|محفظ|انستا)/.test(normText) && normText.includes('كاش')) ||
+    !/(فودافون|اتصالات|اورانج|محفظ|انستا|vodafone|wallet)/.test(normText) && (
+    normText.includes('كاش') ||
     normText.includes('نقدي') ||
     normText.includes('نقديه') ||
     normText.includes('cash') ||
     normText.includes('من الكاش') ||
-    normText.includes('صرفت من الكاش')
+    normText.includes('صرفت من الكاش'))
   ) {
     const cashAcc = accounts.find((a) => a.type === 'cash' || normalizeArabic(a.nameAr).includes('كاش') || a.name.toLowerCase().includes('cash'));
     if (cashAcc) return cashAcc;
@@ -196,6 +197,7 @@ export function matchAccountFromText<T extends MatchableAccount>(text: string, a
     normText.includes('انستا') ||
     normText.includes('تيلدا') ||
     normText.includes('wallet') ||
+    normText.includes('vodafone') ||
     normText.includes('wallets')
   ) {
     const walletAcc = accounts.find(
@@ -226,6 +228,23 @@ export function matchAccountFromText<T extends MatchableAccount>(text: string, a
   }
 
   return null;
+}
+
+/** Resolve an explicitly named account without using learned guesses or silently picking among duplicates. */
+export function matchExplicitAccountFromText<T extends MatchableAccount>(text: string, accounts: T[]): T | null {
+  const norm = normalizeArabic(text);
+  const named = accounts.map(account => {
+    const names = [account.name, account.nameAr].map(name => normalizeArabic(name || '')).filter(name => name.length >= 3 && norm.includes(name) && !(account.type === 'cash' && /فودافون|اتصالات|اورانج|محفظ|انستا|vodafone/.test(norm)));
+    const name = names.sort((a, b) => b.length - a.length)[0] || '';
+    return { account, name, score: name.length };
+  }).filter(item => item.score > 0).sort((a, b) => b.score - a.score);
+  if (named.length && !named[1]) return named[0].account;
+  if (named.length > 1) {
+    return named[0].score > named[1].score && named[0].name.includes(named[1].name) ? named[0].account : null;
+  }
+  const candidate = matchAccountFromText(text, accounts, false);
+  if (!candidate) return null;
+  return accounts.filter(account => account.type === candidate.type).length === 1 ? candidate : null;
 }
 
 /**

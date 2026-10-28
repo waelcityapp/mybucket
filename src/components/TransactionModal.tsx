@@ -38,6 +38,7 @@ import { aiClient } from '../services/ai/aiClient';
 import {
   matchCategoryFromText,
   matchAccountFromText,
+  matchExplicitAccountFromText,
   matchDescriptionEdit,
   matchAmountEdit,
   matchTransactionType,
@@ -388,7 +389,7 @@ export function TransactionModal({
         }
 
         // 4. Source Account
-        let resolvedAccountId = matchAccountFromText(text, accounts, false)?.id || null;
+        let resolvedAccountId = matchExplicitAccountFromText(text, accounts)?.id || null;
 
         if (resolvedAccountId) {
           const acc = accounts.find((a) => a.id === resolvedAccountId);
@@ -944,7 +945,7 @@ export function TransactionModal({
                             <span>{getAccountDisplayName(acc)}</span>
                           </div>
                           <span className="font-mono text-slate-400">
-                            {formatNumber(acc.balance)} {acc.currency}
+                            {formatNumber(acc.linkedBankId ? (accounts.find(a => a.id === acc.linkedBankId)?.balance ?? 0) : acc.type === 'credit' ? (acc.creditLimit || 0) + acc.balance : acc.balance)} {acc.currency}
                           </span>
                         </button>
                       ))}

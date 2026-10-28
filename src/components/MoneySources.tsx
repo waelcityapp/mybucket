@@ -133,10 +133,13 @@ export function MoneySources({
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
         {accounts.map((acc) => {
           const displayName = lang === 'ar' ? acc.nameAr : acc.name;
+          const bank = acc.linkedBankId ? accounts.find(a => a.id === acc.linkedBankId) : undefined;
+          const displayBalance = bank ? bank.balance : acc.type === 'credit' ? Math.max(0, -acc.balance) : acc.balance;
           return (
             <div
               key={acc.id}
               onClick={() => {
+                if (acc.linkedBankId || acc.type === 'credit') return;
                 if (acc.type === 'cash' || acc.id === 'acc_cash') {
                   if (onEditBalance) {
                     onEditBalance(acc.id);
@@ -164,11 +167,13 @@ export function MoneySources({
                 <span className="text-[10px] text-slate-400 font-bold font-mono">
                   {acc.currency}
                 </span>
-                <span className="truncate">{formatAccountBalance(acc.balance, lang)}</span>
+                <span className="truncate">{acc.type === 'credit' ? (lang === 'ar' ? 'المستحق: ' : 'Owed: ') : ''}{formatAccountBalance(displayBalance, lang)}</span>
               </div>
 
+              {bank && <span className="text-[10px] text-slate-500">{lang === 'ar' ? 'مرتبط بـ' : 'Linked to'} {lang === 'ar' ? bank.nameAr : bank.name}</span>}
+              {acc.type === 'credit' && <span className="text-[10px] text-slate-500">{lang === 'ar' ? 'المتاح: ' : 'Available: '}{formatAccountBalance((acc.creditLimit || 0) + acc.balance, lang)}</span>}
               {/* Pencil icon for editing balance */}
-              {onEditBalance && (
+              {onEditBalance && !acc.linkedBankId && acc.type !== 'credit' && (
                 <button
                   type="button"
                   title={lang === 'ar' ? 'تعديل الرصيد' : 'Edit Balance'}

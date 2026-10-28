@@ -78,6 +78,7 @@ import {
 } from './lib/firebase';
 import { aiLearnedMemory } from './services/ai/aiLearnedMemory';
 import { isNonNegativeBalance } from './utils/formatBalance';
+import { validateBalance } from './utils/accountLinking';
 
 import { saveUserSubscriptionToFirestore, subscribeUserSubscription, type SubscriptionReadIssue } from './services/prototypeSubscriptionClient';
 
@@ -91,13 +92,13 @@ export default function App() {
   });
 
   // 2. Active Tab State
-  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : 'home');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : window.location.pathname === '/accounts/new' ? 'accounts' : 'home');
   const openSubscriptionPage = (page: 'trial-details' | 'subscription') => {
     window.history.pushState({ subscriptionPage: page }, '', page === 'trial-details' ? '/trial' : '/subscription');
     setActiveTab(page);
   };
   useEffect(() => {
-    const onPopState = () => setActiveTab(window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : 'home');
+    const onPopState = () => setActiveTab(window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : window.location.pathname === '/accounts/new' ? 'accounts' : 'home');
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
@@ -286,7 +287,7 @@ export default function App() {
         setIsExpenseCategoriesModalOpen(false);
         setIsCategoryDetailModalOpen(false);
         setSelectedCategoryForDetail(null);
-        setActiveTab('home');
+        setActiveTab(firebaseUser && window.location.pathname === '/accounts/new' ? 'accounts' : 'home');
         setToastMessage(null);
         aiLearnedMemory.clear();
       }
@@ -564,6 +565,10 @@ export default function App() {
         ? (lang === 'ar'
           ? `لا يمكن ${newTx.type === 'transfer' ? 'التحويل' : 'تسجيل المصروف'}: رصيد ${error.accountNameAr} هو ${new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency} فقط.`
           : `Cannot ${newTx.type === 'transfer' ? 'transfer' : 'record the expense'}: ${error.accountName} has only ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency}.`)
+        : error instanceof Error && error.message === 'invalid-transfer'
+        ? (lang === 'ar' ? 'لا يمكن التحويل بين وسيلتين مرتبطتين بنفس الحساب.' : 'Cannot transfer between methods linked to the same account.')
+        : error instanceof Error && error.message === 'credit-overpayment'
+        ? (lang === 'ar' ? 'المبلغ أكبر من المستحق على بطاقة الائتمان.' : 'The amount exceeds the outstanding credit balance.')
         : (lang === 'ar' ? 'تعذر تأكيد الحفظ. راجع قائمة العمليات قبل إعادة المحاولة حتى لا تتكرر.' : 'Could not confirm the transaction was saved. Check your connection and account.');
       if (auth.currentUser?.uid === uid) setToastMessage(message);
       return { ok: false, message };
@@ -590,6 +595,8 @@ export default function App() {
         ? (lang === 'ar'
           ? `لا يمكن حذف العملية: رصيد ${error.accountNameAr} الحالي ${new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency} ولا يكفي لعكس العملية.`
           : `Cannot delete: ${error.accountName} has ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency}, which is insufficient to reverse the transaction.`)
+        : error instanceof Error && error.message === 'credit-overpayment'
+        ? (lang === 'ar' ? 'لا يمكن حذف العملية لأن عكسها سيتجاوز المبلغ المستحق على بطاقة الائتمان.' : 'Cannot delete because reversing it would exceed the credit card amount owed.')
         : (lang === 'ar' ? 'تعذر حذف العملية وتحديث الأرصدة. تحقق من الاتصال والحسابات ثم حاول مجددًا.' : 'Could not delete the transaction and update balances. Check your connection and accounts.'));
     } finally {
       deleteInFlight.current.delete(txId);
@@ -610,6 +617,8 @@ export default function App() {
       console.error('Firestore edit transaction error:', error);
       const message = error instanceof InsufficientBalanceError
         ? (lang === 'ar' ? `لا يمكن حفظ التعديل: رصيد ${error.accountNameAr} الحالي ${new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency} لا يكفي لإتمامه.` : `Cannot save: ${error.accountName} has insufficient funds.`)
+        : error instanceof Error && error.message === 'credit-overpayment'
+        ? (lang === 'ar' ? 'المبلغ أكبر من المستحق على بطاقة الائتمان.' : 'The amount exceeds the outstanding credit balance.')
         : error instanceof Error && error.message === 'transaction-changed'
         ? (lang === 'ar' ? 'العملية تغيرت على جهاز آخر. أغلق التعديل وافتحها مجددًا.' : 'This transaction changed elsewhere. Reopen it to edit.')
         : (lang === 'ar' ? 'تعذر حفظ التعديل وتحديث الأرصدة. تحقق من الاتصال والحسابات.' : 'Could not update the transaction and balances. Check your connection and accounts.');
@@ -623,21 +632,22 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const handleAddAccount = async (accData: Omit<FinancialAccount, 'id'>) => {
-    if (!isNonNegativeBalance(accData.balance)) { rejectInvalidBalance(); return; }
-    const newAccount: FinancialAccount = {
-      ...accData,
-      id: `acc_${Date.now()}`,
-    };
-    const updated = [...accounts, newAccount];
-    setAccounts(updated);
-
-    if (authUser) {
-      try {
-        await saveAccountToFirestore(authUser.uid, newAccount);
-      } catch (err) {
-        console.error('Firestore save account error:', err);
+  const handleAddAccount = async (accData: Omit<FinancialAccount, 'id'>): Promise<boolean> => {
+    if (!authUser) return false;
+    try {
+      validateBalance({ ...accData, id: 'new' }, accData.balance);
+      if (accData.linkedBankId) {
+        const bank = accounts.find(account => account.id === accData.linkedBankId);
+        if (!bank || bank.type !== 'bank' || bank.currency !== accData.currency || accData.balance !== 0) throw new Error('invalid-link');
       }
+      const newAccount: FinancialAccount = { ...accData, id: `acc_${crypto.randomUUID()}` };
+      await saveAccountToFirestore(authUser.uid, newAccount);
+      setToastMessage(lang === 'ar' ? 'تم إضافة الحساب بنجاح.' : 'Account added.');
+      return true;
+    } catch (error) {
+      console.error('Firestore save account error:', error);
+      setToastMessage(lang === 'ar' ? 'تعذر إضافة الحساب. راجع البيانات والاتصال.' : 'Could not add account. Check details and connection.');
+      return false;
     }
   };
 
@@ -674,6 +684,8 @@ export default function App() {
   // Open Edit Balance Modal
   const handleOpenEditBalance = (accId: string | null = null) => {
     const target = accounts.find((a) => a.id === accId);
+    if (target?.linkedBankId) { setToastMessage(lang === 'ar' ? 'هذه الوسيلة مرتبطة بالبنك؛ عدّل رصيد البنك نفسه.' : 'Edit the linked bank balance instead.'); return; }
+    if (target?.type === 'credit') { setToastMessage(lang === 'ar' ? 'يتم تحديث مستحقات بطاقة الائتمان من العمليات والسداد.' : 'The credit balance changes through transactions and payments.'); return; }
     if (target?.type === 'bank' || target?.id === 'acc_bank') {
       handleOpenBankAccountModal(accId);
       return;
@@ -944,7 +956,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #26' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #27' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {
@@ -1285,7 +1297,7 @@ export default function App() {
       {/* Interactive Opening Balance Modal */}
       <EditBalanceModal
         isOpen={isEditBalanceModalOpen}
-        accounts={accounts}
+        accounts={accounts.filter(account => !account.linkedBankId && account.type !== 'credit')}
         selectedAccountId={selectedAccountForBalance}
         lang={lang}
         onClose={() => setIsEditBalanceModalOpen(false)}
@@ -1389,7 +1401,7 @@ export default function App() {
       {/* Bottom Navigation Bar */}
       <BottomNav
         activeTab={activeTab}
-        onChangeTab={(tab) => { if (window.location.pathname === '/trial' || window.location.pathname === '/subscription') window.history.pushState({}, '', '/'); setActiveTab(tab); }}
+        onChangeTab={(tab) => { if (window.location.pathname === '/trial' || window.location.pathname === '/subscription' || window.location.pathname === '/accounts/new') window.history.pushState({}, '', '/'); setActiveTab(tab); }}
         lang={lang}
       />
     </div>

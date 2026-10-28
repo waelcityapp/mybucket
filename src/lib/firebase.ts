@@ -21,6 +21,7 @@ import {
 import { FinancialAccount, Transaction, Category } from '../types';
 import firebaseConfig from './firebaseConfig';
 import { isNonNegativeBalance } from '../utils/formatBalance';
+import { bindMovement, movementDeltas, validateBalance, type LinkedAccount } from '../utils/accountLinking';
 
 // Initialize Firebase App
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
@@ -193,14 +194,18 @@ export function subscribeUserCategories(
 
 // Save single account to Firestore
 export async function saveAccountToFirestore(userId: string, account: FinancialAccount) {
-  if (!isNonNegativeBalance(account.balance)) throw new Error('invalid-balance');
+  if (account.type === 'credit') validateBalance(account, account.balance);
+  else if (!isNonNegativeBalance(account.balance)) throw new Error('invalid-balance');
   const accountRef = doc(db, 'users', userId, 'accounts', account.id);
   await setDoc(accountRef, { ...account, userId }, { merge: true });
 }
 
 // Save all accounts (batch)
 export async function saveAllAccountsToFirestore(userId: string, accounts: FinancialAccount[]) {
-  if (accounts.some(account => !isNonNegativeBalance(account.balance))) throw new Error('invalid-balance');
+  for (const account of accounts) {
+    if (account.type === 'credit') validateBalance(account, account.balance);
+    else if (!isNonNegativeBalance(account.balance)) throw new Error('invalid-balance');
+  }
   const batch = writeBatch(db);
   accounts.forEach((acc) => {
     const accRef = doc(db, 'users', userId, 'accounts', acc.id);
@@ -228,111 +233,91 @@ export class InsufficientBalanceError extends Error {
   }
 }
 
-// Atomically create a transaction and update its affected balances from current server values.
-export async function createFinancialTransaction(userId: string, tx: Transaction): Promise<void> {
+// A movement records both the chosen method and the actual balance account.
+async function applyFinancialChange(userId: string, expected: Transaction | null, proposed: Transaction | null): Promise<'changed' | 'already-done'> {
   if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
-  if (!Number.isFinite(tx.amount) || tx.amount <= 0 || !tx.accountId) throw new Error('invalid-transaction');
-  if (tx.type === 'transfer' && (!tx.toAccountId || tx.accountId === tx.toAccountId)) throw new Error('invalid-transfer');
-  const txRef = doc(db, 'users', userId, 'transactions', tx.id);
-  const fromRef = doc(db, 'users', userId, 'accounts', tx.accountId);
-  const toRef = tx.type === 'transfer' && tx.toAccountId ? doc(db, 'users', userId, 'accounts', tx.toAccountId) : null;
-  await runTransaction(db, async (transaction) => {
-    const [oldTx, from, to] = await Promise.all([transaction.get(txRef), transaction.get(fromRef), toRef ? transaction.get(toRef) : Promise.resolve(null)]);
-    if (oldTx.exists()) {
-      const saved = oldTx.data();
-      if (saved.userId === userId && Object.entries(tx).every(([key, value]) => saved[key] === value)) return;
+  const id = expected?.id || proposed?.id;
+  if (!id || (expected && proposed && (expected.id !== proposed.id || expected.type !== proposed.type || expected.currency !== proposed.currency))) throw new Error('invalid-transaction');
+  const txRef = doc(db, 'users', userId, 'transactions', id);
+  return runTransaction(db, async transaction => {
+    const savedSnapshot = await transaction.get(txRef);
+    const saved = savedSnapshot.exists() ? savedSnapshot.data() : null;
+    const matches = (tx: Transaction) => !!saved && Object.entries(tx).every(([key, value]) => saved[key] === value);
+    if (expected && !saved) return proposed ? Promise.reject(new Error('transaction-not-found')) : 'already-done';
+    if (!expected && saved) {
+      if (proposed && matches(proposed)) return 'already-done';
       throw new Error('duplicate-transaction');
     }
-    if (!from.exists() || (toRef && !to?.exists())) throw new Error('account-not-found');
-    const source = from.data();
-    const destination = to?.data();
-    if (!Number.isFinite(source.balance) || (destination && !Number.isFinite(destination.balance))) throw new Error('invalid-balance');
-    if (source.currency !== tx.currency || (destination && destination.currency !== tx.currency)) throw new Error('currency-mismatch');
-    if ((tx.type === 'expense' || tx.type === 'transfer') && tx.amount > source.balance) {
-      throw new InsufficientBalanceError(source.balance, source.currency, source.nameAr || 'الحساب', source.name || 'account');
-    }
-    const sourceBalance = source.balance + (tx.type === 'income' ? tx.amount : -tx.amount);
-    transaction.set(txRef, { ...tx, userId });
-    transaction.update(fromRef, { balance: sourceBalance });
-    if (toRef && destination) transaction.update(toRef, { balance: destination.balance + tx.amount });
-  });
-  // A successful commit is followed by a server read, so the user sees success only
-  // after the exact transaction is visible in the signed-in user's collection.
-  if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
-  const confirmed = await getDocFromServer(txRef);
-  const saved = confirmed.data();
-  if (!confirmed.exists() || saved?.userId !== userId || !Object.entries(tx).every(([key, value]) => saved[key] === value)) {
-    throw new Error('transaction-verification-failed');
-  }
-}
-
-// Apply the difference between the saved and edited transaction in one Firestore transaction.
-export async function updateFinancialTransaction(userId: string, expected: Transaction, updated: Transaction): Promise<void> {
-  if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
-  if (updated.id !== expected.id || updated.type !== expected.type || updated.currency !== expected.currency) throw new Error('invalid-transaction');
-  const valid = (tx: Transaction) => Number.isFinite(tx.amount) && tx.amount > 0 && !!tx.accountId && ['expense', 'income', 'transfer'].includes(tx.type) && (tx.type !== 'transfer' || (!!tx.toAccountId && tx.toAccountId !== tx.accountId));
-  if (!valid(expected) || !valid(updated)) throw new Error('invalid-transaction');
-  const txRef = doc(db, 'users', userId, 'transactions', expected.id);
-  await runTransaction(db, async transaction => {
-    const snapshot = await transaction.get(txRef);
-    if (!snapshot.exists()) throw new Error('transaction-not-found');
-    const saved = snapshot.data();
-    const matches = (tx: Transaction) => Object.entries(tx).every(([key, value]) => saved[key] === value);
-    if (matches(updated)) return; // A retry after a successful but unconfirmed commit must not apply twice.
-    if (!matches(expected)) throw new Error('transaction-changed');
-    const deltas = new Map<string, number>();
-    const add = (id: string, amount: number) => deltas.set(id, (deltas.get(id) || 0) + amount);
-    const apply = (tx: Transaction, factor: number) => {
-      add(tx.accountId, factor * (tx.type === 'income' ? tx.amount : -tx.amount));
-      if (tx.type === 'transfer' && tx.toAccountId) add(tx.toAccountId, factor * tx.amount);
+    if (expected && saved && proposed && matches(proposed)) return 'already-done';
+    if (expected && !matches(expected)) throw new Error('transaction-changed');
+    const cache = new Map<string, LinkedAccount & { nameAr?: string; name?: string }>();
+    const load = async (accountId: string) => {
+      if (!cache.has(accountId)) {
+        const snap = await transaction.get(doc(db, 'users', userId, 'accounts', accountId));
+        if (!snap.exists()) throw new Error('account-not-found');
+        cache.set(accountId, { ...snap.data(), id: accountId } as LinkedAccount & { nameAr?: string; name?: string });
+      }
+      return cache.get(accountId)!;
     };
-    apply(expected, -1);
-    apply(updated, 1);
-    const refs = Array.from(deltas.keys(), id => doc(db, 'users', userId, 'accounts', id));
-    const snapshots = await Promise.all(refs.map(ref => transaction.get(ref)));
-    const changes = snapshots.map((account, i) => {
-      if (!account.exists()) throw new Error('account-not-found');
-      const data = account.data();
-      if (!Number.isFinite(data.balance)) throw new Error('invalid-balance');
-      if (data.currency !== updated.currency) throw new Error('currency-mismatch');
-      const delta = deltas.get(refs[i].id)!;
-      const balance = data.balance + delta;
-      if (balance < 0 && delta < 0) throw new InsufficientBalanceError(data.balance, data.currency, data.nameAr || 'الحساب', data.name || 'account');
-      return { ref: refs[i], balance };
-    });
-    changes.forEach(({ ref, balance }) => transaction.update(ref, { balance }));
-    const cleanUpdated = Object.fromEntries(Object.entries(updated).filter(([, value]) => value !== undefined));
-    transaction.set(txRef, { ...cleanUpdated, userId });
+    let finalTx = proposed;
+    if (proposed) {
+      const fromMethod = await load(proposed.accountId);
+      if (fromMethod.linkedBankId) await load(fromMethod.linkedBankId);
+      if (proposed.type === 'transfer' && proposed.toAccountId) {
+        const targetMethod = await load(proposed.toAccountId);
+        if (targetMethod.linkedBankId) await load(targetMethod.linkedBankId);
+      }
+      const bound = bindMovement(Array.from(cache.values()), proposed);
+      // If the selected method hasn't changed, retain the balance account captured originally.
+      if (expected?.balanceAccountId && expected.accountId === proposed.accountId) bound.balanceAccountId = expected.balanceAccountId;
+      if (expected?.toBalanceAccountId && expected.toAccountId === proposed.toAccountId) bound.toBalanceAccountId = expected.toBalanceAccountId;
+      if (bound.type === 'transfer' && bound.balanceAccountId === bound.toBalanceAccountId) throw new Error('invalid-transfer');
+      finalTx = { ...proposed, balanceAccountId: bound.balanceAccountId, ...(bound.toBalanceAccountId ? { toBalanceAccountId: bound.toBalanceAccountId } : {}) };
+    }
+    const deltas = new Map<string, number>();
+    const apply = (tx: Transaction, factor: number) => {
+      for (const [accountId, delta] of movementDeltas(tx, factor)) deltas.set(accountId, (deltas.get(accountId) || 0) + delta);
+    };
+    if (expected) apply(expected, -1);
+    if (finalTx) apply(finalTx, 1);
+    const changes: Array<{ ref: ReturnType<typeof doc>; balance: number }> = [];
+    for (const [accountId, delta] of deltas) {
+      const account = await load(accountId);
+      if (account.currency !== (finalTx || expected)!.currency) throw new Error('currency-mismatch');
+      const balance = account.balance + delta;
+      try { validateBalance(account, balance); }
+      catch (error) {
+        if (error instanceof Error && ['insufficient-balance', 'credit-limit-exceeded'].includes(error.message)) {
+          const available = account.type === 'credit' ? (account.creditLimit || 0) + account.balance : account.balance;
+          throw new InsufficientBalanceError(available, account.currency, account.nameAr || 'الحساب', account.name || 'account');
+        }
+        throw error;
+      }
+      changes.push({ ref: doc(db, 'users', userId, 'accounts', accountId), balance });
+    }
+    changes.forEach(change => transaction.update(change.ref, { balance: change.balance }));
+    if (finalTx) transaction.set(txRef, { ...Object.fromEntries(Object.entries(finalTx).filter(([, value]) => value !== undefined)), userId });
+    else transaction.delete(txRef);
+    return 'changed';
   });
 }
 
-// Delete and reverse the financial effect together, based on current server values.
+export async function createFinancialTransaction(userId: string, tx: Transaction): Promise<void> {
+  await applyFinancialChange(userId, null, tx);
+  if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
+  const confirmed = await getDocFromServer(doc(db, 'users', userId, 'transactions', tx.id));
+  const saved = confirmed.data();
+  if (!confirmed.exists() || saved?.userId !== userId || !Object.entries(tx).every(([key, value]) => saved[key] === value)) throw new Error('transaction-verification-failed');
+}
+export async function updateFinancialTransaction(userId: string, expected: Transaction, updated: Transaction): Promise<void> {
+  await applyFinancialChange(userId, expected, updated);
+}
 export async function deleteTransactionFromFirestore(userId: string, transactionId: string): Promise<'deleted' | 'already-deleted'> {
   if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
-  const txRef = doc(db, 'users', userId, 'transactions', transactionId);
-  return runTransaction(db, async transaction => {
-    const savedTx = await transaction.get(txRef);
-    if (!savedTx.exists()) return 'already-deleted';
-    const tx = savedTx.data() as Transaction;
-    if (!Number.isFinite(tx.amount) || tx.amount <= 0 || !tx.accountId || !['expense', 'income', 'transfer'].includes(tx.type)) throw new Error('invalid-transaction');
-    if (tx.type === 'transfer' && (!tx.toAccountId || tx.toAccountId === tx.accountId)) throw new Error('invalid-transfer');
-    const fromRef = doc(db, 'users', userId, 'accounts', tx.accountId);
-    const toRef = tx.type === 'transfer' && tx.toAccountId ? doc(db, 'users', userId, 'accounts', tx.toAccountId) : null;
-    const [from, to] = await Promise.all([transaction.get(fromRef), toRef ? transaction.get(toRef) : Promise.resolve(null)]);
-    if (!from.exists() || (toRef && !to?.exists())) throw new Error('account-not-found');
-    const source = from.data();
-    const destination = to?.data();
-    if (!Number.isFinite(source.balance) || (destination && !Number.isFinite(destination.balance))) throw new Error('invalid-balance');
-    if (source.currency !== tx.currency || (destination && destination.currency !== tx.currency)) throw new Error('currency-mismatch');
-    const debitedAccount = tx.type === 'income' ? source : tx.type === 'transfer' ? destination : null;
-    if (debitedAccount && tx.amount > debitedAccount.balance) {
-      throw new InsufficientBalanceError(debitedAccount.balance, debitedAccount.currency, debitedAccount.nameAr || 'الحساب', debitedAccount.name || 'account');
-    }
-    transaction.update(fromRef, { balance: source.balance + (tx.type === 'income' ? -tx.amount : tx.amount) });
-    if (toRef && destination) transaction.update(toRef, { balance: destination.balance - tx.amount });
-    transaction.delete(txRef);
-    return 'deleted';
-  });
+  const snapshot = await getDocFromServer(doc(db, 'users', userId, 'transactions', transactionId));
+  if (!snapshot.exists()) return 'already-deleted';
+  const result = await applyFinancialChange(userId, snapshot.data() as Transaction, null);
+  return result === 'changed' ? 'deleted' : 'already-deleted';
 }
 
 // Save all categories (batch)

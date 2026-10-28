@@ -1,6 +1,6 @@
 export type CurrencyCode = 'EGP' | 'USD' | 'SAR' | 'AED' | 'EUR';
 
-export type AccountType = 'cash' | 'bank' | 'card' | 'savings' | 'wallet' | 'other' | 'custom';
+export type AccountType = 'cash' | 'bank' | 'card' | 'savings' | 'wallet' | 'other' | 'custom' | 'credit';
 
 export interface FinancialAccount {
   id: string;
@@ -10,6 +10,8 @@ export interface FinancialAccount {
   balance: number;
   currency: CurrencyCode;
   color?: string;
+  linkedBankId?: string;
+  creditLimit?: number;
 }
 
 export type TransactionType = 'expense' | 'income' | 'transfer';
@@ -28,7 +30,9 @@ export interface Transaction {
   type: TransactionType;
   amount: number;
   currency: CurrencyCode;
-  accountId: string; // source account for expense/income/transfer
+  accountId: string; // payment method selected by user
+  balanceAccountId?: string; // actual balance affected when saved
+  toBalanceAccountId?: string;
   toAccountId?: string; // destination account for transfer
   categoryId?: string;
   description: string;

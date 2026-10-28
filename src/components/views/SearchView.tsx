@@ -51,8 +51,7 @@ export function SearchView({ transactions, categories, accounts, lang, authUser 
         if (toDate && tx.date > toDate) return false;
         if (categoryId !== 'all' && tx.categoryId !== categoryId) return false;
         if (accountId !== 'all') {
-          if (tx.type === 'transfer' && tx.accountId !== accountId && tx.toAccountId !== accountId) return false;
-          if (tx.type !== 'transfer' && tx.accountId !== accountId) return false;
+          if (![tx.accountId, tx.toAccountId, tx.balanceAccountId, tx.toBalanceAccountId].includes(accountId)) return false;
         }
         if (currency !== 'all' && tx.currency !== currency) return false;
         

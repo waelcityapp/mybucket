@@ -11,6 +11,7 @@ import { auth } from '../../lib/firebase';
 import {
   matchCategoryFromText,
   matchAccountFromText,
+  matchExplicitAccountFromText,
   matchDescriptionEdit,
   matchAmountEdit,
   matchTransactionType,
@@ -217,7 +218,7 @@ export class GeminiAIClient implements AIInterpretationProvider {
 
       // Only accept an account explicitly named by the user, never an AI guess or learned memory.
       // For transfers, the form asks the user to choose both ends explicitly.
-      const explicitAccount = transaction.type === 'transfer' ? null : matchAccountFromText(raw, request.accounts, false);
+      const explicitAccount = transaction.type === 'transfer' ? null : matchExplicitAccountFromText(raw, request.accounts);
       const matchedAccountId: string | null = explicitAccount?.id || null;
 
       // Check category validity
@@ -485,7 +486,7 @@ export class GeminiAIClient implements AIInterpretationProvider {
 
     const draft = parseNaturalLanguageInput(raw, localAccounts, localCategories);
 
-    const explicitAccount = draft.type === 'transfer' ? null : matchAccountFromText(raw, request.accounts, false);
+    const explicitAccount = draft.type === 'transfer' ? null : matchExplicitAccountFromText(raw, request.accounts);
     const missingFields: string[] = explicitAccount ? [] : ['accountId'];
 
     const finalAmount = semanticRoles.amount !== null ? semanticRoles.amount : draft.amount;

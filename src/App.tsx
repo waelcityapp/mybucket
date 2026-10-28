@@ -970,7 +970,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #29' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #30' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {
@@ -1006,6 +1006,10 @@ export default function App() {
         onToggleLanguage={handleToggleLanguage}
       />
     );
+  }
+
+  if (isAdmin && new URLSearchParams(window.location.search).get('setup_preview') === '1') {
+    return <InitialSetupView lang={lang} preview onClosePreview={() => { window.location.href = '/'; }} onSave={async () => {}} />;
   }
 
   if (needsInitialSetup && financialLoaded.accounts) {

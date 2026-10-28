@@ -46,6 +46,7 @@ import { FinancialQueryResultCard } from './components/FinancialQueryResultCard'
 import { HomeFinancialOverview } from './components/HomeFinancialOverview';
 import { AdminView } from './components/views/AdminView';
 import { AuthPage } from './components/views/AuthPage';
+import { InitialSetupView } from './components/views/InitialSetupView';
 import { UserSubscription, UserDailyUsage } from './types/prototypeSubscription';
 import {
   createInitialSubscription,
@@ -134,6 +135,9 @@ export default function App() {
       }
     }
 
+    // Freshly configured accounts do not need old prototype placeholder accounts.
+    if (deduplicated.some(account => account.id === 'setup_cash')) return { updated: deduplicated, migrated };
+
     const hasOther = deduplicated.some((a) => a.id === 'acc_other' || a.type === 'other');
     if (!hasOther) {
       migrated = true;
@@ -183,10 +187,12 @@ export default function App() {
   };
 
   // Financial state is loaded from the signed-in user's confirmed cloud data.
-  const [accounts, setAccounts] = useState<FinancialAccount[]>(INITIAL_ACCOUNTS);
+  const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [financialLoaded, setFinancialLoaded] = useState({ accounts: false, transactions: false });
+  const [needsInitialSetup, setNeedsInitialSetup] = useState(false);
+  const initialSetupAttempt = useRef<{ signature: string; accounts: FinancialAccount[] } | null>(null);
   const [transactionReadError, setTransactionReadError] = useState(false);
   const lastUserId = useRef<string | null>(null);
   const saveInFlight = useRef(false);
@@ -274,10 +280,12 @@ export default function App() {
       if (lastUserId.current !== nextId) {
         lastUserId.current = nextId;
         pendingTransaction.current = null;
-        setAccounts(INITIAL_ACCOUNTS);
+        setAccounts([]);
         setCategories(INITIAL_CATEGORIES);
         setTransactions([]);
         setFinancialLoaded({ accounts: false, transactions: false });
+        setNeedsInitialSetup(false);
+        initialSetupAttempt.current = null;
         setTransactionReadError(false);
         setUserSubscription(null);
         setPrefilledDraft(null);
@@ -323,11 +331,12 @@ export default function App() {
       if (auth.currentUser?.uid !== authUser.uid) return;
       if (cloudAccounts.length > 0) {
         setAccounts(migrateLegacyAccounts(cloudAccounts).updated);
-        setFinancialLoaded(prev => ({ ...prev, accounts: true }));
+        setNeedsInitialSetup(false);
       } else {
-        setAccounts(INITIAL_ACCOUNTS);
-        initializeDefaultDocuments(authUser.uid, 'accounts', INITIAL_ACCOUNTS).catch(() => setToastMessage(lang === 'ar' ? 'تعذر إعداد الحسابات. تحقق من الاتصال.' : 'Could not initialize accounts. Check your connection.'));
+        setAccounts([]);
+        setNeedsInitialSetup(true);
       }
+      setFinancialLoaded(prev => ({ ...prev, accounts: true }));
     });
 
     // 2. Subscribe to User's Transactions
@@ -961,7 +970,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #28' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #29' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {
@@ -997,6 +1006,20 @@ export default function App() {
         onToggleLanguage={handleToggleLanguage}
       />
     );
+  }
+
+  if (needsInitialSetup && financialLoaded.accounts) {
+    return <InitialSetupView lang={lang} onSave={async draft => {
+      if (!auth.currentUser || auth.currentUser.uid !== authUser.uid) throw new Error('auth-changed');
+      const signature = JSON.stringify(draft);
+      if (initialSetupAttempt.current && initialSetupAttempt.current.signature !== signature) {
+        throw new Error('check-previous-setup');
+      }
+      if (!initialSetupAttempt.current) {
+        initialSetupAttempt.current = { signature, accounts: draft.map((account, index) => ({ ...account, id: index === 0 ? 'setup_cash' : `acc_${crypto.randomUUID()}` })) };
+      }
+      await saveAllAccountsToFirestore(authUser.uid, initialSetupAttempt.current.accounts);
+    }} />;
   }
 
   return (

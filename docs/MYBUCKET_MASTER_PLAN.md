@@ -265,3 +265,7 @@ Account creation and balance edits reject negative or invalid balances. Existing
 ## Linked payment methods and credit cards — revision #27
 
 New debit cards and wallets may be configured independently or linked to an existing bank account; linked methods display the bank balance without double-counting it. Credit cards have a credit limit and outstanding balance. Transaction records preserve the actual balance accounts so edits and deletions reverse the right records atomically. No direct banking connection is used. Existing accounts are not migrated automatically.
+
+## Initial account setup — revision #29
+
+When a signed-in user has no saved accounts, show a full-page setup for optional bank accounts and cash. Existing accounts are not overwritten or removed by this change. Google sign-in and subscription state remain separate.

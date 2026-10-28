@@ -36,7 +36,7 @@ import { AccountsView } from './components/views/AccountsView';
 import { CategoriesView } from './components/views/CategoriesView';
 import { SettingsView } from './components/views/SettingsView';
 import { SearchView } from './components/views/SearchView';
-import { CheckCircle2, Smartphone, Cloud, ArrowRight, Sparkles, Clock } from 'lucide-react';
+import { CheckCircle2, Smartphone, Cloud, ArrowRight, Sparkles, Clock, Settings, BookOpen } from 'lucide-react';
 import { AIFinancialQuery, AICorrection } from './services/ai/types';
 import {
   executeDeterministicQuery,
@@ -47,6 +47,7 @@ import { HomeFinancialOverview } from './components/HomeFinancialOverview';
 import { AdminView } from './components/views/AdminView';
 import { AuthPage } from './components/views/AuthPage';
 import { InitialSetupView } from './components/views/InitialSetupView';
+import { UsageGuideView } from './components/views/UsageGuideView';
 import { UserSubscription, UserDailyUsage } from './types/prototypeSubscription';
 import {
   createInitialSubscription,
@@ -93,13 +94,15 @@ export default function App() {
   });
 
   // 2. Active Tab State
-  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : window.location.pathname === '/accounts/new' ? 'accounts' : 'home');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : 'home');
+  const openGuide = () => { window.history.pushState({ guide: true }, '', '/guide'); setActiveTab('guide'); };
+  const openAccountSettings = () => { window.history.pushState({ accounts: true }, '', '/accounts'); setActiveTab('accounts'); };
   const openSubscriptionPage = (page: 'trial-details' | 'subscription') => {
     window.history.pushState({ subscriptionPage: page }, '', page === 'trial-details' ? '/trial' : '/subscription');
     setActiveTab(page);
   };
   useEffect(() => {
-    const onPopState = () => setActiveTab(window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : window.location.pathname === '/accounts/new' ? 'accounts' : 'home');
+    const onPopState = () => setActiveTab(window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : 'home');
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
@@ -300,7 +303,7 @@ export default function App() {
         setIsExpenseCategoriesModalOpen(false);
         setIsCategoryDetailModalOpen(false);
         setSelectedCategoryForDetail(null);
-        setActiveTab(firebaseUser && window.location.pathname === '/accounts/new' ? 'accounts' : 'home');
+        setActiveTab(firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : 'home');
         setToastMessage(null);
         aiLearnedMemory.clear();
       }
@@ -970,7 +973,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #31' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #32' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {
@@ -1006,6 +1009,10 @@ export default function App() {
         onToggleLanguage={handleToggleLanguage}
       />
     );
+  }
+
+  if (activeTab === 'guide') {
+    return <UsageGuideView lang={lang} onBack={() => { if (window.history.state?.guide) window.history.back(); else { window.history.replaceState({}, '', '/'); setActiveTab('home'); } }} />;
   }
 
   if (isAdmin && new URLSearchParams(window.location.search).get('setup_preview') === '1') {
@@ -1150,6 +1157,11 @@ export default function App() {
                 )}
               </div>
             )}
+
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={openAccountSettings} className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 text-xs font-bold text-slate-700 hover:bg-slate-50"><Settings className="h-4 w-4 text-slate-500" />{lang === 'ar' ? 'إعدادات الحساب' : 'Account settings'}</button>
+              <button type="button" onClick={openGuide} className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 text-xs font-bold text-slate-700 hover:bg-slate-50"><BookOpen className="h-4 w-4 text-emerald-700" />{lang === 'ar' ? 'شرح الاستخدام' : 'How to use'}</button>
+            </div>
 
             {/* 2. Top Clear Financial Summary: Net Balance + Today/Month expenses */}
             <HomeFinancialOverview
@@ -1433,7 +1445,7 @@ export default function App() {
       {/* Bottom Navigation Bar */}
       <BottomNav
         activeTab={activeTab}
-        onChangeTab={(tab) => { if (window.location.pathname === '/trial' || window.location.pathname === '/subscription' || window.location.pathname === '/accounts/new') window.history.pushState({}, '', '/'); setActiveTab(tab); }}
+        onChangeTab={(tab) => { if (window.location.pathname === '/trial' || window.location.pathname === '/subscription' || window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts' || window.location.pathname === '/guide') window.history.pushState({}, '', '/'); setActiveTab(tab); }}
         lang={lang}
       />
     </div>

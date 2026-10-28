@@ -269,3 +269,7 @@ New debit cards and wallets may be configured independently or linked to an exis
 ## Initial account setup — revision #29
 
 When a signed-in user has no saved accounts, show a full-page setup for optional bank accounts and cash. Existing accounts are not overwritten or removed by this change. Google sign-in and subscription state remain separate.
+
+## Account settings and usage guide — revision #32
+
+The home screen links to account settings and a full-page usage guide. The guide is also accessible from initial setup and makes clear that saved trial entries are real application records; no financial reset is performed.

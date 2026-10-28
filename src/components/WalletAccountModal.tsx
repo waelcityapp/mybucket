@@ -162,6 +162,7 @@ export function WalletAccountModal({
               <div className="relative">
                 <input
                   type="number"
+                  min="0"
                   step="any"
                   value={balanceStr}
                   onChange={(e) => setBalanceStr(e.target.value)}

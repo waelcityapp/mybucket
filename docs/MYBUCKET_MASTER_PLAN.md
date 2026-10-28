@@ -257,3 +257,7 @@ Deleting a transaction atomically reverses its effect using current server balan
 ## Atomic transaction editing — revision #22
 
 Editing an existing transaction reverses its previous financial effect and applies the new one against current server balances in one Firestore transaction. Stale edits, insufficient funds, invalid accounts and currency mismatches are rejected without partial writes.
+
+## Non-negative balances and legible negative values — revision #26
+
+Account creation and balance edits reject negative or invalid balances. Existing negative balances remain unchanged and are labelled clearly for the user to review.

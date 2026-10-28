@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { Plus, CreditCard, Banknote, Building2, PiggyBank, Smartphone, ArrowLeftRight, FolderKanban, ShieldCheck, X, Pencil } from 'lucide-react';
 import { FinancialAccount, CurrencyCode, AccountType, Language } from '../../types';
 import { translations } from '../../data/translations';
+import { formatAccountBalance } from '../../utils/formatBalance';
 
 interface AccountsViewProps {
   accounts: FinancialAccount[];
@@ -117,13 +118,18 @@ export function AccountsView({ accounts, lang, onAddAccount, onEditBalance }: Ac
             <div key={curr} className="bg-white/10 rounded-2xl p-3 border border-white/10">
               <span className="text-[11px] font-mono text-slate-300">{curr}</span>
               <div className="text-lg font-black text-white">
-                {formatNumber(total)} <span className="text-xs text-emerald-400 font-normal">{curr}</span>
+                {formatAccountBalance(total, lang)} <span className="text-xs text-emerald-400 font-normal">{curr}</span>
               </div>
             </div>
           ))}
         </div>
       </div>
 
+      {accounts.some(acc => acc.balance < 0) && (
+        <p role="alert" className="text-sm font-semibold text-amber-900 bg-amber-50 border border-amber-200 rounded-xl p-3">
+          {lang === 'ar' ? 'يوجد رصيد سالب مسجل سابقًا. راجع الحساب وصحح رصيده الفعلي.' : 'A previously recorded account balance is negative. Review the account and correct its actual balance.'}
+        </p>
+      )}
       {/* List of Accounts */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
         {accounts.map((acc) => (
@@ -148,7 +154,7 @@ export function AccountsView({ accounts, lang, onAddAccount, onEditBalance }: Ac
             <div className="flex items-center gap-3">
               <div className="text-end">
                 <div className="text-base font-black text-slate-900">
-                  {formatNumber(acc.balance)}
+                  {formatAccountBalance(acc.balance, lang)}
                 </div>
                 <span className="text-xs font-bold text-slate-500 font-mono">
                   {acc.currency}
@@ -244,6 +250,7 @@ export function AccountsView({ accounts, lang, onAddAccount, onEditBalance }: Ac
                 </label>
                 <input
                   type="number"
+                  min="0"
                   step="any"
                   placeholder="0.00"
                   value={initialBalance}

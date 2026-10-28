@@ -77,6 +77,7 @@ import {
   updateUserNameInFirebase,
 } from './lib/firebase';
 import { aiLearnedMemory } from './services/ai/aiLearnedMemory';
+import { isNonNegativeBalance } from './utils/formatBalance';
 
 import { saveUserSubscriptionToFirestore, subscribeUserSubscription, type SubscriptionReadIssue } from './services/prototypeSubscriptionClient';
 
@@ -617,7 +618,13 @@ export default function App() {
   };
 
   // Add New Account Handler
+  const rejectInvalidBalance = () => {
+    setToastMessage(lang === 'ar' ? 'لا يمكن حفظ رصيد سالب. أدخل صفرًا أو مبلغًا موجبًا.' : 'A balance cannot be negative. Enter zero or a positive amount.');
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
   const handleAddAccount = async (accData: Omit<FinancialAccount, 'id'>) => {
+    if (!isNonNegativeBalance(accData.balance)) { rejectInvalidBalance(); return; }
     const newAccount: FinancialAccount = {
       ...accData,
       id: `acc_${Date.now()}`,
@@ -700,6 +707,7 @@ export default function App() {
 
   // Save Bank Account Changes (Name & Balance)
   const handleSaveBankAccount = async (accountId: string, newNameAr: string, newBalance: number) => {
+    if (!isNonNegativeBalance(newBalance)) { rejectInvalidBalance(); return; }
     const updated = accounts.map((acc) => {
       if (acc.id === accountId) {
         return {
@@ -733,6 +741,7 @@ export default function App() {
 
   // Save Card Account Changes (Name & Balance)
   const handleSaveCardAccount = async (accountId: string, newNameAr: string, newBalance: number) => {
+    if (!isNonNegativeBalance(newBalance)) { rejectInvalidBalance(); return; }
     const updated = accounts.map((acc) => {
       if (acc.id === accountId) {
         return {
@@ -766,6 +775,7 @@ export default function App() {
 
   // Save Wallet Account Changes (Name & Balance)
   const handleSaveWalletAccount = async (accountId: string, newNameAr: string, newBalance: number) => {
+    if (!isNonNegativeBalance(newBalance)) { rejectInvalidBalance(); return; }
     const updated = accounts.map((acc) => {
       if (acc.id === accountId) {
         return {
@@ -799,6 +809,7 @@ export default function App() {
 
   // Save Other Payment/Receiving Methods Changes (Name & Balance)
   const handleSaveOtherAccount = async (accountId: string, newNameAr: string, newBalance: number) => {
+    if (!isNonNegativeBalance(newBalance)) { rejectInvalidBalance(); return; }
     const updated = accounts.map((acc) => {
       if (acc.id === accountId) {
         return {
@@ -832,6 +843,7 @@ export default function App() {
 
   // Save Extra / Other Accounts Changes (Name & Balance)
   const handleSaveExtraAccount = async (accountId: string, newNameAr: string, newBalance: number) => {
+    if (!isNonNegativeBalance(newBalance)) { rejectInvalidBalance(); return; }
     const updated = accounts.map((acc) => {
       if (acc.id === accountId) {
         return {
@@ -858,6 +870,7 @@ export default function App() {
 
   // Update Single Account Balance
   const handleUpdateSingleBalance = async (accountId: string, newBalance: number) => {
+    if (!isNonNegativeBalance(newBalance)) { rejectInvalidBalance(); return; }
     const updated = accounts.map((acc) =>
       acc.id === accountId ? { ...acc, balance: newBalance } : acc
     );
@@ -877,6 +890,7 @@ export default function App() {
 
   // Update Bulk Account Balances
   const handleUpdateBulkBalances = async (balancesMap: Record<string, number>) => {
+    if (Object.values(balancesMap).some(value => !isNonNegativeBalance(value))) { rejectInvalidBalance(); return; }
     const updated = accounts.map((acc) => {
       if (acc.id in balancesMap) {
         return { ...acc, balance: balancesMap[acc.id] };
@@ -930,7 +944,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #25' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #26' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {

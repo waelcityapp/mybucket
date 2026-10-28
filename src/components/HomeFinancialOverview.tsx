@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Wallet, TrendingDown, Calendar, Eye, EyeOff, ArrowUpRight } from 'lucide-react';
 import { FinancialAccount, Transaction, Language } from '../types';
+import { formatAccountBalance } from '../utils/formatBalance';
 
 interface HomeFinancialOverviewProps {
   accounts: FinancialAccount[];
@@ -108,7 +109,7 @@ export function HomeFinancialOverview({
             ) : (
               <>
                 <span className="text-2xl sm:text-3xl font-black text-slate-900">
-                  {formatNumber(primaryTotal)}
+                  {formatAccountBalance(primaryTotal, lang)}
                 </span>
                 <span className="text-xs sm:text-sm font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
                   {isAr ? (primaryCurrency === 'EGP' ? 'ج.م' : primaryCurrency) : primaryCurrency}
@@ -122,7 +123,7 @@ export function HomeFinancialOverview({
             <div className="flex flex-wrap items-center gap-2 pt-0.5">
               {otherCurrencies.map(([curr, amt]: [string, number]) => (
                 <span key={curr} className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
-                  {formatNumber(amt)} {curr}
+                  {formatAccountBalance(amt, lang)} {curr}
                 </span>
               ))}
             </div>

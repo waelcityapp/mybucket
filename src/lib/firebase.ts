@@ -20,6 +20,7 @@ import {
 } from 'firebase/firestore';
 import { FinancialAccount, Transaction, Category } from '../types';
 import firebaseConfig from './firebaseConfig';
+import { isNonNegativeBalance } from '../utils/formatBalance';
 
 // Initialize Firebase App
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
@@ -192,12 +193,14 @@ export function subscribeUserCategories(
 
 // Save single account to Firestore
 export async function saveAccountToFirestore(userId: string, account: FinancialAccount) {
+  if (!isNonNegativeBalance(account.balance)) throw new Error('invalid-balance');
   const accountRef = doc(db, 'users', userId, 'accounts', account.id);
   await setDoc(accountRef, { ...account, userId }, { merge: true });
 }
 
 // Save all accounts (batch)
 export async function saveAllAccountsToFirestore(userId: string, accounts: FinancialAccount[]) {
+  if (accounts.some(account => !isNonNegativeBalance(account.balance))) throw new Error('invalid-balance');
   const batch = writeBatch(db);
   accounts.forEach((acc) => {
     const accRef = doc(db, 'users', userId, 'accounts', acc.id);

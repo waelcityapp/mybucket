@@ -1,6 +1,7 @@
 import { Plus, Pencil, ChevronLeft } from 'lucide-react';
 import { FinancialAccount, Language } from '../types';
 import { translations } from '../data/translations';
+import { formatAccountBalance } from '../utils/formatBalance';
 
 interface MoneySourcesProps {
   accounts: FinancialAccount[];
@@ -163,7 +164,7 @@ export function MoneySources({
                 <span className="text-[10px] text-slate-400 font-bold font-mono">
                   {acc.currency}
                 </span>
-                <span className="truncate">{formatNumber(acc.balance)}</span>
+                <span className="truncate">{formatAccountBalance(acc.balance, lang)}</span>
               </div>
 
               {/* Pencil icon for editing balance */}

@@ -1,3 +1,4 @@
+import { formatAccountBalance } from '../utils/formatBalance';
 import { useState, useEffect, FormEvent } from 'react';
 import { X, Check, Banknote, Building2, CreditCard, PiggyBank, Smartphone, ArrowLeftRight, FolderKanban, RotateCcw } from 'lucide-react';
 import { FinancialAccount, Language } from '../types';
@@ -148,7 +149,7 @@ export function EditBalanceModal({
 
               <div className="text-end">
                 <div className="text-xl sm:text-2xl font-black text-emerald-700 font-mono ">
-                  {selectedAccount.balance.toLocaleString()}
+                  {formatAccountBalance(selectedAccount.balance, lang)}
                 </div>
                 <div className="text-[11px] font-bold text-slate-500">
                   {selectedAccount.currency}
@@ -164,6 +165,7 @@ export function EditBalanceModal({
               <div className="relative">
                 <input
                   type="number"
+                  min="0"
                   step="any"
                   required
                   autoFocus
@@ -264,6 +266,7 @@ export function EditBalanceModal({
                     <div className="relative w-36 sm:w-44 shrink-0">
                       <input
                         type="number"
+                  min="0"
                         step="any"
                         placeholder="0"
                         value={currentVal}

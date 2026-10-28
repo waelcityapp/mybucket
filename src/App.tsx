@@ -71,6 +71,7 @@ import {
   subscribeUserCategories,
   saveAccountToFirestore,
   saveAllAccountsToFirestore,
+  zeroAccountBalances,
   updateFinancialTransaction,
   deleteTransactionFromFirestore,
   saveAllCategoriesToFirestore,
@@ -937,15 +938,23 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Zero All Account Balances
-  const handleZeroAllBalances = async () => {
-    const zeroed = accounts.map((acc) => ({ ...acc, balance: 0 }));
-    setAccounts(zeroed);
-    setTransactions([]);
-    localStorage.removeItem(`${STORAGE_KEY_PREFIX}transactions`);
-
-    if (authUser) {
-      await saveAllAccountsToFirestore(authUser.uid, zeroed);
+  // Confirm the effect before resetting balances; retain the transaction history.
+  const handleZeroAllBalances = async (): Promise<boolean> => {
+    if (!authUser) return false;
+    const message = lang === 'ar'
+      ? 'سيتم تصفير أرصدة جميع الحسابات، بما فيها المبالغ المستحقة على بطاقات الائتمان داخل التطبيق. ستبقى الحسابات والعمليات المسجلة كما هي، وقد يؤثر تعديل أو حذف عملية قديمة على الرصيد بعد التصفير. هل تريد المتابعة؟'
+      : 'All account balances, including recorded credit card debt, will be set to zero. Accounts and transaction history remain; editing or deleting an old transaction can change balances afterward. Continue?';
+    if (!window.confirm(message)) return false;
+    try {
+      await zeroAccountBalances(authUser.uid);
+      setToastMessage(lang === 'ar' ? 'تم تصفير أرصدة الحسابات. العمليات المسجلة لم تُحذف.' : 'Account balances reset. Transaction history was retained.');
+      setTimeout(() => setToastMessage(null), 5000);
+      return true;
+    } catch (error) {
+      console.error('Could not reset account balances:', error);
+      setToastMessage(lang === 'ar' ? 'تعذر تصفير الأرصدة. تحقق من الاتصال وحاول مرة أخرى.' : 'Could not reset balances. Check your connection and try again.');
+      setTimeout(() => setToastMessage(null), 5000);
+      return false;
     }
   };
 
@@ -973,7 +982,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #32' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #33' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {
@@ -1268,6 +1277,7 @@ export default function App() {
             lang={lang}
             onAddAccount={handleAddAccount}
             onEditBalance={handleOpenEditBalance}
+            onZeroAllBalances={handleZeroAllBalances}
           />
         )}
 

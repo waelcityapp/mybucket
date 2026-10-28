@@ -15,7 +15,7 @@ interface AdminViewProps {
   user: AuthUser;
   onBack: () => void;
   onResetDemoData: () => void;
-  onZeroAllBalances: () => void;
+  onZeroAllBalances: () => Promise<boolean>;
 }
 
 export function AdminView({
@@ -33,9 +33,8 @@ export function AdminView({
     window.setTimeout(() => setConfirmation(null), 3000);
   };
 
-  const handleZeroBalances = () => {
-    onZeroAllBalances();
-    showConfirmation('zero');
+  const handleZeroBalances = async () => {
+    if (await onZeroAllBalances()) showConfirmation('zero');
   };
 
   const handleReset = () => {

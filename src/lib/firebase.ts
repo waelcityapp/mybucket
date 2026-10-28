@@ -17,6 +17,7 @@ import {
   writeBatch,
   runTransaction,
   getDocFromServer,
+  getDocsFromServer,
 } from 'firebase/firestore';
 import { FinancialAccount, Transaction, Category } from '../types';
 import firebaseConfig from './firebaseConfig';
@@ -212,6 +213,21 @@ export async function saveAllAccountsToFirestore(userId: string, accounts: Finan
     batch.set(accRef, { ...acc, userId }, { merge: true });
   });
   await batch.commit();
+}
+
+// Reset only current account balances, without overwriting account settings or transactions.
+export async function zeroAccountBalances(userId: string): Promise<void> {
+  if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
+  const snapshot = await getDocsFromServer(collection(db, 'users', userId, 'accounts'));
+  if (snapshot.size > 450) throw new Error('too-many-accounts');
+  await runTransaction(db, async transaction => {
+    const current = await Promise.all(snapshot.docs.map(account => transaction.get(account.ref)));
+    if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
+    for (const account of current) {
+      if (!account.exists()) throw new Error('account-changed');
+      transaction.update(account.ref, { balance: 0 });
+    }
+  });
 }
 
 // Create defaults only if still absent, preventing concurrent sign-ins from resetting data.

@@ -24,7 +24,7 @@ interface SettingsViewProps {
   lang: Language;
   onSetLanguage: (lang: Language) => void;
   onResetDemoData: () => void;
-  onZeroAllBalances?: () => void;
+  onZeroAllBalances?: () => Promise<boolean>;
   user: AuthUser | null;
   subscription?: UserSubscription | null;
   onUpdateSubscription?: (sub: UserSubscription) => Promise<void>;
@@ -62,9 +62,8 @@ export function SettingsView({
     setTimeout(() => setResetConfirmed(false), 3000);
   };
 
-  const handleZeroBalances = () => {
-    if (onZeroAllBalances) {
-      onZeroAllBalances();
+  const handleZeroBalances = async () => {
+    if (onZeroAllBalances && await onZeroAllBalances()) {
       setZeroConfirmed(true);
       setTimeout(() => setZeroConfirmed(false), 3000);
     }

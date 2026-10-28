@@ -273,3 +273,6 @@ When a signed-in user has no saved accounts, show a full-page setup for optional
 ## Account settings and usage guide — revision #32
 
 The home screen links to account settings and a full-page usage guide. The guide is also accessible from initial setup and makes clear that saved trial entries are real application records; no financial reset is performed.
+
+
+Revision #33: Account management exposes account creation and a confirmed reset of account balances. Reset updates balances atomically, preserves accounts and transaction history, and explains its impact on credit balances and later transaction edits.

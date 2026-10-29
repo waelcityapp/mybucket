@@ -83,7 +83,7 @@ export function HomeFinancialOverview({
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-4 sm:p-5 space-y-4">
+    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-3 sm:p-4 space-y-2.5">
       {/* Top row: Total Net Balance */}
       <div className="flex items-start justify-between">
         <div className="space-y-1">
@@ -144,11 +144,11 @@ export function HomeFinancialOverview({
       </div>
 
       {/* Quick Indicators: Today's Spending & This Month's Spending */}
-      <div className="grid grid-cols-2 gap-2.5 pt-1">
+      <div className="grid grid-cols-2 gap-2">
         {/* Today's spending */}
         <div
           onClick={onViewTransactions}
-          className="p-3 bg-slate-50 hover:bg-rose-50/40 rounded-2xl border border-slate-200/80 transition-all cursor-pointer space-y-1"
+          className="p-2.5 bg-slate-50 hover:bg-rose-50/40 rounded-2xl border border-slate-200/80 transition-all cursor-pointer space-y-1"
         >
           <div className="flex items-center justify-between text-slate-500">
             <span className="text-[11px] font-bold flex items-center gap-1 text-slate-600">
@@ -172,7 +172,7 @@ export function HomeFinancialOverview({
         {/* This Month's spending */}
         <div
           onClick={onViewTransactions}
-          className="p-3 bg-slate-50 hover:bg-emerald-50/40 rounded-2xl border border-slate-200/80 transition-all cursor-pointer space-y-1"
+          className="p-2.5 bg-slate-50 hover:bg-emerald-50/40 rounded-2xl border border-slate-200/80 transition-all cursor-pointer space-y-1"
         >
           <div className="flex items-center justify-between text-slate-500">
             <span className="text-[11px] font-bold flex items-center gap-1 text-slate-600">

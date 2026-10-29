@@ -78,6 +78,7 @@ export function VoiceNaturalInput({
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const processOnSpeechEnd = useRef(false);
+  const [pendingVoiceReview, setPendingVoiceReview] = useState(false);
 
   /**
    * Unified AI Processing Pipeline
@@ -257,7 +258,10 @@ export function VoiceNaturalInput({
           if (processOnSpeechEnd.current) {
             processOnSpeechEnd.current = false;
             const transcript = finalTranscript.trim() || lastTranscript.trim();
-            if (transcript) void processInputWithAI(transcript);
+            if (transcript) {
+              setInputText(transcript);
+              setPendingVoiceReview(true);
+            }
           }
         };
 
@@ -289,6 +293,7 @@ export function VoiceNaturalInput({
       }
     } else {
       try {
+        setPendingVoiceReview(false);
         recognitionRef.current.lang = lang === 'ar' ? 'ar-EG' : 'en-US';
         recognitionRef.current.start();
       } catch {
@@ -310,6 +315,7 @@ export function VoiceNaturalInput({
       return;
     }
     if (!inputText.trim() || isProcessingAI) return;
+    setPendingVoiceReview(false);
     processInputWithAI(inputText);
   };
 
@@ -384,7 +390,7 @@ export function VoiceNaturalInput({
 
         {/* Right Side: Action Buttons */}
         <div className="flex items-center gap-2 shrink-0">
-          {inputText.trim().length > 0 && !isProcessingAI && (
+          {inputText.trim().length > 0 && !isProcessingAI && !pendingVoiceReview && (
             <button
               type="submit"
               className="w-10 h-10 rounded-full bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center transition-transform active:scale-95 cursor-pointer shadow-xs"
@@ -417,6 +423,24 @@ export function VoiceNaturalInput({
           </button>
         </div>
       </form>
+
+      {pendingVoiceReview && !isListening && !isProcessingAI && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 sm:p-4 space-y-3">
+          <p className="text-sm font-bold text-emerald-900">
+            {isAr ? 'راجع الكلام المكتوب بالأعلى، ويمكنك تعديله قبل الإرسال.' : 'Review the transcript above and edit it before sending.'}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button type="button" disabled={!inputText.trim()} onClick={() => { const text = inputText.trim(); if (!text) return; setPendingVoiceReview(false); void processInputWithAI(text); }}
+              className="rounded-xl bg-emerald-600 px-3 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
+              {isAr ? 'إرسال للمراجعة والتأكيد' : 'Send for review and confirmation'}
+            </button>
+            <button type="button" onClick={() => { setPendingVoiceReview(false); setInputText(''); setStatusMessage(null); }}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+              {isAr ? 'إلغاء' : 'Cancel'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Clarification or Status Banner */}
       {statusMessage && (

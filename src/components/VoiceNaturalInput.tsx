@@ -255,13 +255,11 @@ export function VoiceNaturalInput({
 
         recognition.onend = () => {
           setIsListening(false);
-          if (processOnSpeechEnd.current) {
-            processOnSpeechEnd.current = false;
-            const transcript = finalTranscript.trim() || lastTranscript.trim();
-            if (transcript) {
-              setInputText(transcript);
-              setPendingVoiceReview(true);
-            }
+          processOnSpeechEnd.current = false;
+          const transcript = finalTranscript.trim() || lastTranscript.trim();
+          if (transcript) {
+            setInputText(transcript);
+            setPendingVoiceReview(true);
           }
         };
 

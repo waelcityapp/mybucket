@@ -36,7 +36,7 @@ import { AccountsView } from './components/views/AccountsView';
 import { CategoriesView } from './components/views/CategoriesView';
 import { SettingsView } from './components/views/SettingsView';
 import { SearchView } from './components/views/SearchView';
-import { CheckCircle2, Smartphone, Cloud, ArrowRight, Sparkles, Clock, Settings, BookOpen } from 'lucide-react';
+import { CheckCircle2, Smartphone, Cloud, ArrowRight, Sparkles, Clock, Settings, BookOpen, Tag } from 'lucide-react';
 import { AIFinancialQuery, AICorrection } from './services/ai/types';
 import {
   executeDeterministicQuery,
@@ -1109,69 +1109,47 @@ export default function App() {
               </div>
             )}
 
-            {/* 1. Soft Greeting Section Matching Reference */}
-            <div className="pt-1 pb-1 px-1">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-base sm:text-lg font-black text-slate-800 ">
-                    {greetingText}
-                  </h1>
-                </div>
-                {authUser && (userSubscription || subscriptionError) && (
-                  (() => {
-                    const remainingDays = userSubscription ? calculateRemainingTrialDays(userSubscription) : null;
-                    const isPaid = userSubscription?.isPaid;
-                    return (
-                      <button
-                        type="button"
-                        onClick={() => subscriptionError ? setSubscriptionRetry((attempt) => attempt + 1) : openSubscriptionPage('trial-details')}
-                        className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full font-bold transition-all shadow-2xs cursor-pointer ${
-                          isPaid
-                            ? 'text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100'
-                            : remainingDays <= 3
-                            ? 'text-amber-800 bg-amber-50 border border-amber-300 hover:bg-amber-100'
-                            : 'text-emerald-800 bg-emerald-50 border border-emerald-300/80 hover:bg-emerald-100'
-                        }`}
-                        title={lang === 'ar' ? 'عرض تفاصيل الاشتراك والتجربة' : 'View subscription details'}
-                      >
-                        <Clock className={`w-3.5 h-3.5 ${remainingDays <= 3 && !isPaid ? 'text-amber-600' : 'text-emerald-600'}`} />
-                        <span>
-                          {subscriptionError
-                            ? (lang === 'ar' ? 'تعذر قراءة الاشتراك — أعد المحاولة' : 'Could not read subscription — retry')
-                            : userSubscription?.trialDatesStored === false
-                            ? (lang === 'ar' ? 'بيانات التجربة غير مؤكدة' : 'Trial details unconfirmed')
-                            : remainingDays === 0
-                            ? (lang === 'ar' ? 'انتهت التجربة' : 'Trial expired')
-                            : isPaid
-                            ? (lang === 'ar' ? 'مشترك نشط ✨' : 'Active Pro ✨')
-                            : (lang === 'ar'
-                                ? `متبقي ${remainingDays} ${remainingDays === 1 ? 'يوم' : remainingDays === 2 ? 'يومان' : remainingDays <= 10 ? 'أيام' : 'يوم'} للتجربة`
-                                : `${remainingDays} trial days left`)}
-                        </span>
-                      </button>
-                    );
-                  })()
-                )}
+            {/* Compact home header */}
+            <section className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <h1 className="min-w-0 text-base sm:text-lg font-black text-slate-800 leading-relaxed">{greetingText}</h1>
+                {authUser && (userSubscription || subscriptionError) && (() => {
+                  const days = userSubscription ? calculateRemainingTrialDays(userSubscription) : null;
+                  const uncertain = Boolean(subscriptionError || userSubscription?.trialDatesStored === false);
+                  const urgent = !userSubscription?.isPaid && days !== null && days <= 3;
+                  return <button type="button" onClick={() => subscriptionError ? setSubscriptionRetry((n) => n + 1) : openSubscriptionPage('trial-details')}
+                    title={lang === 'ar' ? 'تفاصيل التجربة والاشتراك' : 'Trial and subscription details'}
+                    className={`shrink-0 max-w-[47%] flex items-center gap-1.5 rounded-xl border px-2.5 py-2 text-xs font-bold leading-5 transition-colors ${uncertain || urgent ? 'border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'}`}>
+                    <Clock className="h-4 w-4 shrink-0" />
+                    <span>{subscriptionError ? (lang === 'ar' ? 'تحقق من التجربة' : 'Check trial')
+                      : userSubscription?.trialDatesStored === false ? (lang === 'ar' ? 'بيانات غير مؤكدة' : 'Unconfirmed')
+                      : userSubscription?.isPaid ? (lang === 'ar' ? 'اشتراك نشط' : 'Active plan')
+                      : days === 0 ? (lang === 'ar' ? 'انتهت التجربة' : 'Trial ended')
+                      : (lang === 'ar' ? `متبقي ${days} يوم` : `${days} days left`)}</span>
+                  </button>;
+                })()}
               </div>
-            </div>
-
-            {subscriptionError && (
-              <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950 space-y-1 break-words">
-                <p>{lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn}</p>
-                {isAdmin && (
-                  <div className="text-[11px] text-amber-800 font-mono" dir="ltr">
+              {subscriptionError && (
+                <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950 space-y-1 break-words">
+                  <p>{lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn}</p>
+                  {isAdmin && <div className="text-[11px] text-amber-800 font-mono" dir="ltr">
                     <p>{subscriptionError.readErrors?.join(' • ') || `${subscriptionError.source}: ${subscriptionError.code}`}</p>
                     {subscriptionError.fields && <p>Fields: {subscriptionError.fields.join(', ') || '(empty)'}</p>}
-                  </div>
-                )}
+                  </div>}
+                </div>
+              )}
+              <div className="grid grid-cols-3 gap-2 border-t border-slate-100 pt-3">
+                <button type="button" onClick={openAccountSettings} className="flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl bg-slate-50 px-1 py-3 text-center text-[11px] sm:text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors">
+                  <Settings className="h-5 w-5 text-slate-600" /><span>{lang === 'ar' ? 'الإعدادات' : 'Settings'}</span>
+                </button>
+                <button type="button" onClick={openGuide} className="flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl bg-slate-50 px-1 py-3 text-center text-[11px] sm:text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors">
+                  <BookOpen className="h-5 w-5 text-slate-600" /><span>{lang === 'ar' ? 'دليل الاستخدام' : 'User guide'}</span>
+                </button>
+                <button type="button" onClick={() => openSubscriptionPage('subscription')} className="flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl bg-slate-50 px-1 py-3 text-center text-[11px] sm:text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors">
+                  <Tag className="h-5 w-5 text-slate-600" /><span>{lang === 'ar' ? 'الاشتراكات' : 'Plans'}</span>
+                </button>
               </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={openAccountSettings} className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 text-xs font-bold text-slate-700 hover:bg-slate-50"><Settings className="h-4 w-4 text-slate-500" />{lang === 'ar' ? 'إعدادات الحساب' : 'Account settings'}</button>
-              <button type="button" onClick={openGuide} className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 text-xs font-bold text-slate-700 hover:bg-slate-50"><BookOpen className="h-4 w-4 text-emerald-700" />{lang === 'ar' ? 'شرح الاستخدام' : 'How to use'}</button>
-              <button type="button" onClick={() => openSubscriptionPage('subscription')} className="col-span-2 flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-800 hover:bg-emerald-100">{lang === 'ar' ? 'الأسعار وخطط الاشتراك' : 'Pricing & plans'}</button>
-            </div>
+            </section>
 
             {/* 2. Top Clear Financial Summary: Net Balance + Today/Month expenses */}
             <HomeFinancialOverview

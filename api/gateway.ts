@@ -44,6 +44,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { readGeminiUsage } = await import('../server/geminiUsage.js');
         return res.status(200).json({ ok: true, data: await readGeminiUsage() });
       }
+      case 'admin.aiDiagnose': {
+        if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') {
+          return res.status(403).json({ ok: false, error: 'admin_only' });
+        }
+        const { diagnoseGeminiConnection } = await import('../server/geminiDiagnostic.js');
+        return res.status(200).json({ ok: true, data: await diagnoseGeminiConnection() });
+      }
       case 'subscription.get': {
         const subscription = await getOrCreateSubscription(user.uid);
         return res.status(200).json({ ok: true, data: { subscription } });

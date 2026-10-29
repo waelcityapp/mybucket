@@ -262,20 +262,21 @@ Return strictly structured JSON matching the defined schema.
   };
 
   let responseText: string | undefined;
-  // Use high-availability models with resilient fallback sequence
+  // Keep voice input responsive during model outages. Each request has a
+  // hard cancellation deadline; do not queue multiple slow model retries.
   const modelsToTry = [
-    'gemini-3.1-flash-lite',
-    'gemini-flash-latest',
+    'gemini-3.5-flash-lite',
     'gemini-3.8-flash',
-    'gemini-3.1-pro-preview',
   ];
 
   for (const model of modelsToTry) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
     try {
       const response = await ai.models.generateContent({
         model,
         contents: prompt,
-        config,
+        config: { ...config, abortSignal: controller.signal, httpOptions: { timeout: 8000 } },
       });
       responseText = response.text;
       const usage = response.usageMetadata;
@@ -295,9 +296,9 @@ Return strictly structured JSON matching the defined schema.
         break;
       }
     } catch (apiErr: any) {
-      console.log(`[AI Router] Model ${model} unavailable (${apiErr?.status || '503/error'}), trying next model...`);
-      // Brief jitter backoff before trying fallback model
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      console.warn(`[AI Router] Model ${model} failed (${apiErr?.status || apiErr?.name || 'error'}); switching without a long retry.`);
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 

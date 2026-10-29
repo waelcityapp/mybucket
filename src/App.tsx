@@ -1170,6 +1170,7 @@ export default function App() {
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={openAccountSettings} className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 text-xs font-bold text-slate-700 hover:bg-slate-50"><Settings className="h-4 w-4 text-slate-500" />{lang === 'ar' ? 'إعدادات الحساب' : 'Account settings'}</button>
               <button type="button" onClick={openGuide} className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 text-xs font-bold text-slate-700 hover:bg-slate-50"><BookOpen className="h-4 w-4 text-emerald-700" />{lang === 'ar' ? 'شرح الاستخدام' : 'How to use'}</button>
+              <button type="button" onClick={() => openSubscriptionPage('subscription')} className="col-span-2 flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-800 hover:bg-emerald-100">{lang === 'ar' ? 'الأسعار وخطط الاشتراك' : 'Pricing & plans'}</button>
             </div>
 
             {/* 2. Top Clear Financial Summary: Net Balance + Today/Month expenses */}

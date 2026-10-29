@@ -37,6 +37,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     switch (action) {
+      case 'admin.aiUsage': {
+        if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') {
+          return res.status(403).json({ ok: false, error: 'admin_only' });
+        }
+        const { readGeminiUsage } = await import('../server/geminiUsage.js');
+        return res.status(200).json({ ok: true, data: await readGeminiUsage() });
+      }
       case 'subscription.get': {
         const subscription = await getOrCreateSubscription(user.uid);
         return res.status(200).json({ ok: true, data: { subscription } });

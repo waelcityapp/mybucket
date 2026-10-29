@@ -3,6 +3,7 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { interpretNaturalLanguageWithGemini } from './server/geminiService';
+import { readGeminiUsage } from './server/geminiUsage';
 import {
   applyAffiliateCode,
   getOrCreateSubscription,
@@ -38,6 +39,12 @@ async function startServer() {
       }
 
       switch (action) {
+        case 'admin.aiUsage': {
+          if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') {
+            return res.status(403).json({ ok: false, error: 'admin_only' });
+          }
+          return res.json({ ok: true, data: await readGeminiUsage() });
+        }
         case 'subscription.get': {
           const subscription = await getOrCreateSubscription(user.uid);
           return res.json({ ok: true, data: { subscription } });

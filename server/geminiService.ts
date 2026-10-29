@@ -296,7 +296,23 @@ Return strictly structured JSON matching the defined schema.
         break;
       }
     } catch (apiErr: any) {
-      console.warn(`[AI Router] Model ${model} failed (${apiErr?.status || apiErr?.name || 'error'}); switching without a long retry.`);
+      // Only log pre-defined classifications: raw API errors may echo the user's
+      // financial utterance, prompt, headers or credentials.
+      const errorText = String(apiErr?.message || '').toLowerCase();
+      const category =
+        /api key|api_key|key not valid|invalid key/.test(errorText) ? 'api_key' :
+        /response.?schema|schema|invalid argument|invalid_argument/.test(errorText) ? 'request_schema' :
+        /model.*not found|not found|not supported|unsupported/.test(errorText) ? 'model_unavailable' :
+        /quota|rate.?limit|resource_exhausted/.test(errorText) ? 'quota' :
+        /permission|access denied|forbidden/.test(errorText) ? 'permission' :
+        /timeout|abort/.test(errorText) || apiErr?.name === 'AbortError' ? 'timeout' :
+        'unknown';
+      console.warn('[AI Router] Gemini request failed', {
+        model,
+        status: typeof apiErr?.status === 'number' ? apiErr.status : null,
+        category,
+        errorName: ['AbortError', 'ApiError', 'ClientError'].includes(apiErr?.name) ? apiErr.name : 'other',
+      });
     } finally {
       clearTimeout(timeoutId);
     }

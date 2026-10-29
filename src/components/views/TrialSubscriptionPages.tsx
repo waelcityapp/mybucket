@@ -47,12 +47,39 @@ export function TrialSubscriptionPages({ lang, subscription, error, page, onBack
           <p className="text-sm leading-7 text-slate-700">{subscription.hasAppliedAffiliateCode ? (ar ? 'حسابك مرتبط بكود مسوّق؛ يظهر سعر الخصم في تفاصيل الاشتراك.' : 'Your account has a marketer code; the discounted price appears in subscription details.') : (ar ? 'يمكن استخدام كود مسوّق للحصول على خصم الاشتراك، دون بدء تجربة جديدة بعد انتهائها.' : 'A marketer code can provide a subscription discount without starting another trial after expiry.')}</p>
           <button type="button" onClick={onSubscription} className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-black text-white hover:bg-emerald-800">{ar ? 'الانتقال إلى صفحة الاشتراك' : 'Go to subscription'}</button>
         </> : <>
-          <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-5 space-y-3">
-            <div className="flex items-center gap-2 text-emerald-800"><Tag className="h-5 w-5" /><span className="font-bold">{ar ? 'سعر الاشتراك الشهري' : 'Monthly subscription'}</span></div>
-            <p className="text-2xl font-black text-slate-900">{subscription.hasAppliedAffiliateCode ? '120' : '180'} <span className="text-sm">{ar ? 'جنيه / شهر' : 'EGP / month'}</span></p>
-            {subscription.hasAppliedAffiliateCode ? <p className="text-sm text-emerald-800">{ar ? `السعر المخفض مرتبط بالكود المسجّل ${subscription.affiliateCode || ''}.` : `Discount associated with recorded code ${subscription.affiliateCode || ''}.`}</p> : <p className="text-sm text-emerald-800">{ar ? 'عند تسجيل كود مسوّق صالح، يكون السعر ١٢٠ جنيه شهريًا.' : 'A valid marketer code gives a price of 120 EGP per month.'}</p>}
+          <p className="text-sm leading-7 text-slate-600">{ar ? 'اختر الخطة المناسبة لك. جميع بياناتك المالية محفوظة عند تغيير الخطة.' : 'Choose the plan that suits you. Your financial records remain saved when you change plans.'}</p>
+          {!subscription.isPaid && days !== null && days > 0 && (
+            <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-900">
+              {ar ? `أنت حاليًا بتجرب Pro — متبقي ${days} يوم` : `You are trying Pro — ${days} days remaining`}
+            </p>
+          )}
+          {!subscription.isPaid && days === 0 && (
+            <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">
+              {ar ? 'انتهت تجربتك المجانية. يمكنك الاستمرار بالخطة المجانية، ولن تفقد بياناتك.' : 'Your trial has ended. You can continue with Free without losing your data.'}
+            </p>
+          )}
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4">
+              <h2 className="text-lg font-black text-slate-900">Free</h2>
+              <p className="text-2xl font-black text-slate-900">{ar ? 'مجانًا' : 'Free'}</p>
+              <p className="text-sm leading-7 text-slate-600">{ar ? 'إدارة الحسابات وتسجيل الدخل والمصروفات يدويًا، بدون ذكاء اصطناعي.' : 'Manage accounts and manually record income and expenses, without AI.'}</p>
+              <p className="mt-auto rounded-xl bg-slate-100 px-3 py-2 text-center text-sm font-bold text-slate-700">{ar ? 'متاحة بعد التجربة — التفعيل قيد التجهيز' : 'Available after trial — activation in progress'}</p>
+            </div>
+            <div className="flex flex-col gap-3 rounded-2xl border-2 border-emerald-600 p-4">
+              <h2 className="text-lg font-black text-slate-900">Pro</h2>
+              <p className="text-2xl font-black text-slate-900">{subscription.hasAppliedAffiliateCode ? '120' : '180'} <span className="text-sm font-semibold">{ar ? 'جنيه / شهر' : 'EGP / month'}</span></p>
+              <p className="text-sm leading-7 text-slate-600">{ar ? 'كل مميزات Free، بالإضافة إلى الذكاء الاصطناعي والتحليلات المتقدمة.' : 'Everything in Free, plus AI and advanced insights.'}</p>
+              <p className="text-sm text-emerald-800">{subscription.hasAppliedAffiliateCode ? (ar ? 'تم تطبيق سعر كود المسوق المسجل.' : 'Your marketer code discount is applied.') : (ar ? 'بكود مسوق صالح: 120 جنيه شهريًا.' : 'With a valid marketer code: 120 EGP/month.')}</p>
+              <p className="mt-auto rounded-xl bg-emerald-50 px-3 py-2 text-center text-sm font-bold text-emerald-800">{ar ? 'الاشتراك والدفع قيد التجهيز' : 'Payment and activation coming soon'}</p>
+            </div>
+            <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <h2 className="text-lg font-black text-slate-900">Plus</h2>
+              <p className="text-2xl font-black text-slate-900">299 <span className="text-sm font-semibold">{ar ? 'جنيه / شهر' : 'EGP / month'}</span></p>
+              <p className="text-sm leading-7 text-slate-600">{ar ? 'كل مميزات Pro، مع تصدير البيانات وحفظ صور الإيصالات والتذكير بالالتزامات المالية.' : 'Everything in Pro, plus exports, receipt storage and financial reminders.'}</p>
+              <p className="mt-auto rounded-xl bg-slate-200 px-3 py-2 text-center text-sm font-bold text-slate-700">{ar ? 'قريبًا' : 'Coming soon'}</p>
+            </div>
           </div>
-          <div className="flex gap-2 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-700"><ShieldCheck className="h-5 w-5 shrink-0 text-emerald-700" /><p>{ar ? 'الاشتراك والدفع قيد التجهيز. لا يتم تحصيل أي مبلغ من هذه الصفحة حاليًا.' : 'Subscription and payment are being prepared. No payment is collected on this page yet.'}</p></div>
+          <div className="flex gap-2 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-700"><ShieldCheck className="h-5 w-5 shrink-0 text-emerald-700" /><p>{ar ? 'هذه صفحة عرض الخطط فقط. لا يتم تحصيل أي مبلغ أو تغيير خطتك من هذه الصفحة حاليًا.' : 'This page only shows plans. No payment is collected and your plan is not changed here yet.'}</p></div>
         </>}
       </div>
     </section>

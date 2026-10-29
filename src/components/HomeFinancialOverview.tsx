@@ -148,9 +148,9 @@ export function HomeFinancialOverview({
         {/* Today's spending */}
         <div
           onClick={onViewTransactions}
-          className="p-2.5 bg-slate-50 hover:bg-rose-50/40 rounded-2xl border border-slate-200/80 transition-all cursor-pointer space-y-1"
+          className="p-2.5 bg-slate-50 hover:bg-rose-50/40 rounded-2xl border border-slate-200/80 transition-all cursor-pointer flex items-center justify-between gap-2"
         >
-          <div className="flex items-center justify-between text-slate-500">
+          <div className="flex min-w-0 items-center gap-1 text-slate-500">
             <span className="text-[11px] font-bold flex items-center gap-1 text-slate-600">
               <TrendingDown className="w-3 h-3 text-rose-500" />
               {isAr ? 'مصروف اليوم' : 'Today'}
@@ -161,7 +161,7 @@ export function HomeFinancialOverview({
               </span>
             )}
           </div>
-          <div className="text-base sm:text-lg font-black text-slate-900">
+          <div className="border-s border-slate-300 ps-2 text-xs sm:text-sm font-black text-slate-900 whitespace-nowrap">
             {isBalanceHidden ? '••••' : formatNumber(todayExpenses)}{' '}
             <span className="text-[11px] font-semibold text-slate-500">
               {isAr ? (primaryCurrency === 'EGP' ? 'ج.م' : primaryCurrency) : primaryCurrency}
@@ -172,15 +172,15 @@ export function HomeFinancialOverview({
         {/* This Month's spending */}
         <div
           onClick={onViewTransactions}
-          className="p-2.5 bg-slate-50 hover:bg-emerald-50/40 rounded-2xl border border-slate-200/80 transition-all cursor-pointer space-y-1"
+          className="p-2.5 bg-slate-50 hover:bg-emerald-50/40 rounded-2xl border border-slate-200/80 transition-all cursor-pointer flex items-center justify-between gap-2"
         >
-          <div className="flex items-center justify-between text-slate-500">
+          <div className="flex min-w-0 items-center gap-1 text-slate-500">
             <span className="text-[11px] font-bold flex items-center gap-1 text-slate-600">
               <Calendar className="w-3 h-3 text-emerald-600" />
               {isAr ? 'مصروف الشهر' : 'This Month'}
             </span>
           </div>
-          <div className="text-base sm:text-lg font-black text-slate-900">
+          <div className="border-s border-slate-300 ps-2 text-xs sm:text-sm font-black text-slate-900 whitespace-nowrap">
             {isBalanceHidden ? '••••' : formatNumber(monthExpenses)}{' '}
             <span className="text-[11px] font-semibold text-slate-500">
               {isAr ? (primaryCurrency === 'EGP' ? 'ج.م' : primaryCurrency) : primaryCurrency}

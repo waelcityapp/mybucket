@@ -4,6 +4,7 @@ import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { interpretNaturalLanguageWithGemini } from './server/geminiService';
 import { readGeminiUsage } from './server/geminiUsage';
+import { diagnoseGeminiConnection } from './server/geminiDiagnostic';
 import {
   applyAffiliateCode,
   getOrCreateSubscription,
@@ -44,6 +45,12 @@ async function startServer() {
             return res.status(403).json({ ok: false, error: 'admin_only' });
           }
           return res.json({ ok: true, data: await readGeminiUsage() });
+        }
+        case 'admin.aiDiagnose': {
+          if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') {
+            return res.status(403).json({ ok: false, error: 'admin_only' });
+          }
+          return res.json({ ok: true, data: await diagnoseGeminiConnection() });
         }
         case 'subscription.get': {
           const subscription = await getOrCreateSubscription(user.uid);

@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type } from '@google/genai';
+import { recordGeminiUsage } from './geminiUsage.js';
 import { AIInterpretationRequest, AIInterpretationResult } from '../src/services/ai/types.js';
 import { getFormattedSlangPromptContext } from '../src/services/ai/aiKnowledgeBase.js';
 import { isFinancialQueryText, parseSemanticNumberRoles } from '../src/utils/semanticParser.js';
@@ -277,6 +278,19 @@ Return strictly structured JSON matching the defined schema.
         config,
       });
       responseText = response.text;
+      const usage = response.usageMetadata;
+      if (usage) {
+        try {
+          await recordGeminiUsage({
+            model,
+            inputTokens: usage.promptTokenCount ?? 0,
+            outputTokens: usage.candidatesTokenCount ?? 0,
+            totalTokens: usage.totalTokenCount ?? 0,
+          });
+        } catch (usageError) {
+          console.error('Gemini usage tracking failed:', usageError);
+        }
+      }
       if (responseText) {
         break;
       }

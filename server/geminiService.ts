@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import { recordGeminiUsage } from './geminiUsage.js';
 import { AIInterpretationRequest, AIInterpretationResult } from '../src/services/ai/types.js';
 import { getFormattedSlangPromptContext } from '../src/services/ai/aiKnowledgeBase.js';
@@ -158,107 +158,21 @@ Return strictly structured JSON matching the defined schema.
     prompt += `\n\nCURRENT TRANSACTION DRAFT OPEN IN MODAL:\n${JSON.stringify(req.currentProposal, null, 2)}`;
   }
 
+  // The previous deeply nested responseSchema caused Gemini to reject
+  // otherwise valid requests with HTTP 400. Request JSON output without
+  // constrained schema compilation, then validate/normalize it below.
   const config = {
-    systemInstruction,
+    systemInstruction: systemInstruction + `
+Return exactly one JSON object, not Markdown, with these optional sections:
+{"intent":"CREATE_TRANSACTION|FINANCIAL_QUERY|CORRECT_PROPOSAL|SAVE_REQUEST|UNKNOWN",
+"confidence":0.95,
+"transaction":{"type":"expense|income|transfer","amount":350,"currency":"EGP","accountId":"","toAccountId":"","categoryId":"","description":"","date":"YYYY-MM-DD","time":"HH:mm","missingFields":[]},
+"query":{"metric":"total_spent","period":"all_time","startDate":"","endDate":"","categoryId":"","categoryName":"","accountId":"","accountName":"","transactionType":"expense"},
+"correction":{"fieldToUpdate":"","newValue":""},
+"clarificationNeeded":"","rawInterpretationSummary":""}
+Only include transaction/query/correction when relevant. Do not invent missing financial fields.
+`,
     responseMimeType: 'application/json',
-    responseSchema: {
-      type: Type.OBJECT,
-      properties: {
-        intent: {
-          type: Type.STRING,
-          description: 'Detected intent: CREATE_TRANSACTION, FINANCIAL_QUERY, CORRECT_PROPOSAL, SAVE_REQUEST, or UNKNOWN',
-        },
-        confidence: {
-          type: Type.NUMBER,
-          description: 'Confidence level between 0 and 1',
-        },
-        transaction: {
-          type: Type.OBJECT,
-          description: 'Transaction details if intent is CREATE_TRANSACTION or CORRECT_PROPOSAL',
-          properties: {
-            type: {
-              type: Type.STRING,
-              enum: ['expense', 'income', 'transfer'],
-              description: 'Must strictly be expense, income, or transfer',
-            },
-            amount: {
-              type: Type.NUMBER,
-              description: 'Numeric amount',
-            },
-            currency: {
-              type: Type.STRING,
-              description: 'Currency code',
-            },
-            accountId: {
-              type: Type.STRING,
-              description: 'Matched account ID. Must be null/empty if user did not specify account.',
-            },
-            toAccountId: {
-              type: Type.STRING,
-              description: 'Destination account ID if transfer',
-            },
-            categoryId: {
-              type: Type.STRING,
-              description: 'Matched category ID',
-            },
-            description: {
-              type: Type.STRING,
-              description: 'Extracted clean concise description. Do not copy full sentence.',
-            },
-            date: {
-              type: Type.STRING,
-              description: 'YYYY-MM-DD in user timezone',
-            },
-            time: {
-              type: Type.STRING,
-              description: 'HH:mm in 24-hr format in user timezone',
-            },
-            missingFields: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-              description: 'Fields that are required but missing from user utterance (e.g. accountId)',
-            },
-          },
-        },
-        query: {
-          type: Type.OBJECT,
-          description: 'Query instructions if intent is FINANCIAL_QUERY',
-          properties: {
-            metric: {
-              type: Type.STRING,
-              description: 'total_spent, total_income, category_spent, account_balance, net_savings, or transaction_count',
-            },
-            period: {
-              type: Type.STRING,
-              description: 'today, yesterday, this_week, last_week, this_month, last_month, all_time, or custom',
-            },
-            startDate: { type: Type.STRING },
-            endDate: { type: Type.STRING },
-            categoryId: { type: Type.STRING },
-            categoryName: { type: Type.STRING },
-            accountId: { type: Type.STRING },
-            accountName: { type: Type.STRING },
-            transactionType: { type: Type.STRING },
-          },
-        },
-        correction: {
-          type: Type.OBJECT,
-          properties: {
-            fieldToUpdate: { type: Type.STRING },
-            newValue: { type: Type.STRING },
-          },
-        },
-        clarificationNeeded: {
-          type: Type.STRING,
-          description: 'Clarification prompt if intent is UNKNOWN or ambiguous',
-        },
-        rawInterpretationSummary: {
-          type: Type.STRING,
-          description: 'Brief human summary of interpretation',
-        },
-      },
-      required: ['intent'],
-    },
   };
 
   let responseText: string | undefined;

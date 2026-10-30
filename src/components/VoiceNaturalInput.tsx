@@ -77,13 +77,29 @@ export function VoiceNaturalInput({
   const [speechError, setSpeechError] = useState<string | null>(null);
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const recordingActiveRef = useRef(false);
   const segmentBaseRef = useRef('');
   const latestSegmentRef = useRef('');
   const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [pendingVoiceReview, setPendingVoiceReview] = useState(false);
+  // Grow with the transcript, then scroll within a generous maximum height.
+  // Keep a comfortable minimum font size instead of shrinking indefinitely.
+  const transcriptSizeClass = inputText.length > 350
+    ? 'text-[13px] sm:text-sm'
+    : inputText.length > 180
+    ? 'text-sm sm:text-[15px]'
+    : 'text-base sm:text-lg';
+
+  useEffect(() => {
+    const field = inputRef.current;
+    if (!field) return;
+    field.style.height = 'auto';
+    field.style.height = Math.min(field.scrollHeight, 240) + 'px';
+    if (isRecording) field.scrollTop = field.scrollHeight;
+  }, [inputText, isRecording]);
+
 
   const clearSpeechRestart = () => {
     if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
@@ -381,10 +397,12 @@ export function VoiceNaturalInput({
       >
         {/* Left/Middle Content Area: Input & Sub-example */}
         <div className="flex-1 min-w-0">
-          <input
+          <textarea
             ref={inputRef}
-            type="text"
-            disabled={isProcessingAI || isRecording}
+            rows={3}
+            disabled={isProcessingAI}
+            readOnly={isRecording}
+            dir={isAr ? 'rtl' : 'ltr'}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             placeholder={
@@ -398,9 +416,10 @@ export function VoiceNaturalInput({
                 ? 'اكتب أو قل أي عملية أو سؤال مالي...'
                 : 'Type or speak any transaction or question...'
             }
-            className="w-full text-sm sm:text-base font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-hidden bg-transparent  disabled:opacity-60"
+            className={`block w-full min-h-[92px] max-h-[240px] resize-none overflow-y-auto whitespace-pre-wrap break-words leading-relaxed font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none bg-transparent disabled:opacity-60 ${transcriptSizeClass}`}
+            aria-label={isAr ? 'نص العملية أو السؤال المالي' : 'Transaction or financial question'}
           />
-          <p className="text-[11px] sm:text-xs text-slate-400 font-medium mt-1 truncate">
+          <p className="text-[11px] sm:text-xs text-slate-400 font-medium mt-1">
             {isRecording ? (
               <span className="text-emerald-600 font-bold flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
@@ -425,7 +444,7 @@ export function VoiceNaturalInput({
         </div>
 
         {/* Right Side: Action Buttons */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-start gap-2 shrink-0 self-start">
           {inputText.trim().length > 0 && !isProcessingAI && !pendingVoiceReview && !isRecording && (
             <button
               type="submit"

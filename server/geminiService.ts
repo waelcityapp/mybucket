@@ -1,4 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
 import { recordGeminiUsage } from './geminiUsage.js';
 import { AIInterpretationRequest, AIInterpretationResult } from '../src/services/ai/types.js';
 import { getFormattedSlangPromptContext } from '../src/services/ai/aiKnowledgeBase.js';
@@ -35,7 +34,8 @@ function getGenAI(): GoogleGenAI {
 export async function interpretNaturalLanguageWithGemini(
   req: AIInterpretationRequest
 ): Promise<AIInterpretationResult> {
-  const ai = getGenAI();
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY is not configured on the server');
 
   // Construct minimal context (Data Minimization requirement)
   const accountsContext = req.accounts.map((a) => ({
@@ -150,7 +150,7 @@ ${JSON.stringify(categoriesContext, null, 2)}
      * "الساعة 8 بالليل" -> 20:00
    - Format date as YYYY-MM-DD and time as HH:mm.
 
-Return strictly structured JSON matching the defined schema.
+Return a valid JSON object only, with no Markdown formatting.
 `;
 
   let prompt = `User Input: "${req.text}"`;
@@ -176,24 +176,35 @@ Only include transaction/query/correction when relevant. Do not invent missing f
   };
 
   let responseText: string | undefined;
-  // Keep voice input responsive during model outages. Each request has a
-  // hard cancellation deadline; do not queue multiple slow model retries.
-  const modelsToTry = [
-    'gemini-3.5-flash-lite',
-    'gemini-3.8-flash',
-  ];
-
-  for (const model of modelsToTry) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-    try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: prompt,
-        config: { ...config, abortSignal: controller.signal, httpOptions: { timeout: 8000 } },
-      });
-      responseText = response.text;
-      const usage = response.usageMetadata;
+  // Use the exact REST API and working model proven by the admin connection
+  // test. Avoid the SDK's previously failing request serialization.
+  const model = 'gemini-3.5-flash-lite';
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000);
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `${config.systemInstruction}\n\n${prompt}` }] }],
+          generationConfig: { maxOutputTokens: 1200 },
+        }),
+        signal: controller.signal,
+      }
+    );
+    if (!response.ok) {
+      // Never log the provider's raw error body: it may contain submitted
+      // financial text. Keep only the safe HTTP status.
+      console.warn('[AI Router] Gemini request rejected', { model, httpStatus: response.status });
+    } else {
+      const result = await response.json() as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+        usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number };
+      };
+      responseText = result.candidates?.[0]?.content?.parts?.map(part => part.text || '').join('').trim();
+      const usage = result.usageMetadata;
       if (usage) {
         try {
           await recordGeminiUsage({
@@ -202,40 +213,24 @@ Only include transaction/query/correction when relevant. Do not invent missing f
             outputTokens: usage.candidatesTokenCount ?? 0,
             totalTokens: usage.totalTokenCount ?? 0,
           });
-        } catch (usageError) {
-          console.error('Gemini usage tracking failed:', usageError);
+        } catch {
+          console.warn('[AI Router] Gemini responded but usage telemetry could not be saved');
         }
       }
-      if (responseText) {
-        break;
-      }
-    } catch (apiErr: any) {
-      // Only log pre-defined classifications: raw API errors may echo the user's
-      // financial utterance, prompt, headers or credentials.
-      const errorText = String(apiErr?.message || '').toLowerCase();
-      const category =
-        /api key|api_key|key not valid|invalid key/.test(errorText) ? 'api_key' :
-        /response.?schema|schema|invalid argument|invalid_argument/.test(errorText) ? 'request_schema' :
-        /model.*not found|not found|not supported|unsupported/.test(errorText) ? 'model_unavailable' :
-        /quota|rate.?limit|resource_exhausted/.test(errorText) ? 'quota' :
-        /permission|access denied|forbidden/.test(errorText) ? 'permission' :
-        /timeout|abort/.test(errorText) || apiErr?.name === 'AbortError' ? 'timeout' :
-        'unknown';
-      console.warn('[AI Router] Gemini request failed', {
-        model,
-        status: typeof apiErr?.status === 'number' ? apiErr.status : null,
-        category,
-        errorName: ['AbortError', 'ApiError', 'ClientError'].includes(apiErr?.name) ? apiErr.name : 'other',
-      });
-    } finally {
-      clearTimeout(timeoutId);
     }
+  } catch (error: unknown) {
+    console.warn('[AI Router] Gemini network request failed', {
+      model,
+      reason: controller.signal.aborted ? 'timeout' : 'connection_error',
+    });
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   let parsed: any = null;
   if (responseText) {
     try {
-      parsed = JSON.parse(responseText);
+      parsed = JSON.parse(responseText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''));
     } catch (parseErr) {
       console.warn('Failed to parse Gemini response JSON:', parseErr);
     }

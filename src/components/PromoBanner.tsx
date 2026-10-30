@@ -37,11 +37,11 @@ export const PromoBanner: React.FC<PromoBannerProps> = ({
             <div className="text-xs font-black  flex items-center gap-1.5">
               <span>{lang === 'ar' ? 'عروض وخصومات مستخدمي My Bucket' : 'My Bucket Exclusive Deals'}</span>
               <span className="bg-white/25 text-[10px] font-black px-1.5 py-0.2 rounded-full">
-                {lang === 'ar' ? 'خصومات تصل 40%' : 'Up to 40% Off'}
+                {lang === 'ar' ? 'تصفح العروض' : 'Browse offers'}
               </span>
             </div>
             <p className="text-[11px] text-amber-100 font-medium">
-              {lang === 'ar' ? 'اضغط هنا للاستفادة بكوبونات حصرية لشركائنا' : 'Click to discover exclusive partner discount codes'}
+              {lang === 'ar' ? 'افتح صفحة العروض والخصومات' : 'Open the offers and discounts page'}
             </p>
           </div>
         </div>

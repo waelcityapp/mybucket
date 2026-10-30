@@ -127,7 +127,7 @@ export function VoiceNaturalInput({
     if (!text) return;
 
     setIsProcessingAI(true);
-    setStatusMessage(isAr ? 'جاري الفهم بالذكاء الاصطناعي...' : 'Understanding with Gemini AI...');
+    setStatusMessage(isAr ? 'جاري فهم العملية بالمحلل المحلي...' : 'Understanding with the local parser...');
 
     try {
       const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Cairo';
@@ -229,8 +229,8 @@ export function VoiceNaturalInput({
       console.error('AI processing error:', err);
       setStatusMessage(
         isAr
-          ? 'تعذر الاتصال بالمساعد الذكي، يرجى المحاولة مرة ثانية'
-          : 'Could not reach AI assistant, please try again'
+          ? 'تعذر تحليل النص، يرجى مراجعة البيانات والمحاولة مرة أخرى'
+          : 'Could not analyze text; review your input and try again'
       );
       setTimeout(() => setStatusMessage(null), 4000);
     } finally {
@@ -412,8 +412,8 @@ export function VoiceNaturalInput({
                 ? t.listening
                 : isProcessingAI
                 ? isAr
-                  ? 'جاري التحليل الذكي مع Gemini...'
-                  : 'Analyzing with Gemini AI...'
+                  ? 'جاري التحليل المحلي...'
+                  : 'Analyzing locally...'
                 : isAr
                 ? 'اكتب أو قل أي عملية أو سؤال مالي...'
                 : 'Type or speak any transaction or question...'
@@ -430,7 +430,7 @@ export function VoiceNaturalInput({
             ) : isProcessingAI ? (
               <span className="text-indigo-600 font-bold flex items-center gap-1">
                 <Sparkles className="w-3 h-3 animate-spin text-indigo-500 inline-block" />
-                {isAr ? 'الذكاء الاصطناعي يفهم مقصدك...' : 'AI is processing your intent...'}
+                {isAr ? 'المحلل المحلي يفهم مقصدك...' : 'Local parser is processing your request...'}
               </span>
             ) : (
               <span className="flex items-center gap-1 text-slate-400">

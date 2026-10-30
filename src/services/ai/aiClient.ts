@@ -271,7 +271,7 @@ export class GeminiAIClient implements AIInterpretationProvider {
   /**
    * Safe offline fallback parser using rule-based heuristics if backend is unreachable.
    */
-  private fallbackInterpretation(request: AIInterpretationRequest): AIInterpretationResult {
+  public fallbackInterpretation(request: AIInterpretationRequest): AIInterpretationResult {
     const raw = request.text.trim();
     const lower = raw.toLowerCase();
 
@@ -355,12 +355,6 @@ export class GeminiAIClient implements AIInterpretationProvider {
         if (transferAccs.toAccount) {
           base.toAccountId = transferAccs.toAccount.id;
           changes.push(`إلى حساب ${transferAccs.toAccount.nameAr}`);
-        } else if (!base.toAccountId || base.toAccountId === base.accountId) {
-          const otherAcc = request.accounts.find((a) => a.id !== base.accountId);
-          if (otherAcc) {
-            base.toAccountId = otherAcc.id;
-            changes.push(`إلى حساب ${otherAcc.nameAr}`);
-          }
         }
       } else {
         const matchedAcc = matchAccountFromText(raw, request.accounts);
@@ -486,8 +480,14 @@ export class GeminiAIClient implements AIInterpretationProvider {
 
     const draft = parseNaturalLanguageInput(raw, localAccounts, localCategories);
 
+    // A transfer needs BOTH explicitly named accounts; do not invent a
+    // destination or silently substitute the first account.
     const explicitAccount = draft.type === 'transfer' ? null : matchExplicitAccountFromText(raw, request.accounts);
-    const missingFields: string[] = explicitAccount ? [] : ['accountId'];
+    const sourceId = draft.type === 'transfer' ? (draft.accountId || null) : (explicitAccount?.id || null);
+    const destinationId = draft.type === 'transfer' ? (draft.toAccountId || null) : null;
+    const missingFields: string[] = [];
+    if (!sourceId) missingFields.push('accountId');
+    if (draft.type === 'transfer' && !destinationId) missingFields.push('toAccountId');
 
     const finalAmount = semanticRoles.amount !== null ? semanticRoles.amount : draft.amount;
     const finalDate = semanticRoles.specificDateStr || draft.date;
@@ -500,8 +500,8 @@ export class GeminiAIClient implements AIInterpretationProvider {
         type: draft.type,
         amount: finalAmount,
         currency: draft.currency,
-        accountId: explicitAccount?.id || null,
-        toAccountId: draft.type === 'transfer' ? null : draft.toAccountId || null,
+        accountId: sourceId,
+        toAccountId: destinationId,
         categoryId: draft.categoryId || null,
         description: draft.description,
         date: finalDate,
@@ -516,5 +516,12 @@ export class GeminiAIClient implements AIInterpretationProvider {
   }
 }
 
-// Export singleton instance conforming to provider interface
-export const aiClient: AIInterpretationProvider = new GeminiAIClient();
+// Keep the Gemini client available for a future, explicitly approved feature.
+// Everyday entries and financial inquiries use the local parser ONLY and make
+// no AI gateway request, including when local interpretation is incomplete.
+export const geminiClient: AIInterpretationProvider = new GeminiAIClient();
+export const aiClient: AIInterpretationProvider = {
+  async interpret(request: AIInterpretationRequest): Promise<AIInterpretationResult> {
+    return (geminiClient as GeminiAIClient).fallbackInterpretation(request);
+  },
+};

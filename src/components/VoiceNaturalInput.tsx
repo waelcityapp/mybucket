@@ -59,6 +59,8 @@ export function VoiceNaturalInput({
 }: VoiceNaturalInputProps) {
   const t = translations[lang];
   const isAr = lang === 'ar';
+  // Speech language is independent from the application UI language.
+  const [speechLanguage, setSpeechLanguage] = useState<'ar-EG' | 'en-US'>(lang === 'ar' ? 'ar-EG' : 'en-US');
 
   const [inputText, setInputText] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -251,7 +253,7 @@ export function VoiceNaturalInput({
     const recognition = new SpeechRecognition() as SpeechRecognitionLike;
     recognition.continuous = false;
     recognition.interimResults = true;
-    recognition.lang = lang === 'ar' ? 'ar-EG' : 'en-US';
+    recognition.lang = speechLanguage;
     recognitionRef.current = recognition;
 
     let segmentFinal = '';
@@ -329,7 +331,7 @@ export function VoiceNaturalInput({
       try { recognition.abort?.(); } catch { try { recognition.stop(); } catch {} }
       if (recognitionRef.current === recognition) recognitionRef.current = null;
     };
-  }, [lang, t.speechNotSupported]);
+  }, [speechLanguage, t.speechNotSupported]);
 
   const handleToggleMic = () => {
     if (isProcessingAI) return;
@@ -478,6 +480,24 @@ export function VoiceNaturalInput({
           </button>
         </div>
       </form>
+
+      <div className="flex items-center gap-2 justify-between px-1">
+        <span className="text-xs font-semibold text-slate-600">
+          {isAr ? 'لغة التحدث' : 'Speech language'}
+        </span>
+        <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 gap-1" role="group" aria-label={isAr ? 'اختيار لغة التحدث' : 'Choose speech language'}>
+          <button type="button" disabled={isRecording || isProcessingAI} onClick={() => setSpeechLanguage('ar-EG')}
+            aria-pressed={speechLanguage === 'ar-EG'}
+            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-50 ${speechLanguage === 'ar-EG' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+            عربي
+          </button>
+          <button type="button" disabled={isRecording || isProcessingAI} onClick={() => setSpeechLanguage('en-US')}
+            aria-pressed={speechLanguage === 'en-US'}
+            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-50 ${speechLanguage === 'en-US' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+            English
+          </button>
+        </div>
+      </div>
 
       {isRecording && !isProcessingAI && (
         <button type="button" onClick={finishVoiceRecording} className="w-full rounded-xl bg-rose-600 hover:bg-rose-700 text-white py-3 px-4 text-sm font-extrabold flex justify-center items-center gap-2">

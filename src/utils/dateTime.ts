@@ -114,69 +114,83 @@ export function formatDateDisplay(dateStr: string, lang: Language = 'ar'): strin
  * - "منذ ساعتين", "من ساعتين", "من ساعة", "2 hours ago"
  * - "دلوقتي", "الآن", "now"
  */
-export function parseNaturalDateTime(input: string): { date: string; time: string; dateTime: string } {
-  const now = new Date();
-  const text = input.toLowerCase().trim();
+export function parseNaturalDateTime(
+  input: string,
+  referenceDate: Date = new Date()
+): { date: string; time: string; dateTime: string } {
+  const targetDate = new Date(referenceDate.getTime());
+  const text = input.toLowerCase().trim()
+    .replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+    .replace(/[أإآ]/g, 'ا');
 
-  let targetDate = new Date(now.getTime());
-  let timeSet = false;
+  const subtractDays = (days: number) => targetDate.setDate(targetDate.getDate() - days);
+  const subtractMonths = (months: number) => {
+    const day = targetDate.getDate();
+    targetDate.setDate(1);
+    targetDate.setMonth(targetDate.getMonth() - months);
+    const lastDay = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0).getDate();
+    targetDate.setDate(Math.min(day, lastDay));
+  };
 
-  // Relative day adjustments
-  if (text.includes('امبارح') || text.includes('أمس') || text.includes('yesterday')) {
-    targetDate.setDate(targetDate.getDate() - 1);
-  } else if (text.includes('اول امبارح') || text.includes('أول أمس')) {
-    targetDate.setDate(targetDate.getDate() - 2);
+  // Always check "day before yesterday" before "yesterday".
+  if (/(?:اول\s*امبارح|اول\s*امس|day before yesterday)/.test(text)) {
+    subtractDays(2);
+  } else if (/(?:امبارح|امس|yesterday)/.test(text)) {
+    subtractDays(1);
+  } else if (/(?:من|قبل|منذ)\s*(?:اسبوعين|two weeks)/.test(text)) {
+    subtractDays(14);
+  } else if (/(?:من|قبل|منذ)\s*(?:اسبوع|سبوع|week)(?!\w)/.test(text)) {
+    subtractDays(7);
+  } else if (/(?:من|قبل|منذ)\s*(?:شهرين|two months)/.test(text)) {
+    subtractMonths(2);
+  } else if (/(?:من|قبل|منذ)\s*(?:شهر|month)(?:\s*(?:فات|اللي فات|ago))?/.test(text)
+      || /(?:الشهر|شهر)\s*(?:اللي فات|الماضي|الفات)/.test(text)) {
+    subtractMonths(1);
+  } else if (/(?:من|قبل|منذ)\s*(?:سنه|سنة|عام|year)(?:\s*(?:فاتت|فات|ago))?/.test(text)) {
+    subtractMonths(12);
+  } else {
+    const duration = text.match(/(?:من|قبل|منذ)\s*(\d+)\s*(ايام|يوم|اسابيع|اسبوع|شهور|اشهر|شهر|سنين|سنوات|سنة|سنه|days?|weeks?|months?|years?)(?:\s*(?:فات|فاتت|ago))?/);
+    if (duration) {
+      const n = Number(duration[1]);
+      const unit = duration[2];
+      if (n > 0 && n <= 3650) {
+        if (/^(?:ايام|يوم|days?)/.test(unit)) subtractDays(n);
+        else if (/^(?:اسابيع|اسبوع|weeks?)/.test(unit)) subtractDays(n * 7);
+        else if (/^(?:شهور|اشهر|شهر|months?)/.test(unit)) subtractMonths(n);
+        else subtractMonths(n * 12);
+      }
+    }
   }
 
-  // Relative hours: "منذ ساعتين" / "من ساعتين" / "2 hours ago"
-  if (text.includes('ساعتين') || text.includes('2 hours')) {
+  // Don't mistake "الساعة 3" for "من ساعة".
+  if (/(?:منذ|من|قبل)\s*(?:ساعتين|2\s*hours?)/.test(text)) {
     targetDate.setHours(targetDate.getHours() - 2);
-    timeSet = true;
-  } else if (text.includes('ساعة') || text.includes('1 hour') || text.includes('hour ago')) {
-    targetDate.setHours(targetDate.getHours() - 1);
-    timeSet = true;
-  } else if (text.includes('نصف ساعة') || text.includes('نص ساعة') || text.includes('30 mins') || text.includes('30 min')) {
+  } else if (/(?:نصف|نص)\s*ساعة|30\s*min/.test(text)) {
     targetDate.setMinutes(targetDate.getMinutes() - 30);
-    timeSet = true;
+  } else if (/(?:منذ|من|قبل)\s*(?:ساعة|ساعه|1\s*hour)/.test(text)) {
+    targetDate.setHours(targetDate.getHours() - 1);
   }
 
-  // Explicit hour detection: e.g. "الساعة 3", "الساعة 8 مساءً", "3:30", "at 3pm"
   const timeRegex = /(?:الساعة|at)\s*(\d{1,2})(?::(\d{2}))?\s*(صباحا|صباحاً|مساء|مساءً|am|pm)?/i;
   const match = text.match(timeRegex);
-
   if (match) {
-    let hour = parseInt(match[1], 10);
-    const minute = match[2] ? parseInt(match[2], 10) : 0;
-    const period = match[3] ? match[3].toLowerCase() : '';
-
-    if ((period.includes('مساء') || period === 'pm') && hour < 12) {
-      hour += 12;
-    } else if ((period.includes('صباح') || period === 'am') && hour === 12) {
-      hour = 0;
-    } else if (!period && hour <= 11 && hour >= 1 && (text.includes('بالليل') || text.includes('العصر') || text.includes('المغرب') || text.includes('العشا'))) {
-      hour += 12;
+    let hour = Number(match[1]);
+    const minute = match[2] ? Number(match[2]) : 0;
+    const period = match[3]?.toLowerCase() || '';
+    if (hour >= 1 && hour <= 12 && minute <= 59) {
+      if ((period.includes('مساء') || period === 'pm') && hour < 12) hour += 12;
+      else if ((period.includes('صباح') || period === 'am') && hour === 12) hour = 0;
+      else if (!period && hour <= 11 && /بالليل|العصر|المغرب|العشا/.test(text)) hour += 12;
+      targetDate.setHours(hour, minute, 0, 0);
     }
-
-    targetDate.setHours(hour, minute, 0, 0);
-    timeSet = true;
   }
 
-  if (!timeSet) {
-    // Keep current time
-  }
-
-  const y = targetDate.getFullYear();
+  const y = String(targetDate.getFullYear());
   const m = String(targetDate.getMonth() + 1).padStart(2, '0');
   const d = String(targetDate.getDate()).padStart(2, '0');
-  const dateStr = `${y}-${m}-${d}`;
-
+  const dateStr = [y, m, d].join('-');
   const h = String(targetDate.getHours()).padStart(2, '0');
   const min = String(targetDate.getMinutes()).padStart(2, '0');
-  const timeStr = `${h}:${min}`;
-
-  return {
-    date: dateStr,
-    time: timeStr,
-    dateTime: targetDate.toISOString(),
-  };
+  const timeStr = [h, min].join(':');
+  return { date: dateStr, time: timeStr, dateTime: targetDate.toISOString() };
 }

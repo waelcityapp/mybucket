@@ -127,7 +127,7 @@ export function VoiceNaturalInput({
     if (!text) return;
 
     setIsProcessingAI(true);
-    setStatusMessage(isAr ? 'جاري فهم العملية بالمحلل المحلي...' : 'Understanding with the local parser...');
+    setStatusMessage(isAr ? 'جاري فهم كلامك وتجهيز البيانات...' : 'Understanding your request and preparing details...');
 
     try {
       const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Cairo';
@@ -412,8 +412,8 @@ export function VoiceNaturalInput({
                 ? t.listening
                 : isProcessingAI
                 ? isAr
-                  ? 'جاري التحليل المحلي...'
-                  : 'Analyzing locally...'
+                  ? 'جاري تجهيز البيانات...'
+                  : 'Preparing details...'
                 : isAr
                 ? 'اكتب أو قل أي عملية أو سؤال مالي...'
                 : 'Type or speak any transaction or question...'
@@ -430,7 +430,7 @@ export function VoiceNaturalInput({
             ) : isProcessingAI ? (
               <span className="text-indigo-600 font-bold flex items-center gap-1">
                 <Sparkles className="w-3 h-3 animate-spin text-indigo-500 inline-block" />
-                {isAr ? 'المحلل المحلي يفهم مقصدك...' : 'Local parser is processing your request...'}
+                {isAr ? 'جاري تجهيز طلبك...' : 'Preparing your request...'}
               </span>
             ) : (
               <span className="flex items-center gap-1 text-slate-400">
@@ -542,7 +542,7 @@ export function VoiceNaturalInput({
       {/* Quick Example Pills to test instant Gemini understanding */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-[11px] text-slate-500">
         <span className="text-slate-400 font-medium shrink-0">
-          {isAr ? 'جرّب الذكاء الاصطناعي:' : 'Try AI:'}
+          {isAr ? 'جرّب مثالًا:' : 'Try an example:'}
         </span>
         <button
           type="button"

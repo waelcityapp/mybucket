@@ -76,6 +76,26 @@ export function HomeFinancialOverview({
     };
   }, [transactions]);
 
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const spendingDays = useMemo(() => {
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const days = Array.from({length:7}, (_, i) => {
+      const date = new Date(now); date.setDate(now.getDate() - 6 + i);
+      const key = [date.getFullYear(), String(date.getMonth()+1).padStart(2,'0'), String(date.getDate()).padStart(2,'0')].join('-');
+      return { key, date, amount:0, count:0 };
+    });
+    const lookup = new Map(days.map(d => [d.key,d]));
+    transactions.forEach(tx => {
+      if(tx.type !== 'expense' || tx.currency !== primaryCurrency) return;
+      const day = lookup.get(tx.date);
+      if(day) { day.amount += tx.amount; day.count++; }
+    });
+    return days;
+  }, [transactions, primaryCurrency]);
+  const maxSpending = Math.max(1, ...spendingDays.map(d => d.amount));
+  const pickedDay = spendingDays.find(d => d.key === selectedDay);
+  const otherCurrenciesExist = transactions.some(tx => tx.type === 'expense' && tx.currency !== primaryCurrency && spendingDays.some(d => d.key === tx.date));
+
   const formatNumber = (val: number) => {
     return new Intl.NumberFormat(isAr ? 'ar-EG' : 'en-US', {
       maximumFractionDigits: 2,
@@ -188,6 +208,39 @@ export function HomeFinancialOverview({
           </div>
         </div>
       </div>
+      {/* Interactive seven-day expenses: based only on actual transactions in primary currency. */}
+      <section className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3 sm:p-4">
+        <div className="flex justify-between items-center gap-2 mb-2">
+          <div>
+            <h3 className="text-xs sm:text-sm font-extrabold text-slate-900">{isAr ? 'نبض مصروفاتك' : 'Spending pulse'}</h3>
+            <p className="text-[10px] text-slate-500">{isAr ? 'آخر 7 أيام بما فيها اليوم' : 'Last 7 days including today'} · {primaryCurrency}</p>
+          </div>
+          <TrendingDown className="w-4 h-4 text-emerald-600" />
+        </div>
+        <div className="grid grid-cols-7 gap-1 sm:gap-2" role="group" aria-label={isAr ? 'مصروفات آخر سبعة أيام' : 'Seven-day expenses'}>
+          {spendingDays.map(day => {
+            const height = day.amount > 0 ? Math.max(7, 72 * day.amount / maxSpending) : 3;
+            const selected = selectedDay === day.key;
+            return <button key={day.key} type="button" onClick={() => setSelectedDay(day.key)}
+              aria-pressed={selected}
+              aria-label={`${day.date.toLocaleDateString(isAr ? 'ar-EG' : 'en-US')}: ${formatNumber(day.amount)} ${primaryCurrency}, ${day.count}`}
+              className={`min-w-0 rounded-lg flex flex-col items-center gap-1 p-1 hover:bg-white/70 focus-visible:outline-2 focus-visible:outline-emerald-600 ${selected ? 'bg-white ring-1 ring-emerald-300' : ''}`}>
+              <span dir="ltr" className="text-[9px] sm:text-[10px] font-bold text-slate-700 tabular-nums">{isBalanceHidden ? '••' : formatNumber(day.amount)}</span>
+              <span className="h-[76px] w-full flex items-end justify-center">
+                <span className={`block w-full max-w-7 rounded-t-md ${day.amount > 0 && day.amount === maxSpending ? 'bg-rose-400' : 'bg-emerald-400'}`} style={{height:`${height}px`}} />
+              </span>
+              <span className="w-full truncate text-center text-[9px] sm:text-[10px] text-slate-600">{day.date.toLocaleDateString(isAr ? 'ar-EG' : 'en-US',{weekday:'short'})}</span>
+            </button>;
+          })}
+        </div>
+        <p className="text-[11px] text-slate-700 font-medium mt-2" aria-live="polite">
+          {pickedDay
+            ? isBalanceHidden ? (isAr ? 'الأرقام مخفية، استخدم زر العين لإظهارها' : 'Amounts are hidden; use the eye button to reveal')
+              : `${pickedDay.date.toLocaleDateString(isAr ? 'ar-EG' : 'en-US',{day:'numeric',month:'short'})}: ${formatNumber(pickedDay.amount)} ${primaryCurrency} · ${pickedDay.count} ${isAr ? 'عملية' : 'transactions'}`
+            : (isAr ? 'اضغط على أي عمود لمعرفة المبلغ وعدد العمليات' : 'Tap a bar to see the amount and transaction count')}
+        </p>
+        {otherCurrenciesExist && <p className="text-[10px] text-slate-500 mt-1">{isAr ? `الرسم يعرض ${primaryCurrency} فقط، ولا يجمع العملات المختلفة.` : `Showing ${primaryCurrency} only; currencies are not combined.`}</p>}
+      </section>
     </div>
   );
 }

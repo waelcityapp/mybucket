@@ -47,10 +47,12 @@ export async function diagnoseGeminiConnection() {
     const availableModels = models
       .filter(m => m.name?.startsWith('models/gemini-') && m.supportedGenerationMethods?.includes('generateContent'))
       .map(m => m.name!.slice('models/'.length));
-    const preferred = availableModels.filter(n => /flash-lite|flash/i.test(n) && !/image|audio|live|tts|embedding|exp|preview/i.test(n));
-    const selected = preferred[0] || availableModels.find(n => /flash/i.test(n) && !/image|audio|tts|live|embedding/i.test(n)) || availableModels[0] || null;
+    // Test the exact model that fails in the financial workflow, not an
+    // arbitrary older model picked from the models.list ordering.
+    const diagnosticModel = 'gemini-3.5-flash-lite';
+    const selected = availableModels.includes(diagnosticModel) ? diagnosticModel : null;
     const listedModels = availableModels.slice(0, 30);
-    if (!selected) return { success: false, stage: 'model_selection', reason: 'model_unavailable', httpStatus: null, googleStatus: null, availableModels: listedModels, modelCount: availableModels.length };
+    if (!selected) return { success: false, stage: 'model_selection', model: diagnosticModel, reason: 'model_unavailable', httpStatus: null, googleStatus: null, availableModels: listedModels, modelCount: availableModels.length };
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(selected)}:generateContent`, {
       method: 'POST',

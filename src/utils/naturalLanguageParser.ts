@@ -39,7 +39,7 @@ export function parseNaturalLanguageInput(
     lower.includes('تحويل') ||
     lower.includes('حول') ||
     lower.includes('نقل') ||
-    lower.includes('transfer')
+    lower.includes('transfer') || lower.includes('moved money') || lower.includes('sent from')
   ) {
     type = 'transfer';
   } else if (
@@ -53,7 +53,7 @@ export function parseNaturalLanguageInput(
     lower.includes('أرباح') ||
     lower.includes('ارباح') ||
     lower.includes('income') ||
-    lower.includes('salary')
+    lower.includes('salary') || /\b(received|earned|got paid|paycheck|wages|bonus)\b/.test(lower)
   ) {
     type = 'income';
   }
@@ -89,6 +89,16 @@ export function parseNaturalLanguageInput(
 
   // Transfer destination account detection
   if (type === 'transfer') {
+    // English transfers have explicitly directed endpoints. Never guess either side.
+    const from = lower.match(/\bfrom\s+(cash|bank|visa|card)\b/);
+    const to = lower.match(/\bto\s+(cash|bank|visa|card)\b/);
+    const accountByWord = (word: string | undefined) => {
+      const kind = word === 'cash' ? 'cash' : word === 'bank' ? 'bank' : word === 'visa' || word === 'card' ? 'card' : '';
+      return kind ? accounts.find(a => a.type === kind)?.id : undefined;
+    };
+    if (from) accountId = accountByWord(from[1]) || '';
+    if (to) toAccountId = accountByWord(to[1]);
+
     // Look for "إلى" / "لـ"
     if (lower.includes('للكاش') || lower.includes('إلى الكاش') || lower.includes('الى الكاش')) {
       toAccountId = accounts.find((a) => a.type === 'cash')?.id;
@@ -105,17 +115,17 @@ export function parseNaturalLanguageInput(
   if (type !== 'transfer') {
     const availableCats = categories.filter((c) => c.type === (type === 'income' ? 'income' : 'expense'));
 
-    if (lower.includes('بنزين') || lower.includes('مواصلات') || lower.includes('اوبر') || lower.includes('تاكسي')) {
+    if (lower.includes('بنزين') || lower.includes('مواصلات') || lower.includes('اوبر') || lower.includes('تاكسي') || /\b(fuel|gasoline|petrol|transport|uber|taxi)\b/.test(lower)) {
       categoryId = availableCats.find((c) => c.nameAr.includes('مواصلات') || c.name.toLowerCase().includes('transport'))?.id;
-    } else if (lower.includes('قهوة') || lower.includes('كافيه') || lower.includes('شاي') || lower.includes('مطعم') || lower.includes('عشاء') || lower.includes('غداء') || lower.includes('أكل') || lower.includes('اكل')) {
+    } else if (lower.includes('قهوة') || lower.includes('كافيه') || lower.includes('شاي') || lower.includes('مطعم') || lower.includes('عشاء') || lower.includes('غداء') || lower.includes('أكل') || lower.includes('اكل') || /\b(restaurant|coffee|cafe|lunch|dinner|food)\b/.test(lower)) {
       categoryId = availableCats.find((c) => c.nameAr.includes('طعام') || c.nameAr.includes('قهوة') || c.name.toLowerCase().includes('food'))?.id;
-    } else if (lower.includes('سوبر ماركت') || lower.includes('ماركت') || lower.includes('طلبات البيت') || lower.includes('بقالة')) {
+    } else if (lower.includes('سوبر ماركت') || lower.includes('ماركت') || lower.includes('طلبات البيت') || lower.includes('بقالة') || /\b(grocer(?:y|ies)|supermarket)\b/.test(lower)) {
       categoryId = availableCats.find((c) => c.nameAr.includes('سوبر') || c.nameAr.includes('بقالة') || c.nameAr.includes('طعام'))?.id;
-    } else if (lower.includes('راتب') || lower.includes('مرتب')) {
+    } else if (lower.includes('راتب') || lower.includes('مرتب') || /\b(salary|paycheck|wages)\b/.test(lower)) {
       categoryId = availableCats.find((c) => c.nameAr.includes('راتب') || c.name.toLowerCase().includes('salary'))?.id;
-    } else if (lower.includes('فواتير') || lower.includes('كهرباء') || lower.includes('نت') || lower.includes('فاتورة')) {
+    } else if (lower.includes('فواتير') || lower.includes('كهرباء') || lower.includes('نت') || lower.includes('فاتورة') || /\b(electricity|internet|utility|bills?)\b/.test(lower)) {
       categoryId = availableCats.find((c) => c.nameAr.includes('فواتير') || c.name.toLowerCase().includes('bill'))?.id;
-    } else if (lower.includes('تسوق') || lower.includes('هدوم') || lower.includes('ملابس')) {
+    } else if (lower.includes('تسوق') || lower.includes('هدوم') || lower.includes('ملابس') || /\b(clothes|clothing|shopping)\b/.test(lower)) {
       categoryId = availableCats.find((c) => c.nameAr.includes('تسوق') || c.name.toLowerCase().includes('shopping'))?.id;
     }
 
@@ -125,11 +135,11 @@ export function parseNaturalLanguageInput(
   let description = core;
   // Clean common trigger words from description
   let cleanDesc = core
-    .replace(/(?:دفعت|صرفت|اشتريت|قبضت|حولت|حول|استلمت|جالي)\s*/gi, '')
+    .replace(/(?:دفعت|صرفت|اشتريت|قبضت|حولت|حول|استلمت|جالي|paid|spent|bought|purchased|received|earned|transferred|transfer|moved)\s*/gi, '')
     .replace(/\b\d+(?:[.,]\d+)?\b/g, '')
     .replace(/(?:جنيه|egp|usd|دولار|\$)/gi, '')
-    .replace(/(?:من الكاش|من البنك|من الفيزا|للكاش|للبنك|للفيزا|كاش|فيزا|بنك)/gi, '')
-    .replace(/(?:النهاردة|امبارح|أمس|الساعة\s*\d+(?::\d+)?\s*(?:مساءً|صباحاً|مساء|صباح)?)/gi, '')
+    .replace(/(?:من الكاش|من البنك|من الفيزا|للكاش|للبنك|للفيزا|كاش|فيزا|بنك|from cash|from bank|from card|to cash|to bank|to card)/gi, '')
+    .replace(/(?:النهاردة|امبارح|أمس|today|yesterday|last week|last month|\d+\s*(?:days?|weeks?|months?)\s*ago|الساعة\s*\d+(?::\d+)?\s*(?:مساءً|صباحاً|مساء|صباح)?)/gi, '')
     .replace(/(?:يوم\s*\d+\s*(?:يناير|فبراير|مارس|أبريل|ابريل|مايو|يونيو|يوليو|أغسطس|اغسطس|سبتمبر|أكتوبر|اكتوبر|نوفمبر|ديسمبر)?)/gi, '')
     .trim();
 

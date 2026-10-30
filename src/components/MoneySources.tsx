@@ -87,7 +87,7 @@ export function MoneySources({
   const isAllZero = accounts.length > 0 && accounts.every((acc) => acc.balance === 0);
 
   return (
-    <section className="space-y-2.5">
+    <section className="@container space-y-2.5">
       {/* Header Row: "حساباتك" with black + button on start, "عرض الكل" on end */}
       <div className="flex items-center justify-between px-0.5">
         <div className="flex items-center gap-2">
@@ -130,7 +130,7 @@ export function MoneySources({
       )}
 
       {/* Accounts Grid - 3 items top row, 3 items bottom row */}
-      <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+      <div className="grid grid-cols-2 @min-[480px]:grid-cols-3 gap-2">
         {accounts.map((acc) => {
           const displayName = lang === 'ar' ? acc.nameAr : acc.name;
           const bank = acc.linkedBankId ? accounts.find(a => a.id === acc.linkedBankId) : undefined;
@@ -150,22 +150,23 @@ export function MoneySources({
                   onSelectAccount(acc.id);
                 }
               }}
-              className="bg-white rounded-xl border border-slate-200/80 px-1.5 py-2 sm:px-2 sm:py-2.5 flex flex-col items-center justify-start text-center shadow-2xs hover:shadow-xs hover:border-slate-300 transition-all cursor-pointer group relative active:scale-95"
+              className="min-w-0 bg-white rounded-xl border border-slate-200/80 p-2 flex items-center gap-2 text-start shadow-2xs hover:shadow-xs hover:border-slate-300 transition-all cursor-pointer group relative active:scale-95"
             >
               {/* Account Icon */}
-              <div className="mb-1 group-hover:scale-105 transition-transform">
+              <div className="shrink-0 group-hover:scale-105 transition-transform">
                 {getAccountEmojiIcon(acc.type)}
               </div>
 
+              <div className="min-w-0 flex-1">
               {/* Account Name */}
-              <span className="text-[11px] sm:text-xs font-bold text-slate-800 line-clamp-2 w-full mb-1 min-h-[2.2em] flex items-center justify-center leading-tight">
+              <span className="text-[11px] sm:text-xs font-bold text-slate-800 line-clamp-2 leading-tight">
                 {displayName}
               </span>
 
               {/* Balance & Currency */}
-              <div className="w-full min-w-0 flex flex-col items-center gap-0.5" aria-label={`${displayName}: ${formatAccountBalance(displayBalance, lang)} ${acc.currency}`}>
+              <div className="w-full min-w-0 flex flex-wrap items-baseline gap-x-1 gap-y-0 mt-1" aria-label={`${displayName}: ${formatAccountBalance(displayBalance, lang)} ${acc.currency}`}>
                 {acc.type === 'credit' && <span className="text-[10px] font-semibold text-slate-600">{lang === 'ar' ? 'المستحق' : 'Owed'}</span>}
-                <span dir="ltr" className={`w-full text-center font-black text-[clamp(12px,2.6vw,17px)] leading-snug tabular-nums break-words ${displayBalance < 0 ? 'text-red-700' : 'text-slate-950'}`}>
+                <span dir="ltr" className={`max-w-full overflow-x-auto whitespace-nowrap [scrollbar-width:none] font-black text-[clamp(12px,2.2vw,16px)] leading-snug tabular-nums ${displayBalance < 0 ? 'text-red-700' : 'text-slate-950'}`}>
                   {displayBalance < 0 ? '−' : ''}{new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US', { maximumFractionDigits: 2 }).format(Math.abs(displayBalance))}
                 </span>
                 <span className="text-[10px] font-bold text-slate-500">{acc.currency}</span>
@@ -173,6 +174,7 @@ export function MoneySources({
 
               {bank && <span className="text-[10px] text-slate-500">{lang === 'ar' ? 'مرتبط بـ' : 'Linked to'} {lang === 'ar' ? bank.nameAr : bank.name}</span>}
               {acc.type === 'credit' && <span className="text-[10px] text-slate-500">{lang === 'ar' ? 'المتاح: ' : 'Available: '}{formatAccountBalance((acc.creditLimit || 0) + acc.balance, lang)}</span>}
+              </div>
               {/* Pencil icon for editing balance */}
               {onEditBalance && !acc.linkedBankId && acc.type !== 'credit' && (
                 <button
@@ -182,7 +184,7 @@ export function MoneySources({
                     e.stopPropagation();
                     onEditBalance(acc.id);
                   }}
-                  className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 w-5 h-5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-opacity cursor-pointer"
+                  className="absolute top-1 end-1 opacity-0 group-hover:opacity-100 w-5 h-5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-opacity cursor-pointer"
                 >
                   <Pencil className="w-2.5 h-2.5" />
                 </button>

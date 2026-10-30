@@ -51,6 +51,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { diagnoseGeminiConnection } = await import('../server/geminiDiagnostic.js');
         return res.status(200).json({ ok: true, data: await diagnoseGeminiConnection() });
       }
+      case 'admin.aiSettings': {
+        if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+        const { getGeminiAdminSettings } = await import('../server/geminiSettings.js');
+        return res.status(200).json({ ok: true, data: await getGeminiAdminSettings() });
+      }
+      case 'admin.aiSetModel': {
+        if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+        const { GEMINI_MODEL_OPTIONS, setSelectedGeminiModel } = await import('../server/geminiSettings.js');
+        const id = payload.modelId;
+        if (typeof id !== 'string' || !GEMINI_MODEL_OPTIONS.some(m => m.id === id)) return res.status(400).json({ ok: false, error: 'invalid_model_selection' });
+        const { diagnoseGeminiConnection } = await import('../server/geminiDiagnostic.js');
+        const test = await diagnoseGeminiConnection(id);
+        if (!test.success) return res.status(422).json({ ok: false, error: 'model_test_failed', data: test, message: 'Selected Gemini model failed its connectivity test. The active model was not changed.' });
+        return res.status(200).json({ ok: true, data: await setSelectedGeminiModel(id) });
+      }
       case 'subscription.get': {
         const subscription = await getOrCreateSubscription(user.uid);
         return res.status(200).json({ ok: true, data: { subscription } });

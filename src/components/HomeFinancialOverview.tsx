@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Wallet, TrendingDown, Calendar, Eye, EyeOff, ArrowUpRight } from 'lucide-react';
+import { Wallet, Calendar, Eye, EyeOff, ArrowUpRight } from 'lucide-react';
 import { FinancialAccount, Transaction, Language } from '../types';
 import { formatAccountBalance } from '../utils/formatBalance';
 
@@ -76,25 +76,26 @@ export function HomeFinancialOverview({
     };
   }, [transactions]);
 
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const spendingDays = useMemo(() => {
-    const now = new Date(); now.setHours(0, 0, 0, 0);
-    const days = Array.from({length:7}, (_, i) => {
-      const date = new Date(now); date.setDate(now.getDate() - 6 + i);
-      const key = [date.getFullYear(), String(date.getMonth()+1).padStart(2,'0'), String(date.getDate()).padStart(2,'0')].join('-');
-      return { key, date, amount:0, count:0 };
-    });
-    const lookup = new Map(days.map(d => [d.key,d]));
-    transactions.forEach(tx => {
-      if(tx.type !== 'expense' || tx.currency !== primaryCurrency) return;
-      const day = lookup.get(tx.date);
-      if(day) { day.amount += tx.amount; day.count++; }
-    });
-    return days;
+  // Income/expense comparison for the current calendar month. Transfers are excluded.
+  // Do not combine currencies without conversion.
+  const monthlyComparison = useMemo(() => {
+    const now = new Date();
+    const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    let income = 0;
+    let expense = 0;
+    let otherCurrency = false;
+    for (const tx of transactions) {
+      if (!tx.date.startsWith(prefix) || tx.type === 'transfer') continue;
+      if (tx.currency !== primaryCurrency) { otherCurrency = true; continue; }
+      if (tx.type === 'income') income += tx.amount;
+      if (tx.type === 'expense') expense += tx.amount;
+    }
+    const combined = income + expense;
+    return { income, expense, otherCurrency,
+      incomePct: combined > 0 ? income / combined * 100 : 0,
+      expensePct: combined > 0 ? expense / combined * 100 : 0,
+      hasData: combined > 0 };
   }, [transactions, primaryCurrency]);
-  const maxSpending = Math.max(1, ...spendingDays.map(d => d.amount));
-  const pickedDay = spendingDays.find(d => d.key === selectedDay);
-  const otherCurrenciesExist = transactions.some(tx => tx.type === 'expense' && tx.currency !== primaryCurrency && spendingDays.some(d => d.key === tx.date));
 
   const formatNumber = (val: number) => {
     return new Intl.NumberFormat(isAr ? 'ar-EG' : 'en-US', {
@@ -102,145 +103,104 @@ export function HomeFinancialOverview({
     }).format(val);
   };
 
+  const currencyLabel = isAr && primaryCurrency === 'EGP' ? 'ج.م' : primaryCurrency;
+  const percent = (value: number) => new Intl.NumberFormat(isAr ? 'ar-EG' : 'en-US', { maximumFractionDigits: 1 }).format(value);
+
   return (
-    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-3 sm:p-4 space-y-2.5">
-      {/* Top row: Total Net Balance */}
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
-              <Wallet className="w-3.5 h-3.5 text-emerald-600" />
-              {isAr ? 'إجمالي الرصيد المتاح' : 'Total Net Balance'}
-            </span>
-            <button
-              type="button"
-              onClick={toggleHideBalance}
-              className="p-1 text-slate-400 hover:text-slate-600 rounded-lg transition-colors cursor-pointer"
-              title={isBalanceHidden ? (isAr ? 'إظهار الرصيد' : 'Show balance') : (isAr ? 'إخفاء الرصيد' : 'Hide balance')}
-            >
-              {isBalanceHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-            </button>
-          </div>
-
-          <div className="flex items-baseline gap-2">
-            {isBalanceHidden ? (
-              <span className="text-2xl sm:text-3xl font-black text-slate-800 tracking-wider">
-                ••••••••
-              </span>
-            ) : (
-              <>
-                <span className="text-2xl sm:text-3xl font-black text-slate-900">
-                  {formatAccountBalance(primaryTotal, lang)}
-                </span>
-                <span className="text-xs sm:text-sm font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
-                  {isAr ? (primaryCurrency === 'EGP' ? 'ج.م' : primaryCurrency) : primaryCurrency}
-                </span>
-              </>
-            )}
-          </div>
-
-          {/* Secondary currencies if user has multi-currency accounts */}
-          {!isBalanceHidden && otherCurrencies.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 pt-0.5">
-              {otherCurrencies.map(([curr, amt]: [string, number]) => (
-                <span key={curr} className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
-                  {formatAccountBalance(amt, lang)} {curr}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
+    <section className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-3 sm:p-4 space-y-3">
+      <header className="flex items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-sm sm:text-base font-extrabold text-slate-900">
+          <span className="text-emerald-600"><Wallet size={17}/></span>
+          {isAr ? 'الوضع المالي' : 'Financial overview'}
+        </h2>
         {onViewAccounts && (
-          <button
-            type="button"
-            onClick={onViewAccounts}
-            className="flex items-center gap-1 text-[11px] font-bold text-slate-600 hover:text-emerald-700 bg-slate-50 hover:bg-slate-100 px-2.5 py-1.5 rounded-xl border border-slate-200 transition-colors cursor-pointer"
-          >
-            <span>{isAr ? 'تفاصيل الحسابات' : 'Accounts'}</span>
-            <ArrowUpRight className={`w-3.5 h-3.5 ${isAr ? 'rotate-[-90deg]' : ''}`} />
+          <button type="button" onClick={onViewAccounts}
+            className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] font-bold text-emerald-900 hover:bg-emerald-50">
+            <span>{isAr ? 'تفاصيل الحسابات' : 'Account details'}</span>
+            <ArrowUpRight size={13} className={isAr ? 'rotate-[-90deg]' : ''}/>
           </button>
         )}
-      </div>
+      </header>
 
-      {/* Quick Indicators: Today's Spending & This Month's Spending */}
-      <div className="grid grid-cols-2 gap-2">
-        {/* Today's spending */}
-        <div
-          onClick={onViewTransactions}
-          className="p-2.5 bg-slate-50 hover:bg-rose-50/40 rounded-2xl border border-slate-200/80 transition-all cursor-pointer flex items-center justify-between gap-2"
-        >
-          <div className="flex min-w-0 items-center gap-1 text-slate-500">
-            <span className="text-[11px] font-bold flex items-center gap-1 text-slate-600">
-              <TrendingDown className="w-3 h-3 text-rose-500" />
-              {isAr ? 'مصروف اليوم' : 'Today'}
-            </span>
-            {todayCount > 0 && (
-              <span className="text-[10px] font-bold bg-white text-slate-600 px-1.5 py-0.5 rounded-full border border-slate-200">
-                {todayCount} {isAr ? 'عمليات' : 'tx'}
-              </span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3 sm:p-4">
+        <div className="min-w-0 flex items-center gap-3">
+          <div aria-hidden="true" className="flex shrink-0 items-center justify-center rounded-2xl bg-emerald-100/80 w-14 h-14 sm:w-16 sm:h-16 text-emerald-700">
+            <Wallet size={32} strokeWidth={1.6}/>
+          </div>
+          <div className="min-w-0 space-y-1">
+            <div className="flex items-center gap-1">
+              <span className="text-xs font-bold text-emerald-950">{isAr ? 'إجمالي الرصيد المتاح' : 'Total available balance'}</span>
+              <button type="button" onClick={toggleHideBalance}
+                aria-label={isBalanceHidden ? (isAr ? 'إظهار الأرقام' : 'Show amounts') : (isAr ? 'إخفاء الأرقام' : 'Hide amounts')}
+                className="p-1 text-slate-500 hover:text-slate-900 rounded-md">
+                {isBalanceHidden ? <EyeOff size={16}/> : <Eye size={16}/>}
+              </button>
+            </div>
+            <div className="flex flex-wrap items-baseline gap-1.5">
+              <strong dir="ltr" className="text-[27px] sm:text-3xl font-black tabular-nums text-emerald-950 break-all">
+                {isBalanceHidden ? '••••••' : formatAccountBalance(primaryTotal, lang)}
+              </strong>
+              {!isBalanceHidden && <span className="text-sm text-emerald-900 font-bold">{currencyLabel}</span>}
+            </div>
+            <p className="text-[11px] text-emerald-900/80">{isAr ? 'متاح للاستخدام الآن' : 'Available now'}</p>
+            {!isBalanceHidden && otherCurrencies.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {otherCurrencies.map(([curr, amt]) => <span key={curr} className="rounded-md bg-white/80 px-1.5 py-0.5 text-[10px] text-slate-700">{formatAccountBalance(amt,lang)} {curr}</span>)}
+              </div>
             )}
           </div>
-          <div className="border-s border-slate-300 ps-2 text-xs sm:text-sm font-black text-slate-900 whitespace-nowrap">
-            {isBalanceHidden ? '••••' : formatNumber(todayExpenses)}{' '}
-            <span className="text-[11px] font-semibold text-slate-500">
-              {isAr ? (primaryCurrency === 'EGP' ? 'ج.م' : primaryCurrency) : primaryCurrency}
-            </span>
-          </div>
         </div>
-
-        {/* This Month's spending */}
-        <div
-          onClick={onViewTransactions}
-          className="p-2.5 bg-slate-50 hover:bg-emerald-50/40 rounded-2xl border border-slate-200/80 transition-all cursor-pointer flex items-center justify-between gap-2"
-        >
-          <div className="flex min-w-0 items-center gap-1 text-slate-500">
-            <span className="text-[11px] font-bold flex items-center gap-1 text-slate-600">
-              <Calendar className="w-3 h-3 text-emerald-600" />
-              {isAr ? 'مصروف الشهر' : 'This Month'}
-            </span>
+        <div className="min-w-0 border-t border-emerald-100 pt-3 sm:border-t-0 sm:pt-0 sm:border-s sm:ps-3">
+          <h3 className="font-extrabold text-xs sm:text-sm text-slate-900 mb-2">{isAr ? 'نسبة الدخل والمصروفات هذا الشهر' : 'Monthly income vs expenses'}</h3>
+          <div className="flex h-8 w-full overflow-hidden rounded-full bg-slate-200" role="img"
+            aria-label={isAr ? `الدخل ${percent(monthlyComparison.incomePct)} بالمائة، المصروفات ${percent(monthlyComparison.expensePct)} بالمائة` : `Income ${percent(monthlyComparison.incomePct)} percent, expenses ${percent(monthlyComparison.expensePct)} percent`}>
+            {monthlyComparison.hasData ? (<>
+              <div style={{width:`${monthlyComparison.incomePct}%`}} className="bg-emerald-500 flex items-center justify-center text-[10px] sm:text-xs font-black text-white min-w-0">
+                {monthlyComparison.incomePct >= 16 && !isBalanceHidden ? `${percent(monthlyComparison.incomePct)}%` : ''}
+              </div>
+              <div style={{width:`${monthlyComparison.expensePct}%`}} className="bg-rose-400 flex items-center justify-center text-[10px] sm:text-xs font-black text-white min-w-0">
+                {monthlyComparison.expensePct >= 16 && !isBalanceHidden ? `${percent(monthlyComparison.expensePct)}%` : ''}
+              </div>
+            </>) : <div className="w-full text-center text-[10px] text-slate-500 leading-8">{isAr ? 'لا توجد عمليات هذا الشهر' : 'No transactions this month'}</div>}
           </div>
-          <div className="border-s border-slate-300 ps-2 text-xs sm:text-sm font-black text-slate-900 whitespace-nowrap">
-            {isBalanceHidden ? '••••' : formatNumber(monthExpenses)}{' '}
-            <span className="text-[11px] font-semibold text-slate-500">
-              {isAr ? (primaryCurrency === 'EGP' ? 'ج.م' : primaryCurrency) : primaryCurrency}
-            </span>
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-emerald-700">{isAr ? '● الدخل' : '● Income'} · {isBalanceHidden ? '••' : `${percent(monthlyComparison.incomePct)}%`}</p>
+              <p dir="ltr" className="text-start text-xs sm:text-sm font-black text-slate-900 break-words">{isBalanceHidden ? '••••' : formatNumber(monthlyComparison.income)} <span className="text-[10px] font-medium">{currencyLabel}</span></p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-rose-600">{isAr ? '● المصروفات' : '● Expenses'} · {isBalanceHidden ? '••' : `${percent(monthlyComparison.expensePct)}%`}</p>
+              <p dir="ltr" className="text-start text-xs sm:text-sm font-black text-slate-900 break-words">{isBalanceHidden ? '••••' : formatNumber(monthlyComparison.expense)} <span className="text-[10px] font-medium">{currencyLabel}</span></p>
+            </div>
           </div>
+          {monthlyComparison.otherCurrency && <p className="mt-1 text-[10px] text-slate-500">{isAr ? `المقارنة بعملة ${primaryCurrency} فقط، دون تحويل العملات.` : `Comparison in ${primaryCurrency} only; no currency conversion.`}</p>}
         </div>
       </div>
-      {/* Interactive seven-day expenses: based only on actual transactions in primary currency. */}
-      <section className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3 sm:p-4">
-        <div className="flex justify-between items-center gap-2 mb-2">
-          <div>
-            <h3 className="text-xs sm:text-sm font-extrabold text-slate-900">{isAr ? 'نبض مصروفاتك' : 'Spending pulse'}</h3>
-            <p className="text-[10px] text-slate-500">{isAr ? 'آخر 7 أيام بما فيها اليوم' : 'Last 7 days including today'} · {primaryCurrency}</p>
+
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={onViewTransactions} className="min-w-0 rounded-2xl border border-amber-100 bg-amber-50/60 p-2.5 text-start hover:bg-amber-50">
+          <div className="flex items-center gap-1.5">
+            <Calendar size={16} className="text-amber-600 shrink-0"/>
+            <span className="text-[11px] font-bold text-slate-800">{isAr ? 'مصروف اليوم' : 'Today'}</span>
           </div>
-          <TrendingDown className="w-4 h-4 text-emerald-600" />
-        </div>
-        <div className="grid grid-cols-7 gap-1 sm:gap-2" role="group" aria-label={isAr ? 'مصروفات آخر سبعة أيام' : 'Seven-day expenses'}>
-          {spendingDays.map(day => {
-            const height = day.amount > 0 ? Math.max(7, 72 * day.amount / maxSpending) : 3;
-            const selected = selectedDay === day.key;
-            return <button key={day.key} type="button" onClick={() => setSelectedDay(day.key)}
-              aria-pressed={selected}
-              aria-label={`${day.date.toLocaleDateString(isAr ? 'ar-EG' : 'en-US')}: ${formatNumber(day.amount)} ${primaryCurrency}, ${day.count}`}
-              className={`min-w-0 rounded-lg flex flex-col items-center gap-1 p-1 hover:bg-white/70 focus-visible:outline-2 focus-visible:outline-emerald-600 ${selected ? 'bg-white ring-1 ring-emerald-300' : ''}`}>
-              <span dir="ltr" className="text-[9px] sm:text-[10px] font-bold text-slate-700 tabular-nums">{isBalanceHidden ? '••' : formatNumber(day.amount)}</span>
-              <span className="h-[76px] w-full flex items-end justify-center">
-                <span className={`block w-full max-w-7 rounded-t-md ${day.amount > 0 && day.amount === maxSpending ? 'bg-rose-400' : 'bg-emerald-400'}`} style={{height:`${height}px`}} />
-              </span>
-              <span className="w-full truncate text-center text-[9px] sm:text-[10px] text-slate-600">{day.date.toLocaleDateString(isAr ? 'ar-EG' : 'en-US',{weekday:'short'})}</span>
-            </button>;
-          })}
-        </div>
-        <p className="text-[11px] text-slate-700 font-medium mt-2" aria-live="polite">
-          {pickedDay
-            ? isBalanceHidden ? (isAr ? 'الأرقام مخفية، استخدم زر العين لإظهارها' : 'Amounts are hidden; use the eye button to reveal')
-              : `${pickedDay.date.toLocaleDateString(isAr ? 'ar-EG' : 'en-US',{day:'numeric',month:'short'})}: ${formatNumber(pickedDay.amount)} ${primaryCurrency} · ${pickedDay.count} ${isAr ? 'عملية' : 'transactions'}`
-            : (isAr ? 'اضغط على أي عمود لمعرفة المبلغ وعدد العمليات' : 'Tap a bar to see the amount and transaction count')}
-        </p>
-        {otherCurrenciesExist && <p className="text-[10px] text-slate-500 mt-1">{isAr ? `الرسم يعرض ${primaryCurrency} فقط، ولا يجمع العملات المختلفة.` : `Showing ${primaryCurrency} only; currencies are not combined.`}</p>}
-      </section>
-    </div>
+          <div className="flex flex-wrap items-baseline gap-1 mt-1">
+            <strong dir="ltr" className="text-base sm:text-lg font-black text-slate-950 break-all">{isBalanceHidden ? '••••' : formatNumber(todayExpenses)}</strong>
+            <span className="text-[10px] text-slate-500">{currencyLabel}</span>
+          </div>
+          <span className="text-[10px] text-slate-500">{todayCount} {isAr ? 'عمليات' : 'transactions'}</span>
+        </button>
+        <button type="button" onClick={onViewTransactions} className="min-w-0 rounded-2xl border border-rose-100 bg-rose-50/60 p-2.5 text-start hover:bg-rose-50">
+          <div className="flex items-center gap-1.5">
+            <Calendar size={16} className="text-rose-500 shrink-0"/>
+            <span className="text-[11px] font-bold text-slate-800">{isAr ? 'مصروف الشهر' : 'This month'}</span>
+          </div>
+          <div className="flex flex-wrap items-baseline gap-1 mt-1">
+            <strong dir="ltr" className="text-base sm:text-lg font-black text-rose-700 break-all">{isBalanceHidden ? '••••' : formatNumber(monthExpenses)}</strong>
+            <span className="text-[10px] text-slate-500">{currencyLabel}</span>
+          </div>
+          <span className="text-[10px] text-slate-500">{new Date().toLocaleDateString(isAr ? 'ar-EG' : 'en-US', {day:'numeric',month:'long'})}</span>
+        </button>
+      </div>
+    </section>
   );
 }

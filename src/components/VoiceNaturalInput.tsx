@@ -378,12 +378,6 @@ export function VoiceNaturalInput({
     void processInputWithAI(inputText);
   };
 
-  const handleExampleClick = (example: string) => {
-    if (isProcessingAI || isRecording) return;
-    setInputText(example);
-    void processInputWithAI(example);
-  };
-
   return (
     <div className="space-y-2">
       {/* Primary Big Voice / Text Card with Gemini AI styling */}
@@ -538,59 +532,6 @@ export function VoiceNaturalInput({
           <span>{speechError}</span>
         </div>
       )}
-
-      {/* Quick Example Pills to test instant Gemini understanding */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-[11px] text-slate-500">
-        <span className="text-slate-400 font-medium shrink-0">
-          {isAr ? 'جرّب مثالًا:' : 'Try an example:'}
-        </span>
-        <button
-          type="button"
-          disabled={isProcessingAI || isRecording}
-          onClick={() =>
-            handleExampleClick(
-              isAr ? 'دفعت 350 جنيه بنزين من الكاش الساعة 4 ونص' : 'Paid 350 for fuel from Cash at 4:30 PM'
-            )
-          }
-          className="px-2.5 py-1 rounded-full bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 hover:text-emerald-700 transition-colors whitespace-nowrap cursor-pointer shadow-2xs font-medium"
-        >
-          {isAr ? '⛽ 350 بنزين من الكاش 4:30' : '⛽ 350 fuel from cash'}
-        </button>
-        <button
-          type="button"
-          disabled={isProcessingAI}
-          onClick={() =>
-            handleExampleClick(
-              isAr ? 'دفعت 350 جنيه بنزين من الكاش' : 'Paid 350 for fuel from Cash'
-            )
-          }
-          className="px-2.5 py-1 rounded-full bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 hover:text-emerald-700 transition-colors whitespace-nowrap cursor-pointer shadow-2xs font-medium"
-        >
-          {isAr ? '⛽ 350 بنزين كاش' : '⛽ 350 fuel from cash'}
-        </button>
-        <button
-          type="button"
-          disabled={isProcessingAI}
-          onClick={() =>
-            handleExampleClick(
-              isAr ? 'اشتريت طلبات بـ 200 جنيه' : 'Bought groceries for 200'
-            )
-          }
-          className="px-2.5 py-1 rounded-full bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 hover:text-emerald-700 transition-colors whitespace-nowrap cursor-pointer shadow-2xs font-medium"
-        >
-          {isAr ? '🛒 200 مشتريات' : '🛒 200 groceries'}
-        </button>
-        <button
-          type="button"
-          disabled={isProcessingAI}
-          onClick={() =>
-            handleExampleClick(isAr ? 'أنا صرفت كام الأسبوع ده؟' : 'How much did I spend this week?')
-          }
-          className="px-2.5 py-1 rounded-full bg-indigo-50/80 border border-indigo-200 text-indigo-800 hover:bg-indigo-100 transition-colors whitespace-nowrap cursor-pointer shadow-2xs font-bold"
-        >
-          {isAr ? '🔍 صرفت كام الأسبوع ده؟' : '🔍 Spent this week?'}
-        </button>
-      </div>
 
       {/* Soft Landing Quota Limit Modal */}
       {showSoftLandingModal && (

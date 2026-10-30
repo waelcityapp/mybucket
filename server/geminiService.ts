@@ -11,26 +11,6 @@ import {
   matchTransferAccountsFromText,
 } from '../src/utils/entityMatcher.js';
 
-let genAIClient: GoogleGenAI | null = null;
-
-function getGenAI(): GoogleGenAI {
-  if (!genAIClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY is not configured on the server');
-    }
-    genAIClient = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
-      },
-    });
-  }
-  return genAIClient;
-}
-
 export async function interpretNaturalLanguageWithGemini(
   req: AIInterpretationRequest
 ): Promise<AIInterpretationResult> {

@@ -148,7 +148,27 @@ export function parseNaturalDateTime(
     subtractMonths(1);
   } else if (/(?:من|قبل|منذ)\s*(?:سنه|سنة|عام|year)(?:\s*(?:فاتت|فات|ago))?/.test(text)) {
     subtractMonths(12);
+  } else if (/\b(?:last week|a week ago|one week ago)\b/.test(text)) {
+    subtractDays(7);
+  } else if (/\b(?:last month|a month ago|one month ago)\b/.test(text)) {
+    subtractMonths(1);
+  } else if (/\b(?:last year|a year ago|one year ago)\b/.test(text)) {
+    subtractMonths(12);
+  } else if (/\b(?:two days ago|day before yesterday)\b/.test(text)) {
+    subtractDays(2);
   } else {
+    const englishDuration = text.match(/\b(\d+|one|two|three|four|five|six|seven|ten)\s+(days?|weeks?|months?|years?)\s+ago\b/);
+    const words: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, ten: 10 };
+    if (englishDuration) {
+      const n = words[englishDuration[1]] || Number(englishDuration[1]);
+      const unit = englishDuration[2];
+      if (n > 0 && n <= 3650) {
+        if (unit.startsWith('day')) subtractDays(n);
+        else if (unit.startsWith('week')) subtractDays(n * 7);
+        else if (unit.startsWith('month')) subtractMonths(n);
+        else subtractMonths(n * 12);
+      }
+    }
     const duration = text.match(/(?:من|قبل|منذ)\s*(\d+)\s*(ايام|يوم|اسابيع|اسبوع|شهور|اشهر|شهر|سنين|سنوات|سنة|سنه|days?|weeks?|months?|years?)(?:\s*(?:فات|فاتت|ago))?/);
     if (duration) {
       const n = Number(duration[1]);

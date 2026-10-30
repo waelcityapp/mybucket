@@ -96,7 +96,7 @@ export default function App() {
   });
 
   // 2. Active Tab State
-  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : window.location.pathname === '/offers' ? 'offers' : 'home');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : 'home');
   const openGuide = () => { window.history.pushState({ guide: true }, '', '/guide'); setActiveTab('guide'); };
   const openOffers = () => { if (window.location.pathname !== '/offers') window.history.pushState({ offers: true }, '', '/offers'); setActiveTab('offers'); };
   const openAccountSettings = () => { window.history.pushState({ accounts: true }, '', '/accounts'); setActiveTab('accounts'); };
@@ -105,7 +105,7 @@ export default function App() {
     setActiveTab(page);
   };
   useEffect(() => {
-    const onPopState = () => setActiveTab(window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : 'home');
+    const onPopState = () => setActiveTab(window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : 'home');
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
@@ -306,7 +306,7 @@ export default function App() {
         setIsExpenseCategoriesModalOpen(false);
         setIsCategoryDetailModalOpen(false);
         setSelectedCategoryForDetail(null);
-        setActiveTab(window.location.pathname === '/offers' ? 'offers' : firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : 'home');
+        setActiveTab((window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : 'home');
         setToastMessage(null);
         aiLearnedMemory.clear();
       }
@@ -984,7 +984,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #56' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #57' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {
@@ -1013,10 +1013,26 @@ export default function App() {
 
   // Public offers are browsable without financial account sign-in.
   if (activeTab === 'offers') {
-    return <OffersPage lang={lang} onBack={() => {
-      if (window.history.state?.offers) window.history.back();
-      else { window.history.replaceState({}, '', '/'); setActiveTab('home'); }
-    }} />;
+    const categorySlug = window.location.pathname.startsWith('/offers/category/')
+      ? decodeURIComponent(window.location.pathname.slice('/offers/category/'.length))
+      : null;
+    return <OffersPage
+      lang={lang}
+      categorySlug={categorySlug}
+      onOpenCategory={(slug) => {
+        window.history.pushState({ offerCategory: true }, '', `/offers/category/${encodeURIComponent(slug)}`);
+        setActiveTab('offers');
+        // The route remains 'offers', so re-render after updating the browser URL.
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }}
+      onBack={() => {
+        if (categorySlug) {
+          if (window.history.state?.offerCategory) window.history.back();
+          else { window.history.replaceState({ offers: true }, '', '/offers'); setActiveTab('offers'); window.dispatchEvent(new PopStateEvent('popstate')); }
+        } else if (window.history.state?.offers) window.history.back();
+        else { window.history.replaceState({}, '', '/'); setActiveTab('home'); }
+      }}
+    />;
   }
 
   // 2. Dedicated Full-Page Auth & Registration (No popups / No modals)

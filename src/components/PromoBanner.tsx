@@ -1,18 +1,16 @@
 import React from 'react';
-import { ExternalLink, Tag, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ExternalLink, Tag } from 'lucide-react';
 import { PromoBannerData } from '../types/deals';
 import { Language } from '../types';
 
 interface PromoBannerProps {
   banner: PromoBannerData;
   lang: Language;
-  onOpenDeals: () => void;
 }
 
 export const PromoBanner: React.FC<PromoBannerProps> = ({
   banner,
   lang,
-  onOpenDeals,
 }) => {
   if (!banner.isActive) return null;
 
@@ -23,38 +21,7 @@ export const PromoBanner: React.FC<PromoBannerProps> = ({
 
   return (
     <div className="w-full mt-4 mb-2">
-      {/* 1. Quick Deals & Perks Shortcut Button */}
-      <button
-        id="open-exclusive-deals-bar"
-        onClick={onOpenDeals}
-        className="w-full mb-2.5 p-3 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white shadow-sm hover:shadow-md transition-all flex items-center justify-between group cursor-pointer border border-amber-400/40"
-      >
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0">
-            <Sparkles className="w-4 h-4 text-white animate-pulse" />
-          </div>
-          <div className="text-start">
-            <div className="text-xs font-black  flex items-center gap-1.5">
-              <span>{lang === 'ar' ? 'عروض وخصومات مستخدمي My Bucket' : 'My Bucket Exclusive Deals'}</span>
-              <span className="bg-white/25 text-[10px] font-black px-1.5 py-0.2 rounded-full">
-                {lang === 'ar' ? 'تصفح العروض' : 'Browse offers'}
-              </span>
-            </div>
-            <p className="text-[11px] text-amber-100 font-medium">
-              {lang === 'ar' ? 'افتح صفحة العروض والخصومات' : 'Open the offers and discounts page'}
-            </p>
-          </div>
-        </div>
-        <div className="w-7 h-7 rounded-xl bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors shrink-0">
-          {lang === 'ar' ? (
-            <ChevronLeft className="w-4 h-4 text-white" />
-          ) : (
-            <ChevronRight className="w-4 h-4 text-white" />
-          )}
-        </div>
-      </button>
-
-      {/* 2. Primary Advertiser Sponsored Banner */}
+      {/* Primary Advertiser Sponsored Banner */}
       <div 
         id="sponsored-advertiser-banner"
         className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-700/60 p-3.5 sm:p-4 text-white shadow-sm"

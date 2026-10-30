@@ -50,7 +50,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
   ), [search]);
 
   const categoryCount = (slug: string) => PUBLISHED_OFFERS.filter(offer => offer.categorySlug === slug).length;
-  const title = category ? (isAr ? category.ar : category.en) : (isAr ? 'العروض والخصومات' : 'Offers & Discounts');
+  const title = category ? (isAr ? category.ar : category.en) : (isAr ? 'وفّر مع My Bucket' : 'Save with My Bucket');
 
   return (
     <div dir={isAr ? 'rtl' : 'ltr'} className="min-h-screen bg-[#F8FAFC] text-slate-900">
@@ -93,18 +93,14 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
           </section>
         ) : (
           <section className="space-y-5">
-            <div className="space-y-2">
-              <h2 className="text-xl font-black">{isAr ? 'اكتشف العروض والخصومات' : 'Discover offers & discounts'}</h2>
-              <p className="text-sm text-slate-500">{isAr ? 'اختار المجال اللي يهمك أو ابحث عن قسم' : 'Choose a category or search categories'}</p>
-            </div>
             <label className="relative block">
               <Search className="absolute start-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input
                 type="search"
                 value={search}
                 onChange={event => setSearch(event.target.value)}
-                placeholder={isAr ? 'ابحث في أقسام العروض...' : 'Search offer categories...'}
-                aria-label={isAr ? 'بحث عن قسم عروض' : 'Search offer categories'}
+                placeholder={isAr ? 'ابحث عن عرض أو فرصة توفير...' : 'Search offers or savings opportunities...'}
+                aria-label={isAr ? 'البحث عن عروض وفرص توفير' : 'Search offers and savings opportunities'}
                 className="w-full h-12 rounded-2xl bg-white border border-slate-200 ps-11 pe-4 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
               />
             </label>

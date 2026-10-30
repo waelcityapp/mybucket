@@ -7,7 +7,10 @@ type UsageSummary = { requests?: number; inputTokens?: number; outputTokens?: nu
 type ModelUsage = UsageSummary & { model?: string };
 type DiagnosticData = {
   success: boolean;
-  model: string;
+  model?: string;
+  stage?: string;
+  availableModels?: string[];
+  modelCount?: number;
   reply?: string;
   totalTokens?: number | null;
   trackingRecorded?: boolean;
@@ -134,7 +137,13 @@ export const AdminAiUsageCard: React.FC<AdminAiUsageCardProps> = ({ lang = 'ar',
       {diagnostic && <div role="status" className={`rounded-lg border p-3 text-sm ${diagnostic.success ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
         <p className="font-extrabold">{diagnostic.success ? (ar ? 'نجح اتصال Gemini' : 'Gemini connection succeeded') : (ar ? 'فشل اتصال Gemini' : 'Gemini connection failed')}</p>
         <p className="mt-1">{diagnostic.success ? (ar ? 'ردت Google بنجاح على الطلب التجريبي.' : 'Google answered the test request.') : diagnosisMessage(diagnostic.reason)}</p>
-        <p className="mt-1 text-xs" dir="ltr">Model: {diagnostic.model} {diagnostic.httpStatus ? ` | HTTP: ${diagnostic.httpStatus}` : ''} {diagnostic.googleStatus ? ` | Google: ${diagnostic.googleStatus}` : ''}</p>
+        <p className="mt-1 text-xs" dir="ltr">Stage: {diagnostic.stage || '—'} | Model: {diagnostic.model || '—'} {diagnostic.httpStatus ? ` | HTTP: ${diagnostic.httpStatus}` : ''} {diagnostic.googleStatus ? ` | Google: ${diagnostic.googleStatus}` : ''}</p>
+        {typeof diagnostic.modelCount === 'number' && <div className="mt-2 space-y-1">
+          <p className="text-xs font-bold">{ar ? 'النماذج التي أعلنت Google إتاحتها لتوليد النص' : 'Text generation models listed by Google'}: {diagnostic.modelCount}</p>
+          <div dir="ltr" className="max-h-32 overflow-y-auto rounded-lg bg-white/80 border border-slate-200 px-2 py-1 text-xs font-mono break-all">
+            {diagnostic.availableModels?.length ? diagnostic.availableModels.join(' · ') : '—'}
+          </div>
+        </div>}
         {diagnostic.success && <p className="mt-1 text-xs">{ar ? 'التوكنات' : 'Tokens'}: {fmt(diagnostic.totalTokens ?? undefined)} · {diagnostic.trackingRecorded ? (ar ? 'تم تسجيلها في العداد' : 'Recorded in usage dashboard') : (ar ? 'تعذر تأكيد تسجيلها في العداد' : 'Usage recording could not be confirmed')}</p>}
       </div>}
     </div>

@@ -1087,6 +1087,7 @@ export default function App() {
         onLogin={handleGoogleLogin}
         onLogout={handleGoogleLogout}
         onOpenMobileLink={() => setIsMobileModalOpen(true)}
+        onOpenOffers={openOffers}
         onUpdateUserName={handleUpdateUserName}
       />
 
@@ -1257,7 +1258,6 @@ export default function App() {
             <PromoBanner
               banner={promoBanner}
               lang={lang}
-              onOpenDeals={openOffers}
             />
           </div>
         )}

@@ -1,4 +1,5 @@
 import { recordGeminiUsage } from './geminiUsage.js';
+import { getSelectedGeminiModel, recordGeminiSuccess } from './geminiSettings.js';
 
 // Admin-only diagnostic: discovers models from the same API key used by the server.
 // Never returns a key, headers, raw provider errors, or any financial information.
@@ -19,7 +20,7 @@ function googleFailure(httpStatus: number, error: GoogleError) {
   const googleStatus = knownStatuses.find(s => s === raw) || null;
   return { httpStatus, googleStatus, reason: categorize(googleStatus, error?.error?.message || '') };
 }
-export async function diagnoseGeminiConnection() {
+export async function diagnoseGeminiConnection(modelOverride?: string) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return { success: false, stage: 'models_list', reason: 'missing_key', httpStatus: null, googleStatus: null, availableModels: [] };
   const controller = new AbortController();
@@ -49,7 +50,7 @@ export async function diagnoseGeminiConnection() {
       .map(m => m.name!.slice('models/'.length));
     // Test the exact model that fails in the financial workflow, not an
     // arbitrary older model picked from the models.list ordering.
-    const diagnosticModel = 'gemini-3.5-flash-lite';
+    const diagnosticModel = modelOverride || await getSelectedGeminiModel();
     const selected = availableModels.includes(diagnosticModel) ? diagnosticModel : null;
     const listedModels = availableModels.slice(0, 30);
     if (!selected) return { success: false, stage: 'model_selection', model: diagnosticModel, reason: 'model_unavailable', httpStatus: null, googleStatus: null, availableModels: listedModels, modelCount: availableModels.length };
@@ -65,6 +66,7 @@ export async function diagnoseGeminiConnection() {
       usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number };
     } & GoogleError;
     if (!response.ok) return { success: false, stage: 'generate_content', model: selected, ...googleFailure(response.status, result), availableModels: listedModels, modelCount: availableModels.length };
+    try { await recordGeminiSuccess(selected); } catch { /* Diagnosis succeeded even if status saving failed. */ }
     const usage = result.usageMetadata;
     let trackingRecorded = false;
     if (usage) {

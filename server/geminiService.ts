@@ -1,4 +1,5 @@
 import { recordGeminiUsage } from './geminiUsage.js';
+import { getSelectedGeminiModel, recordGeminiSuccess } from './geminiSettings.js';
 import { AIInterpretationRequest, AIInterpretationResult } from '../src/services/ai/types.js';
 import { getFormattedSlangPromptContext } from '../src/services/ai/aiKnowledgeBase.js';
 import { isFinancialQueryText, parseSemanticNumberRoles } from '../src/utils/semanticParser.js';
@@ -158,7 +159,7 @@ Only include transaction/query/correction when relevant. Do not invent missing f
   let responseText: string | undefined;
   // Use the exact REST API and working model proven by the admin connection
   // test. Avoid the SDK's previously failing request serialization.
-  const model = 'gemini-3.5-flash-lite';
+  const model = await getSelectedGeminiModel();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 12000);
   try {
@@ -185,6 +186,7 @@ Only include transaction/query/correction when relevant. Do not invent missing f
       };
       responseText = result.candidates?.[0]?.content?.parts?.map(part => part.text || '').join('').trim();
       const usage = result.usageMetadata;
+      try { await recordGeminiSuccess(model); } catch { /* Status is best-effort. */ }
       if (usage) {
         try {
           await recordGeminiUsage({

@@ -1,66 +1,93 @@
-import { GoogleGenAI } from '@google/genai';
 import { recordGeminiUsage } from './geminiUsage.js';
 
-// Administrator-only diagnostic: uses no user financial data and never returns
-// provider error text, request headers, credentials or secret API key.
+// Admin-only diagnostic: discovers models from the same API key used by the server.
+// Never returns a key, headers, raw provider errors, or any financial information.
+type GeminiModel = { name?: string; displayName?: string; supportedGenerationMethods?: string[] };
+type GoogleError = { error?: { code?: number; status?: string; message?: string } };
+const knownStatuses = ['FAILED_PRECONDITION', 'INVALID_ARGUMENT', 'PERMISSION_DENIED', 'RESOURCE_EXHAUSTED', 'NOT_FOUND', 'UNAUTHENTICATED', 'UNAVAILABLE', 'INTERNAL'] as const;
+function categorize(status: string | null, message: string) {
+  if (status === 'FAILED_PRECONDITION' || /billing|payment|free tier|region|country/i.test(message)) return 'billing_or_eligibility';
+  if (/api key|api_key|invalid key/i.test(message)) return 'invalid_key';
+  if (status === 'INVALID_ARGUMENT') return 'invalid_request';
+  if (status === 'PERMISSION_DENIED' || status === 'UNAUTHENTICATED') return 'permission';
+  if (status === 'RESOURCE_EXHAUSTED') return 'quota';
+  if (status === 'NOT_FOUND') return 'model_unavailable';
+  return 'unknown';
+}
+function googleFailure(httpStatus: number, error: GoogleError) {
+  const raw = error?.error?.status;
+  const googleStatus = knownStatuses.find(s => s === raw) || null;
+  return { httpStatus, googleStatus, reason: categorize(googleStatus, error?.error?.message || '') };
+}
 export async function diagnoseGeminiConnection() {
-  const model = 'gemini-2.5-flash';
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return { success: false, model, reason: 'missing_key', httpStatus: null, googleStatus: null };
-
+  if (!apiKey) return { success: false, stage: 'models_list', reason: 'missing_key', httpStatus: null, googleStatus: null, availableModels: [] };
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10000);
+  const timer = setTimeout(() => controller.abort(), 12000);
   try {
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model,
-      contents: 'Reply with exactly OK.',
-      config: { maxOutputTokens: 16, abortSignal: controller.signal, httpOptions: { timeout: 10000 } },
+    const models: GeminiModel[] = [];
+    let pageToken: string | undefined;
+    // Follow at most 3 pages so this button remains predictable and inexpensive.
+    for (let page = 0; page < 3; page++) {
+      const url = new URL('https://generativelanguage.googleapis.com/v1beta/models');
+      url.searchParams.set('pageSize', '100');
+      if (pageToken) url.searchParams.set('pageToken', pageToken);
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: { 'x-goog-api-key': apiKey },
+        signal: controller.signal,
+      });
+      const result = await response.json() as { models?: GeminiModel[]; nextPageToken?: string } & GoogleError;
+      if (!response.ok) return { success: false, stage: 'models_list', ...googleFailure(response.status, result), availableModels: [] };
+      models.push(...(Array.isArray(result.models) ? result.models : []));
+      pageToken = result.nextPageToken;
+      if (!pageToken) break;
+    }
+
+    const availableModels = models
+      .filter(m => m.name?.startsWith('models/gemini-') && m.supportedGenerationMethods?.includes('generateContent'))
+      .map(m => m.name!.slice('models/'.length));
+    const preferred = availableModels.filter(n => /flash-lite|flash/i.test(n) && !/image|audio|live|tts|embedding|exp|preview/i.test(n));
+    const selected = preferred[0] || availableModels.find(n => /flash/i.test(n) && !/image|audio|tts|live|embedding/i.test(n)) || availableModels[0] || null;
+    const listedModels = availableModels.slice(0, 30);
+    if (!selected) return { success: false, stage: 'model_selection', reason: 'model_unavailable', httpStatus: null, googleStatus: null, availableModels: listedModels, modelCount: availableModels.length };
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(selected)}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({ contents: [{ parts: [{ text: 'Reply with exactly OK.' }] }], generationConfig: { maxOutputTokens: 32 } }),
+      signal: controller.signal,
     });
-    const usage = response.usageMetadata;
+    const result = await response.json() as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number };
+    } & GoogleError;
+    if (!response.ok) return { success: false, stage: 'generate_content', model: selected, ...googleFailure(response.status, result), availableModels: listedModels, modelCount: availableModels.length };
+    const usage = result.usageMetadata;
     let trackingRecorded = false;
     if (usage) {
       try {
         await recordGeminiUsage({
-          model,
+          model: selected,
           inputTokens: usage.promptTokenCount ?? 0,
           outputTokens: usage.candidatesTokenCount ?? 0,
           totalTokens: usage.totalTokenCount ?? 0,
         });
         trackingRecorded = true;
       } catch {
-        // Keep a successful connectivity test distinct from a tracking failure.
+        // A successful Google request is reported separately from Firestore telemetry.
       }
     }
     return {
-      success: true,
-      model,
-      reply: (response.text || '').trim().slice(0, 30),
-      totalTokens: usage?.totalTokenCount ?? null,
-      trackingRecorded,
+      success: true, stage: 'generate_content', model: selected,
+      reply: (result.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '').trim().slice(0, 30),
+      totalTokens: usage?.totalTokenCount ?? null, trackingRecorded,
+      availableModels: listedModels, modelCount: availableModels.length,
     };
-  } catch (err: unknown) {
-    const e = err as { status?: number; name?: string; message?: string };
-    // Parse only known status codes from the provider response, never return
-    // an untrusted raw error message that may contain sensitive text.
-    const message = typeof e.message === 'string' ? e.message : '';
-    const knownGoogleStatuses = ['FAILED_PRECONDITION', 'INVALID_ARGUMENT', 'PERMISSION_DENIED', 'RESOURCE_EXHAUSTED', 'NOT_FOUND', 'UNAUTHENTICATED', 'UNAVAILABLE', 'INTERNAL'];
-    const googleStatus = knownGoogleStatuses.find(value => message.includes(value)) || null;
-    const reason =
-      /billing|payment|free tier|not available in your country|not available in your region/i.test(message) || googleStatus === 'FAILED_PRECONDITION' ? 'billing_or_eligibility' :
-      /api key|api_key|key not valid|invalid key/i.test(message) ? 'invalid_key' :
-      googleStatus === 'INVALID_ARGUMENT' ? 'invalid_request' :
-      googleStatus === 'PERMISSION_DENIED' || googleStatus === 'UNAUTHENTICATED' ? 'permission' :
-      googleStatus === 'RESOURCE_EXHAUSTED' ? 'quota' :
-      googleStatus === 'NOT_FOUND' ? 'model_unavailable' :
-      controller.signal.aborted || /timeout/i.test(message) ? 'timeout' :
-      'unknown';
+  } catch (error: unknown) {
     return {
-      success: false,
-      model,
-      httpStatus: typeof e.status === 'number' ? e.status : null,
-      googleStatus,
-      reason,
+      success: false, stage: 'connection', reason: controller.signal.aborted ? 'timeout' : 'unknown',
+      httpStatus: null, googleStatus: null, availableModels: [],
     };
   } finally {
     clearTimeout(timer);

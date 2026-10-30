@@ -32,7 +32,7 @@ export function HomeFinancialOverview({
   };
 
   // Group balances by currency
-  const balancesByCurrency = useMemo(() => {
+  const balancesByCurrency: Record<string, number> = useMemo(() => {
     const map: Record<string, number> = {};
     accounts.forEach((acc) => {
       if (acc.linkedBankId || acc.type === 'credit') return;
@@ -127,6 +127,11 @@ export function HomeFinancialOverview({
     }).format(val);
   };
 
+  // Scale longer formatted amounts while retaining a scroll fallback for extreme values.
+  const amountSize = (text: string, base: string) => ({
+    fontSize: `max(10px, calc(${base} * ${Math.min(1, 7 / Math.max(text.length, 1))}))`,
+  });
+
   const currencyLabel = isAr && primaryCurrency === 'EGP' ? 'ج.م' : primaryCurrency;
   const percent = (value: number) => new Intl.NumberFormat(isAr ? 'ar-EG' : 'en-US', { maximumFractionDigits: 1 }).format(value);
 
@@ -134,7 +139,7 @@ export function HomeFinancialOverview({
   const todayBarsMax = Math.max(1, ...spendingSparklines.daily);
 
   return (
-    <section className="@container w-full min-w-0 rounded-[28px] border border-slate-200 bg-white p-3 sm:p-4 shadow-sm space-y-3" aria-label={isAr ? 'ملخص الوضع المالي' : 'Financial overview'}>
+    <section className="@container w-full min-w-0 rounded-[28px] border border-slate-200 bg-white p-3 shadow-sm space-y-2" aria-label={isAr ? 'ملخص الوضع المالي' : 'Financial overview'}>
       <div className="flex items-center justify-between gap-2 px-1 py-1">
         <h2 className="flex items-center gap-2 whitespace-nowrap text-[15px] sm:text-lg font-black text-slate-950">
           <ChartNoAxesColumnIncreasing size={20} className="text-emerald-600 shrink-0" />
@@ -149,10 +154,10 @@ export function HomeFinancialOverview({
         )}
       </div>
 
-      <div className="grid grid-cols-1 @min-[490px]:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] gap-3 @min-[490px]:gap-0 items-stretch rounded-[23px] border border-emerald-100 bg-gradient-to-br from-[#F0FCF8] via-[#FBFEFC] to-[#F2FCF8] px-3 py-4 sm:p-4">
+      <div className="grid grid-cols-1 @min-[490px]:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] gap-2 @min-[490px]:gap-0 items-stretch rounded-[23px] border border-emerald-100 bg-gradient-to-br from-[#F0FCF8] via-[#FBFEFC] to-[#F2FCF8] px-3 py-2.5">
         {/* The comparison is first in RTL, on the right like the approved reference. */}
         <div className="min-w-0 @min-[490px]:border-e @min-[490px]:border-slate-200 @min-[490px]:pe-3">
-          <div className="rounded-2xl bg-white/75 p-2.5 @min-[490px]:p-2.5 @min-[660px]:p-4 h-full">
+          <div className="rounded-2xl p-1 h-full">
             <div className="flex items-start gap-1.5 justify-between min-w-0">
               <h3 className="text-[11px] @min-[660px]:text-sm font-extrabold leading-5 text-slate-900">
                 {isAr ? 'نسبة الدخل والمصروفات هذا الشهر' : 'Income and expenses this month'}
@@ -161,7 +166,7 @@ export function HomeFinancialOverview({
                 <Info size={15} />
               </span>
             </div>
-            <div className="mt-3 flex h-9 w-full overflow-hidden rounded-full bg-slate-200" role="img"
+            <div className="mt-2 flex h-8 w-full overflow-hidden rounded-full bg-slate-200" role="img"
               aria-label={isBalanceHidden
                 ? (isAr ? 'تم إخفاء النسب المالية' : 'Financial percentages hidden')
                 : (isAr ? 'الدخل ' + percent(monthlyComparison.incomePct) + ' بالمائة، المصروفات ' + percent(monthlyComparison.expensePct) + ' بالمائة' : 'Income ' + percent(monthlyComparison.incomePct) + ' percent, expenses ' + percent(monthlyComparison.expensePct) + ' percent')}>
@@ -176,28 +181,28 @@ export function HomeFinancialOverview({
                 </>
               ) : <span className="m-auto text-[11px] text-slate-500">{isBalanceHidden ? (isAr ? 'الأرقام مخفية' : 'Amounts hidden') : (isAr ? 'لا توجد عمليات خلال الشهر' : 'No transactions this month')}</span>}
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-1.5">
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
               <div className="min-w-0">
                 <div className="flex items-center gap-1 text-emerald-700">
                   <span className="flex shrink-0 items-center justify-center w-6 h-6 rounded-full bg-emerald-100"><TrendingUp size={13}/></span>
                   <span className="min-w-0 text-[10px] @min-[660px]:text-sm font-bold leading-4">{isAr ? 'إجمالي الدخل' : 'Total income'}</span>
                 </div>
-                <div className="mt-1 flex flex-wrap items-baseline gap-1">
-                  <strong dir="ltr" className="whitespace-nowrap text-[clamp(12px,3cqw,23px)] font-black tabular-nums leading-tight text-emerald-950">{isBalanceHidden ? '••••' : formatNumber(monthlyComparison.income)}</strong>
+                <div className="mt-1 flex items-baseline gap-1 whitespace-nowrap overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <strong dir="ltr" style={amountSize(isBalanceHidden ? '••••' : formatNumber(monthlyComparison.income), 'clamp(12px, 2.4cqw, 19px)')} className="whitespace-nowrap font-black tabular-nums leading-tight text-emerald-950">{isBalanceHidden ? '••••' : formatNumber(monthlyComparison.income)}</strong>
                   <span className="text-[10px] text-slate-600">{currencyLabel}</span>
                 </div>
-                <p className="text-[10px] font-bold text-emerald-700">{isBalanceHidden ? '••' : percent(monthlyComparison.incomePct) + '%'}</p>
+                {!isBalanceHidden && monthlyComparison.hasData && monthlyComparison.incomePct < 21 && <p className="text-[10px] font-bold text-emerald-700">{percent(monthlyComparison.incomePct)}%</p>}
               </div>
               <div className="min-w-0 border-s border-slate-200 ps-2">
                 <div className="flex items-center gap-1 text-rose-600">
                   <span className="flex shrink-0 items-center justify-center w-6 h-6 rounded-full bg-rose-100"><TrendingDown size={13}/></span>
                   <span className="min-w-0 text-[10px] @min-[660px]:text-sm font-bold leading-4">{isAr ? 'إجمالي المصروفات' : 'Total expenses'}</span>
                 </div>
-                <div className="mt-1 flex flex-wrap items-baseline gap-1">
-                  <strong dir="ltr" className="whitespace-nowrap text-[clamp(12px,3cqw,23px)] font-black tabular-nums leading-tight text-slate-950">{isBalanceHidden ? '••••' : formatNumber(monthlyComparison.expense)}</strong>
+                <div className="mt-1 flex items-baseline gap-1 whitespace-nowrap overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <strong dir="ltr" style={amountSize(isBalanceHidden ? '••••' : formatNumber(monthlyComparison.expense), 'clamp(12px, 2.4cqw, 19px)')} className="whitespace-nowrap font-black tabular-nums leading-tight text-slate-950">{isBalanceHidden ? '••••' : formatNumber(monthlyComparison.expense)}</strong>
                   <span className="text-[10px] text-slate-600">{currencyLabel}</span>
                 </div>
-                <p className="text-[10px] font-bold text-rose-600">{isBalanceHidden ? '••' : percent(monthlyComparison.expensePct) + '%'}</p>
+                {!isBalanceHidden && monthlyComparison.hasData && monthlyComparison.expensePct < 21 && <p className="text-[10px] font-bold text-rose-600">{percent(monthlyComparison.expensePct)}%</p>}
               </div>
             </div>
             {monthlyComparison.otherCurrency && <p className="mt-2 text-[10px] leading-4 text-slate-500">{isAr ? 'المقارنة بعملة ' + primaryCurrency + ' فقط، دون تحويل العملات.' : 'Only ' + primaryCurrency + ' is compared; currencies are not combined.'}</p>}
@@ -216,8 +221,8 @@ export function HomeFinancialOverview({
                   {isBalanceHidden ? <EyeOff size={16}/> : <Eye size={16}/>}
                 </button>
               </div>
-              <div className="mt-2 flex flex-wrap items-baseline gap-x-1 gap-y-0">
-                <strong dir="ltr" className="inline-block whitespace-nowrap text-[clamp(24px,5.1cqw,45px)] font-black leading-none tracking-tight tabular-nums text-emerald-950">
+              <div className="mt-2 flex items-baseline gap-x-1 whitespace-nowrap overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <strong dir="ltr" style={amountSize(isBalanceHidden ? '••••' : formatAccountBalance(primaryTotal, lang), 'clamp(19px, 3.5cqw, 32px)')} className="inline-block whitespace-nowrap font-black leading-none tracking-tight tabular-nums text-emerald-950">
                   {isBalanceHidden ? '••••' : formatAccountBalance(primaryTotal, lang)}
                 </strong>
                 {!isBalanceHidden && <span className="text-[11px] @min-[660px]:text-base font-semibold text-emerald-950">{currencyLabel}</span>}
@@ -227,7 +232,7 @@ export function HomeFinancialOverview({
                 <div className="flex flex-wrap gap-1 mt-1">{otherCurrencies.map(([curr,amt])=><span key={curr} className="rounded-md bg-white/80 px-1.5 py-0.5 text-[10px] text-slate-700">{formatAccountBalance(amt,lang)} {curr}</span>)}</div>
               )}
             </div>
-            <div className="shrink-0 w-[clamp(54px,11cqw,155px)] h-[clamp(70px,14cqw,160px)] self-center" aria-hidden="true">
+            <div className="shrink-0 w-[clamp(54px,10cqw,100px)] h-[clamp(64px,12cqw,105px)] self-center" aria-hidden="true">
               <svg viewBox="0 0 150 160" className="w-full h-full" fill="none">
                 <defs>
                   <linearGradient id="mbWalletBody" x1="15" y1="45" x2="140" y2="140" gradientUnits="userSpaceOnUse"><stop stopColor="#24C992"/><stop offset="1" stopColor="#007E56"/></linearGradient>
@@ -254,21 +259,21 @@ export function HomeFinancialOverview({
       </div>
 
       {/* Compact cards, in the same right-to-left order as the reference. */}
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-2 gap-2">
         <button type="button" onClick={onViewTransactions}
-          className="min-w-0 rounded-[20px] border border-amber-100 bg-gradient-to-br from-[#FFF9EE] via-white to-[#FFF9EC] px-3 py-3 text-start hover:border-amber-300 focus-visible:outline-2 focus-visible:outline-amber-500">
-          <div className="flex items-start gap-2">
+          className="min-w-0 rounded-[20px] border border-amber-100 bg-gradient-to-br from-[#FFF9EE] via-white to-[#FFF9EC] px-2.5 py-2 text-start @min-[490px]:flex @min-[490px]:flex-row-reverse @min-[490px]:items-center @min-[490px]:gap-3 hover:border-amber-300 focus-visible:outline-2 focus-visible:outline-amber-500">
+          <div className="flex min-w-0 items-start gap-2 @min-[490px]:flex-1 @min-[490px]:flex-row-reverse">
             <span className="shrink-0 flex items-center justify-center h-9 w-9 rounded-full bg-amber-100 text-amber-600"><CalendarDays size={20}/></span>
             <div className="min-w-0 flex-1">
               <span className="block text-[11px] sm:text-sm font-extrabold leading-5 text-slate-950">{isAr ? 'مصروف اليوم' : "Today's expenses"}</span>
-              <div className="mt-1 flex flex-wrap items-baseline gap-1">
-                <strong dir="ltr" className="whitespace-nowrap text-[clamp(17px,3.5cqw,30px)] leading-tight font-black text-slate-950 tabular-nums">{isBalanceHidden ? '••••' : formatNumber(todayExpenses)}</strong>
+              <div className="mt-1 flex items-baseline gap-1 whitespace-nowrap overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <strong dir="ltr" style={amountSize(isBalanceHidden ? '••••' : formatNumber(todayExpenses), 'clamp(14px, 2.5cqw, 21px)')} className="whitespace-nowrap leading-tight font-black text-slate-950 tabular-nums">{isBalanceHidden ? '••••' : formatNumber(todayExpenses)}</strong>
                 <span className="text-[10px] text-slate-600">{currencyLabel}</span>
               </div>
               <span className="mt-1 inline-flex rounded-full bg-white border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700">{todayCount} {isAr ? 'عمليات' : 'transactions'}</span>
             </div>
           </div>
-          <div className="mt-1 flex items-end justify-between gap-2">
+          <div className="mt-1 flex items-end justify-between gap-2 @min-[490px]:mt-0 @min-[490px]:w-[30%] @min-[490px]:shrink-0 @min-[490px]:items-center @min-[490px]:border-s @min-[490px]:border-slate-200 @min-[490px]:ps-3">
             <div className="flex h-8 items-end gap-[3px]" aria-label={isAr ? 'مبالغ العمليات اليوم' : 'Today transaction amounts'}>
               {(spendingSparklines.daily.length ? spendingSparklines.daily : [0,0,0,0,0]).map((amount,i)=><span key={i} className="w-2.5 rounded-t-full bg-amber-200/90" style={{height: (isBalanceHidden ? 3 : amount > 0 ? 6 + 26 * amount / todayBarsMax : 3) + 'px'}} />)}
             </div>
@@ -276,19 +281,19 @@ export function HomeFinancialOverview({
           </div>
         </button>
         <button type="button" onClick={onViewTransactions}
-          className="min-w-0 rounded-[20px] border border-rose-100 bg-gradient-to-br from-[#FFF5F6] via-white to-[#FFF6F7] px-3 py-3 text-start hover:border-rose-300 focus-visible:outline-2 focus-visible:outline-rose-400">
-          <div className="flex items-start gap-2">
+          className="min-w-0 rounded-[20px] border border-rose-100 bg-gradient-to-br from-[#FFF5F6] via-white to-[#FFF6F7] px-2.5 py-2 text-start @min-[490px]:flex @min-[490px]:flex-row-reverse @min-[490px]:items-center @min-[490px]:gap-3 hover:border-rose-300 focus-visible:outline-2 focus-visible:outline-rose-400">
+          <div className="flex min-w-0 items-start gap-2 @min-[490px]:flex-1 @min-[490px]:flex-row-reverse">
             <span className="shrink-0 flex items-center justify-center h-9 w-9 rounded-full bg-rose-100 text-rose-500"><CalendarDays size={20}/></span>
             <div className="min-w-0 flex-1">
               <span className="block text-[11px] sm:text-sm font-extrabold leading-5 text-slate-950">{isAr ? 'مصروف الشهر' : 'Monthly expenses'}</span>
-              <div className="mt-1 flex flex-wrap items-baseline gap-1">
-                <strong dir="ltr" className="whitespace-nowrap text-[clamp(17px,3.5cqw,30px)] leading-tight font-black text-rose-700 tabular-nums">{isBalanceHidden ? '••••' : formatNumber(monthExpenses)}</strong>
+              <div className="mt-1 flex items-baseline gap-1 whitespace-nowrap overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <strong dir="ltr" style={amountSize(isBalanceHidden ? '••••' : formatNumber(monthExpenses), 'clamp(14px, 2.5cqw, 21px)')} className="whitespace-nowrap leading-tight font-black text-rose-700 tabular-nums">{isBalanceHidden ? '••••' : formatNumber(monthExpenses)}</strong>
                 <span className="text-[10px] text-slate-600">{currencyLabel}</span>
               </div>
               <span className="mt-1 block text-[10px] text-slate-500">{currentMonthLabel}</span>
             </div>
           </div>
-          <div className="mt-1 flex items-end justify-between gap-2">
+          <div className="mt-1 flex items-end justify-between gap-2 @min-[490px]:mt-0 @min-[490px]:w-[30%] @min-[490px]:shrink-0 @min-[490px]:items-center @min-[490px]:border-s @min-[490px]:border-slate-200 @min-[490px]:ps-3">
             <div className="flex h-8 items-end gap-[3px]" aria-label={isAr ? 'المصروفات في آخر 7 أيام' : 'Expenses during the last 7 days'}>
               {spendingSparklines.weekly.map((amount,i)=><span key={i} className="w-2.5 rounded-t-full bg-rose-200/90" style={{height: (isBalanceHidden ? 3 : amount > 0 ? 6 + 26 * amount / monthBarsMax : 3) + 'px'}} />)}
             </div>

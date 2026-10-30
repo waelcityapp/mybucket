@@ -22,10 +22,14 @@ export function parseNaturalLanguageInput(
   categories: Category[]
 ): ParsedTransactionDraft {
   const raw = text.trim();
-  const lower = raw.toLowerCase();
+  // The core financial statement is the transaction. Explanatory stories
+  // ("بس كان ليا عنده 200") belong in notes only if the user writes them.
+  // Do not infer debts, repayments, or extra amounts from such clauses.
+  const core = raw.split(/\s+(?:بس\s+كان|لكن\s+كان|علشان\s+كان|because\s+he|but\s+he)\b/i)[0].trim();
+  const lower = core.toLowerCase();
 
   // Use semantic number-role parser and query detection
-  const semanticRoles = parseSemanticNumberRoles(raw);
+  const semanticRoles = parseSemanticNumberRoles(core);
   const isQuery = isFinancialQueryText(raw);
 
   // 1. Detect Type
@@ -64,7 +68,8 @@ export function parseNaturalLanguageInput(
   let currency: CurrencyCode = semanticRoles.currency;
 
   // 4. Extract Accounts
-  let accountId = accounts[0]?.id || '';
+  // No account is assumed: the user must name it or select it in review.
+  let accountId = '';
   let toAccountId: string | undefined = undefined;
 
   // Source Account detection
@@ -93,10 +98,6 @@ export function parseNaturalLanguageInput(
       toAccountId = accounts.find((a) => a.type === 'card')?.id;
     }
 
-    if (!toAccountId) {
-      // Pick second account if available
-      toAccountId = accounts.find((a) => a.id !== accountId)?.id || accounts[1]?.id;
-    }
   }
 
   // 5. Extract Category
@@ -118,15 +119,12 @@ export function parseNaturalLanguageInput(
       categoryId = availableCats.find((c) => c.nameAr.includes('تسوق') || c.name.toLowerCase().includes('shopping'))?.id;
     }
 
-    if (!categoryId && availableCats.length > 0) {
-      categoryId = availableCats[0].id;
-    }
   }
 
   // 6. Extract Description
-  let description = raw;
+  let description = core;
   // Clean common trigger words from description
-  let cleanDesc = raw
+  let cleanDesc = core
     .replace(/(?:دفعت|صرفت|اشتريت|قبضت|حولت|حول|استلمت|جالي)\s*/gi, '')
     .replace(/\b\d+(?:[.,]\d+)?\b/g, '')
     .replace(/(?:جنيه|egp|usd|دولار|\$)/gi, '')
@@ -148,7 +146,7 @@ export function parseNaturalLanguageInput(
   }
 
   // 7. Extract Date and Time
-  const dt = parseNaturalDateTime(raw);
+  const dt = parseNaturalDateTime(core);
   const date = semanticRoles.specificDateStr || dt.date;
   const time = semanticRoles.specificTimeStr || dt.time;
   const dateTime = `${date}T${time}:00.000Z`;

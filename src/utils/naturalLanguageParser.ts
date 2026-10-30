@@ -25,7 +25,7 @@ export function parseNaturalLanguageInput(
   // The core financial statement is the transaction. Explanatory stories
   // ("بس كان ليا عنده 200") belong in notes only if the user writes them.
   // Do not infer debts, repayments, or extra amounts from such clauses.
-  const core = raw.split(/\s+(?:بس\s+كان|لكن\s+كان|علشان\s+كان|because\s+he|but\s+he)\b/i)[0].trim();
+  const core = raw.split(/\s+(?:بس\s+كان|لكن\s+كان|علشان\s+كان|because\s+he|but\s+he)(?=\s|$)/i)[0].trim();
   const lower = core.toLowerCase();
 
   // Use semantic number-role parser and query detection

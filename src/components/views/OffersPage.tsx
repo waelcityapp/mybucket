@@ -64,7 +64,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
             <h1 className="text-lg font-extrabold leading-snug">{title}</h1>
             <p className="text-xs text-slate-500">My Bucket</p>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
             <BadgePercent className="w-5 h-5" />
           </div>
         </div>
@@ -77,7 +77,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
               <>
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-slate-700">{isAr ? 'عروض القسم' : 'Category offers'}</p>
-                  <span className="rounded-full bg-amber-50 border border-amber-100 text-amber-800 text-xs font-bold px-3 py-1.5">
+                  <span className="rounded-full bg-emerald-50 border border-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1.5">
                     {isAr ? `${categoryCount(category.slug)} إعلان` : `${categoryCount(category.slug)} offers`}
                   </span>
                 </div>
@@ -128,9 +128,9 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                       key={item.slug}
                       href={`/offers/category/${item.slug}`}
                       onClick={event => { if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); onOpenCategory(item.slug); } }}
-                      className="bg-white border border-slate-200 rounded-2xl px-4 py-4 min-h-[100px] flex items-center gap-3 hover:border-amber-300 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-amber-500 transition-all"
+                      className="bg-white border border-slate-200 rounded-2xl px-4 py-4 min-h-[100px] flex items-center gap-3 hover:border-emerald-300 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-emerald-500 transition-all"
                     >
-                      <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
+                      <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
                         <Icon className="w-5 h-5" />
                       </div>
                       <div className="flex-1 min-w-0">

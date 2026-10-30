@@ -1020,15 +1020,12 @@ export default function App() {
       lang={lang}
       categorySlug={categorySlug}
       onOpenCategory={(slug) => {
-        window.history.pushState({ offerCategory: true }, '', `/offers/category/${encodeURIComponent(slug)}`);
-        setActiveTab('offers');
-        // The route remains 'offers', so re-render after updating the browser URL.
-        window.dispatchEvent(new PopStateEvent('popstate'));
+        window.location.assign(`/offers/category/${encodeURIComponent(slug)}`);
       }}
       onBack={() => {
         if (categorySlug) {
           if (window.history.state?.offerCategory) window.history.back();
-          else { window.history.replaceState({ offers: true }, '', '/offers'); setActiveTab('offers'); window.dispatchEvent(new PopStateEvent('popstate')); }
+          else window.location.assign('/offers');
         } else if (window.history.state?.offers) window.history.back();
         else { window.history.replaceState({}, '', '/'); setActiveTab('home'); }
       }}

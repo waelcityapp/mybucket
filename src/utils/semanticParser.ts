@@ -302,6 +302,19 @@ export function parseSemanticNumberRoles(
     });
   }
 
+  // English relative dates are durations, not transaction amounts.
+  // For "3 days ago I paid 200", exclude 3 before selecting 200.
+  const englishDurationRegex = /\b(\d+)\s*(?:days?|weeks?|months?|years?)\s*ago\b/gi;
+  let enDuration: RegExpExecArray | null;
+  while ((enDuration = englishDurationRegex.exec(norm)) !== null) {
+    consumedRanges.push({
+      start: enDuration.index,
+      end: enDuration.index + enDuration[0].length,
+      val: Number(enDuration[1]),
+      role: 'duration',
+    });
+  }
+
   // 5. TRANSACTION AMOUNT EXTRACTION
   // ONLY match numbers that are NOT consumed by day, time, range, or duration!
   let amount: number | null = null;

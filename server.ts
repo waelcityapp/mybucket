@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { interpretNaturalLanguageWithGemini } from './server/geminiService';
 import { readGeminiUsage } from './server/geminiUsage';
 import { diagnoseGeminiConnection } from './server/geminiDiagnostic';
+import { GEMINI_MODEL_OPTIONS, getGeminiAdminSettings, setSelectedGeminiModel } from './server/geminiSettings';
 import {
   applyAffiliateCode,
   getOrCreateSubscription,
@@ -51,6 +52,18 @@ async function startServer() {
             return res.status(403).json({ ok: false, error: 'admin_only' });
           }
           return res.json({ ok: true, data: await diagnoseGeminiConnection() });
+        }
+        case 'admin.aiSettings': {
+          if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+          return res.json({ ok: true, data: await getGeminiAdminSettings() });
+        }
+        case 'admin.aiSetModel': {
+          if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+          const id = payload.modelId;
+          if (typeof id !== 'string' || !GEMINI_MODEL_OPTIONS.some(m => m.id === id)) return res.status(400).json({ ok: false, error: 'invalid_model_selection' });
+          const test = await diagnoseGeminiConnection(id);
+          if (!test.success) return res.status(422).json({ ok: false, error: 'model_test_failed', data: test, message: 'Selected Gemini model failed its connectivity test. The active model was not changed.' });
+          return res.json({ ok: true, data: await setSelectedGeminiModel(id) });
         }
         case 'subscription.get': {
           const subscription = await getOrCreateSubscription(user.uid);

@@ -8,9 +8,10 @@ interface AuthPageProps {
   lang: Language;
   onSuccess: (appliedCode?: string | null, signedInUid?: string) => Promise<void>;
   onToggleLanguage?: () => void;
+  onOpenOffers: () => void;
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({ lang, onSuccess, onToggleLanguage }) => {
+export const AuthPage: React.FC<AuthPageProps> = ({ lang, onSuccess, onToggleLanguage, onOpenOffers }) => {
   const [affiliateCode, setAffiliateCode] = useState('');
   const [codeValidStatus, setCodeValidStatus] = useState<'idle' | 'valid' | 'invalid'>('idle');
   const [isLoading, setIsLoading] = useState(false);
@@ -152,6 +153,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ lang, onSuccess, onToggleLan
               <span>{errorMsg}</span>
             </div>
           )}
+
+          <button type="button" onClick={onOpenOffers}
+            className="w-full flex items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold py-3 px-4 text-sm transition-colors">
+            <Gift className="w-4 h-4" />
+            {isAr ? 'تصفح العروض والخصومات بدون تسجيل' : 'Browse offers without signing in'}
+          </button>
 
           {/* Login / Register Actions */}
 

@@ -165,7 +165,7 @@ export function HomeFinancialOverview({
               aria-label={isBalanceHidden
                 ? (isAr ? 'تم إخفاء النسب المالية' : 'Financial percentages hidden')
                 : (isAr ? 'الدخل ' + percent(monthlyComparison.incomePct) + ' بالمائة، المصروفات ' + percent(monthlyComparison.expensePct) + ' بالمائة' : 'Income ' + percent(monthlyComparison.incomePct) + ' percent, expenses ' + percent(monthlyComparison.expensePct) + ' percent')}>
-              {monthlyComparison.hasData ? (
+              {!isBalanceHidden && monthlyComparison.hasData ? (
                 <>
                   <div style={{width: monthlyComparison.incomePct + '%'}} className="flex min-w-0 items-center justify-center bg-gradient-to-l from-emerald-500 to-emerald-300 text-[10px] sm:text-xs font-black text-white">
                     {!isBalanceHidden && monthlyComparison.incomePct >= 21 ? percent(monthlyComparison.incomePct) + '%' : ''}
@@ -174,7 +174,7 @@ export function HomeFinancialOverview({
                     {!isBalanceHidden && monthlyComparison.expensePct >= 21 ? percent(monthlyComparison.expensePct) + '%' : ''}
                   </div>
                 </>
-              ) : <span className="m-auto text-[11px] text-slate-500">{isAr ? 'لا توجد عمليات خلال الشهر' : 'No transactions this month'}</span>}
+              ) : <span className="m-auto text-[11px] text-slate-500">{isBalanceHidden ? (isAr ? 'الأرقام مخفية' : 'Amounts hidden') : (isAr ? 'لا توجد عمليات خلال الشهر' : 'No transactions this month')}</span>}
             </div>
             <div className="mt-3 grid grid-cols-2 gap-1.5">
               <div className="min-w-0">
@@ -270,7 +270,7 @@ export function HomeFinancialOverview({
           </div>
           <div className="mt-1 flex items-end justify-between gap-2">
             <div className="flex h-8 items-end gap-[3px]" aria-label={isAr ? 'مبالغ العمليات اليوم' : 'Today transaction amounts'}>
-              {(spendingSparklines.daily.length ? spendingSparklines.daily : [0,0,0,0,0]).map((amount,i)=><span key={i} className="w-2.5 rounded-t-full bg-amber-200/90" style={{height: (amount > 0 ? 6 + 26 * amount / todayBarsMax : 3) + 'px'}} />)}
+              {(spendingSparklines.daily.length ? spendingSparklines.daily : [0,0,0,0,0]).map((amount,i)=><span key={i} className="w-2.5 rounded-t-full bg-amber-200/90" style={{height: (isBalanceHidden ? 3 : amount > 0 ? 6 + 26 * amount / todayBarsMax : 3) + 'px'}} />)}
             </div>
             <ChevronLeft className={'shrink-0 h-4 w-4 text-slate-800 ' + (!isAr ? 'rotate-180' : '')} />
           </div>
@@ -290,7 +290,7 @@ export function HomeFinancialOverview({
           </div>
           <div className="mt-1 flex items-end justify-between gap-2">
             <div className="flex h-8 items-end gap-[3px]" aria-label={isAr ? 'المصروفات في آخر 7 أيام' : 'Expenses during the last 7 days'}>
-              {spendingSparklines.weekly.map((amount,i)=><span key={i} className="w-2.5 rounded-t-full bg-rose-200/90" style={{height: (amount > 0 ? 6 + 26 * amount / monthBarsMax : 3) + 'px'}} />)}
+              {spendingSparklines.weekly.map((amount,i)=><span key={i} className="w-2.5 rounded-t-full bg-rose-200/90" style={{height: (isBalanceHidden ? 3 : amount > 0 ? 6 + 26 * amount / monthBarsMax : 3) + 'px'}} />)}
             </div>
             <ChevronLeft className={'shrink-0 h-4 w-4 text-slate-800 ' + (!isAr ? 'rotate-180' : '')} />
           </div>

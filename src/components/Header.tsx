@@ -10,6 +10,7 @@ interface HeaderProps {
   onLogin: () => void;
   onLogout: () => void;
   onOpenMobileLink: () => void;
+  onOpenOffers: () => void;
   onUpdateUserName?: (newName: string) => Promise<void>;
 }
 
@@ -20,6 +21,7 @@ export function Header({
   onLogin,
   onLogout,
   onOpenMobileLink,
+  onOpenOffers,
   onUpdateUserName,
 }: HeaderProps) {
   const t = translations[lang];
@@ -72,19 +74,15 @@ export function Header({
   return (
     <header className="bg-white/95 backdrop-blur-md sticky top-0 z-20 px-3 sm:px-6 py-2.5 border-b border-slate-100">
       <div className="max-w-md sm:max-w-xl mx-auto flex items-center justify-between gap-2">
-        {/* Left: Mobile Link Quick Button */}
+        {/* Savings page shortcut */}
         <button
-          id="btn-header-mobile"
+          id="btn-header-savings"
           type="button"
-          onClick={onOpenMobileLink}
-          aria-label={t.mobileLinkTitle}
-          title={lang === 'ar' ? 'افتح التطبيق على الموبايل' : 'Open on Mobile'}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 text-emerald-800 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+          onClick={onOpenOffers}
+          title={isAr ? 'وفّر مع My Bucket' : 'Save with My Bucket'}
+          className="shrink-0 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 text-[11px] sm:text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
         >
-          <Smartphone className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
-          <span className="hidden xs:inline text-[11px] font-bold">
-            {lang === 'ar' ? 'الموبايل' : 'Mobile'}
-          </span>
+          {isAr ? 'وفّر مع My Bucket' : 'Save with My Bucket'}
         </button>
 
         {/* Center: Bucket Logo + Brand Title + Subtitle */}

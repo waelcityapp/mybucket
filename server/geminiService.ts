@@ -1,7 +1,6 @@
 import { recordGeminiUsage } from './geminiUsage.js';
 import { getSelectedGeminiModel, recordGeminiSuccess } from './geminiSettings.js';
 import { AIInterpretationRequest, AIInterpretationResult } from '../src/services/ai/types.js';
-import { getFormattedSlangPromptContext } from '../src/services/ai/aiKnowledgeBase.js';
 import { isFinancialQueryText, parseSemanticNumberRoles } from '../src/utils/semanticParser.js';
 import {
   matchCategoryFromText,
@@ -18,144 +17,38 @@ export async function interpretNaturalLanguageWithGemini(
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY is not configured on the server');
 
-  // Construct minimal context (Data Minimization requirement)
-  const accountsContext = req.accounts.map((a) => ({
-    id: a.id,
-    name: a.name,
-    nameAr: a.nameAr,
-    type: a.type,
-    currency: a.currency,
+  // Only send concise task instructions and existing IDs to Gemini.
+  // The extensive Arabic synonym knowledge base remains available locally in
+  // entityMatcher/semanticParser; sending the full dictionary on every call
+  // wastes thousands of input tokens.
+  const accountsContext = req.accounts.map(a => ({
+    id: a.id, name: a.nameAr || a.name, type: a.type, currency: a.currency,
   }));
-
-  const categoriesContext = req.categories.map((c) => ({
-    id: c.id,
-    name: c.name,
-    nameAr: c.nameAr,
-    type: c.type,
+  const categoriesContext = req.categories.map(c => ({
+    id: c.id, name: c.nameAr || c.name, type: c.type,
   }));
+  const normalizedText = req.text.trim().toLowerCase();
+  const relevantMemory = (req.learnedMemory || []).filter(item =>
+    item.keyword && normalizedText.includes(item.keyword.toLowerCase())
+  ).slice(0, 5);
 
-  const slangKnowledge = getFormattedSlangPromptContext();
-  const learnedMemoryContext = req.learnedMemory && req.learnedMemory.length > 0
-    ? `\n\nUSER'S PERSONAL LEARNED VOCABULARY & PAST ASSOCIATIONS:\n${JSON.stringify(req.learnedMemory, null, 2)}`
-    : '';
+  const instructions = `You interpret Egyptian Arabic and English personal-finance statements.
+Return ONLY a valid JSON object, no markdown. Classify intent as CREATE_TRANSACTION, FINANCIAL_QUERY, CORRECT_PROPOSAL, SAVE_REQUEST or UNKNOWN.
+Questions ("كام", "قد ايه", "إجمالي", "how much") are FINANCIAL_QUERY, never expenses. Saving requests ("احفظ", "save") are SAVE_REQUEST; never save directly.
+For CREATE_TRANSACTION extract type expense|income|transfer, amount, currency, accountId, toAccountId, categoryId, description, date YYYY-MM-DD, time HH:mm, missingFields.
+For FINANCIAL_QUERY return query with metric (total_spent|total_income|category_spent|account_balance|net_savings|transaction_count|recent_list), period (today|yesterday|this_week|last_week|this_month|last_month|all_time|custom), optional startDate/endDate/categoryId/accountId/transactionType.
+For CORRECT_PROPOSAL return updated complete transaction and correction {fieldToUpdate,newValue}.
+Never invent an account, amount, destination, or category; use null if missing, and list missing required fields. Match IDs ONLY from lists provided.
+Distinguish dates/times/quantities from amounts. Resolve امبارح/yesterday using the given local date. Description concise; don't repeat the entire utterance.
+Output shape: {"intent":"CREATE_TRANSACTION","confidence":0.9,"transaction":null,"query":null,"correction":null,"clarificationNeeded":null,"rawInterpretationSummary":null}.
+For transaction object include type,amount,currency,accountId,toAccountId,categoryId,description,date,time,missingFields.
+For SAVE_REQUEST set clarificationNeeded to "من فضلك اضغط على زر تأكيد وحفظ".
+Local date/time: ${req.currentDateTime}; timezone: ${req.userTimezone}; language: ${req.lang}.
+Accounts: ${JSON.stringify(accountsContext)}
+Categories: ${JSON.stringify(categoriesContext)}
+Relevant user vocabulary: ${JSON.stringify(relevantMemory)}`;
 
-  const systemInstruction = `
-You are the natural language understanding and intent detection core of "My Bucket" (ماي باكت), an Arabic and English personal finance assistant.
-You possess deep, native mastery of Egyptian Arabic, Gulf dialects, Levantine, and Modern Standard Arabic colloquial financial terminology.
-
-============================================================
-KNOWLEDGE BASE: COLLOQUIAL ARABIC FINANCIAL PHRASES & SLANG
-============================================================
-${slangKnowledge}
-${learnedMemoryContext}
-
-CRITICAL INSTRUCTIONS & STRICT RULES:
-1. INTENT CLASSIFICATION:
-   - Understand the difference between:
-     A) Recording a NEW financial event -> "CREATE_TRANSACTION"
-     B) Asking a QUESTION / querying historical data -> "FINANCIAL_QUERY"
-
-   - CRITICAL INTENT RULE:
-     Do NOT classify a sentence as CREATE_TRANSACTION merely because:
-     * it contains the word "صرفت" or "دفعت"
-     * it contains numbers
-     * it contains a financial category
-     
-   - QUESTION DETECTION:
-     Arabic financial question patterns such as:
-     "قد إيه", "قد ايه", "كام", "كم", "بكام", "إيه اللي صرفته", "وريني", "اعرض", "هات", "من يوم ... ليوم ...", "خلال", "في الفترة", "إجمالي", "أكتر", "أقل", "قارن", "معايا كام", "رصيدي"
-     strongly indicate FINANCIAL_QUERY!
-     When the user is asking a question about existing financial data, intent MUST BE "FINANCIAL_QUERY", and transaction MUST BE null!
-
-   - NUMBER ROLE DETECTION:
-     Numbers must be interpreted strictly according to their semantic role:
-     A number may represent:
-     - amount
-     - day of month
-     - month
-     - year
-     - time of day
-     - quantity
-     - date range boundary
-     DO NOT automatically treat the first number as an amount!
-     
-     Examples:
-     * "صرفت 500 جنيه بنزين امبارح" -> CREATE_TRANSACTION, amount = 500, relative date = yesterday.
-     * "أنا صرفت كام بنزين امبارح؟" -> FINANCIAL_QUERY, metric = category_spent, period = yesterday, NO amount!
-     * "دفعت 700 جنيه بنزين يوم 3 مارس" -> CREATE_TRANSACTION, amount = 700, day = 3, month = March (date = YYYY-03-03).
-     * "دفعت كام بنزين يوم 3 مارس؟" -> FINANCIAL_QUERY, day = 3, category = fuel, NO amount!
-     * "أنا صرفت قد إيه بنزين من يوم 3 ليوم 18 في شهر مارس؟" -> FINANCIAL_QUERY, startDate = YYYY-03-03, endDate = YYYY-03-18, category = fuel, NO amount!
-     * "يوم 15 مارس الساعة 3 دفعت 600 جنيه بنزين من الفيزا" -> CREATE_TRANSACTION, day = 15, time = 03:00 / 15:00, amount = 600, account = Visa.
-   - "CORRECT_PROPOSAL": When the user is modifying or correcting a currently open transaction draft in the modal (e.g. "عدل خانة التصنيف الى بنزين", "غير التصنيف لبنزين", "التصنيف بنزين", "انا صرفت من الكاش", "صرفت من الكاش", "غير الحساب لكاش", "لا خلي العملية صرف مش دخل", "غير خانة الملاحظات إلى ...", "خلي المبلغ 500", "التصنيف مواصلات").
-     When intent is CORRECT_PROPOSAL:
-     * Take the CURRENT TRANSACTION DRAFT provided in the prompt and apply the user's requested edits to it.
-     * "transaction" MUST BE A COMPLETE, CLEAN OBJECT containing all draft fields (type, amount, currency, accountId, toAccountId, categoryId, description, date, time).
-     * "type" MUST be strictly one of: "expense", "income", or "transfer". NEVER concatenate other properties into "type"!
-     * If user mentions a category (e.g. "بنزين", "وقود", "مواصلات", "فواتير", "اكل"), match to categoryId and set in transaction.categoryId.
-     * If user mentions an account (e.g. "كاش", "انا صرفت من الكاش", "بنك", "فيزا"), match to accountId and set in transaction.accountId.
-     * In "correction", return { "fieldToUpdate": "<name_of_field>", "newValue": "<new_value>" }.
-     * In "rawInterpretationSummary", provide a concise friendly summary in Arabic explaining what changed (e.g. "تم تعديل التصنيف إلى مواصلات وبنزين" or "تم تعديل الحساب إلى كاش").
-
-   - "SAVE_REQUEST": When the user attempts to confirm or save the transaction by voice (e.g. "احفظ العملية", "احفظ", "سجلها", "تأكيد وحفظ", "تمام احفظ", "save", "confirm"):
-     * Intent MUST BE "SAVE_REQUEST".
-     * "clarificationNeeded" MUST BE: "من فضلك اضغط على زر تأكيد وحفظ" (or in English: "Please click on the Confirm & Save button").
-     * "transaction" must be null.
-
-   - "UNKNOWN": When the sentence cannot be understood or is completely unrelated. Provide a polite clarification in user's language.
-
-2. NEVER INVENT REQUIRED FINANCIAL INFORMATION:
-   - If the user did not specify the account (e.g., "دفعت 300 جنيه في مطعم"), accountId MUST BE null / empty string, and "accountId" MUST be added to missingFields.
-   - NEVER guess "Cash" or pick a default account if the user did not mention it!
-   - If amount is missing or unclear, amount MUST be null.
-
-3. RESOLVE ACCOUNTS & CATEGORIES TO EXISTING USER DATA:
-   - Available User Accounts:
-${JSON.stringify(accountsContext, null, 2)}
-   - Available User Categories:
-${JSON.stringify(categoriesContext, null, 2)}
-   - Use the Colloquial Knowledge Base and User's Personal Learned Vocabulary above to match slang terms to categoryId accurately (e.g., "فولت بنزين" -> category: transport; "دليفري بيتزا" -> category: food; "كازيون خضار" -> category: groceries; "باقة فودافون" -> category: bills; "صيدلية العزبي" -> category: health; "مرتب الشهر" -> category: salary).
-
-4. DESCRIPTION EXTRACTION:
-   - DO NOT place the user's full spoken sentence into "description".
-   - Extract a clean, concise description (e.g., "بنزين وطنية" or "غداء كشري التحرير" or "فاتورة كهرباء" or "راتب الشهر").
-
-5. DATE AND TIME RESOLUTION:
-   - Current user local date/time: ${req.currentDateTime}
-   - User timezone: ${req.userTimezone}
-   - User language: ${req.lang}
-   - Resolve natural relative time expressions:
-     * "النهارده" / "اليوم" -> current date
-     * "امبارح" / "أمس" -> yesterday's date
-     * "الساعة 4 ونص" -> 16:30 (if afternoon) or 04:30
-     * "من ساعتين" -> 2 hours before current time
-     * "الساعة 8 بالليل" -> 20:00
-   - Format date as YYYY-MM-DD and time as HH:mm.
-
-Return a valid JSON object only, with no Markdown formatting.
-`;
-
-  let prompt = `User Input: "${req.text}"`;
-  if (req.currentProposal) {
-    prompt += `\n\nCURRENT TRANSACTION DRAFT OPEN IN MODAL:\n${JSON.stringify(req.currentProposal, null, 2)}`;
-  }
-
-  // The previous deeply nested responseSchema caused Gemini to reject
-  // otherwise valid requests with HTTP 400. Request JSON output without
-  // constrained schema compilation, then validate/normalize it below.
-  const config = {
-    systemInstruction: systemInstruction + `
-Return exactly one JSON object, not Markdown, with these optional sections:
-{"intent":"CREATE_TRANSACTION|FINANCIAL_QUERY|CORRECT_PROPOSAL|SAVE_REQUEST|UNKNOWN",
-"confidence":0.95,
-"transaction":{"type":"expense|income|transfer","amount":350,"currency":"EGP","accountId":"","toAccountId":"","categoryId":"","description":"","date":"YYYY-MM-DD","time":"HH:mm","missingFields":[]},
-"query":{"metric":"total_spent","period":"all_time","startDate":"","endDate":"","categoryId":"","categoryName":"","accountId":"","accountName":"","transactionType":"expense"},
-"correction":{"fieldToUpdate":"","newValue":""},
-"clarificationNeeded":"","rawInterpretationSummary":""}
-Only include transaction/query/correction when relevant. Do not invent missing financial fields.
-`,
-    responseMimeType: 'application/json',
-  };
-
+  const prompt = `Input: ${JSON.stringify(req.text)}${req.currentProposal ? `\nDraft for correction: ${JSON.stringify(req.currentProposal)}` : ''}`;
   let responseText: string | undefined;
   // Use the exact REST API and working model proven by the admin connection
   // test. Avoid the SDK's previously failing request serialization.
@@ -169,7 +62,7 @@ Only include transaction/query/correction when relevant. Do not invent missing f
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: `${config.systemInstruction}\n\n${prompt}` }] }],
+          contents: [{ parts: [{ text: `${instructions}\n\n${prompt}` }] }],
           generationConfig: { maxOutputTokens: 1200 },
         }),
         signal: controller.signal,

@@ -28,7 +28,7 @@ export function MoneySources({
     switch (type) {
       case 'cash':
         return (
-          <div className="w-9 h-9 rounded-2xl bg-amber-50 border border-amber-100/80 flex items-center justify-center text-lg">
+          <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-100/80 flex items-center justify-center text-lg">
             💰
           </div>
         );
@@ -130,7 +130,7 @@ export function MoneySources({
       )}
 
       {/* Accounts Grid - 3 items top row, 3 items bottom row */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
         {accounts.map((acc) => {
           const displayName = lang === 'ar' ? acc.nameAr : acc.name;
           const bank = acc.linkedBankId ? accounts.find(a => a.id === acc.linkedBankId) : undefined;
@@ -150,24 +150,25 @@ export function MoneySources({
                   onSelectAccount(acc.id);
                 }
               }}
-              className="bg-white rounded-2xl border border-slate-200/80 p-2.5 sm:p-3 flex flex-col items-center justify-center text-center shadow-2xs hover:shadow-xs hover:border-slate-300 transition-all cursor-pointer group relative active:scale-95"
+              className="bg-white rounded-xl border border-slate-200/80 px-1.5 py-2 sm:px-2 sm:py-2.5 flex flex-col items-center justify-start text-center shadow-2xs hover:shadow-xs hover:border-slate-300 transition-all cursor-pointer group relative active:scale-95"
             >
               {/* Account Icon */}
-              <div className="mb-2 group-hover:scale-105 transition-transform">
+              <div className="mb-1 group-hover:scale-105 transition-transform">
                 {getAccountEmojiIcon(acc.type)}
               </div>
 
               {/* Account Name */}
-              <span className="text-[11px] sm:text-xs font-bold text-slate-800 line-clamp-2 sm:truncate w-full mb-1 min-h-[2.2em] flex items-center justify-center leading-tight">
+              <span className="text-[11px] sm:text-xs font-bold text-slate-800 line-clamp-2 w-full mb-1 min-h-[2.2em] flex items-center justify-center leading-tight">
                 {displayName}
               </span>
 
               {/* Balance & Currency */}
-              <div className="text-[11px] sm:text-xs font-black text-slate-900  flex items-baseline justify-center gap-0.5 w-full">
-                <span className="text-[10px] text-slate-400 font-bold font-mono">
-                  {acc.currency}
+              <div className="w-full min-w-0 flex flex-col items-center gap-0.5" aria-label={`${displayName}: ${formatAccountBalance(displayBalance, lang)} ${acc.currency}`}>
+                {acc.type === 'credit' && <span className="text-[10px] font-semibold text-slate-600">{lang === 'ar' ? 'المستحق' : 'Owed'}</span>}
+                <span dir="ltr" className={`w-full text-center font-black text-[clamp(12px,2.6vw,17px)] leading-snug tabular-nums break-words ${displayBalance < 0 ? 'text-red-700' : 'text-slate-950'}`}>
+                  {displayBalance < 0 ? '−' : ''}{new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US', { maximumFractionDigits: 2 }).format(Math.abs(displayBalance))}
                 </span>
-                <span className="truncate">{acc.type === 'credit' ? (lang === 'ar' ? 'المستحق: ' : 'Owed: ') : ''}{formatAccountBalance(displayBalance, lang)}</span>
+                <span className="text-[10px] font-bold text-slate-500">{acc.currency}</span>
               </div>
 
               {bank && <span className="text-[10px] text-slate-500">{lang === 'ar' ? 'مرتبط بـ' : 'Linked to'} {lang === 'ar' ? bank.nameAr : bank.name}</span>}

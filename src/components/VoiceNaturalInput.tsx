@@ -37,6 +37,7 @@ interface SpeechRecognitionLike {
   lang: string;
   start: () => void;
   stop: () => void;
+  abort?: () => void;
   onstart: () => void;
   onend: () => void;
   onerror: (event: unknown) => void;
@@ -77,8 +78,27 @@ export function VoiceNaturalInput({
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const processOnSpeechEnd = useRef(false);
+  const recordingActiveRef = useRef(false);
+  const segmentBaseRef = useRef('');
+  const latestSegmentRef = useRef('');
+  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
   const [pendingVoiceReview, setPendingVoiceReview] = useState(false);
+
+  const clearSpeechRestart = () => {
+    if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+    restartTimerRef.current = null;
+  };
+
+  // Ends only on the user's explicit action. Speech silence never sends to AI.
+  const finishVoiceRecording = () => {
+    recordingActiveRef.current = false;
+    clearSpeechRestart();
+    setIsRecording(false);
+    setIsListening(false);
+    try { recognitionRef.current?.stop(); } catch { /* Already stopped by browser */ }
+    setPendingVoiceReview(true);
+  };
 
   /**
    * Unified AI Processing Pipeline
@@ -201,131 +221,149 @@ export function VoiceNaturalInput({
     }
   };
 
-  // Initialize Speech Recognition if supported
+  // Keep browser speech recognition in short sessions to avoid duplicate text
+  // on Android Chrome. A browser-imposed stop triggers a new session while
+  // the user has not pressed the explicit Finish Recording button.
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      try {
-        const recognition = new SpeechRecognition() as SpeechRecognitionLike;
-        // Using continuous = false fixes the severe duplication bug on Android Chrome
-        // where it repeats the transcript multiple times (e.g. "انااناانااناانا")
-        recognition.continuous = false;
-        recognition.interimResults = true;
-        recognition.lang = lang === 'ar' ? 'ar-EG' : 'en-US';
-
-        let finalTranscript = '';
-        let lastTranscript = '';
-
-        recognition.onstart = () => {
-          finalTranscript = '';
-          lastTranscript = '';
-          processOnSpeechEnd.current = false;
-          setIsListening(true);
-          setSpeechError(null);
-          // We can optionally clear the input, but keeping it allows the user to edit
-        };
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        recognition.onresult = (event: any) => {
-          let interimTranscript = '';
-          finalTranscript = ''; // Reset and rebuild from results
-
-          for (let i = 0; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript;
-            } else {
-              interimTranscript += event.results[i][0].transcript;
-            }
-          }
-
-          const fullTranscript = finalTranscript + interimTranscript;
-          if (fullTranscript) {
-            lastTranscript = fullTranscript;
-            setInputText(fullTranscript);
-          }
-        };
-
-        recognition.onerror = () => {
-          processOnSpeechEnd.current = false;
-          setIsListening(false);
-          setSpeechError(t.speechNotSupported);
-          setTimeout(() => setSpeechError(null), 4000);
-        };
-
-        recognition.onend = () => {
-          setIsListening(false);
-          processOnSpeechEnd.current = false;
-          const transcript = finalTranscript.trim() || lastTranscript.trim();
-          if (transcript) {
-            setInputText(transcript);
-            setPendingVoiceReview(true);
-          }
-        };
-
-        recognitionRef.current = recognition;
-      } catch {
-        // Speech recognition not permitted in this context
-      }
-    }
-  }, [lang, accounts, categories, t.speechNotSupported]);
-
-  const handleToggleMic = () => {
-    if (isProcessingAI) return;
-
-    if (!recognitionRef.current) {
-      if (inputRef.current) {
-        inputRef.current.focus();
-      }
-      setSpeechError(t.speechNotSupported);
-      setTimeout(() => setSpeechError(null), 3500);
+    if (!SpeechRecognition) {
+      recognitionRef.current = null;
       return;
     }
 
-    if (isListening) {
-      try {
-        processOnSpeechEnd.current = true;
-        recognitionRef.current.stop();
-      } catch {
-        setIsListening(false);
+    const recognition = new SpeechRecognition() as SpeechRecognitionLike;
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = lang === 'ar' ? 'ar-EG' : 'en-US';
+    recognitionRef.current = recognition;
+
+    let segmentFinal = '';
+    let segmentInterim = '';
+    const startRecognition = () => {
+      if (!recordingActiveRef.current || recognitionRef.current !== recognition) return;
+      try { recognition.start(); }
+      catch {
+        // Browser may still be closing its previous speech session.
+        clearSpeechRestart();
+        restartTimerRef.current = setTimeout(startRecognition, 350);
       }
-    } else {
-      try {
-        setPendingVoiceReview(false);
-        recognitionRef.current.lang = lang === 'ar' ? 'ar-EG' : 'en-US';
-        recognitionRef.current.start();
-      } catch {
-        setIsListening(false);
-        if (inputRef.current) {
-          inputRef.current.focus();
+    };
+
+    recognition.onstart = () => {
+      segmentFinal = '';
+      segmentInterim = '';
+      latestSegmentRef.current = '';
+      setIsListening(true);
+      setSpeechError(null);
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onresult = (event: any) => {
+      segmentFinal = '';
+      segmentInterim = '';
+      for (let i = 0; i < event.results.length; i++) {
+        const phrase = event.results[i]?.[0]?.transcript || '';
+        if (event.results[i]?.isFinal) segmentFinal += phrase;
+        else segmentInterim += phrase;
+      }
+      const segment = (segmentFinal + segmentInterim).trim();
+      latestSegmentRef.current = segment;
+      if (segment) {
+        setInputText([segmentBaseRef.current, segment].filter(Boolean).join(' '));
+      }
+    };
+
+    recognition.onerror = (event: unknown) => {
+      const error = (event as { error?: string })?.error;
+      // 'no-speech' and aborted sessions are normal when the user pauses.
+      // Permissions / unavailable microphones require explicit intervention.
+      if (error === 'not-allowed' || error === 'service-not-allowed' ||
+          error === 'audio-capture' || error === 'language-not-supported') {
+        recordingActiveRef.current = false;
+        clearSpeechRestart();
+        setIsRecording(false);
+        setSpeechError(t.speechNotSupported);
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      const segment = (segmentFinal || latestSegmentRef.current).trim();
+      if (segment) {
+        // Append this completed session once, then reset for the next one.
+        segmentBaseRef.current = [segmentBaseRef.current, segment].filter(Boolean).join(' ');
+        setInputText(segmentBaseRef.current);
+      }
+      latestSegmentRef.current = '';
+      segmentFinal = '';
+      segmentInterim = '';
+
+      if (recordingActiveRef.current) {
+        clearSpeechRestart();
+        restartTimerRef.current = setTimeout(startRecognition, 200);
+      } else {
+        setPendingVoiceReview(Boolean(segmentBaseRef.current.trim()));
+      }
+    };
+
+    return () => {
+      recordingActiveRef.current = false;
+      clearSpeechRestart();
+      try { recognition.abort?.(); } catch { try { recognition.stop(); } catch {} }
+      if (recognitionRef.current === recognition) recognitionRef.current = null;
+    };
+  }, [lang, t.speechNotSupported]);
+
+  const handleToggleMic = () => {
+    if (isProcessingAI) return;
+    if (recordingActiveRef.current) {
+      finishVoiceRecording();
+      return;
+    }
+    if (!recognitionRef.current) {
+      inputRef.current?.focus();
+      setSpeechError(t.speechNotSupported);
+      return;
+    }
+    clearSpeechRestart();
+    segmentBaseRef.current = '';
+    latestSegmentRef.current = '';
+    setInputText('');
+    setPendingVoiceReview(false);
+    setSpeechError(null);
+    recordingActiveRef.current = true;
+    setIsRecording(true);
+    try { recognitionRef.current.start(); }
+    catch {
+      // A previous session may still be ending; retry when it closes.
+      restartTimerRef.current = setTimeout(() => {
+        if (!recordingActiveRef.current) return;
+        try { recognitionRef.current?.start(); }
+        catch {
+          recordingActiveRef.current = false;
+          setIsRecording(false);
+          setSpeechError(t.speechNotSupported);
         }
-      }
+      }, 300);
     }
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isListening && recognitionRef.current) {
-      try {
-        processOnSpeechEnd.current = true;
-        recognitionRef.current.stop();
-      } catch {}
+    if (isRecording) {
+      finishVoiceRecording();
       return;
     }
     if (!inputText.trim() || isProcessingAI) return;
     setPendingVoiceReview(false);
-    processInputWithAI(inputText);
+    void processInputWithAI(inputText);
   };
 
   const handleExampleClick = (example: string) => {
-    if (isProcessingAI) return;
-    if (isListening && recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch {}
-    }
+    if (isProcessingAI || isRecording) return;
     setInputText(example);
-    processInputWithAI(example);
+    void processInputWithAI(example);
   };
 
   return (
@@ -334,7 +372,7 @@ export function VoiceNaturalInput({
       <form
         onSubmit={handleFormSubmit}
         className={`bg-white rounded-3xl border transition-all shadow-xs p-4 sm:p-5 flex items-center justify-between gap-3 ${
-          isListening
+          isRecording
             ? 'border-emerald-500 ring-4 ring-emerald-500/10'
             : isProcessingAI
             ? 'border-indigo-400 ring-4 ring-indigo-400/10'
@@ -346,11 +384,11 @@ export function VoiceNaturalInput({
           <input
             ref={inputRef}
             type="text"
-            disabled={isProcessingAI}
+            disabled={isProcessingAI || isRecording}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             placeholder={
-              isListening
+              isRecording
                 ? t.listening
                 : isProcessingAI
                 ? isAr
@@ -363,10 +401,10 @@ export function VoiceNaturalInput({
             className="w-full text-sm sm:text-base font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-hidden bg-transparent  disabled:opacity-60"
           />
           <p className="text-[11px] sm:text-xs text-slate-400 font-medium mt-1 truncate">
-            {isListening ? (
+            {isRecording ? (
               <span className="text-emerald-600 font-bold flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
-                {isAr ? 'تحدث الآن، واضغط إرسال عند الانتهاء...' : 'Speak now, and press send when finished...'}
+                {isAr ? 'التسجيل مستمر حتى تضغط إنهاء التسجيل؛ يمكنك التوقف والتفكير ثم المتابعة.' : 'Recording continues until you tap Finish recording; pause and resume speaking freely.'}
               </span>
             ) : isProcessingAI ? (
               <span className="text-indigo-600 font-bold flex items-center gap-1">
@@ -388,7 +426,7 @@ export function VoiceNaturalInput({
 
         {/* Right Side: Action Buttons */}
         <div className="flex items-center gap-2 shrink-0">
-          {inputText.trim().length > 0 && !isProcessingAI && !pendingVoiceReview && (
+          {inputText.trim().length > 0 && !isProcessingAI && !pendingVoiceReview && !isRecording && (
             <button
               type="submit"
               className="w-10 h-10 rounded-full bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center transition-transform active:scale-95 cursor-pointer shadow-xs"
@@ -403,17 +441,17 @@ export function VoiceNaturalInput({
             disabled={isProcessingAI}
             onClick={handleToggleMic}
             className={`w-12 h-12 rounded-full flex items-center justify-center text-white transition-all cursor-pointer shadow-md disabled:opacity-50 ${
-              isListening
+              isRecording
                 ? 'bg-rose-500 animate-pulse ring-4 ring-rose-500/20 shadow-rose-500/30'
                 : isProcessingAI
                 ? 'bg-indigo-600 shadow-indigo-500/25'
                 : 'bg-emerald-500 hover:bg-emerald-600 active:scale-95 shadow-emerald-500/25'
             }`}
-            title={isListening ? (isAr ? 'إنهاء التسجيل ومراجعة العملية' : 'Finish recording and review') : (isAr ? 'تحدث للمساعد المالي' : 'Speak to AI Financial Assistant')}
+            title={isRecording ? (isAr ? 'إنهاء التسجيل' : 'Finish recording') : (isAr ? 'تحدث للمساعد المالي' : 'Speak to AI Financial Assistant')}
           >
             {isProcessingAI ? (
               <Loader2 className="w-5 h-5 animate-spin" />
-            ) : isListening ? (
+            ) : isRecording ? (
               <MicOff className="w-5 h-5" />
             ) : (
               <Mic className="w-5 h-5" />
@@ -422,7 +460,13 @@ export function VoiceNaturalInput({
         </div>
       </form>
 
-      {pendingVoiceReview && !isListening && !isProcessingAI && (
+      {isRecording && !isProcessingAI && (
+        <button type="button" onClick={finishVoiceRecording} className="w-full rounded-xl bg-rose-600 hover:bg-rose-700 text-white py-3 px-4 text-sm font-extrabold flex justify-center items-center gap-2">
+          <MicOff className="w-4 h-4" />{isAr ? 'إنهاء التسجيل' : 'Finish recording'}
+        </button>
+      )}
+
+      {pendingVoiceReview && !isRecording && !isProcessingAI && (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 sm:p-4 space-y-3">
           <p className="text-sm font-bold text-emerald-900">
             {isAr ? 'راجع الكلام المكتوب بالأعلى، ويمكنك تعديله قبل الإرسال.' : 'Review the transcript above and edit it before sending.'}
@@ -432,7 +476,7 @@ export function VoiceNaturalInput({
               className="rounded-xl bg-emerald-600 px-3 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
               {isAr ? 'إرسال للمراجعة والتأكيد' : 'Send for review and confirmation'}
             </button>
-            <button type="button" onClick={() => { setPendingVoiceReview(false); setInputText(''); setStatusMessage(null); }}
+            <button type="button" onClick={() => { setPendingVoiceReview(false); setInputText(''); segmentBaseRef.current = ''; latestSegmentRef.current = ''; setStatusMessage(null); }}
               className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
               {isAr ? 'إلغاء' : 'Cancel'}
             </button>
@@ -463,7 +507,7 @@ export function VoiceNaturalInput({
         </span>
         <button
           type="button"
-          disabled={isProcessingAI}
+          disabled={isProcessingAI || isRecording}
           onClick={() =>
             handleExampleClick(
               isAr ? 'دفعت 350 جنيه بنزين من الكاش الساعة 4 ونص' : 'Paid 350 for fuel from Cash at 4:30 PM'

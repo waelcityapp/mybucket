@@ -14,6 +14,7 @@ import { INITIAL_PROMO_BANNER, INITIAL_PERK_DEALS } from './data/dealsData';
 import { PromoBannerData, PerkDealItem } from './types/deals';
 import { PromoBanner } from './components/PromoBanner';
 import { DealsModal } from './components/DealsModal';
+import { OffersPage } from './components/views/OffersPage';
 import { translations } from './data/translations';
 import { Header } from './components/Header';
 import { VoiceNaturalInput } from './components/VoiceNaturalInput';
@@ -95,8 +96,9 @@ export default function App() {
   });
 
   // 2. Active Tab State
-  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : 'home');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : window.location.pathname === '/offers' ? 'offers' : 'home');
   const openGuide = () => { window.history.pushState({ guide: true }, '', '/guide'); setActiveTab('guide'); };
+  const openOffers = () => { if (window.location.pathname !== '/offers') window.history.pushState({ offers: true }, '', '/offers'); setActiveTab('offers'); };
   const openAccountSettings = () => { window.history.pushState({ accounts: true }, '', '/accounts'); setActiveTab('accounts'); };
   const openSubscriptionPage = (page: 'trial-details' | 'subscription') => {
     window.history.pushState({ subscriptionPage: page }, '', page === 'trial-details' ? '/trial' : '/subscription');
@@ -304,7 +306,7 @@ export default function App() {
         setIsExpenseCategoriesModalOpen(false);
         setIsCategoryDetailModalOpen(false);
         setSelectedCategoryForDetail(null);
-        setActiveTab(firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : 'home');
+        setActiveTab(window.location.pathname === '/offers' ? 'offers' : firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : 'home');
         setToastMessage(null);
         aiLearnedMemory.clear();
       }
@@ -982,7 +984,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #55' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #56' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {
@@ -1009,6 +1011,14 @@ export default function App() {
     );
   }
 
+  // Public offers are browsable without financial account sign-in.
+  if (activeTab === 'offers') {
+    return <OffersPage lang={lang} onBack={() => {
+      if (window.history.state?.offers) window.history.back();
+      else { window.history.replaceState({}, '', '/'); setActiveTab('home'); }
+    }} />;
+  }
+
   // 2. Dedicated Full-Page Auth & Registration (No popups / No modals)
   if (!authUser) {
     return (
@@ -1016,6 +1026,7 @@ export default function App() {
         lang={lang}
         onSuccess={handleAuthGateSuccess}
         onToggleLanguage={handleToggleLanguage}
+        onOpenOffers={openOffers}
       />
     );
   }
@@ -1233,7 +1244,7 @@ export default function App() {
             <PromoBanner
               banner={promoBanner}
               lang={lang}
-              onOpenDeals={() => setIsDealsModalOpen(true)}
+              onOpenDeals={openOffers}
             />
           </div>
         )}

@@ -82,6 +82,7 @@ import {
 } from './lib/firebase';
 import { aiLearnedMemory } from './services/ai/aiLearnedMemory';
 import { isNonNegativeBalance } from './utils/formatBalance';
+import { recordTabNavigation, tabFromHistory } from './utils/navigationHistory';
 import { validateBalance } from './utils/accountLinking';
 
 import { saveUserSubscriptionToFirestore, subscribeUserSubscription, type SubscriptionReadIssue } from './services/prototypeSubscriptionClient';
@@ -97,6 +98,10 @@ export default function App() {
 
   // 2. Active Tab State
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : 'home');
+  // Keep in-app tab changes in browser history so the device Back button can restore them.
+  const navigateTab = (tab: ActiveTab) => {
+    if (recordTabNavigation(window.history, window.location, activeTab, tab)) setActiveTab(tab);
+  };
   const openGuide = () => { window.history.pushState({ guide: true }, '', '/guide'); setActiveTab('guide'); };
   const openOffers = () => { if (window.location.pathname !== '/offers') window.history.pushState({ offers: true }, '', '/offers'); setActiveTab('offers'); };
   const openAccountSettings = () => { window.history.pushState({ accounts: true }, '', '/accounts'); setActiveTab('accounts'); };
@@ -105,7 +110,7 @@ export default function App() {
     setActiveTab(page);
   };
   useEffect(() => {
-    const onPopState = () => setActiveTab(window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : 'home');
+    const onPopState = () => setActiveTab(tabFromHistory(window.location, window.history.state));
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
@@ -984,7 +989,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #69' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #70' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {
@@ -1181,8 +1186,8 @@ export default function App() {
               accounts={accounts}
               transactions={transactions}
               lang={lang}
-              onViewTransactions={() => setActiveTab('transactions')}
-              onViewAccounts={() => setActiveTab('accounts')}
+              onViewTransactions={() => navigateTab('transactions')}
+              onViewAccounts={() => navigateTab('accounts')}
             />
 
             {/* 3. THE PRIMARY INTERACTION: "اكتب أو قل لي أي عملية..." Large Card */}
@@ -1213,15 +1218,15 @@ export default function App() {
             <QuickActions 
               lang={lang} 
               onOpenAddModal={handleOpenAddModal} 
-              onOpenSearchModal={() => setActiveTab('search')}
+              onOpenSearchModal={() => navigateTab('search')}
             />
 
             {/* 4. "حساباتك" - Money Sources / Accounts Grid */}
             <MoneySources
               accounts={accounts}
               lang={lang}
-              onViewAll={() => setActiveTab('accounts')}
-              onAddAccountClick={() => setActiveTab('accounts')}
+              onViewAll={() => navigateTab('accounts')}
+              onAddAccountClick={() => navigateTab('accounts')}
               onOpenExpenseCategories={() => setIsExpenseCategoriesModalOpen(true)}
               onSelectAccount={(accId) => {
                 const target = accounts.find((a) => a.id === accId);
@@ -1238,7 +1243,7 @@ export default function App() {
                 } else if (target?.type === 'custom' || target?.id === 'acc_extra') {
                   handleOpenExtraAccountModal(accId);
                 } else {
-                  setActiveTab('transactions');
+                  navigateTab('transactions');
                 }
               }}
               onEditBalance={handleOpenEditBalance}
@@ -1250,7 +1255,7 @@ export default function App() {
               accounts={accounts}
               categories={categories}
               lang={lang}
-              onViewAll={() => setActiveTab('transactions')}
+              onViewAll={() => navigateTab('transactions')}
               onDeleteTransaction={handleDeleteTransaction}
             />
 
@@ -1328,12 +1333,12 @@ export default function App() {
             onLogin={handleGoogleLogin}
             onLogout={handleGoogleLogout}
             isAdmin={isAdmin}
-            onOpenAdmin={() => setActiveTab('admin')}
+            onOpenAdmin={() => navigateTab('admin')}
             onOpenMobileLink={() => setIsMobileModalOpen(true)}
           />
         )}
         {activeTab === 'admin' && isAdmin && authUser && (
-          <AdminView lang={lang} user={authUser} onBack={() => setActiveTab('settings')} onResetDemoData={handleResetDemoData} onZeroAllBalances={handleZeroAllBalances} />
+          <AdminView lang={lang} user={authUser} onBack={() => navigateTab('settings')} onResetDemoData={handleResetDemoData} onZeroAllBalances={handleZeroAllBalances} />
         )}
       </main>
 
@@ -1458,7 +1463,7 @@ export default function App() {
       {/* Bottom Navigation Bar */}
       <BottomNav
         activeTab={activeTab}
-        onChangeTab={(tab) => { if (window.location.pathname === '/trial' || window.location.pathname === '/subscription' || window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts' || window.location.pathname === '/guide') window.history.pushState({}, '', '/'); setActiveTab(tab); }}
+        onChangeTab={navigateTab}
         lang={lang}
       />
     </div>

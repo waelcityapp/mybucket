@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   ArrowLeft, ArrowRight, Search, Landmark, UtensilsCrossed, ShoppingBasket,
   Shirt, Plane, Dumbbell, Car, HeartPulse, House, GraduationCap,
-  Gift, Smartphone, BadgePercent, type LucideIcon
+  Gift, Smartphone, type LucideIcon
 } from 'lucide-react';
 import { Language } from '../../types';
 
@@ -63,9 +63,6 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
           <div className="flex-1 min-w-0">
             <h1 className="text-lg font-extrabold leading-snug">{title}</h1>
             <p className="text-xs text-slate-500">My Bucket</p>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-            <BadgePercent className="w-5 h-5" />
           </div>
         </div>
       </header>

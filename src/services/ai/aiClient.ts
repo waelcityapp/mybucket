@@ -296,12 +296,17 @@ export class GeminiAIClient implements AIInterpretationProvider {
     // Handle modification of open draft in modal
     if (request.currentProposal) {
       const base: Partial<any> = { ...request.currentProposal };
+      const noteCorrection = matchDescriptionEdit(raw);
+      // A notes-only command must never change amount, type, account or category,
+      // even if the user's note contains numbers or financial keywords.
+      const isNotesOnlyEdit = Boolean(noteCorrection) &&
+        /^\s*(?:(?:غير|عدل|خلي|اكتب في|بدل)\s+)?(?:خانة\s*)?(?:الملاحظات|الملاحظه|الوصف|البيان|نوتس|notes)(?=\s|:|$)/i.test(raw);
       const changes: string[] = [];
       let fieldToUpdate = '';
       let newValue: any = '';
 
       // Type modification
-      const typeOverride = matchTransactionType(raw);
+      const typeOverride = isNotesOnlyEdit ? null : matchTransactionType(raw);
       if (typeOverride) {
         base.type = typeOverride;
         fieldToUpdate = 'type';
@@ -310,7 +315,7 @@ export class GeminiAIClient implements AIInterpretationProvider {
       }
 
       // Amount modification
-      const matchedAmount = matchAmountEdit(raw) ?? semanticRoles.amount;
+      const matchedAmount = isNotesOnlyEdit ? null : (matchAmountEdit(raw) ?? semanticRoles.amount);
       if (matchedAmount !== null && matchedAmount > 0) {
         base.amount = matchedAmount;
         fieldToUpdate = 'amount';
@@ -319,7 +324,7 @@ export class GeminiAIClient implements AIInterpretationProvider {
       }
 
       // Notes/Description modification
-      const matchedDesc = matchDescriptionEdit(raw);
+      const matchedDesc = noteCorrection;
       if (matchedDesc) {
         base.description = matchedDesc;
         fieldToUpdate = 'description';
@@ -328,7 +333,7 @@ export class GeminiAIClient implements AIInterpretationProvider {
       }
 
       // Category matching
-      const matchedCat = matchCategoryFromText(raw, request.categories);
+      const matchedCat = isNotesOnlyEdit ? null : matchCategoryFromText(raw, request.categories);
       if (matchedCat) {
         base.categoryId = matchedCat.id;
         fieldToUpdate = 'categoryId';
@@ -346,7 +351,7 @@ export class GeminiAIClient implements AIInterpretationProvider {
       }
 
       // Account matching
-      if (base.type === 'transfer') {
+      if (base.type === 'transfer' && !isNotesOnlyEdit) {
         const transferAccs = matchTransferAccountsFromText(raw, request.accounts, base.accountId);
         if (transferAccs.fromAccount) {
           base.accountId = transferAccs.fromAccount.id;
@@ -356,7 +361,7 @@ export class GeminiAIClient implements AIInterpretationProvider {
           base.toAccountId = transferAccs.toAccount.id;
           changes.push(`إلى حساب ${transferAccs.toAccount.nameAr}`);
         }
-      } else {
+      } else if (!isNotesOnlyEdit) {
         const matchedAcc = matchAccountFromText(raw, request.accounts);
         if (matchedAcc) {
           base.accountId = matchedAcc.id;

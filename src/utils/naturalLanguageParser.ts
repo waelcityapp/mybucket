@@ -26,7 +26,7 @@ export function parseNaturalLanguageInput(
   // The core financial statement is the transaction. Explanatory stories
   // ("بس كان ليا عنده 200") belong in notes only if the user writes them.
   // Do not infer debts, repayments, or extra amounts from such clauses.
-  const core = raw.split(/\s+(?:بس\s+كان|لكن\s+كان|علشان\s+كان|because\s+he|but\s+he)(?=\s|$)/i)[0].trim();
+  const core = raw.split(/\s+(?:بس\s+كان|لكن\s+كان|علشان|عشان|بخصوص|بسبب|لأجل|من\s+أجل|because|regarding|but\s+he)(?=\s|$)/i)[0].trim();
   const lower = core.toLowerCase();
 
   // Use semantic number-role parser and query detection
@@ -43,6 +43,9 @@ export function parseNaturalLanguageInput(
     lower.includes('transfer') || lower.includes('moved money') || lower.includes('sent from')
   ) {
     type = 'transfer';
+  } else if (/(?:^|\s)(?:دفعت|صرفت|اشتريت|paid|spent|bought)(?=\s|$)/i.test(lower)) {
+    // An explicit expense verb wins over an income word used in the note.
+    type = 'expense';
   } else if (
     lower.includes('قبضت') ||
     lower.includes('راتب') ||

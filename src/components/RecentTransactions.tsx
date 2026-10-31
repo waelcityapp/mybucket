@@ -146,7 +146,7 @@ export function RecentTransactions({
                   <div className="shrink-0">{getTransactionIcon(tx)}</div>
                   <div className="min-w-0">
                     <h4 className="text-[11px] sm:text-xs font-bold text-slate-900 truncate">
-                      {tx.description}
+                      {tx.description || (categories.find(c => c.id === tx.categoryId)?.[lang === 'ar' ? 'nameAr' : 'name'] || (isTransfer ? (lang === 'ar' ? 'تحويل' : 'Transfer') : isIncome ? (lang === 'ar' ? 'دخل' : 'Income') : (lang === 'ar' ? 'مصروف' : 'Expense')))}
                     </h4>
                     <p className="text-[10px] text-slate-400 font-medium truncate mt-0.5">
                       {isTransfer

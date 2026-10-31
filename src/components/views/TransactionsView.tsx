@@ -192,7 +192,7 @@ export function TransactionsView({
 
                   <div className="min-w-0">
                     <div className="font-bold text-slate-900 text-sm  truncate">
-                      {tx.description}
+                      {tx.description || getCategoryName(tx.categoryId) || (isTransfer ? (lang === 'ar' ? 'تحويل' : 'Transfer') : isIncome ? (lang === 'ar' ? 'دخل' : 'Income') : (lang === 'ar' ? 'مصروف' : 'Expense'))}
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-slate-500 flex-wrap">
                       {isTransfer ? (

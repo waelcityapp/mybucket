@@ -19,6 +19,7 @@ const seenIds = new Set<string>();
 export function AnalyzerFeedbackCard({lang,context}:Props) {
   const isAr=lang==='ar';
   const [enabled,setEnabled]=useState(false);
+  const [adminStatus,setAdminStatus]=useState<'none'|'off'|'error'>('none');
   const [rating,setRating]=useState<FeedbackRating|null>(null);
   const [errorSource,setErrorSource]=useState<FeedbackErrorSource>('analysis');
   const [correction,setCorrection]=useState('');
@@ -30,12 +31,17 @@ export function AnalyzerFeedbackCard({lang,context}:Props) {
 
   useEffect(()=>{
     let alive=true;
-    setEnabled(false);setRating(null);setCorrection('');setSpokenCorrection('');setConsent(false);
+    setEnabled(false);setAdminStatus('none');setRating(null);setCorrection('');setSpokenCorrection('');setConsent(false);
     setSent(false);setError('');setErrorSource('analysis');
     const apply=async()=>{
       try {
         const config=await feedbackRequest<FeedbackConfig>('feedback.config');
-        if(!alive||!config.active||seenIds.has(context.analysisId))return;
+        if(!alive)return;
+        if(!config.active) {
+          if(auth.currentUser?.email?.trim().toLowerCase()==='waelvts@gmail.com')setAdminStatus('off');
+          return;
+        }
+        if(seenIds.has(context.analysisId))return;
         // Frequency is per device/account and never prevents saving transactions.
         const key='mybucket:feedback-count:'+auth.currentUser?.uid;
         const count=Number.parseInt(localStorage.getItem(key)||'0',10)||0;
@@ -43,7 +49,10 @@ export function AnalyzerFeedbackCard({lang,context}:Props) {
         localStorage.setItem(key,String(next));
         seenIds.add(context.analysisId);
         if(next % config.frequency === 0 && alive)setEnabled(true);
-      }catch {/* Feedback service must never block financial entry. */}
+      }catch {
+        // Non-blocking: but show useful diagnostics to the administrator.
+        if(alive&&auth.currentUser?.email?.trim().toLowerCase()==='waelvts@gmail.com')setAdminStatus('error');
+      }
     };
     void apply();
     return ()=>{alive=false;};
@@ -78,7 +87,11 @@ export function AnalyzerFeedbackCard({lang,context}:Props) {
     }catch(e) {setError(e instanceof Error && e.message==='feedback_disabled'?(isAr?'انتهت فترة التقييم. يمكنك الحفظ بشكل طبيعي.':'Feedback period has ended.'):(isAr?'تعذر إرسال البلاغ، حاول مرة أخرى.':'Could not send report. Please retry.'));}
     finally {setSending(false);}
   };
-  if(!enabled)return null;
+  if(!enabled) return adminStatus==='none' ? null : <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+    {adminStatus==='off'
+      ? (isAr?'وضع الإدارة: طلبات تقييم المحلل متوقفة حاليًا. لتجربتها افتح الإعدادات ← تقييمات المحلل المحلي، ثم فعّل الحملة وحدد مدتها.':'Admin: Feedback prompts are currently off. Open Settings → Local analyzer feedback to enable a pilot.')
+      : (isAr?'وضع الإدارة: تعذر تحميل إعدادات التقييم. راجع صفحة الإدارة أو اتصال الخادم.':'Admin: Feedback settings could not be loaded. Check the admin page and server connection.')}
+  </p>;
   if(sent) return <div role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 flex gap-2 items-center">
     <CheckCircle2 className="h-4 w-4 shrink-0"/> {isAr?'شكرًا! تم إرسال تقييمك للمساعدة في تحسين المحلل المحلي.':'Thank you! Your feedback was sent.'}
   </div>;

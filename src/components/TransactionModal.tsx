@@ -1132,17 +1132,19 @@ export function TransactionModal({
                 </button>
               </div>
 
-              {/* Display Card for Date and Time */}
-              <div
-                onClick={() => setShowDateTimeEditor(!showDateTimeEditor)}
+              {/* Show the read-only summary only while the editor is closed.
+                  Showing both it and editable fields duplicated the same date and time. */}
+              {!showDateTimeEditor && <button
+                type="button"
+                onClick={() => setShowDateTimeEditor(true)}
                 className="w-full flex items-center justify-between p-2.5 sm:p-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors cursor-pointer shadow-2xs"
               >
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                <span className="flex items-center gap-2 text-xs font-bold text-slate-800">
                   <CalendarIcon className="w-4 h-4 text-slate-500" />
                   <span>{formatDateTimeDisplay(date, time, undefined, lang)}</span>
-                </div>
+                </span>
                 <Clock className="w-4 h-4 text-slate-400" />
-              </div>
+              </button>}
 
               {/* Expanded Interactive Date & Time Picker */}
               {showDateTimeEditor && (

@@ -27,7 +27,7 @@ export function AnalyzerFeedbackAdmin({lang,onBack}:Props){
   const [config,setConfig]=useState<ConfigForm>({enabled:false,startDate:todayCairo(),durationDays:14,frequency:1});
   const [active,setActive]=useState(false);
   const [reports,setReports]=useState<AnalyzerFeedbackReport[]>([]);
-  const [tab,setTab]=useState<'reports'|'settings'>('reports');
+  const [tab,setTab]=useState<'reports'|'settings'>('settings');
   const [filter,setFilter]=useState<'all'|'needs_review'|'bad'|'acceptable'|'good'|'very_good'>('all');
   const [query,setQuery]=useState('');
   const [selected,setSelected]=useState<string|null>(null);

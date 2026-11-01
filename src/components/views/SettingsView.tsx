@@ -12,6 +12,7 @@ import {
   LogOut,
   User as UserIcon,
   ExternalLink,
+  MessageSquareText,
 } from 'lucide-react';
 import { Language, AuthUser } from '../../types';
 import { UserSubscription } from '../../types/prototypeSubscription';
@@ -33,6 +34,7 @@ interface SettingsViewProps {
   onOpenMobileLink: () => void;
   isAdmin?: boolean;
   onOpenAdmin?: () => void;
+  onOpenFeedbackAdmin?: () => void;
 }
 
 export function SettingsView({
@@ -48,6 +50,7 @@ export function SettingsView({
   onOpenMobileLink,
   isAdmin,
   onOpenAdmin,
+  onOpenFeedbackAdmin,
 }: SettingsViewProps) {
   const t = translations[lang];
   const [showDevAccordion, setShowDevAccordion] = useState(false);
@@ -79,6 +82,17 @@ export function SettingsView({
           {lang === 'ar' ? 'إدارة حسابك والمزامنة السحابية وتفضيلات التطبيق' : 'Manage your account, cloud sync, and preferences'}
         </p>
       </div>
+
+      {isAdmin && onOpenFeedbackAdmin && (
+        <button type="button" onClick={onOpenFeedbackAdmin}
+          className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-start flex items-center gap-3 hover:bg-emerald-100 transition-colors">
+          <MessageSquareText className="h-5 w-5 text-emerald-700 shrink-0" />
+          <span className="flex-1">
+            <span className="block font-extrabold text-sm text-emerald-900">{lang === 'ar' ? 'تقييمات المحلل المحلي — الإدارة' : 'Local analyzer feedback — Admin'}</span>
+            <span className="block text-xs font-medium text-emerald-800 mt-0.5">{lang === 'ar' ? 'استقبال البلاغات · تشغيل التقييم وإيقافه · تحديد المدة' : 'Reports · Enable/disable ratings · Campaign duration'}</span>
+          </span>
+        </button>
+      )}
 
       {/* 1. Google Account & Cloud Sync Section */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">

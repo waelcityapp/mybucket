@@ -47,6 +47,7 @@ import {
 import { FinancialQueryResultCard } from './components/FinancialQueryResultCard';
 import { HomeFinancialOverview } from './components/HomeFinancialOverview';
 import { AdminView } from './components/views/AdminView';
+import { AnalyzerFeedbackAdmin } from './components/views/AnalyzerFeedbackAdmin';
 import { AuthPage } from './components/views/AuthPage';
 import { InitialSetupView } from './components/views/InitialSetupView';
 import { UsageGuideView } from './components/views/UsageGuideView';
@@ -98,7 +99,7 @@ export default function App() {
   });
 
   // 2. Active Tab State
-  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : 'home');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname === '/admin/analyzer-feedback' ? 'admin' : window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : 'home');
   // Keep in-app tab changes in browser history so the device Back button can restore them.
   const navigateTab = (tab: ActiveTab) => {
     if (recordTabNavigation(window.history, window.location, activeTab, tab)) setActiveTab(tab);
@@ -224,6 +225,22 @@ export default function App() {
   });
 
   const isAdmin = authUser?.email?.trim().toLowerCase() === 'waelvts@gmail.com';
+  const closeFeedbackAdmin = () => {
+    if (window.history.state?.feedbackAdmin) {
+      window.history.back();
+    } else {
+      window.history.replaceState({ myBucketTab:'admin' }, '', '/');
+      setActiveTab('admin');
+    }
+  };
+
+  const openFeedbackAdmin = () => {
+    if (!isAdmin) return;
+    if (window.location.pathname !== '/admin/analyzer-feedback') {
+      window.history.pushState({ myBucketTab:'admin', feedbackAdmin:true }, '', '/admin/analyzer-feedback');
+    }
+    setActiveTab('admin');
+  };
 
   // 7. Modals State
   const [isAddModalOpen, setIsAddModalOpen] = useState(() => window.location.pathname === '/transactions/new');
@@ -313,7 +330,7 @@ export default function App() {
         setIsExpenseCategoriesModalOpen(false);
         setIsCategoryDetailModalOpen(false);
         setSelectedCategoryForDetail(null);
-        setActiveTab((window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : 'home');
+        setActiveTab((window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : firebaseUser && window.location.pathname === '/admin/analyzer-feedback' ? 'admin': firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : 'home');
         setToastMessage(null);
         aiLearnedMemory.clear();
       }
@@ -993,7 +1010,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #76' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #77' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {
@@ -1338,11 +1355,14 @@ export default function App() {
             onLogout={handleGoogleLogout}
             isAdmin={isAdmin}
             onOpenAdmin={() => navigateTab('admin')}
+            onOpenFeedbackAdmin={openFeedbackAdmin}
             onOpenMobileLink={() => setIsMobileModalOpen(true)}
           />
         )}
         {activeTab === 'admin' && isAdmin && authUser && (
-          <AdminView lang={lang} user={authUser} onBack={() => navigateTab('settings')} onResetDemoData={handleResetDemoData} onZeroAllBalances={handleZeroAllBalances} />
+          window.location.pathname === '/admin/analyzer-feedback'
+            ? <AnalyzerFeedbackAdmin lang={lang} onBack={closeFeedbackAdmin} />
+            : <AdminView lang={lang} user={authUser} onBack={() => navigateTab('settings')} onResetDemoData={handleResetDemoData} onZeroAllBalances={handleZeroAllBalances} onOpenFeedbackAdmin={openFeedbackAdmin} />
         )}
       </main>
 

@@ -72,7 +72,7 @@ test('reports never store user ID nor financial account/balance arrays',()=>{
 test('ratings do not trigger an automatic save',()=>{
  const s=readFileSync('src/components/AnalyzerFeedbackCard.tsx','utf8');
  assert.ok(!s.includes('onSaveTransaction'));
- assert.ok(s.includes("if(!enabled)return null"));
+ assert.ok(s.includes("if(!enabled) return adminStatus==='none' ? null :"));
 });
 test('feedback fields cannot block native save form validation',()=>{
  const s=readFileSync('src/components/AnalyzerFeedbackCard.tsx','utf8');

@@ -20,7 +20,7 @@ try {
     const parsed = parseNaturalLanguageInput(raw, [], []);
     assert.equal(parsed.amount, 200, raw);
     assert.equal(parsed.date, '2026-10-29', raw);
-    assert.equal(parsed.description, 'جبت هدية لاخويا', raw);
+    assert.equal(parsed.description, 'هدية لاخويا', raw);
     assert.equal(parsed.type, 'expense', raw);
   }
   console.log('4/4 end-to-end local transaction parsing cases passed');

@@ -9,7 +9,10 @@ export function extractTransactionDescription(raw: string, parsedAmount: number 
 
   const connector = /(?:^|\s)(علشان|عشان|بخصوص|بسبب|لأجل|من أجل|because|regarding)(?=\s|$)/i.exec(raw);
   const header = connector ? raw.slice(0, connector.index) : raw;
-  const explanation = connector ? removeRelativeDayPhrase(raw.slice(connector.index + connector[0].length)).trim() : '';
+  const explanation = connector
+    ? removeRelativeDayPhrase(raw.slice(connector.index + connector[0].length)).trim()
+      .replace(/^(?:(?:أنا|انا|إني|اني)\s+)?(?:جبت|جايب|جايبة)\s+/i, '')
+    : '';
 
   let note = removeRelativeDayPhrase(header.trim())
     .replace(/(?:^|\s)(?:الساعة|ساعة)\s*\d{1,2}(?::\d{2})?\s*(?:صباحا|صباحاً|مساء|مساءً|الصبح|بالليل|عصراً|العصر|am|pm)?(?=\s|$|[،,.])/gi, ' ')
@@ -41,6 +44,9 @@ export function extractTransactionDescription(raw: string, parsedAmount: number 
     .replace(/(?:^|\s)(?:جنيه|جنية|egp|usd|دولار|ريال|درهم|eur|يورو)(?=\s|$|[،,.])/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+    // "أنا جبت هدية لأخويا" describes the item, not the user's identity.
+    // Drop introductory speech filler but never strip words inside the note.
+    .replace(/^(?:(?:أنا|انا|إني|اني|I)\s+)?(?:جبت|جايب|جايبة|i bought)\s+/i, '')
     .replace(/^(?:(?:أنا|انا|إني|اني|I)\s+)+/i, '')
     .replace(/^(?:على|علي|في|فى|لـ)\s+(?=\S)/i, '')
     .trim()

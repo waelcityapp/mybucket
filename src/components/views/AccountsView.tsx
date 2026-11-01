@@ -177,7 +177,7 @@ export function AccountsView({ accounts, lang, onAddAccount, onEditBalance, onZe
                 </span>
               </div>
 
-              {onEditBalance && !acc.linkedBankId && acc.type !== 'credit' && (
+              {onEditBalance && acc.type !== 'credit' && (
                 <button
                   type="button"
                   title={lang === 'ar' ? 'تعديل الرصيد الافتتاحي' : 'Edit Balance'}

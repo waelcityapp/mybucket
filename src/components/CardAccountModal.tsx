@@ -225,7 +225,7 @@ export function CardAccountModal({
                   </button>
                 ))}
               </div>
-            </div>
+            </div>}
 
             {error && <p role="alert" className="text-xs font-bold text-red-700">{error}</p>}
             {/* زر حفظ التعديلات */}

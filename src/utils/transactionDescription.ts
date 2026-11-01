@@ -1,4 +1,5 @@
 import { removeRelativeDayPhrase } from './relativeDayPhrase';
+import { removeTodayDateExpression } from './todayDateExpression';
 
 /**
  * Extract only the user's stated transaction note. Never invent categories or
@@ -10,17 +11,17 @@ export function extractTransactionDescription(raw: string, parsedAmount: number 
   const connector = /(?:^|\s)(علشان|عشان|بخصوص|بسبب|لأجل|من أجل|because|regarding)(?=\s|$)/i.exec(raw);
   const header = connector ? raw.slice(0, connector.index) : raw;
   const explanation = connector
-    ? removeRelativeDayPhrase(raw.slice(connector.index + connector[0].length)).trim()
+    ? removeTodayDateExpression(removeRelativeDayPhrase(raw.slice(connector.index + connector[0].length))).trim()
       .replace(/^(?:(?:أنا|انا|إني|اني)\s+)?(?:جبت|جايب|جايبة)\s+/i, '')
     : '';
 
-  let note = removeRelativeDayPhrase(header.trim())
+  let note = removeTodayDateExpression(removeRelativeDayPhrase(header.trim()))
     .replace(/(?:^|\s)(?:الساعة|ساعة)\s*\d{1,2}(?::\d{2})?\s*(?:صباحا|صباحاً|مساء|مساءً|الصبح|بالليل|عصراً|العصر|am|pm)?(?=\s|$|[،,.])/gi, ' ')
     .replace(/(?:^|\s)(?:يوم|بتاريخ)\s*\d{1,2}(?:\s*(?:يناير|فبراير|مارس|أبريل|ابريل|مايو|يونيو|يوليو|أغسطس|اغسطس|سبتمبر|أكتوبر|اكتوبر|نوفمبر|ديسمبر))?(?=\s|$|[،,.])/gi, ' ')
     // Treat "أول امبارح" and equivalent phrases as a single date expression.
     .replace(/(?:^|\s)(?:من\s+)?(?:أول|اول|قبل)\s+(?:امبارح|إمبارح|أمس|امس)(?=\s|$|[،,.])/gi, ' ')
     .replace(/(?:^|\s)(?:(?:the\s+)?day\s+before\s+yesterday|(?:two|2)\s+days?\s+ago)(?=\s|$|[،,.])/gi, ' ')
-    .replace(/(?:^|\s)(?:النهاردة|امبارح|إمبارح|أمس|امس|اليوم|today|yesterday)(?=\s|$|[،,.])/gi, ' ');
+    .replace(/(?:^|\s)(?:امبارح|إمبارح|أمس|امس|yesterday)(?=\s|$|[،,.])/gi, ' ');
 
   // Match on a same-length normalized copy while keeping original characters.
   // Remove the transaction amount once, leaving numbers in user notes intact.

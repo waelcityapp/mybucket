@@ -1,5 +1,6 @@
 import { Language } from '../types';
 import { findRelativeDayPhrase } from './relativeDayPhrase';
+import { hasTodayDateExpression } from './todayDateExpression';
 
 /**
  * Returns current local date formatted as YYYY-MM-DD
@@ -138,6 +139,9 @@ export function parseNaturalDateTime(
   const relativeDayPhrase = findRelativeDayPhrase(input);
   if (relativeDayPhrase) {
     subtractDays(relativeDayPhrase.days);
+  } else if (hasTodayDateExpression(input)) {
+    // Today is the reference date, even if the text also mentions yesterday
+    // in a separate description clause.
   } else if (/(?:اول\s*امبارح|اول\s*امس|قبل\s*امبارح|قبل\s*امس|day before yesterday)/.test(text)) {
     subtractDays(2);
   } else if (/(?:امبارح|امس|yesterday)/.test(text)) {

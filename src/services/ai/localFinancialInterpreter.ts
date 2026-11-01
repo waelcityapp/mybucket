@@ -1,6 +1,7 @@
 import { AIInterpretationRequest, AIInterpretationResult } from './types';
 import { parseNaturalDateTime } from '../../utils/dateTime';
 import { findRelativeDayPhrase } from '../../utils/relativeDayPhrase';
+import { hasTodayDateExpression } from '../../utils/todayDateExpression';
 import { parseNaturalLanguageInput } from '../../utils/naturalLanguageParser';
 import { isFinancialQueryText, parseSemanticNumberRoles } from '../../utils/semanticParser';
 import { FinancialAccount, Category } from '../../types';
@@ -88,7 +89,7 @@ export function interpretLocalFinancialRequest(request: AIInterpretationRequest)
         const calculated = parseNaturalDateTime(raw, localReferenceDate(request.currentDateTime));
         const explicit = parseSemanticNumberRoles(raw, localReferenceDate(request.currentDateTime)).specificDateStr;
         const hasDate = Boolean(findRelativeDayPhrase(raw)) ||
-          /(?:امبارح|أمس|النهاردة|اليوم|today|yesterday|أول\s+امبارح|اول\s+امبارح)/i.test(raw);
+          (hasTodayDateExpression(raw) || /(?:امبارح|أمس|yesterday|أول\s+امبارح|اول\s+امبارح)/i.test(raw));
         if (explicit || hasDate) {
           base.date = explicit || calculated.date;
           fieldToUpdate = 'date';
@@ -182,7 +183,7 @@ export function interpretLocalFinancialRequest(request: AIInterpretationRequest)
         period = 'custom';
         startDate = semanticRoles.specificDateStr;
         endDate = semanticRoles.specificDateStr;
-      } else if (lower.includes('النهاردة') || lower.includes('اليوم') || lower.includes('today')) {
+      } else if (hasTodayDateExpression(raw)) {
         period = 'today';
       } else if (lower.includes('امبارح') || lower.includes('أمس') || lower.includes('yesterday')) {
         period = 'yesterday';
@@ -265,7 +266,7 @@ export function interpretLocalFinancialRequest(request: AIInterpretationRequest)
     })) as FinancialAccount[];
     const localCategories = request.categories as Category[];
 
-    const draft = parseNaturalLanguageInput(raw, localAccounts, localCategories);
+    const draft = parseNaturalLanguageInput(raw, localAccounts, localCategories, localReferenceDate(request.currentDateTime));
 
     // A transfer needs BOTH explicitly named accounts; do not invent a
     // destination or silently substitute the first account.

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { APP_REVISION } from '../src/config/appRevision.ts';
 const app=readFileSync('src/App.tsx','utf8');
 const voice=readFileSync('src/components/VoiceNaturalInput.tsx','utf8');
-assert.equal(APP_REVISION,'#79');
+assert.equal(APP_REVISION,'#80');
 assert.ok(app.includes("import { APP_REVISION } from './config/appRevision';"));
 assert.ok(app.includes("' ' + APP_REVISION"),'admin header reads shared revision');
 assert.ok(voice.includes("import { APP_REVISION } from '../config/appRevision';"));

@@ -20,7 +20,8 @@ export interface ParsedTransactionDraft {
 export function parseNaturalLanguageInput(
   text: string,
   accounts: FinancialAccount[],
-  categories: Category[]
+  categories: Category[],
+  referenceDate: Date = new Date()
 ): ParsedTransactionDraft {
   const raw = text.trim();
   // The core financial statement is the transaction. Explanatory stories
@@ -30,7 +31,7 @@ export function parseNaturalLanguageInput(
   const lower = core.toLowerCase();
 
   // Use semantic number-role parser and query detection
-  const semanticRoles = parseSemanticNumberRoles(core);
+  const semanticRoles = parseSemanticNumberRoles(core, referenceDate);
   const isQuery = isFinancialQueryText(raw);
 
   // 1. Detect Type
@@ -141,7 +142,7 @@ export function parseNaturalLanguageInput(
   const description = extractTransactionDescription(raw, amount);
 
   // 7. Extract Date and Time
-  const dt = parseNaturalDateTime(core);
+  const dt = parseNaturalDateTime(core, referenceDate);
   const date = semanticRoles.specificDateStr || dt.date;
   const time = semanticRoles.specificTimeStr || dt.time;
   const dateTime = `${date}T${time}:00.000Z`;

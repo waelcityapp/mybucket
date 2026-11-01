@@ -35,6 +35,7 @@ import {
 } from '../utils/dateTime';
 import { CategoryAutocomplete } from './CategoryAutocomplete';
 import { aiClient } from '../services/ai/aiClient';
+import { classifyLocalIntent } from '../services/ai/localIntentRouter';
 import {
   matchCategoryFromText,
   matchAccountFromText,
@@ -288,7 +289,7 @@ export function TransactionModal({
     // CRITICAL DIRECTIVE:
     // If the customer asks to save or confirm the transaction by voice (e.g. "احفظ العملية", "سجلها", "تأكيد", "save", etc.):
     // The assistant MUST NOT save automatically, but tell the user: "من فضلك اضغط على زر تأكيد وحفظ"
-    const isSaveIntent = /احفظ|سجل|أكد|اكد|تمام احفظ|تأكيد|حفظ العملية|احفظها|سجلها|اعتمد|اعتمدها|save|confirm/i.test(text);
+    const isSaveIntent = classifyLocalIntent(text, true) === 'SAVE_REQUEST';
 
     if (isSaveIntent) {
       setIsProcessingVoiceEdit(false);

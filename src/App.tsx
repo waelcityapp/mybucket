@@ -731,6 +731,7 @@ export default function App() {
   // Open Edit Balance Modal
   const handleOpenEditBalance = (accId: string | null = null) => {
     const target = accounts.find((a) => a.id === accId);
+    if (target?.linkedBankId && target.type === 'card') { handleOpenCardAccountModal(accId); return; }
     if (target?.linkedBankId) { setToastMessage(lang === 'ar' ? 'هذه الوسيلة مرتبطة بالبنك؛ عدّل رصيد البنك نفسه.' : 'Edit the linked bank balance instead.'); return; }
     if (target?.type === 'credit') { setToastMessage(lang === 'ar' ? 'يتم تحديث مستحقات بطاقة الائتمان من العمليات والسداد.' : 'The credit balance changes through transactions and payments.'); return; }
     if (target?.type === 'bank' || target?.id === 'acc_bank') {
@@ -798,31 +799,35 @@ export default function App() {
     setIsCardAccountModalOpen(true);
   };
 
-  // Save Card Account Changes (Name & Balance)
-  const handleSaveCardAccount = async (accountId: string, newNameAr: string, newBalance: number) => {
-    if (!isNonNegativeBalance(newBalance)) { rejectInvalidBalance(); return; }
-    const updated = accounts.map((acc) => {
-      if (acc.id === accountId) {
-        return {
-          ...acc,
-          nameAr: newNameAr,
-          name: newNameAr,
-          balance: newBalance,
-        };
-      }
-      return acc;
-    });
-    setAccounts(updated);
-
-    if (authUser) {
-      const target = updated.find((a) => a.id === accountId);
-      if (target) {
-        await saveAccountToFirestore(authUser.uid, target);
-      }
+  // Edit card metadata and linking without silently rewriting historical transactions.
+  const handleSaveCardAccount = async (accountId: string, newNameAr: string, newBalance: number, linkedBankId: string | null): Promise<boolean> => {
+    const current = accounts.find(acc => acc.id === accountId && acc.type === 'card');
+    if (!current || !authUser || !financialLoaded.transactions || !financialLoaded.accounts || !newNameAr.trim()) return false;
+    const bank = linkedBankId ? accounts.find(acc => acc.id === linkedBankId && acc.type === 'bank') : null;
+    if ((linkedBankId && (!bank || bank.currency !== current.currency)) || (!linkedBankId && !isNonNegativeBalance(newBalance))) {
+      setToastMessage(lang === 'ar' ? 'تحقق من الرصيد وعملة البنك.' : 'Check the balance and bank currency.');
+      return false;
     }
-
-    setToastMessage(lang === 'ar' ? `تم حفظ بيانات ${newNameAr} بنجاح` : 'Card updated successfully');
-    setTimeout(() => setToastMessage(null), 3500);
+    const changedLink = (current.linkedBankId || null) !== linkedBankId;
+    if (changedLink && transactions.some(tx => tx.accountId === accountId || tx.toAccountId === accountId)) {
+      setToastMessage(lang === 'ar' ? 'لا يمكن تغيير ارتباط بطاقة لها عمليات سابقة؛ يمكنك تعديل الاسم، مع الاحتفاظ بسجل العمليات والأرصدة.' : 'Cannot change the link for a card with recorded transactions. You can still rename it.');
+      return false;
+    }
+    const updated: FinancialAccount = {
+      ...current, name: newNameAr.trim(), nameAr: newNameAr.trim(),
+      balance: linkedBankId ? 0 : newBalance,
+    };
+    if (linkedBankId) updated.linkedBankId = linkedBankId;
+    else delete updated.linkedBankId;
+    try {
+      await saveAccountToFirestore(authUser.uid, updated);
+      setAccounts(prev => prev.map(acc => acc.id === accountId ? updated : acc));
+      setToastMessage(lang === 'ar' ? 'تم حفظ إعدادات البطاقة.' : 'Card settings saved.');
+      return true;
+    } catch {
+      setToastMessage(lang === 'ar' ? 'تعذر حفظ البطاقة. لم تتغير البيانات.' : 'Could not save the card.');
+      return false;
+    }
   };
 
   // Open Wallet / E-Wallet Management Modal
@@ -1409,6 +1414,8 @@ export default function App() {
         lang={lang}
         onClose={() => setIsCardAccountModalOpen(false)}
         onSave={handleSaveCardAccount}
+        banks={accounts.filter(acc => acc.type === 'bank')}
+        hasTransactions={transactions.some(tx => tx.accountId === selectedCardAccountId || tx.toAccountId === selectedCardAccountId)}
       />
 
       {/* E-Wallet Account Management & Plus/Pro Plans Modal */}

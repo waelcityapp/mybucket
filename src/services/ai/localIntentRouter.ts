@@ -1,4 +1,5 @@
 import { isFinancialQueryText } from '../../utils/semanticParser';
+import { isExplicitMoneyReceipt } from '../../utils/receivedMoneyPhrase';
 
 export type LocalCommandIntent = 'SAVE_REQUEST' | 'FINANCIAL_QUERY' | 'CREATE_TRANSACTION' | 'UNKNOWN';
 
@@ -12,6 +13,7 @@ export function classifyLocalIntent(rawText: string, hasDraft: boolean = false):
   }
   if (hasDraft) return 'UNKNOWN'; // The caller processes explicit draft corrections.
   if (isFinancialQueryText(raw)) return 'FINANCIAL_QUERY';
+  if (isExplicitMoneyReceipt(raw)) return 'CREATE_TRANSACTION';
   const event = /(?:^|[\s،,.])(?:أنا\s+|انا\s+|i\s+)?(?:صرفت|صرفنا|دفعت|دفعنا|اشتريت|شريت|جبت|قبضت|استلمت|جالي|دخلني|حولت|حوّلت|حولي|حولنا|نقلت|سددت|paid|spent|bought|purchased|received|earned|transferred|transfer|i paid|i spent)(?=$|[\s،,.])/i.test(raw);
   const financialNoun = /(?:^|[\s،,.])(?:مصروف|دخل|ايراد|إيراد|مرتب|راتب|تحويل|income|expense|salary)(?=$|[\s،,.])/i.test(raw);
   if (event || financialNoun) return 'CREATE_TRANSACTION';

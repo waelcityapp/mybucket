@@ -2,6 +2,7 @@ import { FinancialAccount, Category, TransactionType, CurrencyCode } from '../ty
 import { parseNaturalDateTime } from './dateTime';
 import { parseSemanticNumberRoles, isFinancialQueryText } from './semanticParser';
 import { extractTransactionDescription } from './transactionDescription';
+import { isExplicitMoneyReceipt } from './receivedMoneyPhrase';
 
 export interface ParsedTransactionDraft {
   type: TransactionType;
@@ -48,6 +49,7 @@ export function parseNaturalLanguageInput(
     // An explicit expense verb wins over an income word used in the note.
     type = 'expense';
   } else if (
+    isExplicitMoneyReceipt(core) ||
     lower.includes('قبضت') ||
     lower.includes('راتب') ||
     lower.includes('مرتب') ||

@@ -139,7 +139,7 @@ export function MoneySources({
             <div
               key={acc.id}
               onClick={() => {
-                if (acc.linkedBankId || acc.type === 'credit') return;
+                if (acc.type === 'credit') return;
                 if (acc.type === 'cash' || acc.id === 'acc_cash') {
                   if (onEditBalance) {
                     onEditBalance(acc.id);
@@ -176,7 +176,7 @@ export function MoneySources({
               {acc.type === 'credit' && <span className="text-[10px] text-slate-500">{lang === 'ar' ? 'المتاح: ' : 'Available: '}{formatAccountBalance((acc.creditLimit || 0) + acc.balance, lang)}</span>}
               </div>
               {/* Pencil icon for editing balance */}
-              {onEditBalance && !acc.linkedBankId && acc.type !== 'credit' && (
+              {onEditBalance && acc.type !== 'credit' && (
                 <button
                   type="button"
                   title={lang === 'ar' ? 'تعديل الرصيد' : 'Edit Balance'}

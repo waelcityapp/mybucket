@@ -48,6 +48,11 @@ test('frequency normalized to safe 1, 3, 5 only',()=>{
  for(const num of [1,3,5])assert.equal(normalizeSettings({frequency:num}).frequency,num);
  assert.equal(normalizeSettings({frequency:8}).frequency,1);
 });
+test('feedback service uses a runtime-compatible Firebase Admin ES module import',()=>{
+ const s=readFileSync('server/analyzerFeedback.ts','utf8');
+ assert.match(s,/from ['"]\.\/firebaseAdmin\.js['"]/);
+ assert.doesNotMatch(s,/from ['"]\.\/firebaseAdmin['"]/);
+});
 test('rating endpoints only available from authenticated gateway',()=>{
  for(const file of ['server.ts','api/gateway.ts']){
   const s=readFileSync(file,'utf8');

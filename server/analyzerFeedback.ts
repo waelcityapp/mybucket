@@ -1,5 +1,5 @@
 import { FieldValue } from 'firebase-admin/firestore';
-import { getAdminFirestore } from './firebaseAdmin';
+import { getAdminFirestore } from './firebaseAdmin.js';
 
 export type Rating = 'bad' | 'acceptable' | 'good' | 'very_good';
 export type ErrorSource = 'speech' | 'analysis' | 'both' | 'unspecified';

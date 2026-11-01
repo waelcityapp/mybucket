@@ -1,4 +1,5 @@
 import { Language } from '../types';
+import { findRelativeDayPhrase } from './relativeDayPhrase';
 
 /**
  * Returns current local date formatted as YYYY-MM-DD
@@ -132,8 +133,12 @@ export function parseNaturalDateTime(
     targetDate.setDate(Math.min(day, lastDay));
   };
 
-  // Always check "day before yesterday" before "yesterday".
-  if (/(?:اول\s*امبارح|اول\s*امس|قبل\s*امبارح|قبل\s*امس|day before yesterday)/.test(text)) {
+  // Shared relative-day recognition handles speech-to-text variants such as
+  // "من تلت أيام" exactly like "من 3 أيام".
+  const relativeDayPhrase = findRelativeDayPhrase(input);
+  if (relativeDayPhrase) {
+    subtractDays(relativeDayPhrase.days);
+  } else if (/(?:اول\s*امبارح|اول\s*امس|قبل\s*امبارح|قبل\s*امس|day before yesterday)/.test(text)) {
     subtractDays(2);
   } else if (/(?:امبارح|امس|yesterday)/.test(text)) {
     subtractDays(1);

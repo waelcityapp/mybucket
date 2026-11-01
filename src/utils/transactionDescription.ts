@@ -1,3 +1,5 @@
+import { removeRelativeDayPhrase } from './relativeDayPhrase';
+
 /**
  * Extract only the user's stated transaction note. Never invent categories or
  * reasons. Reason clauses preserve their wording, numbers and private labels.
@@ -7,9 +9,9 @@ export function extractTransactionDescription(raw: string, parsedAmount: number 
 
   const connector = /(?:^|\s)(علشان|عشان|بخصوص|بسبب|لأجل|من أجل|because|regarding)(?=\s|$)/i.exec(raw);
   const header = connector ? raw.slice(0, connector.index) : raw;
-  const explanation = connector ? raw.slice(connector.index + connector[0].length).trim() : '';
+  const explanation = connector ? removeRelativeDayPhrase(raw.slice(connector.index + connector[0].length)).trim() : '';
 
-  let note = header.trim()
+  let note = removeRelativeDayPhrase(header.trim())
     .replace(/(?:^|\s)(?:الساعة|ساعة)\s*\d{1,2}(?::\d{2})?\s*(?:صباحا|صباحاً|مساء|مساءً|الصبح|بالليل|عصراً|العصر|am|pm)?(?=\s|$|[،,.])/gi, ' ')
     .replace(/(?:^|\s)(?:يوم|بتاريخ)\s*\d{1,2}(?:\s*(?:يناير|فبراير|مارس|أبريل|ابريل|مايو|يونيو|يوليو|أغسطس|اغسطس|سبتمبر|أكتوبر|اكتوبر|نوفمبر|ديسمبر))?(?=\s|$|[،,.])/gi, ' ')
     // Treat "أول امبارح" and equivalent phrases as a single date expression.
@@ -33,7 +35,7 @@ export function extractTransactionDescription(raw: string, parsedAmount: number 
   }
 
   note = note
-    .replace(/(^|[\s،,])(?:دفعت|صرفت|اشتريت|قبضت|حولت|حول|استلمت|جالي|paid|spent|bought|purchased|received|earned|transferred|transfer|moved)(?=\s|$|[،,.])/gi, '$1')
+    .replace(/(^|[\s،,])(?:دفعت|صرفت|صرفتها|صرفته|صرافه|صرافة|اشتريت|قبضت|حولت|حول|استلمت|جالي|paid|spent|bought|purchased|received|earned|transferred|transfer|moved)(?=\s|$|[،,.])/gi, '$1')
     .replace(/(?:^|\s)(?:من\s+)?(?:الكاش|البنك|الفيزا|كاش|فيزا|بنك|cash|card|bank)(?=\s|$|[،,.])/gi, ' ')
     .replace(/(?:^|\s)(?:للكاش|للبنك|للفيزا|إلى\s+الكاش|الى\s+الكاش|إلى\s+البنك|الى\s+البنك|إلى\s+الفيزا|الى\s+الفيزا)(?=\s|$|[،,.])/gi, ' ')
     .replace(/(?:^|\s)(?:جنيه|جنية|egp|usd|دولار|ريال|درهم|eur|يورو)(?=\s|$|[،,.])/gi, ' ')

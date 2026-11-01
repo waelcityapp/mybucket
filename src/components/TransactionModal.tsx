@@ -521,18 +521,8 @@ export function TransactionModal({
 
     const isoString = toDateTimeISO(date, time);
 
-    let finalDesc = description.trim();
-    if (!finalDesc) {
-      if (type === 'transfer') {
-        finalDesc = isAr
-          ? `تحويل إلى ${selectedToAccount ? selectedToAccount.nameAr : 'حساب'}`
-          : `Transfer to ${selectedToAccount ? selectedToAccount.name : 'Account'}`;
-      } else if (selectedCategory) {
-        finalDesc = isAr ? selectedCategory.nameAr : selectedCategory.name;
-      } else {
-        finalDesc = type === 'income' ? (isAr ? 'دخل' : 'Income') : isAr ? 'مصروف' : 'Expense';
-      }
-    }
+    // Notes are optional. Do not persist an invented description or category.
+    const finalDesc = description.trim();
 
     setIsSaving(true);
     try {

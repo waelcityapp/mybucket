@@ -204,7 +204,7 @@ export function VoiceNaturalInput({
           accountId: tx.accountId || undefined,
           toAccountId: tx.toAccountId || undefined,
           categoryId: tx.categoryId || undefined,
-          description: tx.description || (isAr ? 'معاملة جديدة' : 'New Transaction'),
+          description: tx.description ?? '',
           date: tx.date || localISO.slice(0, 10),
           time: tx.time || localISO.slice(11, 16),
         };

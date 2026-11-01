@@ -1,6 +1,7 @@
 import { FinancialAccount, Category, TransactionType, CurrencyCode } from '../types';
 import { parseNaturalDateTime } from './dateTime';
 import { parseSemanticNumberRoles, isFinancialQueryText } from './semanticParser';
+import { extractTransactionDescription } from './transactionDescription';
 
 export interface ParsedTransactionDraft {
   type: TransactionType;
@@ -25,7 +26,7 @@ export function parseNaturalLanguageInput(
   // The core financial statement is the transaction. Explanatory stories
   // ("بس كان ليا عنده 200") belong in notes only if the user writes them.
   // Do not infer debts, repayments, or extra amounts from such clauses.
-  const core = raw.split(/\s+(?:بس\s+كان|لكن\s+كان|علشان\s+كان|because\s+he|but\s+he)(?=\s|$)/i)[0].trim();
+  const core = raw.split(/\s+(?:بس\s+كان|لكن\s+كان|علشان|عشان|بخصوص|بسبب|لأجل|من\s+أجل|because|regarding|but\s+he)(?=\s|$)/i)[0].trim();
   const lower = core.toLowerCase();
 
   // Use semantic number-role parser and query detection
@@ -42,6 +43,9 @@ export function parseNaturalLanguageInput(
     lower.includes('transfer') || lower.includes('moved money') || lower.includes('sent from')
   ) {
     type = 'transfer';
+  } else if (/(?:^|\s)(?:دفعت|صرفت|اشتريت|paid|spent|bought)(?=\s|$)/i.test(lower)) {
+    // An explicit expense verb wins over an income word used in the note.
+    type = 'expense';
   } else if (
     lower.includes('قبضت') ||
     lower.includes('راتب') ||
@@ -131,29 +135,10 @@ export function parseNaturalLanguageInput(
 
   }
 
-  // 6. Extract Description
-  let description = core;
-  // Clean common trigger words from description
-  let cleanDesc = core
-    .replace(/(?:دفعت|صرفت|اشتريت|قبضت|حولت|حول|استلمت|جالي|paid|spent|bought|purchased|received|earned|transferred|transfer|moved)\s*/gi, '')
-    .replace(/\b\d+(?:[.,]\d+)?\b/g, '')
-    .replace(/(?:جنيه|egp|usd|دولار|\$)/gi, '')
-    .replace(/(?:من الكاش|من البنك|من الفيزا|للكاش|للبنك|للفيزا|كاش|فيزا|بنك|from cash|from bank|from card|to cash|to bank|to card)/gi, '')
-    .replace(/(?:النهاردة|امبارح|أمس|today|yesterday|last week|last month|\d+\s*(?:days?|weeks?|months?)\s*ago|الساعة\s*\d+(?::\d+)?\s*(?:مساءً|صباحاً|مساء|صباح)?)/gi, '')
-    .replace(/(?:يوم\s*\d+\s*(?:يناير|فبراير|مارس|أبريل|ابريل|مايو|يونيو|يوليو|أغسطس|اغسطس|سبتمبر|أكتوبر|اكتوبر|نوفمبر|ديسمبر)?)/gi, '')
-    .trim();
-
-  if (cleanDesc.length > 1) {
-    description = cleanDesc;
-  } else {
-    // Fallback based on category or type
-    if (lower.includes('بنزين')) description = 'بنزين';
-    else if (lower.includes('قهوة')) description = 'قهوة';
-    else if (lower.includes('سوبر ماركت')) description = 'مشتريات سوبر ماركت';
-    else if (lower.includes('راتب')) description = 'راتب';
-    else if (type === 'transfer') description = 'تحويل مالي';
-    else description = type === 'income' ? 'دخل' : 'مصروف';
-  }
+  // 6. Keep only notes actually stated by the user. Never synthesize a note.
+  // Use the full sentence for explanations even when only its first clause
+  // supplies the financial amount (e.g. "بس كان" / "علشان كان").
+  const description = extractTransactionDescription(raw, amount);
 
   // 7. Extract Date and Time
   const dt = parseNaturalDateTime(core);

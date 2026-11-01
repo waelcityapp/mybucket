@@ -19,6 +19,7 @@ import { translations } from './data/translations';
 import { Header } from './components/Header';
 import { VoiceNaturalInput } from './components/VoiceNaturalInput';
 import type { AnalyzerFeedbackContext } from './services/ai/analyzerFeedbackClient';
+import { APP_REVISION } from './config/appRevision';
 import { QuickActions } from './components/QuickActions';
 import { MoneySources } from './components/MoneySources';
 import { RecentTransactions } from './components/RecentTransactions';
@@ -1010,7 +1011,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #77' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' ' + APP_REVISION : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {

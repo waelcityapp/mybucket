@@ -6,6 +6,7 @@ import { translations } from '../data/translations';
 import { aiClient } from '../services/ai/aiClient';
 import { AIFinancialQuery, AIInterpretationResult, AICorrection } from '../services/ai/types';
 import type { AnalyzerFeedbackContext } from '../services/ai/analyzerFeedbackClient';
+import { APP_REVISION } from '../config/appRevision';
 
 interface VoiceNaturalInputProps {
   lang: Language;
@@ -213,7 +214,7 @@ export function VoiceNaturalInput({
         onTransactionDraft(draft, tx.missingFields || [], {
           analyzedText:text,
           originalText:inputSource==='voice' ? (originalTranscript.trim() || text) : text,
-          inputSource,analysisId:crypto.randomUUID(),appRevision:'#76',
+          inputSource,analysisId:crypto.randomUUID(),appRevision:APP_REVISION,
         });
       } else if (result.intent === 'CORRECT_PROPOSAL' && result.correction) {
         setStatusMessage(null);

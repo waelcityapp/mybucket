@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { APP_REVISION } from '../src/config/appRevision.ts';
+const app=readFileSync('src/App.tsx','utf8');
+const voice=readFileSync('src/components/VoiceNaturalInput.tsx','utf8');
+assert.equal(APP_REVISION,'#79');
+assert.ok(app.includes("import { APP_REVISION } from './config/appRevision';"));
+assert.ok(app.includes("' ' + APP_REVISION"),'admin header reads shared revision');
+assert.ok(voice.includes("import { APP_REVISION } from '../config/appRevision';"));
+assert.ok(voice.includes('appRevision:APP_REVISION'),'new reports snapshot the shared revision');
+assert.ok(!/appRevision:\\s*['"]#\d+/.test(voice),'no stale hard-coded feedback version');
+assert.ok(!/\\? ['"] #\d+['"]/.test(app),'no stale hard-coded admin version');
+console.log('PASS: admin header and feedback reports share app revision '+APP_REVISION);

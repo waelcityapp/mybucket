@@ -6,9 +6,11 @@ import {
   Database,
   RotateCcw,
   ShieldCheck,
+  MessageSquareText,
 } from 'lucide-react';
 import { AuthUser, Language } from '../../types';
 import { translations } from '../../data/translations';
+import { AnalyzerFeedbackAdmin } from './AnalyzerFeedbackAdmin';
 
 interface AdminViewProps {
   lang: Language;
@@ -27,6 +29,7 @@ export function AdminView({
 }: AdminViewProps) {
   const t = translations[lang];
   const [confirmation, setConfirmation] = useState<'zero' | 'reset' | null>(null);
+  const [showAnalyzerFeedback, setShowAnalyzerFeedback] = useState(false);
 
   const showConfirmation = (type: 'zero' | 'reset') => {
     setConfirmation(type);
@@ -41,6 +44,8 @@ export function AdminView({
     onResetDemoData();
     showConfirmation('reset');
   };
+
+  if (showAnalyzerFeedback) return <AnalyzerFeedbackAdmin lang={lang} onBack={()=>setShowAnalyzerFeedback(false)} />;
 
   return (
     <div className="space-y-5 pb-20">
@@ -115,6 +120,14 @@ export function AdminView({
         ) : null}
       </section>
 
+      <button type="button" onClick={()=>setShowAnalyzerFeedback(true)}
+        className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 flex items-center gap-3 text-start hover:bg-emerald-100 transition-colors">
+        <MessageSquareText className="w-5 h-5 text-emerald-700 shrink-0"/>
+        <span className="flex-1">
+          <span className="block text-sm font-extrabold text-emerald-900">{lang === 'ar' ? 'تقييمات المحلل المحلي' : 'Local analyzer feedback'}</span>
+          <span className="block text-[11px] text-emerald-800">{lang === 'ar' ? 'استقبال البلاغات والتحكم في مدة ظهور التقييم وتفعيله أو إيقافه' : 'Review feedback and control the rating campaign'}</span>
+        </span>
+      </button>
       <section className="bg-slate-100/70 border border-slate-200/60 rounded-2xl p-4 space-y-3">
         <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
           <Database className="w-4 h-4 text-slate-500" />

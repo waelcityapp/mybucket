@@ -5,6 +5,7 @@ import { UserSubscription, UserDailyUsage } from '../types/prototypeSubscription
 import { translations } from '../data/translations';
 import { aiClient } from '../services/ai/aiClient';
 import { AIFinancialQuery, AIInterpretationResult, AICorrection } from '../services/ai/types';
+import type { AnalyzerFeedbackContext } from '../services/ai/analyzerFeedbackClient';
 
 interface VoiceNaturalInputProps {
   lang: Language;
@@ -12,7 +13,7 @@ interface VoiceNaturalInputProps {
   categories: Category[];
   userDailyUsage?: UserDailyUsage;
   userSubscription?: UserSubscription | null;
-  onTransactionDraft: (draft: Partial<Transaction>, missingFields: string[]) => void;
+  onTransactionDraft: (draft: Partial<Transaction>, missingFields: string[], feedback:AnalyzerFeedbackContext) => void;
   onFinancialQuery: (query: AIFinancialQuery, questionText: string) => void;
   onAICorrection?: (correction: AICorrection) => void;
   onAiEntryUsed?: () => void;
@@ -122,7 +123,7 @@ export function VoiceNaturalInput({
    * Unified AI Processing Pipeline
    * Both Voice STT and Typed Input go through this exact same function!
    */
-  const processInputWithAI = async (rawText: string) => {
+  const processInputWithAI = async (rawText: string, inputSource: 'voice'|'text' = 'text', originalTranscript = '') => {
     const text = rawText.trim();
     if (!text) return;
 
@@ -209,7 +210,11 @@ export function VoiceNaturalInput({
           time: tx.time || localISO.slice(11, 16),
         };
 
-        onTransactionDraft(draft, tx.missingFields || []);
+        onTransactionDraft(draft, tx.missingFields || [], {
+          analyzedText:text,
+          originalText:inputSource==='voice' ? (originalTranscript.trim() || text) : text,
+          inputSource,analysisId:crypto.randomUUID(),appRevision:'#76',
+        });
       } else if (result.intent === 'CORRECT_PROPOSAL' && result.correction) {
         setStatusMessage(null);
         if (onAICorrection) {
@@ -375,7 +380,7 @@ export function VoiceNaturalInput({
     }
     if (!inputText.trim() || isProcessingAI) return;
     setPendingVoiceReview(false);
-    void processInputWithAI(inputText);
+    void processInputWithAI(inputText, pendingVoiceReview ? 'voice' : 'text', segmentBaseRef.current);
   };
 
   return (
@@ -505,7 +510,7 @@ export function VoiceNaturalInput({
             {isAr ? 'راجع الكلام المكتوب بالأعلى، ويمكنك تعديله قبل الإرسال.' : 'Review the transcript above and edit it before sending.'}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <button type="button" disabled={!inputText.trim()} onClick={() => { const text = inputText.trim(); if (!text) return; setPendingVoiceReview(false); void processInputWithAI(text); }}
+            <button type="button" disabled={!inputText.trim()} onClick={() => { const text = inputText.trim(); if (!text) return; setPendingVoiceReview(false); void processInputWithAI(text, 'voice', segmentBaseRef.current); }}
               className="rounded-xl bg-emerald-600 px-3 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
               {isAr ? 'إرسال للمراجعة والتأكيد' : 'Send for review and confirmation'}
             </button>

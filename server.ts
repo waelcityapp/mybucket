@@ -65,6 +65,29 @@ async function startServer() {
           if (!test.success) return res.status(422).json({ ok: false, error: 'model_test_failed', data: test, message: 'Selected Gemini model failed its connectivity test. The active model was not changed.' });
           return res.json({ ok: true, data: await setSelectedGeminiModel(id) });
         }
+        case 'feedback.config': {
+          const { getFeedbackSettings } = await import('./server/analyzerFeedback');
+          return res.json({ ok:true, data:await getFeedbackSettings() });
+        }
+        case 'feedback.submit': {
+          const { submitFeedback } = await import('./server/analyzerFeedback');
+          return res.json({ ok:true, data:await submitFeedback(payload, user.uid) });
+        }
+        case 'admin.feedbackSettings': {
+          if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ok:false,error:'admin_only'});
+          const { updateFeedbackSettings } = await import('./server/analyzerFeedback');
+          return res.json({ ok:true, data:await updateFeedbackSettings(payload) });
+        }
+        case 'admin.feedbackReports': {
+          if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ok:false,error:'admin_only'});
+          const { listFeedbackReports } = await import('./server/analyzerFeedback');
+          return res.json({ ok:true, data:await listFeedbackReports() });
+        }
+        case 'admin.feedbackUpdateStatus': {
+          if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ok:false,error:'admin_only'});
+          const { updateFeedbackStatus } = await import('./server/analyzerFeedback');
+          return res.json({ ok:true, data:await updateFeedbackStatus(payload) });
+        }
         case 'subscription.get': {
           const subscription = await getOrCreateSubscription(user.uid);
           return res.json({ ok: true, data: { subscription } });

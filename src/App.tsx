@@ -18,6 +18,7 @@ import { OffersPage } from './components/views/OffersPage';
 import { translations } from './data/translations';
 import { Header } from './components/Header';
 import { VoiceNaturalInput } from './components/VoiceNaturalInput';
+import type { AnalyzerFeedbackContext } from './services/ai/analyzerFeedbackClient';
 import { QuickActions } from './components/QuickActions';
 import { MoneySources } from './components/MoneySources';
 import { RecentTransactions } from './components/RecentTransactions';
@@ -245,6 +246,7 @@ export default function App() {
   };
   const [addModalInitialType, setAddModalInitialType] = useState<TransactionType>('expense');
   const [prefilledDraft, setPrefilledDraft] = useState<Partial<Transaction> | null>(null);
+  const [analyzerFeedbackContext, setAnalyzerFeedbackContext] = useState<AnalyzerFeedbackContext | null>(null);
   const [draftMissingFields, setDraftMissingFields] = useState<string[]>([]);
   const [activeFinancialQueryResult, setActiveFinancialQueryResult] = useState<DeterministicQueryResult | null>(null);
   const [isEditBalanceModalOpen, setIsEditBalanceModalOpen] = useState(false);
@@ -476,6 +478,7 @@ export default function App() {
 
   // Open Add Modal manually
   const handleOpenAddModal = (type: TransactionType = 'expense') => {
+    setAnalyzerFeedbackContext(null);
     setPrefilledDraft(null);
     setDraftMissingFields([]);
     setAddModalInitialType(type);
@@ -494,7 +497,8 @@ export default function App() {
   };
 
   // Handle Natural Language / Voice input parsed draft via Gemini AI
-  const handleTransactionDraft = (draft: Partial<Transaction>, missingFields: string[]) => {
+  const handleTransactionDraft = (draft: Partial<Transaction>, missingFields: string[], feedback:AnalyzerFeedbackContext) => {
+    setAnalyzerFeedbackContext(feedback);
     setPrefilledDraft(draft);
     setDraftMissingFields(missingFields || []);
     if (draft.type) setAddModalInitialType(draft.type);
@@ -989,7 +993,7 @@ export default function App() {
     : (lang === 'ar' ? 'صديقي' : 'Friend');
 
   const greetingPrefix = currentHour < 12 ? (lang === 'ar' ? 'صباح الخير يا' : 'Good morning,') : (lang === 'ar' ? 'مساء الخير يا' : 'Good evening,');
-  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #75' : ''}`;
+  const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' #76' : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {
@@ -1347,6 +1351,7 @@ export default function App() {
         isOpen={isAddModalOpen}
         initialType={addModalInitialType}
         initialValues={prefilledDraft}
+        feedbackContext={analyzerFeedbackContext}
         missingFields={draftMissingFields}
         accounts={accounts}
         categories={categories}

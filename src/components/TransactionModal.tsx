@@ -36,6 +36,8 @@ import {
 import { CategoryAutocomplete } from './CategoryAutocomplete';
 import { aiClient } from '../services/ai/aiClient';
 import { classifyLocalIntent } from '../services/ai/localIntentRouter';
+import { AnalyzerFeedbackCard } from './AnalyzerFeedbackCard';
+import type { AnalyzerFeedbackContext } from '../services/ai/analyzerFeedbackClient';
 import {
   matchCategoryFromText,
   matchAccountFromText,
@@ -49,6 +51,7 @@ interface TransactionModalProps {
   isOpen: boolean;
   initialType?: TransactionType;
   initialValues?: Partial<Transaction> | null;
+  feedbackContext?: AnalyzerFeedbackContext | null;
   missingFields?: string[];
   accounts: FinancialAccount[];
   categories: Category[];
@@ -62,6 +65,7 @@ export function TransactionModal({
   isOpen,
   initialType = 'expense',
   initialValues,
+  feedbackContext,
   missingFields = [],
   accounts,
   categories,
@@ -1219,6 +1223,8 @@ export function TransactionModal({
                 </div>
               )}
             </div>
+
+            {isAiProposal && feedbackContext && <AnalyzerFeedbackCard lang={lang} context={feedbackContext} />}
 
             {/* Action Buttons: "✓ تأكيد وحفظ العملية" & "إلغاء" */}
             <div className="pt-2 space-y-2">

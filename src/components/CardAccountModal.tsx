@@ -7,7 +7,9 @@ interface CardAccountModalProps {
   account: FinancialAccount | null;
   lang: Language;
   onClose: () => void;
-  onSave: (accountId: string, newNameAr: string, newBalance: number) => void;
+  onSave: (accountId: string, newNameAr: string, newBalance: number, linkedBankId: string | null) => Promise<boolean>;
+  banks: FinancialAccount[];
+  hasTransactions: boolean;
 }
 
 export function CardAccountModal({
@@ -16,27 +18,42 @@ export function CardAccountModal({
   lang,
   onClose,
   onSave,
+  banks,
+  hasTransactions,
 }: CardAccountModalProps) {
   const [nameAr, setNameAr] = useState('');
   const [balanceStr, setBalanceStr] = useState('');
+  const [bankId, setBankId] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const [showUpgradeNotice, setShowUpgradeNotice] = useState(false);
 
   useEffect(() => {
     if (account && isOpen) {
       setNameAr(account.nameAr || account.name || (lang === 'ar' ? 'فيزا مشتريات' : 'Visa Card'));
       setBalanceStr(String(account.balance));
+      setBankId(account.linkedBankId || '');
+      setError('');
       setShowUpgradeNotice(false);
     }
   }, [account, isOpen, lang]);
 
   if (!isOpen || !account) return null;
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const finalName = nameAr.trim() || (lang === 'ar' ? 'فيزا' : 'Visa Card');
-    const parsedBalance = parseFloat(balanceStr) || 0;
-    onSave(account.id, finalName, parsedBalance);
-    onClose();
+    if (saving) return;
+    const parsedBalance = Number(balanceStr);
+    if (!bankId && (!Number.isFinite(parsedBalance) || parsedBalance < 0)) {
+      setError(lang === 'ar' ? 'أدخل رصيدًا صحيحًا.' : 'Enter a valid balance.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const ok = await onSave(account.id, nameAr.trim(), bankId ? 0 : parsedBalance, bankId || null);
+      if (ok) onClose();
+      else setError(lang === 'ar' ? 'لم يتم حفظ التغييرات. راجع الارتباط أو سجل العمليات.' : 'Changes were not saved. Check linking and transactions.');
+    } finally { setSaving(false); }
   };
 
   const quickCardSuggestions = [
@@ -136,6 +153,15 @@ export function CardAccountModal({
               )}
             </div>
 
+            <div className="rounded-2xl border border-slate-200 p-4 space-y-2">
+              <label className="block text-xs font-bold text-slate-800">{lang === 'ar' ? 'ارتباط البطاقة بالحساب البنكي' : 'Linked bank account'}</label>
+              <select value={bankId} disabled={hasTransactions} onChange={e => { setBankId(e.target.value); setError(''); }} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+                <option value="">{lang === 'ar' ? 'بطاقة مستقلة (فك الارتباط)' : 'Independent card (unlink)'}</option>
+                {banks.filter(bank => bank.currency === account.currency).map(bank => <option key={bank.id} value={bank.id}>{lang === 'ar' ? bank.nameAr : bank.name}</option>)}
+              </select>
+              {hasTransactions && <p className="text-xs text-amber-800">{lang === 'ar' ? 'لأن للبطاقة عمليات مسجلة، يمكن تعديل اسمها، لكن تغيير الارتباط محظور لحماية الأرصدة والتقارير.' : 'This card has recorded transactions. Rename is available, but changing the link is blocked to protect history.'}</p>}
+              {bankId && <p className="text-xs text-slate-600">{lang === 'ar' ? 'الرصيد يؤخذ من البنك المرتبط ولا يُحسب مرتين.' : 'The balance comes from the linked bank and is not counted twice.'}</p>}
+            </div>
             {/* 2. الرصيد الحالي */}
             <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
               <div>
@@ -157,7 +183,7 @@ export function CardAccountModal({
             </div>
 
             {/* 3. تعديل الرصيد */}
-            <div>
+            {!bankId && <div>
               <label className="block text-xs font-bold text-slate-800 mb-1.5">
                 {lang === 'ar' ? 'تعديل الرصيد' : 'Edit Balance'} ({account.currency})
               </label>
@@ -201,6 +227,7 @@ export function CardAccountModal({
               </div>
             </div>
 
+            {error && <p role="alert" className="text-xs font-bold text-red-700">{error}</p>}
             {/* زر حفظ التعديلات */}
             <div className="pt-2 flex items-center justify-end gap-2.5">
               <button
@@ -212,6 +239,7 @@ export function CardAccountModal({
               </button>
               <button
                 type="submit"
+                disabled={saving}
                 className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 transition-colors active:scale-95"
               >
                 <Check className="w-4 h-4 stroke-[3]" />

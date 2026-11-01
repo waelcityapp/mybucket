@@ -12,7 +12,10 @@ export function extractTransactionDescription(raw: string, parsedAmount: number 
   let note = header.trim()
     .replace(/(?:^|\s)(?:الساعة|ساعة)\s*\d{1,2}(?::\d{2})?\s*(?:صباحا|صباحاً|مساء|مساءً|الصبح|بالليل|عصراً|العصر|am|pm)?(?=\s|$|[،,.])/gi, ' ')
     .replace(/(?:^|\s)(?:يوم|بتاريخ)\s*\d{1,2}(?:\s*(?:يناير|فبراير|مارس|أبريل|ابريل|مايو|يونيو|يوليو|أغسطس|اغسطس|سبتمبر|أكتوبر|اكتوبر|نوفمبر|ديسمبر))?(?=\s|$|[،,.])/gi, ' ')
-    .replace(/(?:^|\s)(?:النهاردة|امبارح|أمس|اليوم|today|yesterday)(?=\s|$|[،,.])/gi, ' ');
+    // Treat "أول امبارح" and equivalent phrases as a single date expression.
+    .replace(/(?:^|\s)(?:من\s+)?(?:أول|اول|قبل)\s+(?:امبارح|إمبارح|أمس|امس)(?=\s|$|[،,.])/gi, ' ')
+    .replace(/(?:^|\s)(?:(?:the\s+)?day\s+before\s+yesterday|(?:two|2)\s+days?\s+ago)(?=\s|$|[،,.])/gi, ' ')
+    .replace(/(?:^|\s)(?:النهاردة|امبارح|إمبارح|أمس|امس|اليوم|today|yesterday)(?=\s|$|[،,.])/gi, ' ');
 
   // Match on a same-length normalized copy while keeping original characters.
   // Remove the transaction amount once, leaving numbers in user notes intact.

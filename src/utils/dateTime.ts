@@ -133,7 +133,7 @@ export function parseNaturalDateTime(
   };
 
   // Always check "day before yesterday" before "yesterday".
-  if (/(?:اول\s*امبارح|اول\s*امس|day before yesterday)/.test(text)) {
+  if (/(?:اول\s*امبارح|اول\s*امس|قبل\s*امبارح|قبل\s*امس|day before yesterday)/.test(text)) {
     subtractDays(2);
   } else if (/(?:امبارح|امس|yesterday)/.test(text)) {
     subtractDays(1);

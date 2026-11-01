@@ -20,8 +20,16 @@ const cases = [
   ['دفعت 50 جنيه في البنك', 50, ''],
   ['اشتريت علبة دواء 50 جنيه', 50, 'علبة دواء'],
   ['دفعت 100 جنيه كاش علشان كان في طلب خاص 200 جنيه', 100, 'كان في طلب خاص 200 جنيه'],
+  ['أول امبارح صرفت 100 جنيه علشان كان مشوار لماما', 100, 'كان مشوار لماما'],
+  ['اول امبارح صرفت 100 جنيه', 100, ''],
+  ['أول أمس دفعت 50 جنيه علشان طعام', 50, 'طعام'],
+  ['قبل امبارح دفعت 75 جنيه بنزين', 75, 'بنزين'],
+  ['من أول امبارح دفعت 75 جنيه بنزين', 75, 'بنزين'],
+  ['أول دفعة كانت 400 جنيه', 400, 'أول دفعة كانت'],
+  ['I paid 50 EGP day before yesterday for coffee', 50, 'for coffee'],
+  ['I spent 25 EGP two days ago', 25, ''],
 ];
 for (const [input, amount, expected] of cases) {
   assert.equal(parse(input, amount), expected, input);
 }
-console.log('18/18 transaction-note test cases passed');
+console.log('26/26 transaction-note test cases passed');

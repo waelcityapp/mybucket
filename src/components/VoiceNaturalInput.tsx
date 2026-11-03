@@ -457,27 +457,35 @@ export function VoiceNaturalInput({
             </button>
           )}
 
-          <button
-            type="button"
-            disabled={isProcessingAI}
-            onClick={handleToggleMic}
-            className={`w-12 h-12 rounded-full flex items-center justify-center text-white transition-all cursor-pointer shadow-md disabled:opacity-50 ${
-              isRecording
-                ? 'bg-rose-500 animate-pulse ring-4 ring-rose-500/20 shadow-rose-500/30'
-                : isProcessingAI
-                ? 'bg-indigo-600 shadow-indigo-500/25'
-                : 'bg-emerald-500 hover:bg-emerald-600 active:scale-95 shadow-emerald-500/25'
-            }`}
-            title={isRecording ? (isAr ? 'إنهاء التسجيل' : 'Finish recording') : (isAr ? 'تحدث للمساعد المالي' : 'Speak to AI Financial Assistant')}
-          >
-            {isProcessingAI ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : isRecording ? (
-              <MicOff className="w-5 h-5" />
-            ) : (
-              <Mic className="w-5 h-5" />
+          <div className="flex flex-col items-center gap-1 shrink-0">
+            <button
+              type="button"
+              disabled={isProcessingAI}
+              onClick={handleToggleMic}
+              aria-label={isRecording ? (isAr ? 'إنهاء التسجيل' : 'Finish recording') : (isAr ? 'بدء التسجيل الصوتي' : 'Start voice recording')}
+              className={`w-12 h-12 rounded-full flex items-center justify-center text-white transition-all cursor-pointer shadow-md disabled:opacity-50 ${
+                isRecording
+                  ? 'bg-red-600 hover:bg-red-700 animate-pulse ring-4 ring-red-500/20 shadow-red-500/30'
+                  : isProcessingAI
+                  ? 'bg-indigo-600 shadow-indigo-500/25'
+                  : 'bg-emerald-500 hover:bg-emerald-600 active:scale-95 shadow-emerald-500/25'
+              }`}
+              title={isRecording ? (isAr ? 'إنهاء التسجيل' : 'Finish recording') : (isAr ? 'تحدث للمساعد المالي' : 'Speak to AI Financial Assistant')}
+            >
+              {isProcessingAI ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : isRecording ? (
+                <MicOff className="w-5 h-5" />
+              ) : (
+                <Mic className="w-5 h-5" />
+              )}
+            </button>
+            {isRecording && (
+              <span className="text-[10px] leading-tight whitespace-nowrap font-bold text-red-600">
+                {isAr ? 'إنهاء التسجيل' : 'Finish recording'}
+              </span>
             )}
-          </button>
+          </div>
         </div>
       </form>
 
@@ -498,12 +506,6 @@ export function VoiceNaturalInput({
           </button>
         </div>
       </div>
-
-      {isRecording && !isProcessingAI && (
-        <button type="button" onClick={finishVoiceRecording} className="w-full rounded-xl bg-rose-600 hover:bg-rose-700 text-white py-3 px-4 text-sm font-extrabold flex justify-center items-center gap-2">
-          <MicOff className="w-4 h-4" />{isAr ? 'إنهاء التسجيل' : 'Finish recording'}
-        </button>
-      )}
 
       {pendingVoiceReview && !isRecording && !isProcessingAI && (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 sm:p-4 space-y-3">

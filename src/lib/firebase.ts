@@ -215,6 +215,40 @@ export async function saveAllAccountsToFirestore(userId: string, accounts: Finan
   await batch.commit();
 }
 
+// Delete an unused account only. Existing transactions and linked payment methods
+// must never be orphaned or silently deleted.
+export async function deleteUnusedAccountFromFirestore(userId: string, accountId: string): Promise<void> {
+  if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
+  if (accountId === 'acc_other' || accountId === 'acc_extra') throw new Error('system-account');
+
+  const accountsSnapshot = await getDocsFromServer(collection(db, 'users', userId, 'accounts'));
+  const accountDocs = accountsSnapshot.docs;
+  if (accountDocs.length <= 1) throw new Error('last-account');
+  const accountSnapshot = accountDocs.find(item => item.id === accountId);
+  if (!accountSnapshot) throw new Error('account-missing');
+
+  const account = accountSnapshot.data() as FinancialAccount;
+  if (account.balance !== 0) throw new Error('nonzero-balance');
+  if (accountDocs.some(item => item.id !== accountId && (item.data() as FinancialAccount).linkedBankId === accountId)) {
+    throw new Error('linked-account');
+  }
+
+  const transactionsSnapshot = await getDocsFromServer(collection(db, 'users', userId, 'transactions'));
+  if (transactionsSnapshot.docs.some(item => {
+    const tx = item.data() as Transaction;
+    return tx.accountId === accountId || tx.toAccountId === accountId;
+  })) throw new Error('has-transactions');
+
+  const accountRef = doc(db, 'users', userId, 'accounts', accountId);
+  await runTransaction(db, async transaction => {
+    const current = await transaction.get(accountRef);
+    if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
+    if (!current.exists()) throw new Error('account-missing');
+    if ((current.data() as FinancialAccount).balance !== 0) throw new Error('nonzero-balance');
+    transaction.delete(accountRef);
+  });
+}
+
 // Reset only current account balances, without overwriting account settings or transactions.
 export async function zeroAccountBalances(userId: string): Promise<void> {
   if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');

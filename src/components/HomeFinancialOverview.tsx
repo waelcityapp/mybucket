@@ -7,7 +7,7 @@ interface HomeFinancialOverviewProps {
   accounts: FinancialAccount[];
   transactions: Transaction[];
   lang: Language;
-  onViewTransactions?: () => void;
+  onViewTransactions?: (period: 'today' | 'month', currency: string) => void;
   onViewAccounts?: () => void;
 }
 
@@ -260,7 +260,7 @@ export function HomeFinancialOverview({
 
       {/* Compact cards, in the same right-to-left order as the reference. */}
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={onViewTransactions}
+        <button type="button" onClick={() => onViewTransactions?.('today', primaryCurrency)}
           className="min-w-0 rounded-[20px] border border-amber-100 bg-gradient-to-br from-[#FFF9EE] via-white to-[#FFF9EC] px-2.5 py-2 text-start @min-[490px]:flex @min-[490px]:flex-row-reverse @min-[490px]:items-center @min-[490px]:gap-3 hover:border-amber-300 focus-visible:outline-2 focus-visible:outline-amber-500">
           <div className="flex min-w-0 items-start gap-2 @min-[490px]:flex-1 @min-[490px]:flex-row-reverse">
             <span className="shrink-0 flex items-center justify-center h-9 w-9 rounded-full bg-amber-100 text-amber-600"><CalendarDays size={20}/></span>
@@ -280,7 +280,7 @@ export function HomeFinancialOverview({
             <ChevronLeft className={'shrink-0 h-4 w-4 text-slate-800 ' + (!isAr ? 'rotate-180' : '')} />
           </div>
         </button>
-        <button type="button" onClick={onViewTransactions}
+        <button type="button" onClick={() => onViewTransactions?.('month', primaryCurrency)}
           className="min-w-0 rounded-[20px] border border-rose-100 bg-gradient-to-br from-[#FFF5F6] via-white to-[#FFF6F7] px-2.5 py-2 text-start @min-[490px]:flex @min-[490px]:flex-row-reverse @min-[490px]:items-center @min-[490px]:gap-3 hover:border-rose-300 focus-visible:outline-2 focus-visible:outline-rose-400">
           <div className="flex min-w-0 items-start gap-2 @min-[490px]:flex-1 @min-[490px]:flex-row-reverse">
             <span className="shrink-0 flex items-center justify-center h-9 w-9 rounded-full bg-rose-100 text-rose-500"><CalendarDays size={20}/></span>

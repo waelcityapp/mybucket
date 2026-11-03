@@ -38,7 +38,7 @@ export function isIncomingExternalTransfer(rawText: string): boolean {
   const senderFirst = /(?:^|[\s،,.])(?:[\u0621-\u064A]{2,})\s+(?:بعت\s*لي|بعتلي|بعث\s*لي|بعثلي|حول\s*لي|حوللي|حولت\s*لي|حولتلي|حوّل\s*لي|وصل\s*لي|وصللي)(?=$|[\s،,.])/i.test(text);
   const incomingVerb = recipientClitic || senderFirst;
   const transferNoun = /(?:^|[\s،,.])(?:تحويل|تحويلي|حوالة|حواله)(?=$|[\s،,.])/i.test(text);
-  const outgoingVerb = /(?:^|[\s،,.])(?:حولت|حوّلت|بعت|بعثت|ارسلت|أرسلت|دفعت)(?=$|[\s،,.])/i.test(text);
+  const outgoingVerb = /(?:^|[\s،,.])(?:حولت(?!\s+لي(?=$|[\s،,.]))|حوّلت(?!\s+لي(?=$|[\s،,.]))|بعت(?!\s+لي(?=$|[\s،,.]))|بعثت(?!\s+لي(?=$|[\s،,.]))|ارسلت|أرسلت|دفعت)(?=$|[\s،,.])/i.test(text);
   // "حولت 500 من محمد" is not safely an incoming transfer.
   return !outgoingVerb && (incomingVerb || (transferNoun && sender));
 }

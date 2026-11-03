@@ -11,6 +11,7 @@ interface TransactionsViewProps {
   loadState: 'loading' | 'ready' | 'error';
   onOpenAddModal: () => void;
   onDeleteTransaction: (id: string) => void;
+  initialFilter?: { period: 'today' | 'month'; currency: string } | null;
 }
 
 export function TransactionsView({
@@ -21,10 +22,17 @@ export function TransactionsView({
   loadState,
   onOpenAddModal,
   onDeleteTransaction,
+  initialFilter,
 }: TransactionsViewProps) {
   const t = translations[lang];
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'expense' | 'income' | 'transfer'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'expense' | 'income' | 'transfer'>(initialFilter ? 'expense' : 'all');
+  const [filterPeriod, setFilterPeriod] = useState<'all' | 'today' | 'month'>(initialFilter?.period || 'all');
+  const [filterCurrency, setFilterCurrency] = useState<string>(initialFilter?.currency || 'all');
+  const now = new Date();
+  const todayKey = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
+  const monthKey = todayKey.slice(0, 7);
+  const currencies = Array.from(new Set(transactions.map(tx => tx.currency))).sort();
 
   const getAccountName = (accId: string) => {
     const acc = accounts.find((a) => a.id === accId);
@@ -41,6 +49,9 @@ export function TransactionsView({
 
   const filtered = transactions.filter((tx) => {
     if (filterType !== 'all' && tx.type !== filterType) return false;
+    if (filterPeriod === 'today' && tx.date !== todayKey) return false;
+    if (filterPeriod === 'month' && !tx.date.startsWith(monthKey)) return false;
+    if (filterCurrency !== 'all' && tx.currency !== filterCurrency) return false;
     if (!searchTerm.trim()) return true;
 
     const term = searchTerm.toLowerCase();
@@ -101,6 +112,28 @@ export function TransactionsView({
           />
         </div>
 
+        {/* Date and currency filters, including contextual filters from summary cards. */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {(['all', 'today', 'month'] as const).map(period => (
+            <button
+              key={period}
+              type="button"
+              onClick={() => setFilterPeriod(period)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${filterPeriod === period ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200'}`}
+            >
+              {period === 'all' ? (lang === 'ar' ? 'كل الفترات' : 'All dates') : period === 'today' ? (lang === 'ar' ? 'اليوم' : 'Today') : (lang === 'ar' ? 'هذا الشهر' : 'This month')}
+            </button>
+          ))}
+          <select
+            aria-label={lang === 'ar' ? 'فلتر العملة' : 'Currency filter'}
+            value={filterCurrency}
+            onChange={e => setFilterCurrency(e.target.value)}
+            className="rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-xs font-bold text-slate-700"
+          >
+            <option value="all">{lang === 'ar' ? 'كل العملات' : 'All currencies'}</option>
+            {currencies.map(currency => <option key={currency} value={currency}>{currency}</option>)}
+          </select>
+        </div>
         {/* Filter Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
           <button

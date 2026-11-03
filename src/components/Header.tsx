@@ -72,7 +72,7 @@ export function Header({
   }, []);
 
   return (
-    <header className="bg-white/95 backdrop-blur-md sticky top-0 z-20 px-3 sm:px-6 py-2.5 border-b border-slate-100">
+    <header className="bg-white/95 backdrop-blur-md sticky top-0 z-20 px-3 sm:px-6 py-3 border-b border-slate-100">
       <div className="max-w-md sm:max-w-xl mx-auto flex items-center justify-between gap-2">
         {/* Savings page shortcut */}
         <button
@@ -80,7 +80,7 @@ export function Header({
           type="button"
           onClick={onOpenOffers}
           title={isAr ? 'وفّر مع My Bucket' : 'Save with My Bucket'}
-          className="shrink-0 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 text-[11px] sm:text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+          className="shrink-0 min-h-10 sm:min-h-11 inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 sm:px-4 py-2.5 text-xs sm:text-sm font-extrabold shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
         >
           {isAr ? 'وفّر مع My Bucket' : 'Save with My Bucket'}
         </button>

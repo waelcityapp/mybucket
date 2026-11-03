@@ -39,3 +39,23 @@ test('outgoing transfer to a person must not become income', () => {
   const result = interpretLocalFinancialRequest(request('حولت 500 جنيه لمحمد على انستاباي'));
   assert.notEqual(result.transaction?.type, 'income');
 });
+
+test('Egyptian phrase محمد بعت لي is money received, not an expense', () => {
+  const result = interpretLocalFinancialRequest(request('محمد بعت لي 200 جنيه اشتراك رحلة السخنة'));
+  assert.equal(result.intent, 'CREATE_TRANSACTION');
+  assert.equal(result.transaction?.type, 'income');
+  assert.equal(result.transaction?.amount, 200);
+  assert.equal(result.transaction?.accountId, null);
+  assert.ok(result.transaction?.missingFields.includes('accountId'));
+});
+
+test('joined Egyptian phrase محمد بعتلي is also income', () => {
+  const result = interpretLocalFinancialRequest(request('محمد بعتلي 200 جنيه على انستاباي'));
+  assert.equal(result.transaction?.type, 'income');
+  assert.equal(result.transaction?.amount, 200);
+});
+
+test('outgoing sent-to-Mohamed must not become income', () => {
+  const result = interpretLocalFinancialRequest(request('أنا بعت 200 جنيه لمحمد'));
+  assert.notEqual(result.transaction?.type, 'income');
+});

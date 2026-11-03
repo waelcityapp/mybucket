@@ -242,6 +242,12 @@ export function matchExplicitAccountFromText<T extends MatchableAccount>(text: s
   if (named.length > 1) {
     return named[0].score > named[1].score && named[0].name.includes(named[1].name) ? named[0].account : null;
   }
+  // InstaPay is a transfer channel, not a user-owned wallet/account.
+  // An explicitly named account above still wins; channel-only wording cannot.
+  if (/انستا\s*باي|انستاباي|instapay/i.test(norm) &&
+      !/(?:محفظه|محافظ|فودافون|اورانج|اتصالات|بنك|بنكي|كاش|فيزا|كارت|حساب)/i.test(norm)) {
+    return null;
+  }
   const candidate = matchAccountFromText(text, accounts, false);
   if (!candidate) return null;
   return accounts.filter(account => account.type === candidate.type).length === 1 ? candidate : null;

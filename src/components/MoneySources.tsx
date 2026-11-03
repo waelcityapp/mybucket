@@ -1,7 +1,6 @@
-import { Plus, Pencil, ChevronLeft } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import { FinancialAccount, Language } from '../types';
 import { translations } from '../data/translations';
-import { formatAccountBalance } from '../utils/formatBalance';
 
 interface MoneySourcesProps {
   accounts: FinancialAccount[];
@@ -17,71 +16,10 @@ export function MoneySources({
   accounts,
   lang,
   onViewAll,
-  onAddAccountClick,
-  onSelectAccount,
   onEditBalance,
   onOpenExpenseCategories,
 }: MoneySourcesProps) {
   const t = translations[lang];
-
-  const getAccountEmojiIcon = (type: string) => {
-    switch (type) {
-      case 'cash':
-        return (
-          <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-100/80 flex items-center justify-center text-lg">
-            💰
-          </div>
-        );
-      case 'bank':
-        return (
-          <div className="w-9 h-9 rounded-2xl bg-blue-50 border border-blue-100/80 flex items-center justify-center text-lg">
-            🏛️
-          </div>
-        );
-      case 'card':
-        return (
-          <div className="w-9 h-9 rounded-2xl bg-purple-50 border border-purple-100/80 flex items-center justify-center text-lg">
-            💳
-          </div>
-        );
-      case 'wallet':
-        return (
-          <div className="w-9 h-9 rounded-2xl bg-cyan-50 border border-cyan-100/80 flex items-center justify-center text-lg">
-            📱
-          </div>
-        );
-      case 'savings':
-        return (
-          <div className="w-9 h-9 rounded-2xl bg-emerald-50 border border-emerald-100/80 flex items-center justify-center text-lg">
-            💲
-          </div>
-        );
-      case 'other':
-        return (
-          <div className="w-9 h-9 rounded-2xl bg-amber-50 border border-amber-100/80 flex items-center justify-center text-lg">
-            🔄
-          </div>
-        );
-      case 'custom':
-        return (
-          <div className="w-9 h-9 rounded-2xl bg-indigo-50 border border-indigo-100/80 flex items-center justify-center text-lg">
-            💼
-          </div>
-        );
-      default:
-        return (
-          <div className="w-9 h-9 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-lg">
-            💼
-          </div>
-        );
-    }
-  };
-
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US', {
-      maximumFractionDigits: 2,
-    }).format(num);
-  };
 
   // Check if all zero
   const isAllZero = accounts.length > 0 && accounts.every((acc) => acc.balance === 0);
@@ -137,71 +75,6 @@ export function MoneySources({
           </button>
         </div>
       )}
-
-      {/* Accounts Grid - 3 items top row, 3 items bottom row */}
-      <div className="grid grid-cols-2 @min-[480px]:grid-cols-3 gap-2">
-        {accounts.map((acc) => {
-          const displayName = lang === 'ar' ? acc.nameAr : acc.name;
-          const bank = acc.linkedBankId ? accounts.find(a => a.id === acc.linkedBankId) : undefined;
-          const displayBalance = bank ? bank.balance : acc.type === 'credit' ? Math.max(0, -acc.balance) : acc.balance;
-          return (
-            <div
-              key={acc.id}
-              onClick={() => {
-                if (acc.type === 'credit') return;
-                if (acc.type === 'cash' || acc.id === 'acc_cash') {
-                  if (onEditBalance) {
-                    onEditBalance(acc.id);
-                    return;
-                  }
-                }
-                if (onSelectAccount) {
-                  onSelectAccount(acc.id);
-                }
-              }}
-              className="min-w-0 bg-white rounded-xl border border-slate-200/80 p-2 flex items-center gap-2 text-start shadow-2xs hover:shadow-xs hover:border-slate-300 transition-all cursor-pointer group relative active:scale-95"
-            >
-              {/* Account Icon */}
-              <div className="shrink-0 group-hover:scale-105 transition-transform">
-                {getAccountEmojiIcon(acc.type)}
-              </div>
-
-              <div className="min-w-0 flex-1">
-              {/* Account Name */}
-              <span className="text-[11px] sm:text-xs font-bold text-slate-800 line-clamp-2 leading-tight">
-                {displayName}
-              </span>
-
-              {/* Balance & Currency */}
-              <div className="w-full min-w-0 flex flex-wrap items-baseline gap-x-1 gap-y-0 mt-1" aria-label={`${displayName}: ${formatAccountBalance(displayBalance, lang)} ${acc.currency}`}>
-                {acc.type === 'credit' && <span className="text-[10px] font-semibold text-slate-600">{lang === 'ar' ? 'المستحق' : 'Owed'}</span>}
-                <span dir="ltr" className={`max-w-full overflow-x-auto whitespace-nowrap [scrollbar-width:none] font-black text-[clamp(12px,2.2vw,16px)] leading-snug tabular-nums ${displayBalance < 0 ? 'text-red-700' : 'text-slate-950'}`}>
-                  {displayBalance < 0 ? '−' : ''}{new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US', { maximumFractionDigits: 2 }).format(Math.abs(displayBalance))}
-                </span>
-                <span className="text-[10px] font-bold text-slate-500">{acc.currency}</span>
-              </div>
-
-              {bank && <span className="text-[10px] text-slate-500">{lang === 'ar' ? 'مرتبط بـ' : 'Linked to'} {lang === 'ar' ? bank.nameAr : bank.name}</span>}
-              {acc.type === 'credit' && <span className="text-[10px] text-slate-500">{lang === 'ar' ? 'المتاح: ' : 'Available: '}{formatAccountBalance((acc.creditLimit || 0) + acc.balance, lang)}</span>}
-              </div>
-              {/* Pencil icon for editing balance */}
-              {onEditBalance && acc.type !== 'credit' && (
-                <button
-                  type="button"
-                  title={lang === 'ar' ? 'تعديل الرصيد' : 'Edit Balance'}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEditBalance(acc.id);
-                  }}
-                  className="absolute top-1 end-1 opacity-0 group-hover:opacity-100 w-5 h-5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-opacity cursor-pointer"
-                >
-                  <Pencil className="w-2.5 h-2.5" />
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
 
       {/* Button for Spending Categories under the 6 accounts boxes */}
       {onOpenExpenseCategories && (

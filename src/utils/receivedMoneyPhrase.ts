@@ -22,3 +22,19 @@ export function isExplicitMoneyReceipt(rawText: string): boolean {
   // cash withdrawn from one's own bank account with new income.
   return payerSource.test(text) && (moneyAmount.test(text) || moneyMention.test(text));
 }
+
+
+/**
+ * Detect transfers RECEIVED from an outside person, as opposed to transfers
+ * between the user's own accounts. "InstaPay" identifies a payment rail,
+ * never the user's receiving account.
+ */
+export function isIncomingExternalTransfer(rawText: string): boolean {
+  const text = rawText.toLowerCase().replace(/[\u064B-\u065F]/g, '').trim();
+  const sender = /(?:^|[\s،,.])(?:من|عن طريق)\s+(?!(?:حسابي|حساب|البنك|بنك|الكاش|كاش|الفيزا|فيزا|محفظتي|المحفظة|انستاباي|انستا|instapay|cash|bank|visa|wallet)(?=$|[\s،,.]))[\u0621-\u064A]{2,}(?=$|[\s،,.])/i.test(text);
+  const incomingVerb = /(?:^|[\s،,.])(?:حوللي|حوّللي|حولتلي|حولي|بعتلي|اتبعتلي|وصلني|جالي|استلمت|وصلتني)(?=$|[\s،,.])/i.test(text);
+  const transferNoun = /(?:^|[\s،,.])(?:تحويل|تحويلي|حوالة|حواله)(?=$|[\s،,.])/i.test(text);
+  const outgoingVerb = /(?:^|[\s،,.])(?:حولت|حوّلت|بعت|ارسلت|أرسلت|دفعت)(?=$|[\s،,.])/i.test(text);
+  // "حولت 500 من محمد" is not safely an incoming transfer.
+  return !outgoingVerb && (incomingVerb || (transferNoun && sender));
+}

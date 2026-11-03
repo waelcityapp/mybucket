@@ -2,7 +2,7 @@ import { FinancialAccount, Category, TransactionType, CurrencyCode } from '../ty
 import { parseNaturalDateTime } from './dateTime';
 import { parseSemanticNumberRoles, isFinancialQueryText } from './semanticParser';
 import { extractTransactionDescription } from './transactionDescription';
-import { isExplicitMoneyReceipt } from './receivedMoneyPhrase';
+import { isExplicitMoneyReceipt, isIncomingExternalTransfer } from './receivedMoneyPhrase';
 
 export interface ParsedTransactionDraft {
   type: TransactionType;

@@ -1,5 +1,5 @@
 import React, { useState, FormEvent } from 'react';
-import { Plus, CreditCard, Banknote, Building2, PiggyBank, Smartphone, ArrowLeftRight, FolderKanban, ShieldCheck, X, Pencil, RotateCcw } from 'lucide-react';
+import { Plus, CreditCard, Banknote, Building2, PiggyBank, Smartphone, ArrowLeftRight, FolderKanban, ShieldCheck, X, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 import { FinancialAccount, CurrencyCode, AccountType, Language } from '../../types';
 import { translations } from '../../data/translations';
 import { formatAccountBalance } from '../../utils/formatBalance';
@@ -8,11 +8,12 @@ interface AccountsViewProps {
   accounts: FinancialAccount[];
   lang: Language;
   onAddAccount: (acc: Omit<FinancialAccount, 'id'>) => Promise<boolean>;
+  onDeleteAccount: (accountId: string) => Promise<boolean>;
   onEditBalance?: (accId: string | null) => void;
   onZeroAllBalances: () => Promise<boolean>;
 }
 
-export function AccountsView({ accounts, lang, onAddAccount, onEditBalance, onZeroAllBalances }: AccountsViewProps) {
+export function AccountsView({ accounts, lang, onAddAccount, onDeleteAccount, onEditBalance, onZeroAllBalances }: AccountsViewProps) {
   const t = translations[lang];
   const [showAddModal, setShowAddModal] = useState(() => window.location.pathname === '/accounts/new');
   const openAdd = () => { window.history.pushState({ accountCreate: true }, '', '/accounts/new'); setShowAddModal(true); };
@@ -27,6 +28,8 @@ export function AccountsView({ accounts, lang, onAddAccount, onEditBalance, onZe
   const [creditLimit, setCreditLimit] = useState('');
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   // Group balances by currency to strictly prevent combining different currencies
@@ -150,7 +153,7 @@ export function AccountsView({ accounts, lang, onAddAccount, onEditBalance, onZe
         {accounts.map((acc) => (
           <div
             key={acc.id}
-            className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex items-center justify-between group"
+            className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex flex-wrap items-center justify-between gap-y-1 group"
           >
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center">
@@ -177,17 +180,56 @@ export function AccountsView({ accounts, lang, onAddAccount, onEditBalance, onZe
                 </span>
               </div>
 
-              {onEditBalance && acc.type !== 'credit' && (
+              <div className="flex shrink-0 items-center gap-1">
+                {onEditBalance && acc.type !== 'credit' && (
+                  <button
+                    type="button"
+                    title={lang === 'ar' ? 'تعديل الرصيد الافتتاحي' : 'Edit Balance'}
+                    onClick={() => onEditBalance(acc.id)}
+                    className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                )}
                 <button
                   type="button"
-                  title={lang === 'ar' ? 'تعديل الرصيد الافتتاحي' : 'Edit Balance'}
-                  onClick={() => onEditBalance(acc.id)}
-                  className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+                  disabled={deletingId !== null || acc.id === 'acc_other' || acc.id === 'acc_extra'}
+                  title={acc.id === 'acc_other' || acc.id === 'acc_extra'
+                    ? (lang === 'ar' ? 'حساب أساسي لا يمكن حذفه' : 'Built-in account cannot be deleted')
+                    : (lang === 'ar' ? 'مسح الحساب' : 'Delete account')}
+                  aria-label={lang === 'ar' ? `مسح حساب ${acc.nameAr}` : `Delete account ${acc.name}`}
+                  onClick={() => setConfirmDeleteId(acc.id)}
+                  className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                  <Pencil className="w-3.5 h-3.5" />
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
-              )}
+              </div>
             </div>
+            {confirmDeleteId === acc.id && (
+              <div className="mt-3 w-full rounded-xl border border-rose-200 bg-rose-50 p-3 text-start sm:col-span-2">
+                <p className="text-xs font-bold text-rose-900">
+                  {lang === 'ar' ? `هل تريد مسح حساب «${acc.nameAr}»؟ لن يتم حذف أي عمليات مالية، ولا يُسمح بمسح حساب له رصيد أو عمليات أو حسابات مرتبطة.` : `Delete “${acc.name}”? Transactions are never deleted; accounts with balances, transactions or linked methods cannot be removed.`}
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <button type="button" disabled={deletingId !== null}
+                    onClick={async () => {
+                      if (deletingId !== null) return;
+                      setDeletingId(acc.id);
+                      try {
+                        const success = await onDeleteAccount(acc.id);
+                        if (success) setConfirmDeleteId(null);
+                      } finally { setDeletingId(null); }
+                    }}
+                    className="rounded-lg bg-rose-600 px-3 py-2 text-xs font-bold text-white hover:bg-rose-700 disabled:opacity-50">
+                    {deletingId === acc.id ? (lang === 'ar' ? 'جارٍ المسح...' : 'Deleting...') : (lang === 'ar' ? 'تأكيد المسح' : 'Confirm delete')}
+                  </button>
+                  <button type="button" disabled={deletingId !== null} onClick={() => setConfirmDeleteId(null)}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:opacity-50">
+                    {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>

@@ -102,7 +102,9 @@ export default function App() {
   // 2. Active Tab State
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname === '/admin/analyzer-feedback' ? 'admin' : window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : 'home');
   // Keep in-app tab changes in browser history so the device Back button can restore them.
-  const navigateTab = (tab: ActiveTab) => {
+  const [transactionQuickFilter, setTransactionQuickFilter] = useState<{ period: 'today' | 'month'; currency: string } | null>(null);
+  const navigateTab = (tab: ActiveTab, quickFilter: { period: 'today' | 'month'; currency: string } | null = null) => {
+    if (tab === 'transactions') setTransactionQuickFilter(quickFilter);
     if (recordTabNavigation(window.history, window.location, activeTab, tab)) setActiveTab(tab);
   };
   const openGuide = () => { window.history.pushState({ guide: true }, '', '/guide'); setActiveTab('guide'); };
@@ -1213,7 +1215,7 @@ export default function App() {
               accounts={accounts}
               transactions={transactions}
               lang={lang}
-              onViewTransactions={() => navigateTab('transactions')}
+              onViewTransactions={(period, currency) => navigateTab('transactions', { period, currency })}
               onViewAccounts={() => navigateTab('accounts')}
             />
 
@@ -1296,6 +1298,7 @@ export default function App() {
 
         {activeTab === 'transactions' && (
           <TransactionsView
+            initialFilter={transactionQuickFilter}
             transactions={transactions}
             accounts={accounts}
             categories={categories}

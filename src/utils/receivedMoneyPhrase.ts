@@ -32,9 +32,13 @@ export function isExplicitMoneyReceipt(rawText: string): boolean {
 export function isIncomingExternalTransfer(rawText: string): boolean {
   const text = rawText.toLowerCase().replace(/[\u064B-\u065F]/g, '').trim();
   const sender = /(?:^|[\s،,.])(?:من|عن طريق)\s+(?!(?:حسابي|حساب|البنك|بنك|الكاش|كاش|الفيزا|فيزا|محفظتي|المحفظة|انستاباي|انستا|instapay|cash|bank|visa|wallet)(?=$|[\s،,.]))[\u0621-\u064A]{2,}(?=$|[\s،,.])/i.test(text);
-  const incomingVerb = /(?:^|[\s،,.])(?:حوللي|حوّللي|حولتلي|حولي|بعتلي|اتبعتلي|وصلني|جالي|استلمت|وصلتني)(?=$|[\s،,.])/i.test(text);
+  // "محمد بعت لي" and "محمد بعتلي" are both incoming;
+  // "أنا بعت لمحمد" is outgoing and must not be matched.
+  const recipientClitic = /(?:^|[\s،,.])(?:بعت\s*لي|بعتلي|بعث\s*لي|بعثلي|حول\s*لي|حوللي|حولت\s*لي|حولتلي|حوّل\s*لي|وصل\s*لي|وصللي|وصلني|وصلتني|جالي|استلمت|اتبعتلي)(?=$|[\s،,.])/i.test(text);
+  const senderFirst = /(?:^|[\s،,.])(?:[\u0621-\u064A]{2,})\s+(?:بعت\s*لي|بعتلي|بعث\s*لي|بعثلي|حول\s*لي|حوللي|حولت\s*لي|حولتلي|حوّل\s*لي|وصل\s*لي|وصللي)(?=$|[\s،,.])/i.test(text);
+  const incomingVerb = recipientClitic || senderFirst;
   const transferNoun = /(?:^|[\s،,.])(?:تحويل|تحويلي|حوالة|حواله)(?=$|[\s،,.])/i.test(text);
-  const outgoingVerb = /(?:^|[\s،,.])(?:حولت|حوّلت|بعت|ارسلت|أرسلت|دفعت)(?=$|[\s،,.])/i.test(text);
+  const outgoingVerb = /(?:^|[\s،,.])(?:حولت|حوّلت|بعت|بعثت|ارسلت|أرسلت|دفعت)(?=$|[\s،,.])/i.test(text);
   // "حولت 500 من محمد" is not safely an incoming transfer.
   return !outgoingVerb && (incomingVerb || (transferNoun && sender));
 }

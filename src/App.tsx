@@ -78,6 +78,7 @@ import {
   zeroAccountBalances,
   updateFinancialTransaction,
   deleteTransactionFromFirestore,
+  deleteUnusedAccountFromFirestore,
   saveAllCategoriesToFirestore,
   saveLearnedMemoryToFirestore,
   subscribeLearnedMemory,
@@ -700,6 +701,30 @@ export default function App() {
     }
   };
 
+  const handleDeleteAccount = async (accountId: string): Promise<boolean> => {
+    if (!authUser || !financialLoaded.accounts || !financialLoaded.transactions || transactionReadError) {
+      setToastMessage(lang === 'ar' ? 'تعذر التحقق من حساباتك وعملياتك. أعد المحاولة بعد اكتمال التحميل.' : 'Could not verify accounts and transactions. Retry after loading.');
+      return false;
+    }
+    try {
+      await deleteUnusedAccountFromFirestore(authUser.uid, accountId);
+      setToastMessage(lang === 'ar' ? 'تم حذف الحساب غير المستخدم بنجاح.' : 'Unused account deleted.');
+      return true;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : '';
+      const messages: Record<string, [string, string]> = {
+        'has-transactions': ['لا يمكن مسح حساب له عمليات مسجلة. ستظل بياناتك محفوظة.', 'Cannot delete an account with recorded transactions.'],
+        'nonzero-balance': ['لا يمكن مسح حساب برصيد غير صفري. راجع الرصيد أولًا.', 'Account balance must be zero before deletion.'],
+        'linked-account': ['لا يمكن مسح حساب مرتبط بحساب أو بطاقة أخرى.', 'This account has linked payment methods.'],
+        'system-account': ['هذا حساب أساسي في التطبيق ولا يمكن مسحه حاليًا.', 'This built-in account cannot be deleted.'],
+        'last-account': ['يجب الاحتفاظ بحساب واحد على الأقل.', 'Keep at least one account.'],
+      };
+      const message = messages[reason];
+      setToastMessage(message ? message[lang === 'ar' ? 0 : 1] : (lang === 'ar' ? 'تعذر مسح الحساب. تحقق من الاتصال ثم حاول مرة أخرى.' : 'Could not delete account. Check connection and retry.'));
+      return false;
+    }
+  };
+
   // Add New Category Handler (from autocomplete or categories view)
   const handleAddCategory = async (newCat: Category) => {
     const updated = [...categories, newCat];
@@ -1314,6 +1339,7 @@ export default function App() {
             accounts={accounts}
             lang={lang}
             onAddAccount={handleAddAccount}
+            onDeleteAccount={handleDeleteAccount}
             onEditBalance={handleOpenEditBalance}
             onZeroAllBalances={handleZeroAllBalances}
           />

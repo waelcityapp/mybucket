@@ -88,32 +88,41 @@ export function MoneySources({
 
   return (
     <section className="@container space-y-2.5">
-      {/* Header Row: "حساباتك" with black + button on start, "عرض الكل" on end */}
-      <div className="flex items-center justify-between px-0.5">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm sm:text-base font-black text-slate-900 ">
-            {t.yourAccounts}
-          </h2>
-          <button
-            type="button"
-            onClick={onAddAccountClick}
-            aria-label={t.addAccount}
-            className="w-5 h-5 rounded-full bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center transition-transform active:scale-90 cursor-pointer shadow-xs"
-          >
-            <Plus className="w-3.5 h-3.5 stroke-[3]" />
-          </button>
+      {/* Accounts management header matches the Spending Categories card. */}
+      <button
+        type="button"
+        onClick={onViewAll}
+        className="w-full bg-white hover:bg-slate-50/90 border border-slate-200/90 hover:border-slate-300 rounded-2xl p-2.5 sm:p-3 flex items-center justify-between shadow-2xs hover:shadow-xs transition-all cursor-pointer group active:scale-[0.99]"
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-100/80 flex items-center justify-center text-base shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+            💳
+          </div>
+          <div className="text-start min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs sm:text-sm font-black text-slate-900 leading-tight">
+                {t.yourAccounts}
+              </span>
+              <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-md">
+                {lang === 'ar' ? 'تعديل وإضافة' : 'Edit & Add'}
+              </span>
+            </div>
+            <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium">
+              {lang === 'ar'
+                ? 'عرض حساباتك الحالية وإدارة الأرصدة وإضافة حسابات جديدة'
+                : 'View accounts, manage balances, and add new accounts'}
+            </p>
+          </div>
         </div>
+        <div className="flex items-center gap-1 text-slate-400 group-hover:text-slate-700 transition-colors shrink-0">
+          <span className="text-xs font-bold text-slate-600 hidden sm:inline">
+            {lang === 'ar' ? 'عرض القائمة' : 'View list'}
+          </span>
+          <ChevronLeft className={`w-4 h-4 ${lang === 'ar' ? '' : 'rotate-180'}`} />
+        </div>
+      </button>
 
-        <button
-          type="button"
-          onClick={onViewAll}
-          className="text-xs font-semibold text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-        >
-          {t.viewAll}
-        </button>
-      </div>
-
-      {/* When all accounts are zero, show friendly prompt to set opening balances */}
+            {/* When all accounts are zero, show friendly prompt to set opening balances */}
       {isAllZero && onEditBalance && (
         <div className="bg-emerald-50/80 border border-emerald-200/70 rounded-2xl p-3 flex items-center justify-between gap-2 text-xs">
           <span className="text-emerald-900 font-bold">

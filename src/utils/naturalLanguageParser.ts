@@ -37,7 +37,9 @@ export function parseNaturalLanguageInput(
 
   // 1. Detect Type
   let type: TransactionType = 'expense';
-  if (
+  if (isIncomingExternalTransfer(core)) {
+    type = 'income';
+  } else if (
     lower.includes('حولت') ||
     lower.includes('تحويل') ||
     lower.includes('حول') ||

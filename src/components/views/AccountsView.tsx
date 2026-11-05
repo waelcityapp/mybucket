@@ -1,6 +1,6 @@
 import React, { useState, FormEvent } from 'react';
 import { Plus, CreditCard, Banknote, Building2, PiggyBank, Smartphone, ArrowLeftRight, FolderKanban, ShieldCheck, X, Pencil, RotateCcw, Trash2 } from 'lucide-react';
-import { FinancialAccount, CurrencyCode, AccountType, Language } from '../../types';
+import { FinancialAccount, CurrencyCode, AccountType, Language, SUPPORTED_CURRENCIES, currencyName } from '../../types';
 import { translations } from '../../data/translations';
 import { formatAccountBalance } from '../../utils/formatBalance';
 
@@ -295,11 +295,7 @@ export function AccountsView({ accounts, lang, onAddAccount, onDeleteAccount, on
                     onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold font-mono"
                   >
-                    <option value="EGP">EGP (جنيه مصري)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="SAR">SAR (ريال سعودي)</option>
-                    <option value="AED">AED (درهم إماراتي)</option>
-                    <option value="EUR">EUR (€)</option>
+                    {SUPPORTED_CURRENCIES.map(code => <option key={code} value={code}>{currencyName(code, lang)} ({code})</option>)}
                   </select>
                 </div>
               </div>

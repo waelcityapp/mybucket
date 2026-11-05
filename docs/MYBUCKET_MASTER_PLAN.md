@@ -291,3 +291,8 @@ Corrects the admin entry callback binding on the authenticated Header (previousl
 ## Admin console organization — revision #93
 
 Move the existing Gemini AI usage, server connection diagnostic and active model selection card from user Settings to the owner-only Admin dashboard. Keep feedback reports and rating controls under a clearly labeled dashboard entry, and return from Admin to Home instead of Settings. Existing data reset functions remain intact. No backend changes or new administration features are introduced.
+
+
+## Admin navigation sections — revision #94
+
+The existing administrator dashboard is organized into six selectable sections: Users, Subscriptions, Marketers, Reports, Artificial Intelligence, and System Settings. The first three are clearly marked in development with no fabricated user data or enabled admin controls. Reports opens the existing feedback administration page; AI preserves the existing Gemini usage, diagnostics, and model management widget. System Settings contains the existing diagnostics and current-account data tools, clearly labeled as personal-account operations. No server endpoints, billing rules, data models, Firebase or Vercel configurations are changed. Administrator PIN limitations documented previously still apply.

@@ -127,6 +127,22 @@ export function MobileLinkModal({ isOpen, onClose, lang, user, onLogin }: Mobile
               </button>
             </div>
           </div>
+          <details className="rounded-xl border border-slate-200 bg-white p-3">
+            <summary className="cursor-pointer text-xs font-bold text-slate-700">
+              {isAr ? 'عرض رمز QR لفتح الموقع على موبايل آخر' : 'Show QR code to open on another phone'}
+            </summary>
+            <div className="mt-3 flex justify-center">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(appUrl)}`}
+                alt={isAr ? 'رمز QR لرابط My Bucket' : 'QR code for My Bucket website'}
+                width={180}
+                height={180}
+                loading="lazy"
+                className="rounded-lg border border-slate-200 bg-white p-2"
+              />
+            </div>
+            <p className="mt-2 text-center text-[10px] text-slate-500">{isAr ? 'امسح الرمز بالكاميرا، ثم اتبع خطوات تثبيت التطبيق.' : 'Scan with your phone, then follow the installation steps.'}</p>
+          </details>
           <p className="text-center text-[11px] leading-5 text-slate-500">{isAr ? 'التثبيت مجاني. بياناتك تظل محفوظة في حساب Google وتحتاج الإنترنت للمزامنة؛ لا نحفظ البيانات المالية دون اتصال.' : 'Installation is free. Your Google account data stays in the cloud; an internet connection is needed for syncing. Financial data is not cached offline.'}</p>
           {!user && <button type="button" onClick={() => {onClose();onLogin();}} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">{isAr ? 'تسجيل الدخول بجوجل' : 'Sign in with Google'}</button>}
         </div>

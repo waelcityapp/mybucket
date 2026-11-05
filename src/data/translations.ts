@@ -79,7 +79,7 @@ export const translations = {
     navSearch: 'استعلام',
     navAccounts: 'الحسابات',
     navCategories: 'التقارير',
-    navSettings: 'المزيد',
+    navSettings: 'الإعدادات',
     
     // Search View
     searchTitle: 'استعلام مالي',
@@ -261,7 +261,7 @@ export const translations = {
     navSearch: 'Search',
     navAccounts: 'Accounts',
     navCategories: 'Reports',
-    navSettings: 'More',
+    navSettings: 'Settings',
     
     // Search View
     searchTitle: 'Financial Search',

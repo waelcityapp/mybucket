@@ -226,16 +226,19 @@ export default function App() {
   const isAdmin = authUser?.email?.trim().toLowerCase() === 'waelvts@gmail.com';
   // This PIN is a temporary UI gate, not a server-side security boundary.
   const [adminPinVerified, setAdminPinVerified] = useState(false);
+  const [adminRoute, setAdminRoute] = useState(() => window.location.pathname);
   const openAdminPin = () => {
     if (!isAdmin) return;
     if (adminPinVerified) { navigateTab('admin'); return; }
     window.history.pushState({ myBucketTab: 'admin-pin' }, '', '/admin/unlock');
+    setAdminRoute('/admin/unlock');
     setActiveTab('admin-pin');
   };
   const verifyAdminPin = (pin: string) => {
     if (!isAdmin || pin !== '2233') return false;
     setAdminPinVerified(true);
     window.history.replaceState({ myBucketTab: 'admin' }, '', '/admin');
+    setAdminRoute('/admin');
     setActiveTab('admin');
     return true;
   };
@@ -243,6 +246,7 @@ export default function App() {
   useEffect(() => {
     const onPopState = () => {
       const next = tabFromHistory(window.location, window.history.state);
+      setAdminRoute(window.location.pathname);
       setActiveTab(next === 'admin' && !adminPinVerified ? 'admin-pin' : next);
     };
     window.addEventListener('popstate', onPopState);
@@ -250,17 +254,19 @@ export default function App() {
   }, [adminPinVerified]);
 
   const adminSectionFromPath = (): SectionId | null => {
-    const section = window.location.pathname.match(/^\/admin\/(users|subscriptions|marketers|ads|ai|system)$/)?.[1];
+    const section = adminRoute.match(/^\/admin\/(users|subscriptions|marketers|ads|ai|system)$/)?.[1];
     return section ? section as SectionId : null;
   };
   const openAdminSection = (section: SectionId) => {
     if (!isAdmin || !adminPinVerified) return;
     if (section === 'reports') { openFeedbackAdmin(); return; }
     window.history.pushState({ myBucketTab: 'admin' }, '', `/admin/${section}`);
+    setAdminRoute(`/admin/${section}`);
     setActiveTab('admin');
   };
   const backToAdminSections = () => {
     window.history.pushState({ myBucketTab: 'admin' }, '', '/admin');
+    setAdminRoute('/admin');
     setActiveTab('admin');
   };
 
@@ -269,6 +275,7 @@ export default function App() {
       window.history.back();
     } else {
       window.history.replaceState({ myBucketTab:'admin' }, '', '/admin');
+      setAdminRoute('/admin');
       setActiveTab('admin');
     }
   };
@@ -278,6 +285,7 @@ export default function App() {
     if (window.location.pathname !== '/admin/analyzer-feedback') {
       window.history.pushState({ myBucketTab:'admin', feedbackAdmin:true }, '', '/admin/analyzer-feedback');
     }
+    setAdminRoute('/admin/analyzer-feedback');
     setActiveTab('admin');
   };
 
@@ -1433,7 +1441,7 @@ export default function App() {
           <AdminPinView lang={lang} onBack={() => navigateTab('home')} onVerify={verifyAdminPin} />
         )}
         {activeTab === 'admin' && isAdmin && adminPinVerified && authUser && (
-          window.location.pathname === '/admin/analyzer-feedback'
+          adminRoute === '/admin/analyzer-feedback'
             ? <AnalyzerFeedbackAdmin lang={lang} onBack={closeFeedbackAdmin} />
             : <AdminView lang={lang} user={authUser} onBack={() => navigateTab('home')} onResetDemoData={handleResetDemoData} onZeroAllBalances={handleZeroAllBalances} onOpenFeedbackAdmin={openFeedbackAdmin} sectionId={adminSectionFromPath()} onOpenSection={openAdminSection} onBackToSections={backToAdminSections} />
         )}

@@ -119,8 +119,22 @@ export function TransactionsView({
           />
         </div>
 
-        {/* Date period and currency are independent filters, with clear labels. */}
+        {/* Currency first, then date period, then transaction type. All choices combine. */}
         <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
+            <label htmlFor="transaction-currency-filter" className="text-xs font-bold text-slate-700">
+              {lang === 'ar' ? 'العملة' : 'Currency'}
+            </label>
+            <select
+              id="transaction-currency-filter"
+              value={filterCurrency}
+              onChange={event => setFilterCurrency(event.target.value)}
+              className="min-w-[155px] max-w-full rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs font-bold text-emerald-900"
+            >
+              <option value="all">{lang === 'ar' ? 'جميع العملات' : 'All currencies'}</option>
+              {currencies.map(currency => <option key={currency} value={currency}>{currencyName(currency, lang)} ({currency})</option>)}
+            </select>
+          </div>
           <div className="space-y-1.5">
             <span className="block text-xs font-bold text-slate-700">{lang === 'ar' ? 'الفترة الزمنية' : 'Date period'}</span>
             <div className="flex flex-wrap gap-1.5">
@@ -161,20 +175,7 @@ export function TransactionsView({
               </div>
             )}
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
-            <label htmlFor="transaction-currency-filter" className="text-xs font-bold text-slate-700">
-              {lang === 'ar' ? 'فلتر العملة (مستقل عن الفترة)' : 'Currency filter (separate)'}
-            </label>
-            <select
-              id="transaction-currency-filter"
-              value={filterCurrency}
-              onChange={event => setFilterCurrency(event.target.value)}
-              className="min-w-[155px] max-w-full rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs font-bold text-emerald-900"
-            >
-              <option value="all">{lang === 'ar' ? 'جميع العملات' : 'All currencies'}</option>
-              {currencies.map(currency => <option key={currency} value={currency}>{currencyName(currency, lang)} ({currency})</option>)}
-            </select>
-          </div>
+
         </div>
         {/* Filter Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1">

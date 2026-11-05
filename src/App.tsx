@@ -40,7 +40,7 @@ import { AccountsView } from './components/views/AccountsView';
 import { CategoriesView } from './components/views/CategoriesView';
 import { SettingsView } from './components/views/SettingsView';
 import { SearchView } from './components/views/SearchView';
-import { CheckCircle2, Smartphone, Cloud, ArrowRight, Sparkles, Clock, Settings, BookOpen, Tag } from 'lucide-react';
+import { CheckCircle2, Smartphone, Cloud, ArrowRight, Sparkles, Clock, BookOpen, Tag } from 'lucide-react';
 import { AIFinancialQuery, AICorrection } from './services/ai/types';
 import {
   executeDeterministicQuery,
@@ -1290,10 +1290,7 @@ export default function App() {
                   </div>}
                 </div>
               )}
-              <div className="grid grid-cols-3 gap-1.5 border-t border-slate-100 pt-2">
-                <button type="button" onClick={openAccountSettings} className="flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-lg bg-slate-50 px-1 py-2 text-center text-[11px] sm:text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors">
-                  <Settings className="h-4 w-4 text-slate-600" /><span>{lang === 'ar' ? 'الإعدادات' : 'Settings'}</span>
-                </button>
+              <div className="grid grid-cols-2 gap-1.5 border-t border-slate-100 pt-2">
                 <button type="button" onClick={openGuide} className="flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-lg bg-slate-50 px-1 py-2 text-center text-[11px] sm:text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors">
                   <BookOpen className="h-4 w-4 text-slate-600" /><span>{lang === 'ar' ? 'دليل الاستخدام' : 'User guide'}</span>
                 </button>
@@ -1456,7 +1453,6 @@ export default function App() {
             }}
             onLogin={handleGoogleLogin}
             onLogout={handleGoogleLogout}
-            isAdmin={isAdmin}
             onOpenMobileLink={() => setIsMobileModalOpen(true)}
           />
         )}

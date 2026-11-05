@@ -1176,6 +1176,22 @@ export default function App() {
     }} />;
   }
 
+  const showBottomNavigation = (
+    ['home', 'transactions', 'search', 'categories', 'settings', 'accounts'].includes(activeTab)
+    && window.location.pathname !== '/accounts/new'
+    && !isAddModalOpen
+    && !isEditBalanceModalOpen
+    && !isBankAccountModalOpen
+    && !isCardAccountModalOpen
+    && !isWalletAccountModalOpen
+    && !isOtherAccountModalOpen
+    && !isExtraAccountModalOpen
+    && !isExpenseCategoriesModalOpen
+    && !isCategoryDetailModalOpen
+    && !isMobileModalOpen
+    && !isDealsModalOpen
+  );
+
   return (
     <div
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
@@ -1203,7 +1219,7 @@ export default function App() {
       />
 
       {/* Main Content Area - Mobile First proportions matching reference */}
-      <main className="flex-1 max-w-md sm:max-w-xl w-full mx-auto p-4 pb-24">
+      <main className={`flex-1 max-w-md sm:max-w-xl w-full mx-auto p-4 ${showBottomNavigation ? 'pb-32' : 'pb-8'}`}>
         {activeTab === 'home' && (
           <div className="space-y-4">
             {/* Quick Mobile & Google Account Banner (if not logged in) */}
@@ -1575,12 +1591,14 @@ export default function App() {
         lang={lang}
       />
 
-      {/* Bottom Navigation Bar */}
-      <BottomNav
-        activeTab={activeTab}
-        onChangeTab={navigateTab}
-        lang={lang}
-      />
+      {/* Always visible while scrolling main pages; hidden in focused workflows. */}
+      {showBottomNavigation && (
+        <BottomNav
+          activeTab={activeTab}
+          onChangeTab={navigateTab}
+          lang={lang}
+        />
+      )}
     </div>
   );
 }

@@ -1,2 +1,2 @@
 // One source of truth for the admin-visible app revision and feedback reports.
-export const APP_REVISION = '#109' as const;
+export const APP_REVISION = '#110' as const;

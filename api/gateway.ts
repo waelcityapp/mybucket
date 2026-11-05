@@ -37,6 +37,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     switch (action) {
+      case 'fx.get': {
+        const { getExchangeRateWidget } = await import('../server/exchangeRates.js');
+        return res.status(200).json({ ok: true, data: await getExchangeRateWidget(user.uid) });
+      }
+      case 'fx.select': {
+        const { changeExchangeRateWidget } = await import('../server/exchangeRates.js');
+        return res.status(200).json({ ok: true, data: await changeExchangeRateWidget(user.uid, payload) });
+      }
       case 'admin.aiUsage': {
         if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') {
           return res.status(403).json({ ok: false, error: 'admin_only' });

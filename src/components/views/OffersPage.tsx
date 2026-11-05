@@ -11,7 +11,7 @@ interface OffersPageProps {
   onBack: () => void;
   categorySlug?: string | null;
   onOpenCategory: (slug: string) => void;
-  onAddAd?: () => void;
+  onAddAd: () => void;
 }
 
 interface OfferCategory {
@@ -65,7 +65,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
             <h1 className="text-lg font-extrabold leading-snug">{title}</h1>
             <p className="text-xs text-slate-500">My Bucket</p>
           </div>
-          {!categorySlug && onAddAd && (
+          {!categorySlug && (
             <button type="button" onClick={onAddAd}
               aria-label={isAr ? 'إضافة إعلان جديد' : 'Add new advertisement'}
               title={isAr ? 'إضافة إعلان جديد' : 'Add new advertisement'}

@@ -296,3 +296,8 @@ Move the existing Gemini AI usage, server connection diagnostic and active model
 ## Admin navigation sections — revision #94
 
 The existing administrator dashboard is organized into six selectable sections: Users, Subscriptions, Marketers, Reports, Artificial Intelligence, and System Settings. The first three are clearly marked in development with no fabricated user data or enabled admin controls. Reports opens the existing feedback administration page; AI preserves the existing Gemini usage, diagnostics, and model management widget. System Settings contains the existing diagnostics and current-account data tools, clearly labeled as personal-account operations. No server endpoints, billing rules, data models, Firebase or Vercel configurations are changed. Administrator PIN limitations documented previously still apply.
+
+
+## Admin full-page navigation — revision #95
+
+The owner dashboard now lists seven cards, adding Ads Management (not yet implemented). Every card opens its dedicated route rather than expanding beneath the grid. Reports goes directly to the existing `/admin/analyzer-feedback` route; AI and System settings retain their current working widgets, and the remaining sections show clearly marked development placeholders. The section Back control returns to `/admin`; browser/mobile history navigation is wired to admin routes. Google account gating and the existing temporary client-only PIN step remain unchanged. No backend, Firebase, ad data or deployment settings are changed.

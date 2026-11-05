@@ -1416,7 +1416,7 @@ export default function App() {
         {activeTab === 'admin' && isAdmin && adminPinVerified && authUser && (
           window.location.pathname === '/admin/analyzer-feedback'
             ? <AnalyzerFeedbackAdmin lang={lang} onBack={closeFeedbackAdmin} />
-            : <AdminView lang={lang} user={authUser} onBack={() => navigateTab('settings')} onResetDemoData={handleResetDemoData} onZeroAllBalances={handleZeroAllBalances} onOpenFeedbackAdmin={openFeedbackAdmin} />
+            : <AdminView lang={lang} user={authUser} onBack={() => navigateTab('home')} onResetDemoData={handleResetDemoData} onZeroAllBalances={handleZeroAllBalances} onOpenFeedbackAdmin={openFeedbackAdmin} />
         )}
       </main>
 

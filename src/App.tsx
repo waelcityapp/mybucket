@@ -246,36 +246,7 @@ export default function App() {
       }
     }
 
-    // Freshly configured accounts do not need old prototype placeholder accounts.
-    if (deduplicated.some(account => account.id === 'setup_cash')) return { updated: deduplicated, migrated };
-
-    const hasOther = deduplicated.some((a) => a.id === 'acc_other' || a.type === 'other');
-    if (!hasOther) {
-      migrated = true;
-      deduplicated.push({
-        id: 'acc_other',
-        name: 'Other Methods',
-        nameAr: 'وسائل دفع واستلام أخرى',
-        type: 'other' as const,
-        balance: 0,
-        currency: 'EGP' as const,
-        color: '#f59e0b',
-      });
-    }
-
-    const hasExtra = deduplicated.some((a) => a.id === 'acc_extra' || a.type === 'custom');
-    if (!hasExtra) {
-      migrated = true;
-      deduplicated.push({
-        id: 'acc_extra',
-        name: 'Other Accounts',
-        nameAr: 'حسابات أخرى',
-        type: 'custom' as const,
-        balance: 0,
-        currency: 'EGP' as const,
-        color: '#6366f1',
-      });
-    }
+    // Keep only accounts that actually exist in Firestore. Deleted legacy accounts stay deleted.
 
     return { updated: deduplicated, migrated };
   };

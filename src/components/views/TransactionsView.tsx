@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Search, Filter, Plus, ArrowDownRight, ArrowUpRight, ArrowLeftRight, Trash2 } from 'lucide-react';
-import { Transaction, FinancialAccount, Category, Language } from '../../types';
+import { Transaction, FinancialAccount, Category, Language, currencyName } from '../../types';
 import { translations } from '../../data/translations';
 
 interface TransactionsViewProps {
@@ -32,7 +32,7 @@ export function TransactionsView({
   const now = new Date();
   const todayKey = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
   const monthKey = todayKey.slice(0, 7);
-  const currencies = Array.from(new Set(transactions.map(tx => tx.currency))).sort();
+  const currencies = Array.from(new Set([...accounts.map(acc => acc.currency), ...transactions.map(tx => tx.currency)])).sort();
 
   const getAccountName = (accId: string) => {
     const acc = accounts.find((a) => a.id === accId);
@@ -131,7 +131,7 @@ export function TransactionsView({
             className="rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-xs font-bold text-slate-700"
           >
             <option value="all">{lang === 'ar' ? 'كل العملات' : 'All currencies'}</option>
-            {currencies.map(currency => <option key={currency} value={currency}>{currency}</option>)}
+            {currencies.map(currency => <option key={currency} value={currency}>{currencyName(currency, lang)} ({currency})</option>)}
           </select>
         </div>
         {/* Filter Pills */}

@@ -15,6 +15,7 @@ import { PromoBannerData, PerkDealItem } from './types/deals';
 import { PromoBanner } from './components/PromoBanner';
 import { DealsModal } from './components/DealsModal';
 import { OffersPage } from './components/views/OffersPage';
+import { CreateOfferPage } from './components/views/CreateOfferPage';
 import { translations } from './data/translations';
 import { Header } from './components/Header';
 import { VoiceNaturalInput } from './components/VoiceNaturalInput';
@@ -1114,6 +1115,11 @@ export default function App() {
     );
   }
 
+  // Advertisement creation is a public draft/review experience; no publishing occurs client-side.
+  if (window.location.pathname === '/offers/new') {
+    return <CreateOfferPage lang={lang} onBack={() => window.location.assign('/offers')} />;
+  }
+
   // Public offers are browsable without financial account sign-in.
   if (activeTab === 'offers') {
     const categorySlug = window.location.pathname.startsWith('/offers/category/')
@@ -1122,11 +1128,7 @@ export default function App() {
     return <OffersPage
       lang={lang}
       categorySlug={categorySlug}
-      onAddAd={isAdmin ? () => {
-        window.history.pushState({ myBucketTab: adminPinVerified ? 'admin' : 'admin-pin' }, '', adminPinVerified ? '/admin/ads/new' : '/admin/unlock');
-        setAdminRoute(adminPinVerified ? '/admin/ads/new' : '/admin/unlock');
-        setActiveTab(adminPinVerified ? 'admin' : 'admin-pin');
-      } : undefined}
+      onAddAd={() => { window.location.assign('/offers/new'); }}
       onOpenCategory={(slug) => {
         window.location.assign(`/offers/category/${encodeURIComponent(slug)}`);
       }}

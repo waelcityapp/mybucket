@@ -346,3 +346,8 @@ The third shortcut spot in the home greeting/plan row hosts a compact currency c
 ## Exchange rate display fallback — revision #104
 
 Fixed a potential all-or-nothing reference fetch failure by requesting the complete Frankfurter v2 EUR quote feed and selecting supported codes afterward, rather than requesting every supported currency as an API filter. The server now logs upstream feed failures and returns a list of currently quoted currencies. If the authenticated gateway still fails, the home widget tries a read-only direct EGP/USD reference rate for information, clearly marks its temporary nature, and does not allow changing pairs or bypass the 10-per-user-per-day server limit. No fabricated rates and no financial data modifications. Verify the app's gateway and Firebase Admin environment separately if direct fallback displays persistently.
+
+
+## Rates card layout redesign — revision #105
+
+The rates widget is now the prominent larger card in the home quick-access area. The two existing User guide and Subscriptions buttons are stacked vertically beside it, rather than occupying equal-width columns. The rate is shown in stronger, larger type, with more spacing, rounded surface, daily approximate-rate disclosure and remaining-change badge. The feature remains inline on the home screen with the existing account-scoped daily exchange limits, same source and fallback; no financial transactions or balances changed.

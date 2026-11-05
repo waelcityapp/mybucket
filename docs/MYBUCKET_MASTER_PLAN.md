@@ -326,3 +326,8 @@ Rename the bottom navigation label from More to Settings in Arabic and English; 
 ## Transaction filters — revision #100
 
 Transaction history displays separate controls for the date period and currency. The date group supports All dates, Today, This month, This year, Last year, and custom inclusive From/To dates; incomplete/invalid date ranges show an instruction and no misleading results. The currency dropdown has its own label and remains independent of date/type filters and the home overview currency preference. Existing quick links from Today's/Monthly spending continue to preselect the matching date and currency. No financial transactions or account records are modified.
+
+
+## Transaction filter order — revision #101
+
+Show the currency dropdown as the first control above the date period choices, followed by transaction type (income, expense, transfer, all). Rename the caption simply Currency / العملة, removing the confusing 'independent of period' wording. The three choices still compose as a combined filter; no changes to filter calculations or stored data.

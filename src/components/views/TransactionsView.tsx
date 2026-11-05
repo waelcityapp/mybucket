@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Filter, Plus, ArrowDownRight, ArrowUpRight, ArrowLeftRight, Trash2 } from 'lucide-react';
+import { Search, Plus, ArrowDownRight, ArrowUpRight, ArrowLeftRight, Trash2 } from 'lucide-react';
 import { Transaction, FinancialAccount, Category, Language, currencyName } from '../../types';
 import { translations } from '../../data/translations';
 
@@ -27,11 +27,15 @@ export function TransactionsView({
   const t = translations[lang];
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'expense' | 'income' | 'transfer'>(initialFilter ? 'expense' : 'all');
-  const [filterPeriod, setFilterPeriod] = useState<'all' | 'today' | 'month'>(initialFilter?.period || 'all');
+  const [filterPeriod, setFilterPeriod] = useState<'all' | 'today' | 'month' | 'year' | 'previousYear' | 'range'>(initialFilter?.period || 'all');
+  const [rangeFrom, setRangeFrom] = useState('');
+  const [rangeTo, setRangeTo] = useState('');
   const [filterCurrency, setFilterCurrency] = useState<string>(initialFilter?.currency || 'all');
   const now = new Date();
   const todayKey = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
   const monthKey = todayKey.slice(0, 7);
+  const yearKey = todayKey.slice(0, 4);
+  const previousYearKey = String(Number(yearKey) - 1);
   const currencies = Array.from(new Set([...accounts.map(acc => acc.currency), ...transactions.map(tx => tx.currency)])).sort();
 
   const getAccountName = (accId: string) => {
@@ -51,6 +55,9 @@ export function TransactionsView({
     if (filterType !== 'all' && tx.type !== filterType) return false;
     if (filterPeriod === 'today' && tx.date !== todayKey) return false;
     if (filterPeriod === 'month' && !tx.date.startsWith(monthKey)) return false;
+    if (filterPeriod === 'year' && !tx.date.startsWith(yearKey + '-')) return false;
+    if (filterPeriod === 'previousYear' && !tx.date.startsWith(previousYearKey + '-')) return false;
+    if (filterPeriod === 'range' && (!rangeFrom || !rangeTo || rangeFrom > rangeTo || tx.date < rangeFrom || tx.date > rangeTo)) return false;
     if (filterCurrency !== 'all' && tx.currency !== filterCurrency) return false;
     if (!searchTerm.trim()) return true;
 
@@ -112,27 +119,62 @@ export function TransactionsView({
           />
         </div>
 
-        {/* Date and currency filters, including contextual filters from summary cards. */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          {(['all', 'today', 'month'] as const).map(period => (
-            <button
-              key={period}
-              type="button"
-              onClick={() => setFilterPeriod(period)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${filterPeriod === period ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200'}`}
+        {/* Date period and currency are independent filters, with clear labels. */}
+        <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3">
+          <div className="space-y-1.5">
+            <span className="block text-xs font-bold text-slate-700">{lang === 'ar' ? 'الفترة الزمنية' : 'Date period'}</span>
+            <div className="flex flex-wrap gap-1.5">
+              {([
+                ['all', lang === 'ar' ? 'كل الفترات' : 'All dates'],
+                ['today', lang === 'ar' ? 'اليوم' : 'Today'],
+                ['month', lang === 'ar' ? 'هذا الشهر' : 'This month'],
+                ['year', lang === 'ar' ? 'هذه السنة' : 'This year'],
+                ['previousYear', lang === 'ar' ? 'السنة السابقة' : 'Last year'],
+                ['range', lang === 'ar' ? 'من تاريخ إلى تاريخ' : 'Custom range'],
+              ] as const).map(([period, label]) => (
+                <button
+                  key={period}
+                  type="button"
+                  aria-pressed={filterPeriod === period}
+                  onClick={() => setFilterPeriod(period)}
+                  className={`rounded-xl border px-2.5 py-1.5 text-xs font-bold transition-colors ${filterPeriod === period ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {filterPeriod === 'range' && (
+              <div className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-2">
+                <label className="space-y-1 text-xs font-semibold text-slate-700">
+                  <span>{lang === 'ar' ? 'من تاريخ' : 'From date'}</span>
+                  <input type="date" value={rangeFrom} onChange={event => setRangeFrom(event.target.value)} max={rangeTo || undefined} className="block w-full rounded-xl border border-slate-200 bg-white px-2 py-2 text-sm" />
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-slate-700">
+                  <span>{lang === 'ar' ? 'إلى تاريخ' : 'To date'}</span>
+                  <input type="date" value={rangeTo} onChange={event => setRangeTo(event.target.value)} min={rangeFrom || undefined} className="block w-full rounded-xl border border-slate-200 bg-white px-2 py-2 text-sm" />
+                </label>
+                {(!rangeFrom || !rangeTo || rangeFrom > rangeTo) && (
+                  <p role="status" className="text-xs text-amber-700 sm:col-span-2">
+                    {lang === 'ar' ? 'حدد تاريخ البداية والنهاية بصورة صحيحة لعرض العمليات.' : 'Choose a valid start and end date to show transactions.'}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
+            <label htmlFor="transaction-currency-filter" className="text-xs font-bold text-slate-700">
+              {lang === 'ar' ? 'فلتر العملة (مستقل عن الفترة)' : 'Currency filter (separate)'}
+            </label>
+            <select
+              id="transaction-currency-filter"
+              value={filterCurrency}
+              onChange={event => setFilterCurrency(event.target.value)}
+              className="min-w-[155px] max-w-full rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs font-bold text-emerald-900"
             >
-              {period === 'all' ? (lang === 'ar' ? 'كل الفترات' : 'All dates') : period === 'today' ? (lang === 'ar' ? 'اليوم' : 'Today') : (lang === 'ar' ? 'هذا الشهر' : 'This month')}
-            </button>
-          ))}
-          <select
-            aria-label={lang === 'ar' ? 'فلتر العملة' : 'Currency filter'}
-            value={filterCurrency}
-            onChange={e => setFilterCurrency(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-xs font-bold text-slate-700"
-          >
-            <option value="all">{lang === 'ar' ? 'كل العملات' : 'All currencies'}</option>
-            {currencies.map(currency => <option key={currency} value={currency}>{currencyName(currency, lang)} ({currency})</option>)}
-          </select>
+              <option value="all">{lang === 'ar' ? 'جميع العملات' : 'All currencies'}</option>
+              {currencies.map(currency => <option key={currency} value={currency}>{currencyName(currency, lang)} ({currency})</option>)}
+            </select>
+          </div>
         </div>
         {/* Filter Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1">

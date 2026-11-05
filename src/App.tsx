@@ -1307,6 +1307,7 @@ export default function App() {
               lang={lang}
               onViewTransactions={(period, currency) => navigateTab('transactions', { period, currency })}
               onViewAccounts={() => navigateTab('accounts')}
+              userId={authUser?.uid}
             />
 
             {/* 3. THE PRIMARY INTERACTION: "اكتب أو قل لي أي عملية..." Large Card */}

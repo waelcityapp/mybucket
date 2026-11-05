@@ -306,3 +306,8 @@ The owner dashboard now lists seven cards, adding Ads Management (not yet implem
 ## Public advertisement creation entry — revision #96
 
 The green plus button beside the offers title is available to ALL visitors (not only administrators). It opens a full-page route `/offers/new`, separate from `/admin/ads` (owner-only advertisement moderation). Visitors can choose a free or premium advertisement, select its category, enter details, add local image previews, and review their draft. This is an interface-only workflow: no ad or image is uploaded or persisted, and no prices, payment, approval, or publishing services are invented. The form transparently explains that publishing is not available until a verified backend and policy are implemented. Existing public offers counts remain based on real published ads only, currently none.
+
+
+## Context-aware fixed bottom navigation — revision #97
+
+Keep the bottom navigation fixed and visible through both upward and downward scrolling on the main financial pages (Home, Transactions, Search, Categories, Settings and Accounts). Hide it during full-page workflows such as advertisements, login, subscription/trial, guides, admin pages, initial account setup, transaction creation and account editing, as well as open modal forms. Reserve extra bottom space only on screens that display the bar so the final content and controls are not obscured; retain safe-area inset padding. The bar's five existing actions and styling are preserved. No backend or financial data changes.

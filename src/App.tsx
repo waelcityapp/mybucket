@@ -98,7 +98,7 @@ import { saveUserSubscriptionToFirestore, subscribeUserSubscription, type Subscr
 const STORAGE_KEY_PREFIX = 'mybucket_';
 
 
-type FxRateInfo = { from: string; to: string; rate: number | null; remaining: number; limit: number; rateDate: string; stale: boolean };
+type FxRateInfo = { from: string; to: string; rate: number | null; remaining: number; limit: number; rateDate: string; stale: boolean; availableCurrencies?: string[] };
 async function callCurrencyRates(action: 'fx.get' | 'fx.select', payload: Record<string, string> = {}): Promise<FxRateInfo> {
   const user = auth.currentUser;
   if (!user) throw new Error('login_required');
@@ -180,7 +180,7 @@ function ExchangeRatesMini({ lang }: { lang: Language }) {
             aria-label={side === 'from' ? (ar ? 'العملة الأولى' : 'First currency') : (ar ? 'العملة الثانية' : 'Second currency')}
             disabled={!info || busy || info.remaining === 0}
             className="h-10 w-full min-w-0 rounded-xl border border-emerald-200 bg-white px-1 text-[11px] font-extrabold text-slate-800 shadow-sm disabled:opacity-70">
-            {SUPPORTED_CURRENCIES.map(code => <option key={code} value={code}>{currencyName(code, lang)} ({code})</option>)}
+            {SUPPORTED_CURRENCIES.filter(code => !info?.availableCurrencies || info.availableCurrencies.includes(code) || info[side] === code).map(code => <option key={code} value={code}>{currencyName(code, lang)} ({code})</option>)}
           </select>
         ))}
       </div>

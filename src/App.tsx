@@ -1116,7 +1116,6 @@ export default function App() {
         onSuccess={handleAuthGateSuccess}
         onToggleLanguage={handleToggleLanguage}
         onOpenOffers={openOffers}
-        onOpenAdmin={isAdmin ? openAdminPin : undefined}
       />
     );
   }
@@ -1165,6 +1164,7 @@ export default function App() {
         onLogout={handleGoogleLogout}
         onOpenMobileLink={() => setIsMobileModalOpen(true)}
         onOpenOffers={openOffers}
+        onOpenAdmin={isAdmin ? openAdminPin : undefined}
         onUpdateUserName={handleUpdateUserName}
       />
 

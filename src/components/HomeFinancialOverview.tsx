@@ -9,6 +9,7 @@ interface HomeFinancialOverviewProps {
   lang: Language;
   onViewTransactions?: (period: 'today' | 'month', currency: string) => void;
   onViewAccounts?: () => void;
+  userId?: string;
 }
 
 export function HomeFinancialOverview({
@@ -17,6 +18,7 @@ export function HomeFinancialOverview({
   lang,
   onViewTransactions,
   onViewAccounts,
+  userId,
 }: HomeFinancialOverviewProps) {
   const isAr = lang === 'ar';
   const [isBalanceHidden, setIsBalanceHidden] = useState<boolean>(() => {
@@ -42,8 +44,12 @@ export function HomeFinancialOverview({
     return map;
   }, [accounts]);
 
-  // Primary currency and total
-  const primaryCurrency = accounts[0]?.currency || 'EGP';
+  // Selected currency is a view preference and never changes stored balances.
+  const accountCurrencies = useMemo(() => Array.from(new Set(accounts.map(account => account.currency || 'EGP'))), [accounts]);
+  const key = 'mybucket_currency_' + (userId || 'guest');
+  const [currency, setCurrency] = useState(() => localStorage.getItem(key) || 'EGP');
+  const primaryCurrency = accountCurrencies.includes(currency) ? currency : (accountCurrencies[0] || 'EGP');
+  const selectCurrency = (value: string) => { setCurrency(value); localStorage.setItem(key, value); };
   const primaryTotal = balancesByCurrency[primaryCurrency] ?? 0;
   const otherCurrencies = Object.entries(balancesByCurrency).filter(([curr]) => curr !== primaryCurrency);
 
@@ -145,6 +151,12 @@ export function HomeFinancialOverview({
           <ChartNoAxesColumnIncreasing size={18} className="text-emerald-600 shrink-0" />
           {isAr ? 'الوضع المالي' : 'Financial overview'}
         </h2>
+        <div className="flex items-center gap-1 min-w-0">
+          {accountCurrencies.length > 1 ? (
+            <select aria-label={isAr ? 'عملة الوضع المالي' : 'Overview currency'} title={isAr ? 'اختر العملة' : 'Select currency'} value={primaryCurrency} onChange={event => selectCurrency(event.target.value)} className="max-w-[100px] rounded-lg border border-emerald-200 bg-emerald-50 px-1 py-1.5 text-[11px] font-bold text-emerald-950">
+              {accountCurrencies.map(code => <option key={code} value={code}>{code}</option>)}
+            </select>
+          ) : <span className="text-xs font-bold text-emerald-800">{primaryCurrency}</span>}
         {onViewAccounts && (
           <button type="button" onClick={onViewAccounts}
             className="inline-flex shrink-0 min-h-8 items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 sm:px-2.5 text-[10px] sm:text-xs font-bold text-emerald-950 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-emerald-500">
@@ -152,6 +164,7 @@ export function HomeFinancialOverview({
             <ArrowUpRight size={13} className={isAr ? 'rotate-[-90deg]' : ''}/>
           </button>
         )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 @min-[490px]:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] gap-1.5 @min-[490px]:gap-0 items-stretch rounded-[18px] border border-emerald-100 bg-gradient-to-br from-[#F0FCF8] via-[#FBFEFC] to-[#F2FCF8] px-2.5 py-2">

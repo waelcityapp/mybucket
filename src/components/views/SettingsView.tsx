@@ -2,10 +2,6 @@ import { useState } from 'react';
 import {
   Globe,
   RotateCcw,
-  ShieldCheck,
-  ChevronDown,
-  ChevronUp,
-  Database,
   CheckCircle2,
   Smartphone,
   Cloud,
@@ -17,7 +13,6 @@ import {
 import { Language, AuthUser } from '../../types';
 import { UserSubscription } from '../../types/prototypeSubscription';
 import { translations } from '../../data/translations';
-import { storageService } from '../../services/storage/storageManager';
 import { SubscriptionCard } from '../SubscriptionCard';
 
 interface SettingsViewProps {
@@ -31,7 +26,6 @@ interface SettingsViewProps {
   onLogin: () => void;
   onLogout: () => void;
   onOpenMobileLink: () => void;
-  isAdmin?: boolean;
 }
 
 export function SettingsView({
@@ -45,14 +39,11 @@ export function SettingsView({
   onLogin,
   onLogout,
   onOpenMobileLink,
-  isAdmin,
 }: SettingsViewProps) {
   const t = translations[lang];
-  const [showDevAccordion, setShowDevAccordion] = useState(false);
   const [resetConfirmed, setResetConfirmed] = useState(false);
   const [zeroConfirmed, setZeroConfirmed] = useState(false);
 
-  const activeProvider = storageService.getProvider().name;
 
   const handleReset = () => {
     onResetDemoData();
@@ -294,43 +285,7 @@ export function SettingsView({
         )}
       </div>
 
-      {/* 5. Technical Diagnostics */}
-      <div className="bg-slate-100/70 border border-slate-200/60 rounded-2xl overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setShowDevAccordion(!showDevAccordion)}
-          className="w-full p-3.5 flex items-center justify-between text-xs font-bold text-slate-500 hover:text-slate-700 cursor-pointer"
-        >
-          <span className="flex items-center gap-2">
-            <Database className="w-3.5 h-3.5 text-slate-400" />
-            <span>{t.devDiagnostics}</span>
-          </span>
-          {showDevAccordion ? (
-            <ChevronUp className="w-4 h-4" />
-          ) : (
-            <ChevronDown className="w-4 h-4" />
-          )}
-        </button>
 
-        {showDevAccordion && (
-          <div className="p-4 pt-0 border-t border-slate-200/50 space-y-2.5 text-xs text-slate-600">
-            <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 font-medium flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>{t.storageEnforcementBadge}</span>
-            </div>
-
-            <div className="space-y-1 bg-white p-3 rounded-xl border border-slate-200 font-mono text-[11px]">
-              <div>Active Auth: <strong>{user ? `Logged in (${user.email})` : 'Anonymous / Local'}</strong></div>
-              <div>Firestore Database: <strong>ai-studio-mybucket-8e5dde08...</strong></div>
-              <div>Storage Mode: Structured Firestore Documents Only</div>
-            </div>
-
-            <p className="text-[11px] text-slate-400">
-              {t.devNote}
-            </p>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

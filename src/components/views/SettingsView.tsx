@@ -19,7 +19,6 @@ import { UserSubscription } from '../../types/prototypeSubscription';
 import { translations } from '../../data/translations';
 import { storageService } from '../../services/storage/storageManager';
 import { SubscriptionCard } from '../SubscriptionCard';
-import { AdminAiUsageCard } from '../AdminAiUsageCard';
 
 interface SettingsViewProps {
   lang: Language;
@@ -192,8 +191,6 @@ export function SettingsView({
         />
       )}
 
-      {/* 3. Gemini AI Admin & Token Usage Card */}
-      {isAdmin && <AdminAiUsageCard lang={lang} />}
       {/* 4. Mobile Access & QR Link Card */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">
         <div className="flex items-center justify-between">

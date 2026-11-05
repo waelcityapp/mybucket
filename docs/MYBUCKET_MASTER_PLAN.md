@@ -276,3 +276,8 @@ The home screen links to account settings and a full-page usage guide. The guide
 
 
 Revision #33: Account management exposes account creation and a confirmed reset of account balances. Reset updates balances atomically, preserves accounts and transaction history, and explains its impact on credit balances and later transaction edits.
+
+
+## Administrator dashboard entry — revision #91
+
+Move the owner-only dashboard shortcut into the Google avatar menu. A dedicated full-page PIN prompt is introduced without a new Vercel backend. For now PIN verification is client-side UX only and is **not an additional server-side security boundary**; Google administrator authorization remains mandatory on existing protected server actions. Failed-attempt limits and one-hour lockout remain deferred until secure server-side enforcement is available.

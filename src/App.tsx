@@ -120,7 +120,7 @@ export default function App() {
     const onPopState = () => setActiveTab(prev => { const next = tabFromHistory(window.location, window.history.state); return (next === 'admin' && !adminPinVerified) ? 'admin-pin' : next; });
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, [adminPinVerified]);
+  }, []);
 
   // Helper to migrate legacy 'acc_savings_usd' / 'مدخرات دولار' to 'acc_wallet' / 'محافظ إلكترونية' and ensure unique account IDs
   const migrateLegacyAccounts = (accs: FinancialAccount[]): { updated: FinancialAccount[]; migrated: boolean } => {

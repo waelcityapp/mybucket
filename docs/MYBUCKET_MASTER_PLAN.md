@@ -316,3 +316,8 @@ Keep the bottom navigation fixed and visible through both upward and downward sc
 ## User-only bottom settings navigation — revision #98
 
 Rename the bottom navigation label from More to Settings in Arabic and English; it continues to open the existing user Settings tab, never the admin dashboard. Remove the redundant home-header Settings shortcut (which previously opened Accounts instead of user Settings), and reflow the remaining two shortcuts. Remove developer diagnostics from the public Settings page; equivalent technical diagnostics remain available in the owner-only Admin System section. Administrator access remains exclusively in the Google account avatar menu with existing account and PIN checks. Bottom navigation fixed-scroll behavior is unchanged. No changes to Firebase or backend authorization.
+
+
+## Currency support — #99
+
+19 currencies available in fixed account currency selectors, including first-run setup. The financial overview has a saved currency selector and its calculations are currency-scoped. Transaction filters are independent and results show separate totals by currency. Existing balances and transactions are not converted. Cross-currency transfers remain unsupported by the current balance engine; a future dedicated exchange-rate model is required.

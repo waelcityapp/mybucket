@@ -281,3 +281,8 @@ Revision #33: Account management exposes account creation and a confirmed reset 
 ## Administrator dashboard entry — revision #91
 
 Move the owner-only dashboard shortcut into the Google avatar menu. A dedicated full-page PIN prompt is introduced without a new Vercel backend. For now PIN verification is client-side UX only and is **not an additional server-side security boundary**; Google administrator authorization remains mandatory on existing protected server actions. Failed-attempt limits and one-hour lockout remain deferred until secure server-side enforcement is available.
+
+
+## Revision #92 — admin avatar link wiring fix
+
+Corrects the admin entry callback binding on the authenticated Header (previously misplaced on AuthPage). Keeps existing PIN page and defers server-side rate limiting.

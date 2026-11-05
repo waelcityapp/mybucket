@@ -111,18 +111,50 @@ async function callCurrencyRates(action: 'fx.get' | 'fx.select', payload: Record
   if (!response.ok || !result?.ok || !result?.data) throw new Error(result?.error || 'rate_unavailable');
   return result.data as FxRateInfo;
 }
+async function readPublicReferenceRate(): Promise<{ rate: number; date: string }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6500);
+  try {
+    const response = await fetch('https://api.frankfurter.dev/v2/rate/EGP/USD', { signal: controller.signal });
+    if (!response.ok) throw new Error('reference_provider_http_' + response.status);
+    const data: unknown = await response.json();
+    if (!data || typeof data !== 'object') throw new Error('reference_provider_format');
+    const record = data as { base?: string; quote?: string; rate?: number; date?: string };
+    if (record.base !== 'EGP' || record.quote !== 'USD' || typeof record.rate !== 'number' || !Number.isFinite(record.rate) || record.rate <= 0) {
+      throw new Error('reference_provider_invalid_rate');
+    }
+    return { rate: record.rate, date: typeof record.date === 'string' ? record.date : '' };
+  } finally { clearTimeout(timeout); }
+}
 function ExchangeRatesMini({ lang }: { lang: Language }) {
   const ar = lang === 'ar';
   const [info, setInfo] = useState<FxRateInfo | null>(null);
+  const [reference, setReference] = useState<{ rate: number; date: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
   useEffect(() => {
     let alive = true;
     setBusy(true);
-    callCurrencyRates('fx.get').then(value => { if (alive) { setInfo(value); setError(''); } })
-      .catch(() => { if (alive) setError(ar ? 'السعر غير متاح الآن' : 'Rate unavailable'); })
-      .finally(() => { if (alive) setBusy(false); });
+    callCurrencyRates('fx.get').then(value => {
+      if (alive) { setInfo(value); setReference(null); setError(''); }
+    }).catch(async failure => {
+      const code = failure instanceof Error ? failure.message : '';
+      const serverIssue = ['firebase_admin_not_configured', 'firebase_project_mismatch', 'firebase_database_mismatch', 'gateway_operation_failed'].includes(code);
+      try {
+        const publicQuote = await readPublicReferenceRate();
+        if (alive) {
+          setReference(publicQuote);
+          setError(serverIssue
+            ? (ar ? 'السعر ظاهر، تغيير العملات يحتاج إصلاح اتصال الخادم' : 'Rate shown; server connection needed to change pair')
+            : (ar ? 'سعر مباشر مؤقت، تغيير العملات غير متاح الآن' : 'Direct reference rate; changing pairs is temporarily unavailable'));
+        }
+      } catch {
+        if (alive) setError(serverIssue
+          ? (ar ? 'تعذر الاتصال بخادم الأسعار' : 'Rate server unavailable')
+          : (ar ? 'السعر غير متاح الآن' : 'Rate unavailable'));
+      }
+    }).finally(() => { if (alive) setBusy(false); });
     return () => { alive = false; };
   }, [retry, ar]);
   const update = async (side: 'from' | 'to', code: string) => {
@@ -136,7 +168,8 @@ function ExchangeRatesMini({ lang }: { lang: Language }) {
       setError(limited ? (ar ? 'انتهى حد اليوم' : 'Daily limit reached') : (ar ? 'تعذر التغيير' : 'Change failed'));
     } finally { setBusy(false); }
   };
-  const rate = info?.rate == null ? '—' : new Intl.NumberFormat(ar ? 'ar-EG' : 'en-US', { maximumSignificantDigits: 5 }).format(info.rate);
+  const effectiveRate = info?.rate ?? reference?.rate;
+  const rate = effectiveRate == null ? '—' : new Intl.NumberFormat(ar ? 'ar-EG' : 'en-US', { maximumSignificantDigits: 5 }).format(effectiveRate);
   return (
     <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50/60 px-1 py-1.5 text-center" aria-label={ar ? 'أسعار العملات التقريبية' : 'Approximate currency rates'}>
       <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-900"><ArrowLeftRight className="h-3 w-3" />{ar ? 'أسعار العملات' : 'Exchange rates'}</span>
@@ -151,11 +184,11 @@ function ExchangeRatesMini({ lang }: { lang: Language }) {
           </select>
         ))}
       </div>
-      <strong dir="ltr" className="text-[10px] font-black text-slate-900 tabular-nums">{info ? '1 ' + info.from + ' ≈ ' + rate + ' ' + info.to : busy ? '...' : '—'}</strong>
-      <span className="text-[9px] leading-tight text-slate-600">{ar ? 'تقريبي · تحديث يومي' : 'Approx. · daily update'}{info?.rateDate ? ' · ' + info.rateDate : ''}</span>
+      <strong dir="ltr" className="text-[10px] font-black text-slate-900 tabular-nums">{info ? '1 ' + info.from + ' ≈ ' + rate + ' ' + info.to : reference ? '1 EGP ≈ ' + rate + ' USD' : busy ? '...' : '—'}</strong>
+      <span className="text-[9px] leading-tight text-slate-600">{ar ? 'تقريبي · تحديث يومي' : 'Approx. · daily update'}{(info?.rateDate || reference?.date) ? ' · ' + (info?.rateDate || reference?.date) : ''}</span>
       {info && <span className="text-[9px] text-slate-600">{ar ? 'تغييرات متبقية' : 'Changes left'}: {info.remaining}/{info.limit}</span>}
       {info?.stale && <span className="text-[9px] text-amber-700">{ar ? 'آخر سعر محفوظ' : 'Cached rate'}</span>}
-      {error && <button type="button" onClick={() => setRetry(value => value + 1)} className="flex items-center gap-1 text-[9px] text-rose-700"><RefreshCw className="h-3 w-3"/>{error}</button>}
+      {error && <button type="button" onClick={() => setRetry(value => value + 1)} className="flex items-center gap-1 text-[9px] leading-tight text-rose-700"><RefreshCw className="h-3 w-3 shrink-0"/>{error}</button>}
     </div>
   );
 }

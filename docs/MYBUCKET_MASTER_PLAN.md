@@ -356,3 +356,8 @@ The rates widget is now the prominent larger card in the home quick-access area.
 ## FX currency changes on production — revision #107
 
 Root cause: the Vercel production API entrypoint `api/gateway.ts` did not register `fx.get` or `fx.select`, although local `server.ts` had those actions. This caused authenticated production requests to return `gateway_action_not_found` and forced the read-only direct EGP/USD fallback. Add the two production gateway actions using the existing verified Firebase identity. Preserve existing per-user, per-Cairo-day 10 actual pair changes limit, validated with an atomic Firestore transaction. UI dropdowns list only currencies currently provided by the daily reference feed. Default EGP/USD, informational-only values, daily timestamps, and no changes to actual financial balances or transactions. Deploy build validates compilation; actual logged-in gateway response and quota need user-session end-to-end verification.
+
+
+## Uniform compact account cards — revision #108
+
+On the Accounts screen, all account cards use the same compact 92px height, aligned with the previously smaller Cash and Visa examples. Replace flex wrapping with a fixed two-row layout: icon/account name/currency description above, balance and edit/delete actions below. Long names/descriptions truncate visually with a full title for hover, and large balances remain horizontally scrollable within the number area without stretching the card. Only an explicitly opened delete confirmation can extend its card height. All account data, balance calculations, permissions, editing/deleting handlers and storage are unchanged. Support Arabic RTL and English LTR, mobile single-column and desktop two-column layouts.

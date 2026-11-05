@@ -48,6 +48,7 @@ import {
 import { FinancialQueryResultCard } from './components/FinancialQueryResultCard';
 import { HomeFinancialOverview } from './components/HomeFinancialOverview';
 import { AdminView } from './components/views/AdminView';
+import { AdminPinView } from './components/views/AdminPinView';
 import { AnalyzerFeedbackAdmin } from './components/views/AnalyzerFeedbackAdmin';
 import { AuthPage } from './components/views/AuthPage';
 import { InitialSetupView } from './components/views/InitialSetupView';
@@ -101,7 +102,7 @@ export default function App() {
   });
 
   // 2. Active Tab State
-  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname === '/admin/analyzer-feedback' ? 'admin' : window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : 'home');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname === '/admin/analyzer-feedback' ? 'admin-pin' : window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : 'home');
   // Keep in-app tab changes in browser history so the device Back button can restore them.
   const [transactionQuickFilter, setTransactionQuickFilter] = useState<{ period: 'today' | 'month'; currency: string } | null>(null);
   const navigateTab = (tab: ActiveTab, quickFilter: { period: 'today' | 'month'; currency: string } | null = null) => {
@@ -116,10 +117,10 @@ export default function App() {
     setActiveTab(page);
   };
   useEffect(() => {
-    const onPopState = () => setActiveTab(tabFromHistory(window.location, window.history.state));
+    const onPopState = () => setActiveTab(prev => { const next = tabFromHistory(window.location, window.history.state); return (next === 'admin' && !adminPinVerified) ? 'admin-pin' : next; });
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, []);
+  }, [adminPinVerified]);
 
   // Helper to migrate legacy 'acc_savings_usd' / 'مدخرات دولار' to 'acc_wallet' / 'محافظ إلكترونية' and ensure unique account IDs
   const migrateLegacyAccounts = (accs: FinancialAccount[]): { updated: FinancialAccount[]; migrated: boolean } => {
@@ -229,6 +230,21 @@ export default function App() {
   });
 
   const isAdmin = authUser?.email?.trim().toLowerCase() === 'waelvts@gmail.com';
+  // This PIN is a temporary UI gate, not a server-side security boundary.
+  const [adminPinVerified, setAdminPinVerified] = useState(false);
+  const openAdminPin = () => {
+    if (!isAdmin) return;
+    if (adminPinVerified) { navigateTab('admin'); return; }
+    window.history.pushState({ myBucketTab: 'admin-pin' }, '', '/admin/unlock');
+    setActiveTab('admin-pin');
+  };
+  const verifyAdminPin = (pin: string) => {
+    if (!isAdmin || pin !== '2233') return false;
+    setAdminPinVerified(true);
+    window.history.replaceState({ myBucketTab: 'admin' }, '', '/');
+    setActiveTab('admin');
+    return true;
+  };
   const closeFeedbackAdmin = () => {
     if (window.history.state?.feedbackAdmin) {
       window.history.back();
@@ -239,7 +255,7 @@ export default function App() {
   };
 
   const openFeedbackAdmin = () => {
-    if (!isAdmin) return;
+    if (!isAdmin || !adminPinVerified) return;
     if (window.location.pathname !== '/admin/analyzer-feedback') {
       window.history.pushState({ myBucketTab:'admin', feedbackAdmin:true }, '', '/admin/analyzer-feedback');
     }
@@ -334,7 +350,7 @@ export default function App() {
         setIsExpenseCategoriesModalOpen(false);
         setIsCategoryDetailModalOpen(false);
         setSelectedCategoryForDetail(null);
-        setActiveTab((window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : firebaseUser && window.location.pathname === '/admin/analyzer-feedback' ? 'admin': firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : 'home');
+        setActiveTab((window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : firebaseUser && window.location.pathname === '/admin/analyzer-feedback' ? 'admin-pin': firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : 'home');
         setToastMessage(null);
         aiLearnedMemory.clear();
       }
@@ -468,6 +484,7 @@ export default function App() {
 
   // Google Logout Handler
   const handleGoogleLogout = async () => {
+    setAdminPinVerified(false);
     try {
       await logoutUser();
       setToastMessage(lang === 'ar' ? 'تم تسجيل الخروج بنجاح' : 'Signed out successfully');
@@ -1099,6 +1116,7 @@ export default function App() {
         onSuccess={handleAuthGateSuccess}
         onToggleLanguage={handleToggleLanguage}
         onOpenOffers={openOffers}
+        onOpenAdmin={isAdmin ? openAdminPin : undefined}
       />
     );
   }
@@ -1389,12 +1407,13 @@ export default function App() {
             onLogin={handleGoogleLogin}
             onLogout={handleGoogleLogout}
             isAdmin={isAdmin}
-            onOpenAdmin={() => navigateTab('admin')}
-            onOpenFeedbackAdmin={openFeedbackAdmin}
             onOpenMobileLink={() => setIsMobileModalOpen(true)}
           />
         )}
-        {activeTab === 'admin' && isAdmin && authUser && (
+        {activeTab === 'admin-pin' && isAdmin && authUser && (
+          <AdminPinView lang={lang} onBack={() => navigateTab('home')} onVerify={verifyAdminPin} />
+        )}
+        {activeTab === 'admin' && isAdmin && adminPinVerified && authUser && (
           window.location.pathname === '/admin/analyzer-feedback'
             ? <AnalyzerFeedbackAdmin lang={lang} onBack={closeFeedbackAdmin} />
             : <AdminView lang={lang} user={authUser} onBack={() => navigateTab('settings')} onResetDemoData={handleResetDemoData} onZeroAllBalances={handleZeroAllBalances} onOpenFeedbackAdmin={openFeedbackAdmin} />

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
-  ArrowLeft, ArrowRight, Search, Landmark, UtensilsCrossed, ShoppingBasket,
+  ArrowLeft, ArrowRight, Search, Plus, Landmark, UtensilsCrossed, ShoppingBasket,
   Shirt, Plane, Dumbbell, Car, HeartPulse, House, GraduationCap,
   Gift, Smartphone, type LucideIcon
 } from 'lucide-react';
@@ -11,6 +11,7 @@ interface OffersPageProps {
   onBack: () => void;
   categorySlug?: string | null;
   onOpenCategory: (slug: string) => void;
+  onAddAd?: () => void;
 }
 
 interface OfferCategory {
@@ -39,7 +40,7 @@ const CATEGORIES: OfferCategory[] = [
 // Do not use INITIAL_PERK_DEALS: its coupons are demonstration-only.
 const PUBLISHED_OFFERS: ReadonlyArray<{ id: string; categorySlug: string; titleAr: string; titleEn: string }> = [];
 
-export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySlug, onOpenCategory }) => {
+export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySlug, onOpenCategory, onAddAd }) => {
   const isAr = lang === 'ar';
   const BackIcon = isAr ? ArrowRight : ArrowLeft;
   const ForwardIcon = isAr ? ArrowLeft : ArrowRight;
@@ -64,6 +65,14 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
             <h1 className="text-lg font-extrabold leading-snug">{title}</h1>
             <p className="text-xs text-slate-500">My Bucket</p>
           </div>
+          {!categorySlug && onAddAd && (
+            <button type="button" onClick={onAddAd}
+              aria-label={isAr ? 'إضافة إعلان جديد' : 'Add new advertisement'}
+              title={isAr ? 'إضافة إعلان جديد' : 'Add new advertisement'}
+              className="h-12 w-12 sm:h-14 sm:w-14 shrink-0 rounded-2xl bg-emerald-600 text-white shadow-md hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 flex items-center justify-center transition-colors">
+              <Plus className="h-7 w-7 sm:h-8 sm:w-8" strokeWidth={3} />
+            </button>
+          )}
         </div>
       </header>
 

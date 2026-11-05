@@ -311,3 +311,8 @@ The green plus button beside the offers title is available to ALL visitors (not 
 ## Context-aware fixed bottom navigation — revision #97
 
 Keep the bottom navigation fixed and visible through both upward and downward scrolling on the main financial pages (Home, Transactions, Search, Categories, Settings and Accounts). Hide it during full-page workflows such as advertisements, login, subscription/trial, guides, admin pages, initial account setup, transaction creation and account editing, as well as open modal forms. Reserve extra bottom space only on screens that display the bar so the final content and controls are not obscured; retain safe-area inset padding. The bar's five existing actions and styling are preserved. No backend or financial data changes.
+
+
+## User-only bottom settings navigation — revision #98
+
+Rename the bottom navigation label from More to Settings in Arabic and English; it continues to open the existing user Settings tab, never the admin dashboard. Remove the redundant home-header Settings shortcut (which previously opened Accounts instead of user Settings), and reflow the remaining two shortcuts. Remove developer diagnostics from the public Settings page; equivalent technical diagnostics remain available in the owner-only Admin System section. Administrator access remains exclusively in the Google account avatar menu with existing account and PIN checks. Bottom navigation fixed-scroll behavior is unchanged. No changes to Firebase or backend authorization.

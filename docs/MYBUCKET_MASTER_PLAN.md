@@ -301,3 +301,8 @@ The existing administrator dashboard is organized into six selectable sections: 
 ## Admin full-page navigation — revision #95
 
 The owner dashboard now lists seven cards, adding Ads Management (not yet implemented). Every card opens its dedicated route rather than expanding beneath the grid. Reports goes directly to the existing `/admin/analyzer-feedback` route; AI and System settings retain their current working widgets, and the remaining sections show clearly marked development placeholders. The section Back control returns to `/admin`; browser/mobile history navigation is wired to admin routes. Google account gating and the existing temporary client-only PIN step remain unchanged. No backend, Firebase, ad data or deployment settings are changed.
+
+
+## Public advertisement creation entry — revision #96
+
+The green plus button beside the offers title is available to ALL visitors (not only administrators). It opens a full-page route `/offers/new`, separate from `/admin/ads` (owner-only advertisement moderation). Visitors can choose a free or premium advertisement, select its category, enter details, add local image previews, and review their draft. This is an interface-only workflow: no ad or image is uploaded or persisted, and no prices, payment, approval, or publishing services are invented. The form transparently explains that publishing is not available until a verified backend and policy are implemented. Existing public offers counts remain based on real published ads only, currently none.

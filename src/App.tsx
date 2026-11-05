@@ -139,20 +139,20 @@ function ExchangeRatesMini({ lang }: { lang: Language }) {
     callCurrencyRates('fx.get').then(value => {
       if (alive) { setInfo(value); setReference(null); setError(''); }
     }).catch(async failure => {
-      const code = failure instanceof Error ? failure.message : '';
+      const code = failure instanceof Error ? failure.message : 'unknown_error';
       const serverIssue = ['firebase_admin_not_configured', 'firebase_project_mismatch', 'firebase_database_mismatch', 'gateway_operation_failed'].includes(code);
       try {
         const publicQuote = await readPublicReferenceRate();
         if (alive) {
           setReference(publicQuote);
-          setError(serverIssue
-            ? (ar ? 'السعر ظاهر، تغيير العملات يحتاج إصلاح اتصال الخادم' : 'Rate shown; server connection needed to change pair')
-            : (ar ? 'سعر مباشر مؤقت، تغيير العملات غير متاح الآن' : 'Direct reference rate; changing pairs is temporarily unavailable'));
+          setError((serverIssue
+            ? (ar ? 'اتصال الخادم يحتاج إصلاحًا؛ تغيير العملات متوقف مؤقتًا' : 'Server connection needs repair; pair selection paused')
+            : (ar ? 'سعر مباشر مؤقت؛ تغيير العملات متوقف لحين اتصال الخادم' : 'Direct reference rate; pair selection paused until server reconnects')) + ' (' + code + ')');
         }
       } catch {
         if (alive) setError(serverIssue
           ? (ar ? 'تعذر الاتصال بخادم الأسعار' : 'Rate server unavailable')
-          : (ar ? 'السعر غير متاح الآن' : 'Rate unavailable'));
+          : (ar ? 'السعر غير متاح الآن' : 'Rate unavailable') + ' (' + code + ')');
       }
     }).finally(() => { if (alive) setBusy(false); });
     return () => { alive = false; };
@@ -169,7 +169,7 @@ function ExchangeRatesMini({ lang }: { lang: Language }) {
     } finally { setBusy(false); }
   };
   const effectiveRate = info?.rate ?? reference?.rate;
-  const rate = effectiveRate == null ? '—' : new Intl.NumberFormat(ar ? 'ar-EG' : 'en-US', { maximumSignificantDigits: 5 }).format(effectiveRate);
+  const rate = effectiveRate == null ? '—' : new Intl.NumberFormat('en-US', { maximumSignificantDigits: 6, useGrouping: false }).format(effectiveRate);
   return (
     <div className="flex min-w-0 flex-col items-stretch justify-center gap-2 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white p-3 text-center shadow-sm" aria-label={ar ? 'أسعار العملات التقريبية' : 'Approximate currency rates'}>
       <span className="flex items-center justify-center gap-1.5 text-sm font-black text-emerald-900"><ArrowLeftRight className="h-4 w-4" />{ar ? 'أسعار العملات' : 'Exchange rates'}</span>
@@ -184,7 +184,7 @@ function ExchangeRatesMini({ lang }: { lang: Language }) {
           </select>
         ))}
       </div>
-      <strong dir="ltr" className="block rounded-xl bg-emerald-50 px-1 py-3 text-center text-[clamp(1.1rem,4.2vw,1.8rem)] font-black leading-tight tracking-tight text-emerald-800 tabular-nums">{info ? '1 ' + info.from + ' ≈ ' + rate + ' ' + info.to : reference ? '1 EGP ≈ ' + rate + ' USD' : busy ? '...' : '—'}</strong>
+      <strong dir="ltr" className="block rounded-xl bg-emerald-50 px-1 py-3 text-center text-[clamp(1.1rem,4.2vw,1.8rem)] font-black leading-tight tracking-tight text-emerald-800 tabular-nums">{info ? '1 ' + info.from + ' = ' + rate + ' ' + info.to : reference ? '1 EGP = ' + rate + ' USD' : busy ? '...' : '—'}</strong>
       <span className="text-[9px] leading-tight text-slate-600">{ar ? 'سعر تقريبي غير ملزم · تحديث يومي' : 'Approximate, non-binding · daily update'}{(info?.rateDate || reference?.date) ? ' · ' + (info?.rateDate || reference?.date) : ''}</span>
       {info && <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold text-emerald-900">{ar ? 'تغييرات متبقية' : 'Changes left'}: {info.remaining}/{info.limit}</span>}
       {info?.stale && <span className="text-[9px] text-amber-700">{ar ? 'آخر سعر محفوظ' : 'Cached rate'}</span>}

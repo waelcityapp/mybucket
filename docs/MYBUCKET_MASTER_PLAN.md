@@ -321,3 +321,8 @@ Rename the bottom navigation label from More to Settings in Arabic and English; 
 ## Currency support — #99
 
 19 currencies available in fixed account currency selectors, including first-run setup. The financial overview has a saved currency selector and its calculations are currency-scoped. Transaction filters are independent and results show separate totals by currency. Existing balances and transactions are not converted. Cross-currency transfers remain unsupported by the current balance engine; a future dedicated exchange-rate model is required.
+
+
+## Transaction filters — revision #100
+
+Transaction history displays separate controls for the date period and currency. The date group supports All dates, Today, This month, This year, Last year, and custom inclusive From/To dates; incomplete/invalid date ranges show an instruction and no misleading results. The currency dropdown has its own label and remains independent of date/type filters and the home overview currency preference. Existing quick links from Today's/Monthly spending continue to preselect the matching date and currency. No financial transactions or account records are modified.

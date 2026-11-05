@@ -1,4 +1,6 @@
 import { TrialSubscriptionPages } from './components/views/TrialSubscriptionPages';
+import { currencyName, SUPPORTED_CURRENCIES } from './types';
+import { ArrowLeftRight, RefreshCw } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import {
   FinancialAccount,
@@ -94,6 +96,69 @@ import { validateBalance } from './utils/accountLinking';
 import { saveUserSubscriptionToFirestore, subscribeUserSubscription, type SubscriptionReadIssue } from './services/prototypeSubscriptionClient';
 
 const STORAGE_KEY_PREFIX = 'mybucket_';
+
+
+type FxRateInfo = { from: string; to: string; rate: number | null; remaining: number; limit: number; rateDate: string; stale: boolean };
+async function callCurrencyRates(action: 'fx.get' | 'fx.select', payload: Record<string, string> = {}): Promise<FxRateInfo> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('login_required');
+  const response = await fetch('/api/gateway', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + await user.getIdToken() },
+    body: JSON.stringify({ action, payload }),
+  });
+  const result = await response.json();
+  if (!response.ok || !result?.ok || !result?.data) throw new Error(result?.error || 'rate_unavailable');
+  return result.data as FxRateInfo;
+}
+function ExchangeRatesMini({ lang }: { lang: Language }) {
+  const ar = lang === 'ar';
+  const [info, setInfo] = useState<FxRateInfo | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    setBusy(true);
+    callCurrencyRates('fx.get').then(value => { if (alive) { setInfo(value); setError(''); } })
+      .catch(() => { if (alive) setError(ar ? 'السعر غير متاح الآن' : 'Rate unavailable'); })
+      .finally(() => { if (alive) setBusy(false); });
+    return () => { alive = false; };
+  }, [retry, ar]);
+  const update = async (side: 'from' | 'to', code: string) => {
+    if (!info || busy || info.remaining <= 0 || info[side] === code) return;
+    setBusy(true);
+    try {
+      const updated = await callCurrencyRates('fx.select', { from: side === 'from' ? code : info.from, to: side === 'to' ? code : info.to });
+      setInfo(updated); setError('');
+    } catch (e) {
+      const limited = e instanceof Error && e.message === 'exchange_daily_limit';
+      setError(limited ? (ar ? 'انتهى حد اليوم' : 'Daily limit reached') : (ar ? 'تعذر التغيير' : 'Change failed'));
+    } finally { setBusy(false); }
+  };
+  const rate = info?.rate == null ? '—' : new Intl.NumberFormat(ar ? 'ar-EG' : 'en-US', { maximumSignificantDigits: 5 }).format(info.rate);
+  return (
+    <div className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50/60 px-1 py-1.5 text-center" aria-label={ar ? 'أسعار العملات التقريبية' : 'Approximate currency rates'}>
+      <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-900"><ArrowLeftRight className="h-3 w-3" />{ar ? 'أسعار العملات' : 'Exchange rates'}</span>
+      <div className="grid w-full grid-cols-2 gap-1">
+        {(['from','to'] as const).map(side => (
+          <select key={side} value={info?.[side] || (side === 'from' ? 'EGP' : 'USD')}
+            onChange={event => void update(side, event.target.value)}
+            aria-label={side === 'from' ? (ar ? 'العملة الأولى' : 'First currency') : (ar ? 'العملة الثانية' : 'Second currency')}
+            disabled={!info || busy || info.remaining === 0}
+            className="w-full min-w-0 rounded-md border border-emerald-200 bg-white px-0.5 py-1 text-[10px] font-bold text-emerald-900 disabled:opacity-70">
+            {SUPPORTED_CURRENCIES.map(code => <option key={code} value={code}>{currencyName(code, lang)} ({code})</option>)}
+          </select>
+        ))}
+      </div>
+      <strong dir="ltr" className="text-[10px] font-black text-slate-900 tabular-nums">{info ? '1 ' + info.from + ' ≈ ' + rate + ' ' + info.to : busy ? '...' : '—'}</strong>
+      <span className="text-[9px] leading-tight text-slate-600">{ar ? 'تقريبي · تحديث يومي' : 'Approx. · daily update'}{info?.rateDate ? ' · ' + info.rateDate : ''}</span>
+      {info && <span className="text-[9px] text-slate-600">{ar ? 'تغييرات متبقية' : 'Changes left'}: {info.remaining}/{info.limit}</span>}
+      {info?.stale && <span className="text-[9px] text-amber-700">{ar ? 'آخر سعر محفوظ' : 'Cached rate'}</span>}
+      {error && <button type="button" onClick={() => setRetry(value => value + 1)} className="flex items-center gap-1 text-[9px] text-rose-700"><RefreshCw className="h-3 w-3"/>{error}</button>}
+    </div>
+  );
+}
 
 export default function App() {
   // 1. Language State (Arabic is default)
@@ -1290,13 +1355,14 @@ export default function App() {
                   </div>}
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-1.5 border-t border-slate-100 pt-2">
+              <div className="grid grid-cols-3 gap-1.5 border-t border-slate-100 pt-2">
                 <button type="button" onClick={openGuide} className="flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-lg bg-slate-50 px-1 py-2 text-center text-[11px] sm:text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors">
                   <BookOpen className="h-4 w-4 text-slate-600" /><span>{lang === 'ar' ? 'دليل الاستخدام' : 'User guide'}</span>
                 </button>
                 <button type="button" onClick={() => openSubscriptionPage('subscription')} className="flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-lg bg-slate-50 px-1 py-2 text-center text-[11px] sm:text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors">
                   <Tag className="h-4 w-4 text-slate-600" /><span>{lang === 'ar' ? 'الاشتراكات' : 'Plans'}</span>
                 </button>
+                <ExchangeRatesMini lang={lang} />
               </div>
             </section>
 

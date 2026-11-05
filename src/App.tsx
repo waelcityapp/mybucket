@@ -254,7 +254,7 @@ export default function App() {
   }, [adminPinVerified]);
 
   const adminSectionFromPath = (): SectionId | null => {
-    const section = adminRoute.match(/^\/admin\/(users|subscriptions|marketers|ads|ai|system)$/)?.[1];
+    const section = adminRoute.match(/^\/admin\/(users|subscriptions|marketers|ads|ai|system)(?:\/new)?$/)?.[1];
     return section ? section as SectionId : null;
   };
   const openAdminSection = (section: SectionId) => {
@@ -1122,6 +1122,11 @@ export default function App() {
     return <OffersPage
       lang={lang}
       categorySlug={categorySlug}
+      onAddAd={isAdmin ? () => {
+        window.history.pushState({ myBucketTab: adminPinVerified ? 'admin' : 'admin-pin' }, '', adminPinVerified ? '/admin/ads/new' : '/admin/unlock');
+        setAdminRoute(adminPinVerified ? '/admin/ads/new' : '/admin/unlock');
+        setActiveTab(adminPinVerified ? 'admin' : 'admin-pin');
+      } : undefined}
       onOpenCategory={(slug) => {
         window.location.assign(`/offers/category/${encodeURIComponent(slug)}`);
       }}

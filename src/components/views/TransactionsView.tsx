@@ -183,6 +183,16 @@ export function TransactionsView({
         </div>
       </div>
 
+      {loadState === 'ready' && filtered.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 rounded-xl border border-slate-200 bg-white p-2">
+          {Array.from(new Set(filtered.map(item => item.currency))).map(code => (
+            <span key={code} className="rounded-lg bg-slate-50 px-2 py-1 text-[11px]">
+              {code}: {lang === 'ar' ? 'دخل' : 'Income'} {filtered.filter(item => item.currency === code && item.type === 'income').reduce((sum, item) => sum + item.amount, 0).toLocaleString()}
+              {' · '}{lang === 'ar' ? 'مصروف' : 'Expense'} {filtered.filter(item => item.currency === code && item.type === 'expense').reduce((sum, item) => sum + item.amount, 0).toLocaleString()}
+            </span>
+          ))}
+        </div>
+      )}
       {/* Transactions List */}
       {loadState !== 'ready' ? (
         <div role="status" className="p-6 text-center bg-white rounded-3xl border border-slate-200 text-slate-600 text-sm">

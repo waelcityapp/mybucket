@@ -152,11 +152,17 @@ export function HomeFinancialOverview({
           {isAr ? 'الوضع المالي' : 'Financial overview'}
         </h2>
         <div className="flex items-center gap-1 min-w-0">
-          {accountCurrencies.length > 1 ? (
-            <select aria-label={isAr ? 'عملة الوضع المالي' : 'Overview currency'} title={isAr ? 'اختر العملة' : 'Select currency'} value={primaryCurrency} onChange={event => selectCurrency(event.target.value)} className="max-w-[100px] rounded-lg border border-emerald-200 bg-emerald-50 px-1 py-1.5 text-[11px] font-bold text-emerald-950">
-              {accountCurrencies.map(code => <option key={code} value={code}>{code}</option>)}
-            </select>
-          ) : <span className="text-xs font-bold text-emerald-800">{primaryCurrency}</span>}
+          <select
+            aria-label={isAr ? 'اختيار عملة الوضع المالي' : 'Select financial overview currency'}
+            title={isAr ? 'العملات الموجودة في حساباتك فقط' : 'Currencies in your accounts only'}
+            value={accountCurrencies.length ? primaryCurrency : ''}
+            onChange={event => selectCurrency(event.target.value)}
+            disabled={accountCurrencies.length === 0}
+            className="w-[108px] min-w-0 shrink rounded-lg border border-emerald-200 bg-emerald-50 px-1 py-1.5 text-[11px] font-bold text-emerald-950 disabled:opacity-60"
+          >
+            {accountCurrencies.length === 0 && <option value="">{isAr ? 'لا توجد عملات' : 'No currencies'}</option>}
+            {accountCurrencies.map(code => <option key={code} value={code}>{code}</option>)}
+          </select>
         {onViewAccounts && (
           <button type="button" onClick={onViewAccounts}
             className="inline-flex shrink-0 min-h-8 items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 sm:px-2.5 text-[10px] sm:text-xs font-bold text-emerald-950 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-emerald-500">

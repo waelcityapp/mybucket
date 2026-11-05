@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Globe, Smartphone, Cloud, LogOut, Check, ChevronDown, Edit2, X, User as UserIcon } from 'lucide-react';
+import { Globe, Smartphone, Cloud, LogOut, Check, ChevronDown, Edit2, X, ShieldCheck } from 'lucide-react';
 import { Language, AuthUser } from '../types';
 import { translations } from '../data/translations';
 
@@ -11,6 +11,7 @@ interface HeaderProps {
   onLogout: () => void;
   onOpenMobileLink: () => void;
   onOpenOffers: () => void;
+  onOpenAdmin?: () => void;
   onUpdateUserName?: (newName: string) => Promise<void>;
 }
 
@@ -22,6 +23,7 @@ export function Header({
   onLogout,
   onOpenMobileLink,
   onOpenOffers,
+  onOpenAdmin,
   onUpdateUserName,
 }: HeaderProps) {
   const t = translations[lang];
@@ -246,6 +248,12 @@ export function Header({
                   </div>
 
                   <div className="space-y-1 pt-1">
+                    {user.email?.trim().toLowerCase() === 'waelvts@gmail.com' && onOpenAdmin && (
+                      <button type="button" onClick={() => { setIsUserMenuOpen(false); onOpenAdmin(); }} className="w-full flex items-center gap-2 p-2 rounded-xl hover:bg-emerald-50 text-xs font-bold text-emerald-800 transition-colors cursor-pointer">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>{isAr ? 'لوحة الإدارة' : 'Admin dashboard'}</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => {

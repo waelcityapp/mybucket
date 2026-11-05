@@ -336,3 +336,8 @@ Show the currency dropdown as the first control above the date period choices, f
 ## Persistently visible currency selector — revision #102
 
 The financial overview always renders its currency dropdown even when there is only one account currency; opening it lists only currencies used by the user's actual accounts. With zero accounts it displays a disabled 'No currencies' placeholder. Choosing a currency continues to update all scoped indicators, without changing stored account balances or transactions. No other financial logic or presentation changes.
+
+
+## Inline approximate currency comparison — revision #103
+
+The third shortcut spot in the home greeting/plan row hosts a compact currency comparison card directly; no dedicated page. Default pair is EGP versus USD, with two separate drop-downs showing all 19 supported currency codes. The current approximate rate is fetched via the existing authenticated /api/gateway action (fx.get / fx.select), based on Frankfurter v2 daily reference rates cached centrally in Firestore; the provider date is shown and cached older values are marked. Each actual change to either selected currency counts toward a server-authoritative limit of ten per user per Cairo calendar day via a Firestore transaction, shared across devices. Users can still view the currently selected rate after hitting the quota. Pair preferences persist on the authenticated user record. The UI explicitly says rates are approximate and updated daily, with no promise of bank buy/sell accuracy. The values are strictly informational: no account balances, income, expenses, transfers or exchange rates in financial transactions are changed. Failure to retrieve rates must show an error, not a made-up value.

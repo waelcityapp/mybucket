@@ -42,7 +42,7 @@ export function BottomNav({ activeTab, onChangeTab, lang }: BottomNavProps) {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-100 py-1.5 px-3 pb-[env(safe-area-inset-bottom)]">
+    <nav className="fixed inset-x-0 bottom-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-100 pt-1.5 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
       <div className="max-w-md mx-auto flex items-end justify-between relative">
         {navItems.map((item) => {
           const isActive = activeTab === item.id;

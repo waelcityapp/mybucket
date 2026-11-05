@@ -286,3 +286,8 @@ Move the owner-only dashboard shortcut into the Google avatar menu. A dedicated 
 ## Revision #92 — admin avatar link wiring fix
 
 Corrects the admin entry callback binding on the authenticated Header (previously misplaced on AuthPage). Keeps existing PIN page and defers server-side rate limiting.
+
+
+## Admin console organization — revision #93
+
+Move the existing Gemini AI usage, server connection diagnostic and active model selection card from user Settings to the owner-only Admin dashboard. Keep feedback reports and rating controls under a clearly labeled dashboard entry, and return from Admin to Home instead of Settings. Existing data reset functions remain intact. No backend changes or new administration features are introduced.

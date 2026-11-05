@@ -148,36 +148,47 @@ export function AccountsView({ accounts, lang, onAddAccount, onDeleteAccount, on
           {lang === 'ar' ? 'يوجد رصيد سالب مسجل سابقًا. راجع الحساب وصحح رصيده الفعلي.' : 'A previously recorded account balance is negative. Review the account and correct its actual balance.'}
         </p>
       )}
-      {/* List of Accounts */}
+      {/* All account cards share the same compact size; deletion confirmation can expand. */}
       <div className={showAddModal ? "hidden" : "grid grid-cols-1 sm:grid-cols-2 gap-3.5"}>
         {accounts.map((acc) => (
           <div
             key={acc.id}
-            className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex flex-wrap items-center justify-between gap-y-1 group"
+            className={`min-w-0 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-2xs transition-all hover:shadow-xs group ${confirmDeleteId === acc.id ? 'min-h-[92px]' : 'h-[92px]'}`}
           >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-100 bg-slate-50">
                 {getAccountIcon(acc.type)}
               </div>
-              <div>
-                <h3 className="font-bold text-slate-900 text-sm">
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate text-[13px] font-bold leading-5 text-slate-900" title={lang === 'ar' ? acc.nameAr : acc.name}>
                   {lang === 'ar' ? acc.nameAr : acc.name}
                 </h3>
-                <span className="text-[11px] text-slate-400 font-medium capitalize">
-                  {acc.linkedBankId ? `${lang === 'ar' ? 'مرتبطة بـ' : 'Linked to'} ${accounts.find(a => a.id === acc.linkedBankId)?.nameAr || '—'}` : acc.type === 'credit' ? (lang === 'ar' ? 'بطاقة ائتمان' : 'Credit card') : acc.type} · {acc.currency}
-                </span>
+                <p
+                  className="truncate text-[10px] font-medium leading-4 text-slate-500"
+                  title={`${acc.linkedBankId ? (lang === 'ar' ? 'مرتبطة بـ ' : 'Linked to ') + (accounts.find(a => a.id === acc.linkedBankId)?.[lang === 'ar' ? 'nameAr' : 'name'] || '—') : acc.type === 'credit' ? (lang === 'ar' ? 'بطاقة ائتمان' : 'Credit card') : acc.type} · ${acc.currency}`}
+                >
+                  {acc.linkedBankId ? `${lang === 'ar' ? 'مرتبطة بـ' : 'Linked to'} ${accounts.find(a => a.id === acc.linkedBankId)?.[lang === 'ar' ? 'nameAr' : 'name'] || '—'}` : acc.type === 'credit' ? (lang === 'ar' ? 'بطاقة ائتمان' : 'Credit card') : acc.type} · {acc.currency}
+                </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="text-end">
-                <div className="text-base font-black text-slate-900">
-                  {acc.type === 'credit' ? `${lang === 'ar' ? 'المستحق' : 'Owed'}: ${formatAccountBalance(Math.max(0, -acc.balance), lang)}` : formatAccountBalance(acc.linkedBankId ? (accounts.find(a => a.id === acc.linkedBankId)?.balance ?? 0) : acc.balance, lang)}
-                  {acc.type === 'credit' && <div className="text-xs font-medium text-slate-500">{lang === 'ar' ? 'المتاح' : 'Available'}: {formatAccountBalance((acc.creditLimit || 0) + acc.balance, lang)}</div>}
+            <div className="mt-1.5 flex min-w-0 items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-baseline gap-1">
+                  <strong
+                    dir="ltr"
+                    className="min-w-0 max-w-full overflow-x-auto whitespace-nowrap text-sm font-black leading-5 tabular-nums text-slate-900 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    title={String(acc.type === 'credit' ? Math.max(0, -acc.balance) : acc.linkedBankId ? (accounts.find(a => a.id === acc.linkedBankId)?.balance ?? 0) : acc.balance)}
+                  >
+                    {formatAccountBalance(acc.type === 'credit' ? Math.max(0, -acc.balance) : acc.linkedBankId ? (accounts.find(a => a.id === acc.linkedBankId)?.balance ?? 0) : acc.balance, lang)}
+                  </strong>
+                  <span className="shrink-0 text-[10px] font-semibold text-slate-500">{acc.currency}</span>
                 </div>
-                <span className="text-xs font-bold text-slate-500 font-mono">
-                  {acc.currency}
-                </span>
+                {acc.type === 'credit' && (
+                  <p className="truncate text-[9px] leading-3 text-slate-500" title={`${lang === 'ar' ? 'المتاح' : 'Available'}: ${formatAccountBalance((acc.creditLimit || 0) + acc.balance, lang)}`}>
+                    {lang === 'ar' ? 'المتاح' : 'Available'}: {formatAccountBalance((acc.creditLimit || 0) + acc.balance, lang)}
+                  </p>
+                )}
               </div>
 
               <div className="flex shrink-0 items-center gap-1">
@@ -185,10 +196,11 @@ export function AccountsView({ accounts, lang, onAddAccount, onDeleteAccount, on
                   <button
                     type="button"
                     title={lang === 'ar' ? 'تعديل الرصيد الافتتاحي' : 'Edit Balance'}
+                    aria-label={lang === 'ar' ? `تعديل رصيد ${acc.nameAr}` : `Edit balance of ${acc.name}`}
                     onClick={() => onEditBalance(acc.id)}
-                    className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-700"
                   >
-                    <Pencil className="w-3.5 h-3.5" />
+                    <Pencil className="h-3.5 w-3.5" />
                   </button>
                 )}
                 <button
@@ -199,14 +211,15 @@ export function AccountsView({ accounts, lang, onAddAccount, onDeleteAccount, on
                     : (lang === 'ar' ? 'مسح الحساب' : 'Delete account')}
                   aria-label={lang === 'ar' ? `مسح حساب ${acc.nameAr}` : `Delete account ${acc.name}`}
                   onClick={() => setConfirmDeleteId(acc.id)}
-                  className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-50 text-rose-600 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-30"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
+
             {confirmDeleteId === acc.id && (
-              <div className="mt-3 w-full rounded-xl border border-rose-200 bg-rose-50 p-3 text-start sm:col-span-2">
+              <div className="mt-3 w-full rounded-xl border border-rose-200 bg-rose-50 p-3 text-start">
                 <p className="text-xs font-bold text-rose-900">
                   {lang === 'ar' ? `هل تريد مسح حساب «${acc.nameAr}»؟ لن يتم حذف أي عمليات مالية، ولا يُسمح بمسح حساب له رصيد أو عمليات أو حسابات مرتبطة.` : `Delete “${acc.name}”? Transactions are never deleted; accounts with balances, transactions or linked methods cannot be removed.`}
                 </p>

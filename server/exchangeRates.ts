@@ -33,12 +33,11 @@ async function latestRates(): Promise<RateRecord> {
   if (existing?.day === today && existing?.rates?.EUR === 1 && existing.rates.USD > 0 && existing.rates.EGP > 0) return existing;
 
   try {
-    const quotes = SUPPORTED_CURRENCIES.filter(code => code !== 'EUR').join(',');
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 7000);
     let response: Response;
     try {
-      response = await fetch('https://api.frankfurter.dev/v2/rates?base=EUR&quotes=' + quotes, {
+      response = await fetch('https://api.frankfurter.dev/v2/rates?base=EUR', {
         signal: controller.signal,
         headers: { Accept: 'application/json' },
       });
@@ -60,6 +59,7 @@ async function latestRates(): Promise<RateRecord> {
     await ref.set({ ...updated, savedAt: FieldValue.serverTimestamp() });
     return updated;
   } catch (error) {
+    console.error('[fx] reference rate fetch failed', error instanceof Error ? error.message : 'unknown');
     if (existing?.rates?.EUR === 1 && existing.rates.USD > 0 && existing.rates.EGP > 0) return existing;
     throw new SubscriptionError(503, 'exchange_rates_unavailable', 'Exchange rates are temporarily unavailable.');
   }
@@ -75,7 +75,7 @@ function display(data: ChoiceRecord | undefined, rates: RateRecord) {
     from, to, count, remaining: Math.max(0, DAILY_CHANGE_LIMIT - count), limit: DAILY_CHANGE_LIMIT,
     rate: from === to ? 1 : a > 0 && b > 0 ? b / a : null,
     rateDate: rates.providerDate, fetchedAt: rates.updatedAt, stale: rates.day !== day,
-    source: 'Frankfurter',
+    source: 'Frankfurter', availableCurrencies: SUPPORTED_CURRENCIES.filter(code => Boolean(rates.rates[code])),
   };
 }
 export async function getExchangeRateWidget(uid: string) {

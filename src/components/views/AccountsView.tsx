@@ -205,10 +205,8 @@ export function AccountsView({ accounts, lang, onAddAccount, onDeleteAccount, on
                 )}
                 <button
                   type="button"
-                  disabled={deletingId !== null || acc.id === 'acc_other' || acc.id === 'acc_extra'}
-                  title={acc.id === 'acc_other' || acc.id === 'acc_extra'
-                    ? (lang === 'ar' ? 'حساب أساسي لا يمكن حذفه' : 'Built-in account cannot be deleted')
-                    : (lang === 'ar' ? 'مسح الحساب' : 'Delete account')}
+                  disabled={deletingId !== null}
+                  title={lang === 'ar' ? 'مسح الحساب غير المستخدم' : 'Delete unused account'}
                   aria-label={lang === 'ar' ? `مسح حساب ${acc.nameAr}` : `Delete account ${acc.name}`}
                   onClick={() => setConfirmDeleteId(acc.id)}
                   className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-50 text-rose-600 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-30"

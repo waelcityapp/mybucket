@@ -830,7 +830,7 @@ export default function App() {
         'has-transactions': ['لا يمكن مسح حساب له عمليات مسجلة. ستظل بياناتك محفوظة.', 'Cannot delete an account with recorded transactions.'],
         'nonzero-balance': ['لا يمكن مسح حساب برصيد غير صفري. راجع الرصيد أولًا.', 'Account balance must be zero before deletion.'],
         'linked-account': ['لا يمكن مسح حساب مرتبط بحساب أو بطاقة أخرى.', 'This account has linked payment methods.'],
-        'system-account': ['هذا حساب أساسي في التطبيق ولا يمكن مسحه حاليًا.', 'This built-in account cannot be deleted.'],
+        'account-missing': ['الحساب غير موجود بالفعل؛ حدّث الصفحة.', 'Account no longer exists. Refresh the page.'],
         'last-account': ['يجب الاحتفاظ بحساب واحد على الأقل.', 'Keep at least one account.'],
       };
       const message = messages[reason];

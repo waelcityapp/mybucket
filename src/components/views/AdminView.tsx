@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { AuthUser, Language } from '../../types';
 import { translations } from '../../data/translations';
+import { AdminAiUsageCard } from '../AdminAiUsageCard';
 
 interface AdminViewProps {
   lang: Language;
@@ -51,7 +52,7 @@ export function AdminView({
         <button
           type="button"
           onClick={onBack}
-          aria-label={lang === 'ar' ? 'العودة إلى الإعدادات' : 'Back to settings'}
+          aria-label={lang === 'ar' ? 'العودة للرئيسية' : 'Back to home'}
           className="mt-0.5 w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center justify-center cursor-pointer shrink-0"
         >
           {lang === 'ar' ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
@@ -73,10 +74,14 @@ export function AdminView({
         className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 flex items-center gap-3 text-start hover:bg-emerald-100 transition-colors">
         <MessageSquareText className="w-5 h-5 text-emerald-700 shrink-0"/>
         <span className="flex-1">
-          <span className="block text-sm font-extrabold text-emerald-900">{lang === 'ar' ? 'تقييمات المحلل المحلي' : 'Local analyzer feedback'}</span>
+          <span className="block text-sm font-extrabold text-emerald-900">{lang === 'ar' ? 'البلاغات وتقييمات المحلل المحلي' : 'Reports and analyzer feedback'}</span>
           <span className="block text-[11px] text-emerald-800">{lang === 'ar' ? 'البلاغات · تشغيل التقييم · عدد الأيام · الإيقاف الفوري' : 'Reports · Pilot settings · Immediate stop'}</span>
         </span>
       </button>
+
+      <section aria-label={lang === 'ar' ? 'إدارة Gemini AI' : 'Gemini AI management'}>
+        <AdminAiUsageCard lang={lang} />
+      </section>
 
       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
         <ShieldCheck className="w-5 h-5 text-amber-700 shrink-0" />

@@ -219,7 +219,6 @@ export async function saveAllAccountsToFirestore(userId: string, accounts: Finan
 // must never be orphaned or silently deleted.
 export async function deleteUnusedAccountFromFirestore(userId: string, accountId: string): Promise<void> {
   if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
-  if (accountId === 'acc_other' || accountId === 'acc_extra') throw new Error('system-account');
 
   const accountsSnapshot = await getDocsFromServer(collection(db, 'users', userId, 'accounts'));
   const accountDocs = accountsSnapshot.docs;
@@ -236,7 +235,9 @@ export async function deleteUnusedAccountFromFirestore(userId: string, accountId
   const transactionsSnapshot = await getDocsFromServer(collection(db, 'users', userId, 'transactions'));
   if (transactionsSnapshot.docs.some(item => {
     const tx = item.data() as Transaction;
-    return tx.accountId === accountId || tx.toAccountId === accountId;
+    // The movement may reference a linked method or its actual balance source.
+    return tx.accountId === accountId || tx.toAccountId === accountId
+      || tx.balanceAccountId === accountId || tx.toBalanceAccountId === accountId;
   })) throw new Error('has-transactions');
 
   const accountRef = doc(db, 'users', userId, 'accounts', accountId);

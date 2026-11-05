@@ -351,3 +351,8 @@ Fixed a potential all-or-nothing reference fetch failure by requesting the compl
 ## Rates card layout redesign — revision #105
 
 The rates widget is now the prominent larger card in the home quick-access area. The two existing User guide and Subscriptions buttons are stacked vertically beside it, rather than occupying equal-width columns. The rate is shown in stronger, larger type, with more spacing, rounded surface, daily approximate-rate disclosure and remaining-change badge. The feature remains inline on the home screen with the existing account-scoped daily exchange limits, same source and fallback; no financial transactions or balances changed.
+
+
+## FX currency changes on production — revision #107
+
+Root cause: the Vercel production API entrypoint `api/gateway.ts` did not register `fx.get` or `fx.select`, although local `server.ts` had those actions. This caused authenticated production requests to return `gateway_action_not_found` and forced the read-only direct EGP/USD fallback. Add the two production gateway actions using the existing verified Firebase identity. Preserve existing per-user, per-Cairo-day 10 actual pair changes limit, validated with an atomic Firestore transaction. UI dropdowns list only currencies currently provided by the daily reference feed. Default EGP/USD, informational-only values, daily timestamps, and no changes to actual financial balances or transactions. Deploy build validates compilation; actual logged-in gateway response and quota need user-session end-to-end verification.

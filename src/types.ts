@@ -1,4 +1,27 @@
-export type CurrencyCode = 'EGP' | 'USD' | 'SAR' | 'AED' | 'EUR';
+export const SUPPORTED_CURRENCIES = ["EGP","SAR","AED","KWD","QAR","BHD","OMR","JOD","MAD","TND","USD","EUR","GBP","CHF","CAD","AUD","JPY","CNY","TRY"] as const;
+export type CurrencyCode = typeof SUPPORTED_CURRENCIES[number];
+export const CURRENCY_NAMES: Record<CurrencyCode, { ar: string; en: string }> = {
+  EGP: { ar: 'الجنيه المصري', en: 'Egyptian pound' },
+  SAR: { ar: 'الريال السعودي', en: 'Saudi riyal' },
+  AED: { ar: 'الدرهم الإماراتي', en: 'UAE dirham' },
+  KWD: { ar: 'الدينار الكويتي', en: 'Kuwaiti dinar' },
+  QAR: { ar: 'الريال القطري', en: 'Qatari riyal' },
+  BHD: { ar: 'الدينار البحريني', en: 'Bahraini dinar' },
+  OMR: { ar: 'الريال العماني', en: 'Omani rial' },
+  JOD: { ar: 'الدينار الأردني', en: 'Jordanian dinar' },
+  MAD: { ar: 'الدرهم المغربي', en: 'Moroccan dirham' },
+  TND: { ar: 'الدينار التونسي', en: 'Tunisian dinar' },
+  USD: { ar: 'الدولار الأمريكي', en: 'US dollar' },
+  EUR: { ar: 'اليورو', en: 'Euro' },
+  GBP: { ar: 'الجنيه الإسترليني', en: 'British pound' },
+  CHF: { ar: 'الفرنك السويسري', en: 'Swiss franc' },
+  CAD: { ar: 'الدولار الكندي', en: 'Canadian dollar' },
+  AUD: { ar: 'الدولار الأسترالي', en: 'Australian dollar' },
+  JPY: { ar: 'الين الياباني', en: 'Japanese yen' },
+  CNY: { ar: 'اليوان الصيني', en: 'Chinese yuan' },
+  TRY: { ar: 'الليرة التركية', en: 'Turkish lira' },
+};
+export const currencyName = (code: string, lang: 'ar' | 'en') => CURRENCY_NAMES[code as CurrencyCode]?.[lang] || code;
 
 export type AccountType = 'cash' | 'bank' | 'card' | 'savings' | 'wallet' | 'other' | 'custom' | 'credit';
 

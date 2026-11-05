@@ -9,7 +9,7 @@ export function tabFromHistory(location: Location, state: unknown): ActiveTab {
   if (path === '/subscription') return 'subscription';
   if (path === '/accounts' || path === '/accounts/new') return 'accounts';
   if (path === '/guide') return 'guide';
-  if (path === '/offers' || path.startsWith('/offers/category/')) return 'offers';
+  if (path === '/offers' || path.startsWith('/offers/category/') || path === '/offers/new') return 'offers';
   const tab = state && typeof state === 'object' && 'myBucketTab' in state ? (state as { myBucketTab: unknown }).myBucketTab : undefined;
   return typeof tab === 'string' && historyTabs.includes(tab as ActiveTab) ? tab as ActiveTab : 'home';
 }

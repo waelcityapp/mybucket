@@ -41,6 +41,14 @@ async function startServer() {
       }
 
       switch (action) {
+        case 'fx.get': {
+          const { getExchangeRateWidget } = await import('./server/exchangeRates');
+          return res.json({ ok: true, data: await getExchangeRateWidget(user.uid) });
+        }
+        case 'fx.select': {
+          const { changeExchangeRateWidget } = await import('./server/exchangeRates');
+          return res.json({ ok: true, data: await changeExchangeRateWidget(user.uid, payload) });
+        }
         case 'admin.aiUsage': {
           if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') {
             return res.status(403).json({ ok: false, error: 'admin_only' });

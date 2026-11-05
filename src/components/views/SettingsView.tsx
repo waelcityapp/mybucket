@@ -182,7 +182,7 @@ export function SettingsView({
         />
       )}
 
-      {/* 4. Mobile Access & QR Link Card */}
+      {/* 4. Installable mobile app card */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
@@ -204,7 +204,7 @@ export function SettingsView({
           className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-xs"
         >
           <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
-          <span>{lang === 'ar' ? 'عرض رمز QR ورابط الموبايل' : 'Show Mobile QR & Link'}</span>
+          <span>{lang === 'ar' ? 'خطوات تثبيت التطبيق' : 'Install app instructions'}</span>
         </button>
       </div>
 

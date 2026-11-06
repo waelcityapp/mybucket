@@ -140,6 +140,49 @@ export async function changeAppUserAccess(actor: AdminActor, payload: Record<str
   return { uid, disabled, profileSynced };
 }
 
+/** Explicitly delete only the Firebase Authentication identity.
+ *  Financial Firestore data is deliberately retained to prevent irreversible loss.
+ */
+export async function deleteAppUserIdentity(actor: AdminActor, payload: Record<string, unknown>) {
+  mustBeOwner(actor);
+  const uid = payload.uid;
+  const confirmation = payload.confirmEmail;
+  if (typeof uid !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(uid)
+      || typeof confirmation !== 'string' || !confirmation.trim()) {
+    throw new SubscriptionError(400, 'invalid_delete_request', 'Enter the exact email to confirm identity deletion.');
+  }
+  if (uid === actor.uid) throw new SubscriptionError(403, 'cannot_delete_self', 'Administrator identity cannot be deleted.');
+  const auth = getAdminAuth();
+  const user = await auth.getUser(uid);
+  const email = user.email?.trim().toLowerCase();
+  if (!email || email === OWNER_EMAIL) throw new SubscriptionError(403, 'cannot_delete_admin', 'Administrator or email-less identities cannot be deleted.');
+  if (confirmation.trim().toLowerCase() !== email) {
+    throw new SubscriptionError(400, 'delete_email_mismatch', 'The entered email does not match the user.');
+  }
+  if (!user.disabled) {
+    throw new SubscriptionError(409, 'disable_first', 'Disable the account before deleting its login identity.');
+  }
+  const db = getAdminFirestore();
+  // Fail safely before deleting if audit persistence is unavailable.
+  await db.collection('adminAudit').add({
+    actorUid: actor.uid,
+    subjectUid: uid,
+    operation: 'deleteAuthIdentityRequested',
+    subjectEmail: email,
+    at: FieldValue.serverTimestamp(),
+    firestoreDataPreserved: true,
+  });
+  await auth.deleteUser(uid);
+  await db.collection('adminAudit').add({
+    actorUid: actor.uid,
+    subjectUid: uid,
+    operation: 'deleteAuthIdentityCompleted',
+    at: FieldValue.serverTimestamp(),
+    firestoreDataPreserved: true,
+  }).catch(error => console.error('[admin-users] Post-delete audit write failed', error));
+  return { uid, deletedAuthenticationOnly: true, financialDataPreserved: true };
+}
+
 /** Never count page views as installs. Only the appinstalled browser event or
  *  a launch in standalone display mode is recorded, once per signed-in account.
  */

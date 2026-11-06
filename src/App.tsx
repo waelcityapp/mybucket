@@ -307,8 +307,10 @@ export default function App() {
   const verifyAdminPin = (pin: string) => {
     if (!isAdmin || pin !== '2233') return false;
     setAdminPinVerified(true);
-    window.history.replaceState({ myBucketTab: 'admin' }, '', '/admin');
-    setAdminRoute('/admin');
+    const currentPath = window.location.pathname;
+    const safeTarget = /^\/admin\/(users|subscriptions|marketers|ads|ai|system)$/.test(currentPath) ? currentPath : '/admin';
+    window.history.replaceState({ myBucketTab: 'admin' }, '', safeTarget);
+    setAdminRoute(safeTarget);
     setActiveTab('admin');
     return true;
   };

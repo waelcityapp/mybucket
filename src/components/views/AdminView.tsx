@@ -7,6 +7,7 @@ import {
 import type { AuthUser, Language } from '../../types';
 import { translations } from '../../data/translations';
 import { AdminAiUsageCard } from '../AdminAiUsageCard';
+import { AdminAppUsersView } from './AdminAppUsersView';
 
 interface AdminViewProps {
   lang: Language;
@@ -32,7 +33,7 @@ export function AdminView({
   const [confirmation, setConfirmation] = useState<'zero' | 'reset' | null>(null);
 
   const sections = [
-    { id: 'users' as const, icon: Users, title: ar ? 'المستخدمون' : 'Users', desc: ar ? 'إدارة الحسابات والصلاحيات' : 'Accounts and roles', ready: false },
+    { id: 'users' as const, icon: Users, title: ar ? 'مستخدمو التطبيق' : 'App users', desc: ar ? 'التسجيل والتثبيت والاشتراكات والتحكم بالحسابات' : 'Registrations, installs, plans and account controls', ready: true },
     { id: 'subscriptions' as const, icon: CreditCard, title: ar ? 'الاشتراكات' : 'Subscriptions', desc: ar ? 'الخطط وفترات التجربة' : 'Plans and trials', ready: false },
     { id: 'marketers' as const, icon: Megaphone, title: ar ? 'المسوقون' : 'Marketers', desc: ar ? 'الأكواد والعمولات' : 'Codes and commissions', ready: false },
     { id: 'ads' as const, icon: PanelsTopLeft, title: ar ? 'إدارة الإعلانات' : 'Ads management', desc: ar ? 'الإعلانات والعروض المنشورة' : 'Published ads and offers', ready: false },
@@ -129,6 +130,7 @@ export function AdminView({
             </button>
           )}
 
+          {selected === 'users' && <AdminAppUsersView lang={lang} />}
           {selected === 'ai' && <AdminAiUsageCard lang={lang} />}
 
           {selected === 'system' && (

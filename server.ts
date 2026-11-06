@@ -41,6 +41,22 @@ async function startServer() {
       }
 
       switch (action) {
+        case 'app.installSeen': {
+          const { recordSignedInInstallation } = await import('./server/adminUsers');
+          return res.json({ ok: true, data: await recordSignedInInstallation(user.uid, payload) });
+        }
+        case 'admin.users.list': {
+          const { listAppUsers } = await import('./server/adminUsers');
+          return res.json({ ok: true, data: await listAppUsers(user) });
+        }
+        case 'admin.users.setDisabled': {
+          const { changeAppUserAccess } = await import('./server/adminUsers');
+          return res.json({ ok: true, data: await changeAppUserAccess(user, payload) });
+        }
+        case 'admin.users.deleteAuth': {
+          const { deleteAppUserIdentity } = await import('./server/adminUsers');
+          return res.json({ ok: true, data: await deleteAppUserIdentity(user, payload) });
+        }
         case 'fx.get': {
           const { getExchangeRateWidget } = await import('./server/exchangeRates');
           return res.json({ ok: true, data: await getExchangeRateWidget(user.uid) });

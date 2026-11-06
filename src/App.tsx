@@ -467,6 +467,48 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Record installed-PWA usage only once per signed-in account on this device.
+  // Never track ordinary page views or send financial data.
+  useEffect(() => {
+    const pendingKey = 'mybucket:pwa-install-pending';
+    const uid = authUser?.uid;
+    const standalone = () => window.matchMedia('(display-mode: standalone)').matches ||
+      (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    const report = async () => {
+      if (!uid || !auth.currentUser || auth.currentUser.uid !== uid) return;
+      const savedKey = 'mybucket:pwa-install-sent:' + uid;
+      let pending = false;
+      try {
+        pending = window.localStorage.getItem(pendingKey) === '1';
+        if (window.localStorage.getItem(savedKey) === '1') return;
+      } catch { /* storage may be unavailable */ }
+      if (!standalone() && !pending) return;
+      try {
+        const token = await auth.currentUser.getIdToken();
+        const response = await fetch('/api/gateway', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          body: JSON.stringify({ action: 'app.installSeen', payload: { source: standalone() ? 'standalone' : 'appinstalled' } }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result?.ok) return;
+        try {
+          window.localStorage.setItem(savedKey, '1');
+          window.localStorage.removeItem(pendingKey);
+        } catch { /* best effort local de-duplication; server is idempotent */ }
+      } catch {
+        // Silent best-effort telemetry: never block authentication or financial workflows.
+      }
+    };
+    const onInstalled = () => {
+      try { window.localStorage.setItem(pendingKey, '1'); } catch { /* storage may be unavailable */ }
+      void report();
+    };
+    window.addEventListener('appinstalled', onInstalled);
+    void report();
+    return () => window.removeEventListener('appinstalled', onInstalled);
+  }, [authUser?.uid]);
+
   // Real-time Cloud Synchronization with Firestore when user is authenticated
   useEffect(() => {
     if (!authUser) return;

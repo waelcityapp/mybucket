@@ -51,6 +51,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { changeAppUserAccess } = await import('../server/adminUsers.js');
         return res.status(200).json({ ok: true, data: await changeAppUserAccess(user, payload) });
       }
+      case 'admin.users.deleteAuth': {
+        if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+        const { deleteAppUserIdentity } = await import('../server/adminUsers.js');
+        return res.status(200).json({ ok: true, data: await deleteAppUserIdentity(user, payload) });
+      }
       case 'fx.get': {
         const { getExchangeRateWidget } = await import('../server/exchangeRates.js');
         return res.status(200).json({ ok: true, data: await getExchangeRateWidget(user.uid) });

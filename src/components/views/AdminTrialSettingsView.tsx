@@ -98,8 +98,8 @@ export function AdminTrialSettingsView({ lang }: { lang: Language }) {
             const basicChanged = change.previous.basicDays !== change.next.basicDays;
             return <div key={change.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 space-y-2">
               <p className="text-xs font-extrabold text-slate-800">{renderDate(change.timestamp)}</p>
-              {proChanged && <p className="text-sm text-slate-700">Pro: <span className="font-bold">{change.previous.proDays}</span> <span aria-hidden="true">←</span> <span className="font-extrabold text-emerald-800">{change.next.proDays}</span> <span className="text-xs">{ar ? 'يومًا (من السابق إلى الجديد)' : 'days (old to new)'}</span></p>}
-              {basicChanged && <p className="text-sm text-slate-700">Basic: <span className="font-bold">{change.previous.basicDays}</span> <span aria-hidden="true">←</span> <span className="font-extrabold text-emerald-800">{change.next.basicDays}</span> <span className="text-xs">{ar ? 'يومًا (من السابق إلى الجديد)' : 'days (old to new)'}</span></p>}
+              {proChanged && <p className="text-sm text-slate-700">Pro: <span className="text-xs">{ar ? 'من' : 'from'}</span> <span className="font-bold">{change.previous.proDays}</span> <span className="text-xs">{ar ? 'إلى' : 'to'}</span> <span className="font-extrabold text-emerald-800">{change.next.proDays}</span> <span className="text-xs">{ar ? 'يومًا' : 'days'}</span></p>}
+              {basicChanged && <p className="text-sm text-slate-700">Basic: <span className="text-xs">{ar ? 'من' : 'from'}</span> <span className="font-bold">{change.previous.basicDays}</span> <span className="text-xs">{ar ? 'إلى' : 'to'}</span> <span className="font-extrabold text-emerald-800">{change.next.basicDays}</span> <span className="text-xs">{ar ? 'يومًا' : 'days'}</span></p>}
               {!proChanged && !basicChanged && <p className="text-xs text-slate-500">{ar ? 'حفظ بدون تغيير في المدد' : 'Saved without a duration change'}</p>}
             </div>;
           })}

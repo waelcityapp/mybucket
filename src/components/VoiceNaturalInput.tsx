@@ -70,7 +70,7 @@ export function VoiceNaturalInput({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [showSoftLandingModal, setShowSoftLandingModal] = useState<'entry' | 'inquiry' | null>(null);
 
-  const isPaid = userSubscription?.isPaid;
+  const isPaid = userSubscription?.isPaid || userSubscription?.tier === 'trial'; // Full Pro trial
   const maxEntries = userSubscription?.dailyExpenseAiLimit || 15;
   const maxQueries = userSubscription?.dailyInquiryAiLimit || 5;
   const usedEntries = userDailyUsage?.expenseAiCount || 0;

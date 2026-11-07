@@ -1,4 +1,4 @@
-export type SubscriptionTier = 'trial' | 'pro' | 'expired';
+export type SubscriptionTier = 'trial' | 'basic' | 'pro' | 'expired';
 
 export interface UserSubscription {
   tier: SubscriptionTier;

@@ -2,10 +2,10 @@ import type { User } from 'firebase/auth';
 import { doc, getDocFromServer, runTransaction } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import type { UserSubscription } from '../types/subscription';
+import { BASIC_FREE_DAYS, addDays, stageFor } from '../config/subscriptionPolicy';
 
 export type SubscriptionAction = 'subscription.get' | 'subscription.applyAffiliate';
 
-const DAY_MS = 86_400_000;
 const LOCAL_CODE_PREFIX = 'mybucket_prototype_affiliate_';
 // Temporary Google prototype codes. This is display-only until server redemption is enabled.
 const PROTOTYPE_CODES = new Set([
@@ -41,21 +41,19 @@ function normalizeSubscription(raw: LegacySubscription): UserSubscription | null
   const trialStartedAt = dateString(source.trialStartedAt);
   if (!trialStartedAt) return null;
 
-  const start = Date.parse(trialStartedAt);
-  const expiry = dateString(source.trialExpiresAt);
-  if (!expiry) return null;
+  const savedExpiry = dateString(source.trialExpiresAt);
+  if (!savedExpiry) return null;
+  const expiry = addDays(trialStartedAt, BASIC_FREE_DAYS);
   const code = typeof source.affiliateCode === 'string' && source.affiliateCode.trim()
     ? source.affiliateCode.trim().toUpperCase()
     : null;
-  const totalDays = typeof source.totalTrialDays === 'number' && Number.isFinite(source.totalTrialDays)
-    ? source.totalTrialDays
-    : Math.max(10, Math.round((Date.parse(expiry) - start) / DAY_MS));
+  const totalDays = BASIC_FREE_DAYS;
   const isPaid = source.isPaid === true;
   const paidExpiresAt = dateString(source.paidExpiresAt);
-  const effectiveExpiry = isPaid && paidExpiresAt ? paidExpiresAt : expiry;
+  const phase = stageFor({ trialStartedAt, isPaid, paidExpiresAt });
 
   return {
-    status: Date.parse(effectiveExpiry) <= Date.now() ? 'expired' : isPaid ? 'paid' : 'trial',
+    status: phase === 'paid' ? 'paid' : phase === 'expired' ? 'expired' : 'trial',
     trialStartedAt,
     trialExpiresAt: expiry,
     totalTrialDays: totalDays,
@@ -83,8 +81,8 @@ function fromGoogleRegistration(user: User): UserSubscription {
   const trialStartedAt = new Date(start).toISOString();
   return { ...normalizeSubscription({
     trialStartedAt,
-    trialExpiresAt: new Date(Date.parse(trialStartedAt) + 10 * DAY_MS).toISOString(),
-    totalTrialDays: 10,
+    trialExpiresAt: addDays(trialStartedAt, BASIC_FREE_DAYS),
+    totalTrialDays: BASIC_FREE_DAYS,
     isPaid: false,
   })!, recordSource: 'account', trialDatesStored: false };
 }
@@ -95,12 +93,9 @@ function localCodeKey(uid: string): string {
 
 function withCode(subscription: UserSubscription, code: string, temporaryLocalOnly: boolean): UserSubscription {
   if (subscription.hasAppliedAffiliateCode || subscription.isPaid) return subscription;
-  const trialExpiresAt = new Date(Date.parse(subscription.trialStartedAt) + 35 * DAY_MS).toISOString();
   return {
     ...subscription,
-    status: Date.parse(trialExpiresAt) <= Date.now() ? 'expired' : 'trial',
-    trialExpiresAt,
-    totalTrialDays: 35,
+    // Code discount only: do not change trial start or expiry.
     affiliateCode: code,
     hasAppliedAffiliateCode: true,
     monthlyPriceEgp: 120,
@@ -186,7 +181,6 @@ export async function requestSubscription(
   const code = typeof payload.code === 'string' ? payload.code.trim().toUpperCase() : '';
   if (!PROTOTYPE_CODES.has(code)) throw new Error('كود المسوّق غير صحيح أو غير مفعل حالياً.');
   if (current.hasAppliedAffiliateCode) throw new Error('تم تفعيل كود مسوّق مسبقًا لهذا الحساب.');
-  if (!current.isPaid && Date.parse(current.trialExpiresAt) <= Date.now()) throw new Error('انتهت التجربة المجانية. خصم الاشتراك قيد التجهيز ولا يمكن بدء تجربة جديدة.');
   try {
     await persistPrototypeCode(user.uid, code);
   } catch {

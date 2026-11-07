@@ -3,10 +3,11 @@ import { auth, db } from '../lib/firebase';
 import { requestSubscription, resolveSubscriptionRecords } from './subscriptionClient';
 import type { UserSubscription as StoredSubscription } from '../types/subscription';
 import type { UserSubscription } from '../types/prototypeSubscription';
+import { stageFor } from '../config/subscriptionPolicy';
 
 function toPrototype(sub: StoredSubscription): UserSubscription {
   return {
-    tier: sub.status === 'paid' ? 'pro' : sub.status,
+    tier: stageFor(sub) === 'basic-free' ? 'basic' : stageFor(sub) === 'pro-trial' ? 'trial' : stageFor(sub) === 'paid' ? 'pro' : 'expired',
     trialDatesStored: sub.trialDatesStored === true,
     affiliateCode: sub.affiliateCode,
     hasAppliedAffiliateCode: sub.hasAppliedAffiliateCode,

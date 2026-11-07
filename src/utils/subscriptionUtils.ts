@@ -1,5 +1,6 @@
 import { UserSubscription, UserDailyUsage, AffiliateCodeInfo } from '../types/prototypeSubscription';
 import { getCurrentLocalDate } from './dateTime';
+import { BASIC_FREE_DAYS, addDays } from '../config/subscriptionPolicy';
 
 export const VALID_AFFILIATE_CODES: Record<string, AffiliateCodeInfo> = {
   WAEL2026: {
@@ -85,7 +86,7 @@ export function calculateRemainingTrialDays(subscription: UserSubscription): num
 export function createInitialSubscription(appliedCode?: string | null): UserSubscription {
   const codeNormalized = (appliedCode || '').trim().toUpperCase();
   const isCodeValid = Boolean(VALID_AFFILIATE_CODES[codeNormalized]);
-  const totalDays = isCodeValid ? 35 : 10;
+  const totalDays = BASIC_FREE_DAYS;
   
   const now = new Date();
   const expires = new Date(now.getTime() + totalDays * 24 * 60 * 60 * 1000);
@@ -142,32 +143,7 @@ export function applyAffiliateCodeToExistingSubscription(
     };
   }
 
-  // 2. If user is in Trial:
-  // Deduct already used trial days from the 35 total days
-  const startDate = new Date(currentSub.trialStartedAt);
-  const now = new Date();
-  const usedDays = Math.max(0, Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
-  
-  // Total allowed with code is 35 days from initial creation
-  const totalDays = 35;
-  const newExpiresAt = new Date(startDate.getTime() + totalDays * 24 * 60 * 60 * 1000);
-
-  const updated: UserSubscription = {
-    ...currentSub,
-    affiliateCode: codeNormalized,
-    hasAppliedAffiliateCode: true,
-    totalTrialDays: totalDays,
-    trialExpiresAt: newExpiresAt.toISOString(),
-    discountPricePerMonth: 120,
-  };
-
-  const remainingDays = Math.max(0, totalDays - usedDays);
-
-  return {
-    success: true,
-    updatedSubscription: updated,
-    message: `تم تفعيل الكود بنجاح! تم تمديد فترة التجربة إلى 35 يومًا من تاريخ تسجيلك (متبقي لك ${remainingDays} يومًا) + خصم التجديد القادم.`,
-  };
+  return { success: true, updatedSubscription: { ...currentSub, affiliateCode: codeNormalized, hasAppliedAffiliateCode: true, discountPricePerMonth: 120 }, message: 'تم تطبيق خصم Pro دون إضافة أيام تجربة.' };
 }
 
 // Remove / Reset affiliate code from subscription
@@ -175,8 +151,8 @@ export function removeAffiliateCodeFromSubscription(
   currentSub: UserSubscription
 ): UserSubscription {
   const startDate = new Date(currentSub.trialStartedAt);
-  const totalDays = 10;
-  const newExpiresAt = new Date(startDate.getTime() + totalDays * 24 * 60 * 60 * 1000);
+  const totalDays = BASIC_FREE_DAYS;
+  const newExpiresAt = new Date(addDays(startDate.toISOString(), totalDays));
 
   return {
     ...currentSub,

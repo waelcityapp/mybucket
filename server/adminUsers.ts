@@ -11,6 +11,7 @@ type AdminActor = { uid: string; email: string | null };
 type SubscriptionInfo = {
   isPaid?: boolean;
   status?: string;
+  trialStartedAt?: string;
   trialExpiresAt?: string;
   paidExpiresAt?: string | null;
   planId?: string;

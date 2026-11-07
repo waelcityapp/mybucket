@@ -1,0 +1,63 @@
+// PREVIEW DRAFT ONLY. NOT PUBLISHED TO FIREBASE.
+// Derived from the Firebase Console rules supplied by the owner.
+// Before deployment: verify correct named database, bootstrap access documents,
+// test with Firestore emulator, and confirm cross-device financial sync.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    function settingsPath() {
+      return /databases/$(database)/documents/appSettings/subscriptionTrials;
+    }
+    function accessPath(uid) {
+      return /databases/$(database)/documents/users/$(uid)/billing/access;
+    }
+    function allowedFinancialWrite(uid) {
+      let settingsExist = exists(settingsPath());
+      let accessExist = exists(accessPath(uid));
+      return isOwner(uid)
+        && settingsExist
+        && accessExist
+        && get(settingsPath()).data.basicDays is int
+        && get(settingsPath()).data.basicDays >= 1
+        && get(settingsPath()).data.basicDays <= 365
+        && get(accessPath(uid)).data.registeredAt is timestamp
+        && (
+          request.time < get(accessPath(uid)).data.registeredAt
+            + duration.value(get(settingsPath()).data.basicDays, 'd')
+          ||
+          (
+            get(accessPath(uid)).data.paidUntil is timestamp
+            && request.time < get(accessPath(uid)).data.paidUntil
+          )
+        );
+    }
+    match /users/{userId} {
+      // Profile stays editable without granting the user billing permissions.
+      allow read, write: if isOwner(userId);
+      match /accounts/{accountId} {
+        allow read: if isOwner(userId);
+        allow create, update, delete: if allowedFinancialWrite(userId);
+      }
+      match /transactions/{transactionId} {
+        allow read: if isOwner(userId);
+        allow create, update, delete: if allowedFinancialWrite(userId);
+      }
+      match /categories/{categoryId} {
+        allow read: if isOwner(userId);
+        allow create, update, delete: if allowedFinancialWrite(userId);
+      }
+      match /preferences/{preferenceId} {
+        allow read: if isOwner(userId);
+        allow create, update, delete: if allowedFinancialWrite(userId);
+      }
+      match /billing/{documentId} {
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
+    }
+    // No client read/write access to global policy, audit, codes or other users.
+  }
+}

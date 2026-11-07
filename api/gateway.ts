@@ -117,9 +117,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ ok:true, data:await updateFeedbackStatus(payload) });
       }
       case 'subscription.trialSettings': {
+        // Prepare a server-owned entitlement record from Firebase Auth metadata on
+        // each authenticated startup. This does NOT itself enable restrictive rules.
+        const { ensureFirestoreAccessRecord } = await import('../server/financialAccess.js');
         const { readTrialSettings } = await import('../server/trialSettings.js');
-        const { proDays, basicDays } = await readTrialSettings();
-        return res.status(200).json({ ok: true, data: { proDays, basicDays } });
+        const settings = await readTrialSettings();
+        await ensureFirestoreAccessRecord(user.uid);
+        return res.status(200).json({ ok: true, data: { proDays: settings.proDays, basicDays: settings.basicDays } });
       }
       case 'admin.subscriptionTrials.get': {
         if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });

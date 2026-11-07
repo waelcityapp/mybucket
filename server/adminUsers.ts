@@ -1,6 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin.js';
 import { SubscriptionError } from './subscriptionService.js';
+import { stageFor } from '../src/config/subscriptionPolicy';
 
 const OWNER_EMAIL = 'waelvts@gmail.com';
 const MAX_USERS_TO_COUNT = 5000;
@@ -24,13 +25,11 @@ function mustBeOwner(actor: AdminActor) {
 }
 function subscriptionLabel(record: SubscriptionInfo | undefined) {
   if (!record) return { tier: 'unknown', plan: 'Not recorded' };
-  if (record.isPaid === true) {
-    return { tier: 'paid', plan: record.planName || record.planId || record.plan || 'Paid — plan not recorded' };
-  }
-  if (record.trialExpiresAt && new Date(record.trialExpiresAt).getTime() > Date.now()) {
-    return { tier: 'trial', plan: 'Pro trial (' + (record.totalTrialDays || 10) + ' days)' };
-  }
-  return { tier: 'free', plan: 'Free' };
+  const phase = stageFor({ trialStartedAt: record.trialStartedAt || '', isPaid: record.isPaid === true, paidExpiresAt: record.paidExpiresAt });
+  if (phase === 'paid') return { tier: 'paid', plan: record.planName || record.planId || record.plan || 'Pro' };
+  if (phase === 'pro-trial') return { tier: 'trial', plan: 'Pro trial (first 15 days)' };
+  if (phase === 'basic-free') return { tier: 'trial', plan: 'Basic introductory (until day 60)' };
+  return { tier: 'free', plan: 'Introductory period ended' };
 }
 
 /** Auth is the source of truth for registered accounts and disabled status.

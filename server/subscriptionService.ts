@@ -2,7 +2,7 @@ import type { Request } from 'express';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin.js';
 import type { AffiliateCodeRecord, UserSubscription } from '../src/types/subscription';
-import { BASIC_FREE_DAYS, PRO_PRICE_EGP, addDays, stageFor } from '../src/config/subscriptionPolicy';
+import { BASIC_FREE_DAYS, PRO_PRICE_EGP, addDays, stageFor, type TrialDurations } from '../src/config/subscriptionPolicy';
 
 const BASE_TRIAL_DAYS = BASIC_FREE_DAYS;
 const DEFAULT_MONTHLY_PRICE_EGP = PRO_PRICE_EGP;
@@ -72,12 +72,12 @@ function isoAfterDays(startIso: string, days: number): string {
   return new Date(new Date(startIso).getTime() + days * DAY_MS).toISOString();
 }
 
-function createBaseSubscription(nowIso: string): UserSubscription {
+function createBaseSubscription(nowIso: string, basicDays = BASE_TRIAL_DAYS): UserSubscription {
   return {
     status: 'trial',
     trialStartedAt: nowIso,
-    trialExpiresAt: isoAfterDays(nowIso, BASE_TRIAL_DAYS),
-    totalTrialDays: BASE_TRIAL_DAYS,
+    trialExpiresAt: isoAfterDays(nowIso, basicDays),
+    totalTrialDays: basicDays,
     affiliateCode: null,
     affiliateAppliedAt: null,
     hasAppliedAffiliateCode: false,
@@ -92,31 +92,44 @@ function createBaseSubscription(nowIso: string): UserSubscription {
   };
 }
 
-function withComputedStatus(subscription: UserSubscription): UserSubscription {
-  const phase = stageFor(subscription);
+function withComputedStatus(subscription: UserSubscription, durations: TrialDurations): UserSubscription {
+  const phase = stageFor(subscription, Date.now(), durations);
   return { ...subscription, status: phase === 'paid' ? 'paid' : phase === 'expired' ? 'expired' : 'trial' };
 }
 
 export async function getOrCreateSubscription(uid: string): Promise<UserSubscription> {
+  const { readTrialSettings } = await import('./trialSettings.js');
+  const durations = await readTrialSettings();
   const db = getAdminFirestore();
   const subscriptionRef = db.doc(`users/${uid}/billing/subscription`);
-
-  const subscription = await db.runTransaction(async (transaction) => {
-    const snapshot = await transaction.get(subscriptionRef);
-    if (snapshot.exists) {
-      const old = snapshot.data() as UserSubscription;
-      if (old.totalTrialDays === BASIC_FREE_DAYS) return old;
-      const next = { ...old, totalTrialDays: BASIC_FREE_DAYS, trialExpiresAt: addDays(old.trialStartedAt, BASIC_FREE_DAYS), updatedAt: new Date().toISOString() };
-      transaction.set(subscriptionRef, next, { merge: true });
-      return next;
-    }
-
-    const created = createBaseSubscription(new Date().toISOString());
-    transaction.create(subscriptionRef, created);
-    return created;
-  });
-
-  return withComputedStatus(subscription);
+  const snapshot = await subscriptionRef.get();
+  if (snapshot.exists) {
+    const stored = snapshot.data() as UserSubscription;
+    return withComputedStatus({
+      ...stored,
+      totalTrialDays: durations.basicDays,
+      trialExpiresAt: addDays(stored.trialStartedAt, durations.basicDays),
+    }, durations);
+  }
+  // Never start a fresh trial on a returning account with a missing billing document.
+  const authUser = await getAdminAuth().getUser(uid);
+  const registered = authUser.metadata.creationTime;
+  if (!registered || !Number.isFinite(Date.parse(registered)))
+    throw new SubscriptionError(503, 'missing_registration_date', 'Account registration date is unavailable.');
+  const created = createBaseSubscription(new Date(registered).toISOString(), durations.basicDays);
+  try {
+    await subscriptionRef.create(created);
+  } catch (error: unknown) {
+    if (!(error && typeof error === 'object' && 'code' in error &&
+      (error.code === 6 || error.code === 'already-exists'))) throw error;
+  }
+  const latest = await subscriptionRef.get();
+  const stored = latest.exists ? latest.data() as UserSubscription : created;
+  return withComputedStatus({
+    ...stored,
+    totalTrialDays: durations.basicDays,
+    trialExpiresAt: addDays(stored.trialStartedAt, durations.basicDays),
+  }, durations);
 }
 
 function validateAffiliateCodeRecord(data: AffiliateCodeRecord | undefined, normalizedCode: string) {
@@ -144,11 +157,15 @@ export async function applyAffiliateCode(uid: string, rawCode: unknown): Promise
     throw new SubscriptionError(400, 'affiliate_code_invalid_format', 'Enter a valid marketer code.');
   }
 
+  const { readTrialSettings } = await import('./trialSettings.js');
+  const durations = await readTrialSettings();
   const db = getAdminFirestore();
   const subscriptionRef = db.doc(`users/${uid}/billing/subscription`);
   const codeRef = db.doc(`affiliateCodes/${normalizedCode}`);
   const redemptionRef = codeRef.collection('redemptions').doc(uid);
 
+  const accountCreationTime = (await getAdminAuth().getUser(uid)).metadata.creationTime;
+  if (!Number.isFinite(Date.parse(accountCreationTime))) throw new SubscriptionError(503, 'missing_registration_date', 'Account registration date is unavailable.');
   const updated = await db.runTransaction(async (transaction) => {
     const [subscriptionSnapshot, codeSnapshot, redemptionSnapshot] = await Promise.all([
       transaction.get(subscriptionRef),
@@ -158,7 +175,7 @@ export async function applyAffiliateCode(uid: string, rawCode: unknown): Promise
 
     const current = subscriptionSnapshot.exists
       ? (subscriptionSnapshot.data() as UserSubscription)
-      : createBaseSubscription(new Date().toISOString());
+      : createBaseSubscription(new Date(accountCreationTime).toISOString(), durations.basicDays);
 
     if (current.hasAppliedAffiliateCode || redemptionSnapshot.exists) {
       throw new SubscriptionError(409, 'affiliate_code_already_applied', 'A marketer code was already applied to this account.');
@@ -172,8 +189,8 @@ export async function applyAffiliateCode(uid: string, rawCode: unknown): Promise
     const next: UserSubscription = {
       ...current,
       status: current.isPaid ? 'paid' : 'trial',
-      totalTrialDays: BASIC_FREE_DAYS,
-      trialExpiresAt: addDays(current.trialStartedAt, BASIC_FREE_DAYS),
+      totalTrialDays: durations.basicDays,
+      trialExpiresAt: addDays(current.trialStartedAt, durations.basicDays),
       affiliateCode: normalizedCode,
       affiliateAppliedAt: nowIso,
       hasAppliedAffiliateCode: true,
@@ -199,5 +216,5 @@ export async function applyAffiliateCode(uid: string, rawCode: unknown): Promise
     return next;
   });
 
-  return withComputedStatus(updated);
+  return withComputedStatus(updated, durations);
 }

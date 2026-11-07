@@ -60,17 +60,17 @@ export function BottomNav({ activeTab, onChangeTab, lang }: BottomNavProps) {
                   <div
                     className={`p-3 rounded-full transition-all duration-300 ${
                       isActive 
-                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 scale-110' 
-                        : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 scale-110' 
+                        : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
                     }`}
                   >
                     {item.icon}
                   </div>
                 </div>
-                <span className={`text-[10px]  font-bold transition-colors ${isActive ? 'text-blue-600' : 'text-slate-500'}`}>
+                <span className={`text-[10px]  font-bold transition-colors ${isActive ? 'text-emerald-600' : 'text-slate-500'}`}>
                   {item.label}
                 </span>
-                {isActive && <div className="absolute -bottom-1.5 w-8 h-1 bg-blue-600 rounded-t-md" />}
+                {isActive && <div className="absolute -bottom-1.5 w-8 h-1 bg-emerald-600 rounded-t-md" />}
               </button>
             );
           }
@@ -83,7 +83,7 @@ export function BottomNav({ activeTab, onChangeTab, lang }: BottomNavProps) {
               onClick={() => onChangeTab(item.id)}
               className={`flex flex-col items-center justify-center py-2 px-1 flex-1 transition-all cursor-pointer relative ${
                 isActive
-                  ? 'text-blue-600 font-bold'
+                  ? 'text-emerald-600 font-bold'
                   : 'text-slate-400 hover:text-slate-600 font-medium'
               }`}
             >

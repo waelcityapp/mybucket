@@ -401,3 +401,7 @@ The existing Firestore `subscriptionTrialsAudit` trail is exposed read-only to t
 
 ## Revision #121 — Archived audit entries and centered trial-expiry notice
 Subscription trial history allows the owner to hide individual obsolete entries from the UI after inline confirmation; Firestore `subscriptionTrialsAudit` records remain retained with `archivedAt` and `archivedBy`. This only changes audit visibility, never plan durations. Expired-user manual, typed and microphone input attempts display a centrally positioned notice linked to the full subscription page; voice recognition is stopped on expiry. These are client UX safeguards, not a substitute for deployed Firestore Security Rules.
+
+
+## Revision #122 — Bottom navigation brand green
+Replaced blue active and hover colors in `src/components/BottomNav.tsx` with the existing emerald-green visual theme, including the elevated center Search button. Navigation behavior, layout, and financial functionality remain unchanged.

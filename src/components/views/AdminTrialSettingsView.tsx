@@ -3,6 +3,7 @@ import { auth } from '../../lib/firebase';
 import type { Language } from '../../types';
 
 type Settings = { proDays: number; basicDays: number; updatedAt: string | null };
+type Change = { id: string; timestamp: string; previous: { proDays: number; basicDays: number }; next: { proDays: number; basicDays: number } };
 async function gateway(action: string, payload: Record<string, unknown> = {}) {
   const user = auth.currentUser;
   if (!user) throw new Error('Please sign in');
@@ -12,7 +13,7 @@ async function gateway(action: string, payload: Record<string, unknown> = {}) {
   });
   const json = await response.json();
   if (!response.ok || json.ok !== true) throw new Error(json.message || json.error || 'Request failed');
-  return json.data as Settings;
+  return json.data as unknown;
 }
 export function AdminTrialSettingsView({ lang }: { lang: Language }) {
   const ar = lang === 'ar';
@@ -23,12 +24,31 @@ export function AdminTrialSettingsView({ lang }: { lang: Language }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [confirm, setConfirm] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<Change[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  const loadHistory = async () => {
+    setHistoryLoading(true); setHistoryError('');
+    try {
+      const data = await gateway('admin.subscriptionTrials.history');
+      if (!Array.isArray(data)) throw new Error('Unexpected change history response');
+      setHistory(data as Change[]);
+    } catch (err) { setHistoryError(err instanceof Error ? err.message : String(err)); }
+    finally { setHistoryLoading(false); }
+  };
+  const toggleHistory = () => {
+    if (!historyOpen) void loadHistory();
+    setHistoryOpen(open => !open);
+  };
+  const renderDate = (date: string) => new Date(date).toLocaleString(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' });
 
   useEffect(() => {
     let active = true;
     gateway('admin.subscriptionTrials.get').then(data => {
       if (!active) return;
-      setValue(data); setPro(String(data.proDays)); setBasic(String(data.basicDays)); setError('');
+      const settings = data as Settings;
+      setValue(settings); setPro(String(settings.proDays)); setBasic(String(settings.basicDays)); setError('');
     }).catch(err => { if (active) setError(err instanceof Error ? err.message : String(err)); });
     return () => { active = false; };
   }, []);
@@ -42,8 +62,9 @@ export function AdminTrialSettingsView({ lang }: { lang: Language }) {
     if (!valid || !confirm || !changed || busy) return;
     setBusy(true); setError(''); setSuccess('');
     try {
-      const saved = await gateway('admin.subscriptionTrials.save', { proDays: proposedPro, basicDays: proposedBasic });
+      const saved = await gateway('admin.subscriptionTrials.save', { proDays: proposedPro, basicDays: proposedBasic }) as Settings;
       setValue(saved); setConfirm(false);
+      if (historyOpen) void loadHistory();
       window.dispatchEvent(new Event('mybucket:trial-settings-changed'));
       setSuccess(ar ? 'تم حفظ المدد في Firebase وتطبيقها على جميع الحسابات عند تحديث حالتها.' : 'Durations saved to Firebase for all accounts.');
     } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
@@ -63,6 +84,27 @@ export function AdminTrialSettingsView({ lang }: { lang: Language }) {
     {error && <p role="alert" className="text-sm text-rose-700 break-words">{error}</p>}
     {success && <p role="status" className="text-sm text-emerald-700">{success}</p>}
     <button type="button" disabled={!value || !changed || !valid || !confirm || busy} onClick={save} className="rounded-xl px-5 py-2.5 bg-emerald-700 text-white font-bold text-sm disabled:opacity-40">{busy ? (ar ? 'جارٍ الحفظ...' : 'Saving...') : (ar ? 'حفظ وتطبيق على الجميع' : 'Save for all users')}</button>
-    {value?.updatedAt && <p className="text-xs text-slate-500">{ar ? 'آخر تعديل: ' : 'Last update: '}{new Date(value.updatedAt).toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>}
+    {value?.updatedAt && <button type="button" onClick={toggleHistory} aria-expanded={historyOpen} className="text-xs text-emerald-800 underline underline-offset-2 hover:text-emerald-950 text-start">{ar ? 'آخر تعديل: ' : 'Last update: '}{renderDate(value.updatedAt)} — {ar ? 'عرض ما تغيّر' : 'View changes'}</button>}
+    <div className="border-t border-slate-100 pt-3 space-y-3">
+      <button type="button" onClick={toggleHistory} aria-expanded={historyOpen} className="text-sm font-bold text-emerald-800 hover:text-emerald-950 underline underline-offset-2">{historyOpen ? (ar ? 'إخفاء سجل التعديلات' : 'Hide change history') : (ar ? 'عرض سجل التعديلات' : 'View change history')}</button>
+      {historyOpen && <div className="space-y-3" aria-label={ar ? 'سجل تعديلات الاشتراكات' : 'Subscription changes history'}>
+        {historyLoading && <p role="status" className="text-xs text-slate-500">{ar ? 'جارٍ تحميل السجل...' : 'Loading history...'}</p>}
+        {historyError && <div role="alert" className="text-xs text-rose-700">{historyError} <button type="button" onClick={() => void loadHistory()} className="underline font-semibold">{ar ? 'إعادة المحاولة' : 'Retry'}</button></div>}
+        {!historyLoading && !historyError && history.length === 0 && <p className="text-xs text-slate-500">{ar ? 'لا توجد تعديلات مسجلة حتى الآن.' : 'No saved changes yet.'}</p>}
+        {!historyLoading && !historyError && history.length > 0 && <>
+          <p className="text-xs text-slate-500">{ar ? 'أحدث 50 تعديلًا محفوظًا في Firebase. السجل للعرض فقط.' : 'Latest 50 changes recorded in Firebase. Read-only.'}</p>
+          {history.map(change => {
+            const proChanged = change.previous.proDays !== change.next.proDays;
+            const basicChanged = change.previous.basicDays !== change.next.basicDays;
+            return <div key={change.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 space-y-2">
+              <p className="text-xs font-extrabold text-slate-800">{renderDate(change.timestamp)}</p>
+              {proChanged && <p className="text-sm text-slate-700">Pro: <span className="font-bold">{change.previous.proDays}</span> <span aria-hidden="true">←</span> <span className="font-extrabold text-emerald-800">{change.next.proDays}</span> <span className="text-xs">{ar ? 'يومًا (من السابق إلى الجديد)' : 'days (old to new)'}</span></p>}
+              {basicChanged && <p className="text-sm text-slate-700">Basic: <span className="font-bold">{change.previous.basicDays}</span> <span aria-hidden="true">←</span> <span className="font-extrabold text-emerald-800">{change.next.basicDays}</span> <span className="text-xs">{ar ? 'يومًا (من السابق إلى الجديد)' : 'days (old to new)'}</span></p>}
+              {!proChanged && !basicChanged && <p className="text-xs text-slate-500">{ar ? 'حفظ بدون تغيير في المدد' : 'Saved without a duration change'}</p>}
+            </div>;
+          })}
+        </>}
+      </div>}
+    </div>
   </section>;
 }

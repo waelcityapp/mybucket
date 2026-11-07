@@ -393,3 +393,7 @@ Administrator-only `/admin/subscriptions` is wired through the existing authenti
 
 ## Revision #119 — Gateway module resolution repair
 Production runtime error `ERR_MODULE_NOT_FOUND` for `/var/task/src/config/subscriptionPolicy` in `server/subscriptionService.js` was identified through Vercel runtime logs. Two server imports were updated to explicit `.js` ESM paths so subscription and admin gateway actions can resolve the shared policy at runtime. The subscription durations, Firestore rules, and all user data are unchanged.
+
+
+## Revision #120 — Subscription trial change history
+The existing Firestore `subscriptionTrialsAudit` trail is exposed read-only to the authenticated owner via the existing gateway action `admin.subscriptionTrials.history`. The admin `/admin/subscriptions` page lets the owner click the last-update timestamp or open the change-history section to inspect each saved Pro/Basic day count before and after, with its timestamp. Only the latest 50 entries are returned (newest first), and no user financial data or subscription settings are modified by viewing history.

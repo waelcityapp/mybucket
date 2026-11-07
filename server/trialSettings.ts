@@ -37,3 +37,37 @@ export async function saveTrialSettings(payload: Record<string, unknown>, uid: s
   });
   return next;
 }
+
+
+export type TrialSettingsChange = {
+  id: string;
+  timestamp: string;
+  previous: { proDays: number; basicDays: number };
+  next: { proDays: number; basicDays: number };
+};
+export async function listTrialSettingsHistory(): Promise<TrialSettingsChange[]> {
+  const results = await getAdminFirestore().collection('subscriptionTrialsAudit')
+    .orderBy('timestamp', 'desc').limit(50).get();
+  const changes: TrialSettingsChange[] = [];
+  for (const doc of results.docs) {
+    const data = doc.data();
+    const before = data.previous;
+    const after = data.next;
+    const beforePro = before?.proDays;
+    const beforeBasic = before?.basicDays;
+    const afterPro = after?.proDays;
+    const afterBasic = after?.basicDays;
+    if (![beforePro, beforeBasic, afterPro, afterBasic].every(v => Number.isInteger(v) && v >= 1 && v <= 365)) continue;
+    const time = typeof data.timestamp?.toDate === 'function' ? data.timestamp.toDate() : null;
+    const timestamp = time && Number.isFinite(time.getTime()) ? time.toISOString()
+      : typeof after?.updatedAt === 'string' && Number.isFinite(Date.parse(after.updatedAt)) ? after.updatedAt : null;
+    if (!timestamp) continue;
+    changes.push({
+      id: doc.id,
+      timestamp,
+      previous: { proDays: beforePro, basicDays: beforeBasic },
+      next: { proDays: afterPro, basicDays: afterBasic },
+    });
+  }
+  return changes;
+}

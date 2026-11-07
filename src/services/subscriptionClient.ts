@@ -2,7 +2,7 @@ import type { User } from 'firebase/auth';
 import { doc, getDocFromServer, runTransaction } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import type { UserSubscription } from '../types/subscription';
-import { BASIC_FREE_DAYS, addDays, stageFor } from '../config/subscriptionPolicy';
+import { getTrialDurations, addDays, stageFor } from '../config/subscriptionPolicy';
 
 export type SubscriptionAction = 'subscription.get' | 'subscription.applyAffiliate';
 
@@ -43,11 +43,11 @@ function normalizeSubscription(raw: LegacySubscription): UserSubscription | null
 
   const savedExpiry = dateString(source.trialExpiresAt);
   if (!savedExpiry) return null;
-  const expiry = addDays(trialStartedAt, BASIC_FREE_DAYS);
+  const expiry = addDays(trialStartedAt, getTrialDurations().basicDays);
   const code = typeof source.affiliateCode === 'string' && source.affiliateCode.trim()
     ? source.affiliateCode.trim().toUpperCase()
     : null;
-  const totalDays = BASIC_FREE_DAYS;
+  const totalDays = getTrialDurations().basicDays;
   const isPaid = source.isPaid === true;
   const paidExpiresAt = dateString(source.paidExpiresAt);
   const phase = stageFor({ trialStartedAt, isPaid, paidExpiresAt });
@@ -81,8 +81,8 @@ function fromGoogleRegistration(user: User): UserSubscription {
   const trialStartedAt = new Date(start).toISOString();
   return { ...normalizeSubscription({
     trialStartedAt,
-    trialExpiresAt: addDays(trialStartedAt, BASIC_FREE_DAYS),
-    totalTrialDays: BASIC_FREE_DAYS,
+    trialExpiresAt: addDays(trialStartedAt, getTrialDurations().basicDays),
+    totalTrialDays: getTrialDurations().basicDays,
     isPaid: false,
   })!, recordSource: 'account', trialDatesStored: false };
 }

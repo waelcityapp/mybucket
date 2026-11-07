@@ -116,6 +116,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { updateFeedbackStatus } = await import('../server/analyzerFeedback.js');
         return res.status(200).json({ ok:true, data:await updateFeedbackStatus(payload) });
       }
+      case 'subscription.trialSettings': {
+        const { readTrialSettings } = await import('../server/trialSettings.js');
+        return res.status(200).json({ ok: true, data: await readTrialSettings() });
+      }
+      case 'admin.subscriptionTrials.get': {
+        if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+        const { readTrialSettings } = await import('../server/trialSettings.js');
+        return res.status(200).json({ ok: true, data: await readTrialSettings() });
+      }
+      case 'admin.subscriptionTrials.save': {
+        if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+        const { saveTrialSettings } = await import('../server/trialSettings.js');
+        return res.status(200).json({ ok: true, data: await saveTrialSettings(payload, user.uid) });
+      }
       case 'subscription.get': {
         const subscription = await getOrCreateSubscription(user.uid);
         return res.status(200).json({ ok: true, data: { subscription } });

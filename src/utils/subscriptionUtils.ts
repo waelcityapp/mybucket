@@ -1,6 +1,6 @@
 import { UserSubscription, UserDailyUsage, AffiliateCodeInfo } from '../types/prototypeSubscription';
 import { getCurrentLocalDate } from './dateTime';
-import { BASIC_FREE_DAYS, addDays } from '../config/subscriptionPolicy';
+import { getTrialDurations, addDays } from '../config/subscriptionPolicy';
 
 export const VALID_AFFILIATE_CODES: Record<string, AffiliateCodeInfo> = {
   WAEL2026: {
@@ -86,7 +86,7 @@ export function calculateRemainingTrialDays(subscription: UserSubscription): num
 export function createInitialSubscription(appliedCode?: string | null): UserSubscription {
   const codeNormalized = (appliedCode || '').trim().toUpperCase();
   const isCodeValid = Boolean(VALID_AFFILIATE_CODES[codeNormalized]);
-  const totalDays = BASIC_FREE_DAYS;
+  const totalDays = getTrialDurations().basicDays;
   
   const now = new Date();
   const expires = new Date(now.getTime() + totalDays * 24 * 60 * 60 * 1000);
@@ -151,7 +151,7 @@ export function removeAffiliateCodeFromSubscription(
   currentSub: UserSubscription
 ): UserSubscription {
   const startDate = new Date(currentSub.trialStartedAt);
-  const totalDays = BASIC_FREE_DAYS;
+  const totalDays = getTrialDurations().basicDays;
   const newExpiresAt = new Date(addDays(startDate.toISOString(), totalDays));
 
   return {

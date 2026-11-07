@@ -595,9 +595,11 @@ export default function App() {
         const json = await response.json();
         if (!response.ok || !json.ok || !json.data) throw new Error(json.message || 'Cannot read trial settings');
         if (!live) return;
+        const before = getTrialDurations();
+        const changed = before.proDays !== json.data.proDays || before.basicDays !== json.data.basicDays;
         setTrialDurations({ proDays: json.data.proDays, basicDays: json.data.basicDays });
         setTrialSettingsReady(true);
-        setSubscriptionRetry(n => n + 1);
+        if (changed) setSubscriptionRetry(n => n + 1);
       } catch (error) {
         if (live) {
           // No fabricated expiry from unverified configuration.

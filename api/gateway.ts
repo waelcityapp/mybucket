@@ -118,7 +118,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       case 'subscription.trialSettings': {
         const { readTrialSettings } = await import('../server/trialSettings.js');
-        return res.status(200).json({ ok: true, data: await readTrialSettings() });
+        const { proDays, basicDays } = await readTrialSettings();
+        return res.status(200).json({ ok: true, data: { proDays, basicDays } });
       }
       case 'admin.subscriptionTrials.get': {
         if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });

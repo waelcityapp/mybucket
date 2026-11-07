@@ -26,9 +26,9 @@ function mustBeOwner(actor: AdminActor) {
   }
 }
 function subscriptionLabel(record: SubscriptionInfo | undefined, durations: TrialDurations, registrationDate: string | null) {
-  if (!record) return { tier: 'unknown', plan: 'Not recorded' };
-  const phase = stageFor({ trialStartedAt: record.trialStartedAt || registrationDate || '', isPaid: record.isPaid === true, paidExpiresAt: record.paidExpiresAt }, Date.now(), durations);
-  if (phase === 'paid') return { tier: 'paid', plan: record.planName || record.planId || record.plan || 'Pro' };
+  if (!record && !registrationDate) return { tier: 'unknown', plan: 'Registration date unavailable' };
+  const phase = stageFor({ trialStartedAt: record?.trialStartedAt || registrationDate || '', isPaid: record?.isPaid === true, paidExpiresAt: record?.paidExpiresAt }, Date.now(), durations);
+  if (phase === 'paid') return { tier: 'paid', plan: record?.planName || record?.planId || record?.plan || 'Pro' };
   if (phase === 'pro-trial') return { tier: 'trial', plan: 'Pro trial (first ' + durations.proDays + ' days)' };
   if (phase === 'basic-free') return { tier: 'trial', plan: 'Basic introductory (until day ' + durations.basicDays + ')' };
   return { tier: 'free', plan: 'Introductory period ended' };

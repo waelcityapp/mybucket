@@ -62,7 +62,7 @@ export async function verifyAuthenticatedUser(req: Request): Promise<{ uid: stri
 
   try {
     const decoded = await getAdminAuth().verifyIdToken(match[1], true);
-    return { uid: decoded.uid, email: decoded.email || null };
+    return { uid: decoded.uid, email: decoded.email_verified === true ? (decoded.email || null) : null };
   } catch {
     throw new SubscriptionError(401, 'invalid_authentication', 'The Firebase ID token is invalid or expired.');
   }

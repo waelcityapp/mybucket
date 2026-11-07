@@ -1391,6 +1391,10 @@ export default function App() {
                     ? new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'numeric', year: 'numeric' }).format(new Date(trialStart))
                     : null;
                   const remaining = phase === 'pro-trial' ? proRemaining : phase === 'basic-free' ? basicRemaining : null;
+                  const paidExpiresAt = userSubscription?.paidExpiresAt ? Date.parse(userSubscription.paidExpiresAt) : NaN;
+                  const renewalRemaining = phase === 'paid' && Number.isFinite(paidExpiresAt)
+                    ? Math.max(0, Math.ceil((paidExpiresAt - Date.now()) / 86400000))
+                    : null;
                   const isUrgent = remaining !== null && remaining <= 3;
                   const plan = phase === 'pro-trial' || phase === 'paid' ? 'Pro' : 'Basic';
                   const heading = subscriptionError
@@ -1405,10 +1409,13 @@ export default function App() {
                     : !registeredAt
                     ? (lang === 'ar' ? 'راجع تفاصيل اشتراكك' : 'Review subscription details')
                     : phase === 'paid'
-                    ? (lang === 'ar' ? 'اشتراك مدفوع نشط' : 'Active paid subscription')
+                    ? renewalRemaining === null
+                      ? (lang === 'ar' ? 'اشتراك مدفوع نشط' : 'Active paid subscription')
+                      : (lang === 'ar' ? `التجديد خلال: ${renewalRemaining} ${renewalRemaining === 1 ? 'يوم' : 'أيام'}` : `Renewal in: ${renewalRemaining} ${renewalRemaining === 1 ? 'day' : 'days'}`)
+
                     : isExpired
                     ? (lang === 'ar' ? 'اختر خطتك' : 'Choose your plan')
-                    : (lang === 'ar' ? `الأيام المتبقية: ${remaining} ${remaining === 1 ? 'يوم' : 'أيام'}` : `${remaining} ${remaining === 1 ? 'day' : 'days'} remaining`);
+                    : (lang === 'ar' ? `الأيام المجانية المتبقية: ${remaining} ${remaining === 1 ? 'يوم' : 'أيام'}` : `${remaining} ${remaining === 1 ? 'free day' : 'free days'} remaining`);
                   const registeredLabel = registeredAt
                     ? (lang === 'ar' ? `تاريخ تسجيلك: ${registeredAt}` : `Registered: ${registeredAt}`)
                     : null;

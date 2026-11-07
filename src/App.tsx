@@ -57,6 +57,7 @@ import { AuthPage } from './components/views/AuthPage';
 import { InitialSetupView } from './components/views/InitialSetupView';
 import { UsageGuideView } from './components/views/UsageGuideView';
 import { UserSubscription, UserDailyUsage } from './types/prototypeSubscription';
+import { stageFor } from './config/subscriptionPolicy';
 import {
   createInitialSubscription,
   applyAffiliateCodeToExistingSubscription,
@@ -1382,6 +1383,7 @@ export default function App() {
                   const days = userSubscription ? calculateRemainingTrialDays(userSubscription) : null;
                   const uncertain = Boolean(subscriptionError || userSubscription?.trialDatesStored === false);
                   const urgent = !userSubscription?.isPaid && days !== null && days <= 3;
+                  const phase = userSubscription ? stageFor(userSubscription) : null;
                   return <button type="button" onClick={() => subscriptionError ? setSubscriptionRetry((n) => n + 1) : openSubscriptionPage('trial-details')}
                     title={lang === 'ar' ? 'تفاصيل التجربة والاشتراك' : 'Trial and subscription details'}
                     className={`shrink-0 max-w-[47%] flex items-center gap-1.5 rounded-xl border px-2.5 py-2 text-xs font-bold leading-5 transition-colors ${uncertain || urgent ? 'border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'}`}>
@@ -1389,8 +1391,9 @@ export default function App() {
                     <span>{subscriptionError ? (lang === 'ar' ? 'تحقق من التجربة' : 'Check trial')
                       : userSubscription?.trialDatesStored === false ? (lang === 'ar' ? 'بيانات غير مؤكدة' : 'Unconfirmed')
                       : userSubscription?.isPaid ? (lang === 'ar' ? 'اشتراك نشط' : 'Active plan')
-                      : days === 0 ? (lang === 'ar' ? 'انتهت التجربة' : 'Trial ended')
-                      : (lang === 'ar' ? `متبقي ${days} يوم` : `${days} days left`)}</span>
+                      : days === 0 ? (lang === 'ar' ? 'انتهت الفترة المجانية' : 'Trial ended')
+                      : phase === 'basic-free' ? (lang === 'ar' ? `Basic: ${days} يوم` : `Basic: ${days} days`)
+                      : (lang === 'ar' ? `تجربة Pro: ${days} يوم` : `Pro trial: ${days} days`)}</span>
                   </button>;
                 })()}
               </div>

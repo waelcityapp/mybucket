@@ -397,3 +397,7 @@ Production runtime error `ERR_MODULE_NOT_FOUND` for `/var/task/src/config/subscr
 
 ## Revision #120 — Subscription trial change history
 The existing Firestore `subscriptionTrialsAudit` trail is exposed read-only to the authenticated owner via the existing gateway action `admin.subscriptionTrials.history`. The admin `/admin/subscriptions` page lets the owner click the last-update timestamp or open the change-history section to inspect each saved Pro/Basic day count before and after, with its timestamp. Only the latest 50 entries are returned (newest first), and no user financial data or subscription settings are modified by viewing history.
+
+
+## Revision #121 — Archived audit entries and centered trial-expiry notice
+Subscription trial history allows the owner to hide individual obsolete entries from the UI after inline confirmation; Firestore `subscriptionTrialsAudit` records remain retained with `archivedAt` and `archivedBy`. This only changes audit visibility, never plan durations. Expired-user manual, typed and microphone input attempts display a centrally positioned notice linked to the full subscription page; voice recognition is stopped on expiry. These are client UX safeguards, not a substitute for deployed Firestore Security Rules.

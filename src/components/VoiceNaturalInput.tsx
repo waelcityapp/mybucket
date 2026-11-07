@@ -20,6 +20,8 @@ interface VoiceNaturalInputProps {
   onAiEntryUsed?: () => void;
   onAiQueryUsed?: () => void;
   onOpenManualAdd?: () => void;
+  subscriptionExpired?: boolean;
+  onExpiredAttempt?: () => void;
 }
 
 // Typing helper for Web Speech API
@@ -58,6 +60,8 @@ export function VoiceNaturalInput({
   onAiEntryUsed,
   onAiQueryUsed,
   onOpenManualAdd,
+  subscriptionExpired = false,
+  onExpiredAttempt,
 }: VoiceNaturalInputProps) {
   const t = translations[lang];
   const isAr = lang === 'ar';
@@ -97,6 +101,16 @@ export function VoiceNaturalInput({
     : 'text-base sm:text-lg';
 
   useEffect(() => {
+    if (!subscriptionExpired) return;
+    recordingActiveRef.current = false;
+    clearTimeout(restartTimerRef.current ?? undefined);
+    restartTimerRef.current = null;
+    try { recognitionRef.current?.abort?.(); } catch { /* ignore */ }
+    setIsRecording(false); setIsListening(false);
+    setInputText(''); setPendingVoiceReview(false); setStatusMessage(null);
+  }, [subscriptionExpired]);
+
+  useEffect(() => {
     const field = inputRef.current;
     if (!field) return;
     field.style.height = 'auto';
@@ -126,6 +140,7 @@ export function VoiceNaturalInput({
    */
   const processInputWithAI = async (rawText: string, inputSource: 'voice'|'text' = 'text', originalTranscript = '') => {
     const text = rawText.trim();
+    if (subscriptionExpired) { onExpiredAttempt?.(); return; }
     if (!text) return;
 
     setIsProcessingAI(true);
@@ -340,6 +355,7 @@ export function VoiceNaturalInput({
   }, [speechLanguage, t.speechNotSupported]);
 
   const handleToggleMic = () => {
+    if (subscriptionExpired) { onExpiredAttempt?.(); return; }
     if (isProcessingAI) return;
     if (recordingActiveRef.current) {
       finishVoiceRecording();
@@ -375,6 +391,7 @@ export function VoiceNaturalInput({
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (subscriptionExpired) { onExpiredAttempt?.(); return; }
     if (isRecording) {
       finishVoiceRecording();
       return;
@@ -403,10 +420,12 @@ export function VoiceNaturalInput({
             ref={inputRef}
             rows={3}
             disabled={isProcessingAI}
-            readOnly={isRecording}
+            readOnly={isRecording || subscriptionExpired}
+            onFocus={() => { if (subscriptionExpired) { inputRef.current?.blur(); onExpiredAttempt?.(); } }}
+            onClick={() => { if (subscriptionExpired) onExpiredAttempt?.(); }}
             dir={isAr ? 'rtl' : 'ltr'}
             value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
+            onChange={(e) => { if (subscriptionExpired) { onExpiredAttempt?.(); return; } setInputText(e.target.value); }}
             placeholder={
               isRecording
                 ? t.listening

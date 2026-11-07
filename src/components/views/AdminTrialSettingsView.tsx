@@ -28,12 +28,27 @@ export function AdminTrialSettingsView({ lang }: { lang: Language }) {
   const [history, setHistory] = useState<Change[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
+  const [archivePendingId, setArchivePendingId] = useState<string | null>(null);
+  const [archivingId, setArchivingId] = useState<string | null>(null);
+  const archiveHistoryEntry = async (id: string) => {
+    if (archivingId || archivePendingId !== id) return;
+    setArchivingId(id);
+    setHistoryError('');
+    try {
+      await gateway('admin.subscriptionTrials.archiveHistory', { id });
+      setHistory(items => items.filter(item => item.id !== id));
+      setArchivePendingId(null);
+    } catch (err) {
+      setHistoryError(err instanceof Error ? err.message : String(err));
+    } finally { setArchivingId(null); }
+  };
   const loadHistory = async () => {
     setHistoryLoading(true); setHistoryError('');
     try {
       const data = await gateway('admin.subscriptionTrials.history');
       if (!Array.isArray(data)) throw new Error('Unexpected change history response');
       setHistory(data as Change[]);
+      setArchivePendingId(null);
     } catch (err) { setHistoryError(err instanceof Error ? err.message : String(err)); }
     finally { setHistoryLoading(false); }
   };
@@ -92,12 +107,22 @@ export function AdminTrialSettingsView({ lang }: { lang: Language }) {
         {historyError && <div role="alert" className="text-xs text-rose-700">{historyError} <button type="button" onClick={() => void loadHistory()} className="underline font-semibold">{ar ? 'إعادة المحاولة' : 'Retry'}</button></div>}
         {!historyLoading && !historyError && history.length === 0 && <p className="text-xs text-slate-500">{ar ? 'لا توجد تعديلات مسجلة حتى الآن.' : 'No saved changes yet.'}</p>}
         {!historyLoading && !historyError && history.length > 0 && <>
-          <p className="text-xs text-slate-500">{ar ? 'أحدث 50 تعديلًا محفوظًا في Firebase. السجل للعرض فقط.' : 'Latest 50 changes recorded in Firebase. Read-only.'}</p>
+          <p className="text-xs text-slate-500">{ar ? 'أحدث 50 تعديلًا؛ يمكن إخفاء المدخلات القديمة من العرض مع الاحتفاظ بها في سجل التدقيق.' : 'Latest 50 changes. Hide older entries from this view while retaining their audit records.'}</p>
           {history.map(change => {
             const proChanged = change.previous.proDays !== change.next.proDays;
             const basicChanged = change.previous.basicDays !== change.next.basicDays;
             return <div key={change.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 space-y-2">
-              <p className="text-xs font-extrabold text-slate-800">{renderDate(change.timestamp)}</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-extrabold text-slate-800">{renderDate(change.timestamp)}</p>
+                <button type="button" disabled={Boolean(archivingId)} onClick={() => setArchivePendingId(id => id === change.id ? null : change.id)} className="text-xs font-bold text-rose-700 underline underline-offset-2 disabled:opacity-50">{ar ? 'إزالة من السجل' : 'Hide entry'}</button>
+              </div>
+              {archivePendingId === change.id && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+                <p className="text-xs text-amber-950">{ar ? 'هل تريد إخفاء هذا التعديل من القائمة؟ سيتم الاحتفاظ به في Firebase للتدقيق، ولن تتغير مدد الاشتراكات الحالية.' : 'Hide this entry from the list? Its audit record remains in Firebase; current plan durations will not change.'}</p>
+                <div className="flex gap-2">
+                  <button type="button" disabled={Boolean(archivingId)} onClick={() => void archiveHistoryEntry(change.id)} className="rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">{archivingId === change.id ? (ar ? 'جارٍ الإخفاء...' : 'Hiding...') : (ar ? 'تأكيد الإخفاء' : 'Confirm hide')}</button>
+                  <button type="button" disabled={Boolean(archivingId)} onClick={() => setArchivePendingId(null)} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700">{ar ? 'إلغاء' : 'Cancel'}</button>
+                </div>
+              </div>}
               {proChanged && <p className="text-sm text-slate-700">Pro: <span className="text-xs">{ar ? 'من' : 'from'}</span> <span className="font-bold">{change.previous.proDays}</span> <span className="text-xs">{ar ? 'إلى' : 'to'}</span> <span className="font-extrabold text-emerald-800">{change.next.proDays}</span> <span className="text-xs">{ar ? 'يومًا' : 'days'}</span></p>}
               {basicChanged && <p className="text-sm text-slate-700">Basic: <span className="text-xs">{ar ? 'من' : 'from'}</span> <span className="font-bold">{change.previous.basicDays}</span> <span className="text-xs">{ar ? 'إلى' : 'to'}</span> <span className="font-extrabold text-emerald-800">{change.next.basicDays}</span> <span className="text-xs">{ar ? 'يومًا' : 'days'}</span></p>}
               {!proChanged && !basicChanged && <p className="text-xs text-slate-500">{ar ? 'حفظ بدون تغيير في المدد' : 'Saved without a duration change'}</p>}

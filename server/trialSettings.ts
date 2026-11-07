@@ -51,6 +51,7 @@ export async function listTrialSettingsHistory(): Promise<TrialSettingsChange[]>
   const changes: TrialSettingsChange[] = [];
   for (const doc of results.docs) {
     const data = doc.data();
+    if (data.archivedAt) continue; // Hidden from UI, retained for audit integrity.
     const before = data.previous;
     const after = data.next;
     const beforePro = before?.proDays;
@@ -70,4 +71,19 @@ export async function listTrialSettingsHistory(): Promise<TrialSettingsChange[]>
     });
   }
   return changes;
+}
+
+/** Hide one historical log entry from the admin UI; retain evidence in Firestore. */
+export async function archiveTrialSettingsHistoryEntry(rawId: unknown, adminUid: string): Promise<{ archived: true }> {
+  if (typeof rawId !== 'string' || !/^[A-Za-z0-9_-]{10,128}$/.test(rawId)) {
+    throw new SubscriptionError(400, 'invalid_history_id', 'Invalid change history ID.');
+  }
+  const ref = getAdminFirestore().collection('subscriptionTrialsAudit').doc(rawId);
+  await getAdminFirestore().runTransaction(async tx => {
+    const snapshot = await tx.get(ref);
+    if (!snapshot.exists) throw new SubscriptionError(404, 'history_entry_not_found', 'History entry not found.');
+    if (snapshot.get('archivedAt')) return;
+    tx.update(ref, { archivedAt: FieldValue.serverTimestamp(), archivedBy: adminUid });
+  });
+  return { archived: true };
 }

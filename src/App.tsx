@@ -410,6 +410,8 @@ export default function App() {
 
   // 8. Success Toast Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [expiredNoticeOpen, setExpiredNoticeOpen] = useState(false);
+  const showExpiredNotice = () => setExpiredNoticeOpen(true);
   useEffect(() => {
     if (!toastMessage) return;
     const timer = window.setTimeout(() => setToastMessage(null), 4000);
@@ -709,7 +711,7 @@ export default function App() {
 
   // Open Add Modal manually
   const handleOpenAddModal = (type: TransactionType = 'expense') => {
-    if (currentTrialExpired) { setToastMessage(lang === 'ar' ? 'انتهت الفترة المجانية. اختر خطة للاشتراك قبل تسجيل عمليات جديدة.' : 'Your free period ended. Choose a plan before recording new transactions.'); return; }
+    if (currentTrialExpired) { showExpiredNotice(); return; }
     setAnalyzerFeedbackContext(null);
     setPrefilledDraft(null);
     setDraftMissingFields([]);
@@ -730,7 +732,7 @@ export default function App() {
 
   // Handle Natural Language / Voice input parsed draft via Gemini AI
   const handleTransactionDraft = (draft: Partial<Transaction>, missingFields: string[], feedback:AnalyzerFeedbackContext) => {
-    if (currentTrialExpired) { setToastMessage(lang === 'ar' ? 'انتهت الفترة المجانية. اختر خطتك.' : 'Your trial expired. Choose a plan.'); return; }
+    if (currentTrialExpired) { showExpiredNotice(); return; }
     setAnalyzerFeedbackContext(feedback);
     setPrefilledDraft(draft);
     setDraftMissingFields(missingFields || []);
@@ -795,7 +797,7 @@ export default function App() {
 
   // Save only after an atomic, server-confirmed transaction and balance update.
   const handleSaveTransaction = async (newTxData: Omit<Transaction, 'id' | 'createdAt'>): Promise<{ ok: boolean; message?: string }> => {
-    if (currentTrialExpired) return { ok: false, message: lang === 'ar' ? 'انتهت الفترة المجانية. اختر خطتك للاستمرار.' : 'Your free trial ended. Choose your plan to continue.' };
+    if (currentTrialExpired) { showExpiredNotice(); return { ok: false, message: lang === 'ar' ? 'انتهت الفترة المجانية. اختر خطتك للاستمرار.' : 'Your free trial ended. Choose your plan to continue.' }; }
     if (saveInFlight.current) return { ok: false };
     if (!authUser || !financialLoaded.accounts || !financialLoaded.transactions) {
       const message = lang === 'ar' ? 'انتظر تحميل بيانات حسابك وتأكد من الاتصال.' : 'Wait for your account data and check your connection.';
@@ -1373,6 +1375,16 @@ export default function App() {
         </div>
       )}
 
+      {expiredNoticeOpen && <div role="presentation" className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4">
+        <div role="alertdialog" aria-modal="true" aria-labelledby="expired-access-heading" aria-describedby="expired-access-description" className="w-full max-w-sm rounded-3xl border border-amber-200 bg-white px-5 py-6 shadow-2xl space-y-4 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700"><Clock className="h-6 w-6" /></div>
+          <h2 id="expired-access-heading" className="text-lg font-black text-slate-900">{lang === 'ar' ? 'انتهت الفترة المجانية' : 'Your free period has ended'}</h2>
+          <p id="expired-access-description" className="text-sm leading-7 text-slate-700">{lang === 'ar' ? 'اختر خطة للاشتراك قبل تسجيل أي عملية جديدة، سواء يدويًا أو بالكتابة أو بالصوت. جميع عملياتك السابقة وأرصدتك ما زالت محفوظة ويمكنك الاطلاع عليها.' : 'Choose a subscription plan before recording new transactions by hand, text or voice. Your existing records and balances are still safe and visible.'}</p>
+          <button type="button" onClick={() => { setExpiredNoticeOpen(false); openSubscriptionPage('subscription'); }} className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-800">{lang === 'ar' ? 'عرض خطط الاشتراك' : 'View subscription plans'}</button>
+          <button type="button" onClick={() => setExpiredNoticeOpen(false)} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">{lang === 'ar' ? 'إغلاق' : 'Close'}</button>
+        </div>
+      </div>}
+
       {/* Top Header Matching Reference + Google Account / Mobile quick actions */}
       <Header
         lang={lang}
@@ -1528,6 +1540,8 @@ export default function App() {
               categories={categories}
               userDailyUsage={dailyUsage}
               userSubscription={userSubscription}
+              subscriptionExpired={currentTrialExpired}
+              onExpiredAttempt={showExpiredNotice}
               onTransactionDraft={handleTransactionDraft}
               onFinancialQuery={handleFinancialQuery}
               onAICorrection={handleAICorrection}

@@ -41,7 +41,7 @@ function accountPlan(record: AppUser, ar: boolean) {
     return ar ? 'مدفوع · ' + (unknown ? 'الخطة غير مسجلة' : record.plan) : 'Paid · ' + (unknown ? 'Plan not recorded' : record.plan);
   }
   if (record.tier === 'trial') return ar ? 'تجربة برو · ' + record.plan.replace('Pro trial', '').trim() : record.plan;
-  if (record.tier === 'free') return ar ? 'مجاني / تجربة منتهية' : 'Free / trial ended';
+  if (record.tier === 'free') return ar ? 'انتهت الفترة المجانية' : 'Introductory period ended';
   return ar ? 'لا توجد بيانات اشتراك' : 'Subscription not recorded';
 }
 function niceDate(input: string | null, ar: boolean) {

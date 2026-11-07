@@ -1,5 +1,5 @@
 export const PRO_TRIAL_DAYS = 15;
-export const BASIC_FREE_DAYS = 60;
+export const BASIC_FREE_DAYS = 75; // Temporary testing setting. Restore to 60 after approval.
 export const PRO_PRICE_EGP = 180;
 export const PRO_MARKETER_PRICE_EGP = 120;
 export const BASIC_PRICE_EGP: number | null = null; // Pending approval.

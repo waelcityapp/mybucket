@@ -34,7 +34,7 @@ export function TrialSubscriptionPages({ lang, subscription, error, page, onBack
         {error ? <p role="alert" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{error}</p> : !subscription ? <p className="text-sm text-slate-600">{ar ? 'جارٍ قراءة بيانات الاشتراك...' : 'Loading subscription details...'}</p> : page === 'trial-details' ? <>
           <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 space-y-3 text-sm text-slate-700">
             <p className="font-black text-slate-900">{stage === 'paid' ? (ar ? 'اشتراك نشط' : 'Subscription active') : stage === 'pro-trial' ? (ar ? 'تجربة Pro نشطة' : 'Pro trial active') : stage === 'basic-free' ? (ar ? 'فترة Basic المجانية' : 'Basic introductory period') : (ar ? 'انتهت الفترة المجانية' : 'Introductory period ended')}</p>
-            <p>{ar ? 'أول 15 يومًا لتجربة Pro، وBasic مجانًا حتى نهاية اليوم 60 من التسجيل.' : 'Try Pro for 15 days; Basic is free until day 60 after signup.'}</p>
+            <p>{ar ? 'أول 15 يومًا لتجربة Pro، وBasic مجانًا حتى نهاية اليوم 75 من التسجيل.' : 'Try Pro for 15 days; Basic is free until day 75 after signup.'}</p>
             <p>{ar ? 'الأيام المجانية المتبقية: ' : 'Introductory days remaining: '}{days}</p>
             {start && <p>{ar ? `تاريخ تسجيلك: ${start}` : `Registration date: ${start}`}</p>}
             {subscription.trialDatesStored === false && <p className="text-xs text-slate-500">{ar ? 'المدة محسوبة من تاريخ إنشاء حسابك المسجل في Firebase لعدم وجود تاريخ تجربة منفصل.' : 'The period is calculated from your recorded Firebase account creation date because no separate trial record is available.'}</p>}
@@ -47,7 +47,7 @@ export function TrialSubscriptionPages({ lang, subscription, error, page, onBack
         </> : <>
           <p className="text-sm leading-7 text-slate-600">{ar ? 'اختر الخطة المناسبة لك. جميع بياناتك المالية محفوظة عند تغيير الخطة.' : 'Choose the plan that suits you. Your financial records remain saved when you change plans.'}</p>
           {stage === 'pro-trial' && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-900">{ar ? 'تجربة Pro في أول 15 يومًا، مع إمكانية مقارنة Basic.' : 'Your Pro trial is active during the first 15 days.'}</p>}
-          {stage === 'basic-free' && <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm font-bold text-sky-900">{ar ? 'انتهت تجربة Pro؛ Basic مجانية حتى اليوم 60. المتبقي: ' : 'Basic remains free until day 60. Days remaining: '}{days}</p>}
+          {stage === 'basic-free' && <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm font-bold text-sky-900">{ar ? 'انتهت تجربة Pro؛ Basic مجانية حتى اليوم 75. المتبقي: ' : 'Basic remains free until day 75. Days remaining: '}{days}</p>}
           {stage === 'expired' && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">{ar ? 'انتهت الفترة المجانية — اختر خطتك. الدفع قيد التجهيز، وبياناتك المالية محفوظة.' : 'Your introductory period has ended — choose your plan. Payments are not enabled yet; your records are safe.'}</p>}
           {start && <p className="text-xs text-slate-500">{ar ? `تاريخ تسجيلك: ${start}` : `Registration date: ${start}`}</p>}
           <div className="grid gap-4 md:grid-cols-2">
@@ -55,7 +55,7 @@ export function TrialSubscriptionPages({ lang, subscription, error, page, onBack
               <h2 className="text-lg font-black text-slate-900">Basic</h2>
               <p className="text-2xl font-black text-slate-900">{BASIC_PRICE_EGP === null ? (ar ? 'السعر قيد التحديد' : 'Price to be decided') : BASIC_PRICE_EGP}</p>
               <p className="text-sm leading-7 text-slate-600">{ar ? 'الخطة الأساسية؛ مميزاتها وحدودها قيد الاختبار.' : 'The essential plan; features and limits are being tested.'}</p>
-              <p className="mt-auto rounded-xl bg-slate-100 px-3 py-2 text-center text-sm font-bold text-slate-700">{ar ? 'مجانية لأول 60 يومًا فقط' : 'Free for the first 60 days only'}</p>
+              <p className="mt-auto rounded-xl bg-slate-100 px-3 py-2 text-center text-sm font-bold text-slate-700">{ar ? 'مجانية لأول 75 يومًا فقط' : 'Free for the first 75 days only'}</p>
             </div>
             <div className="flex flex-col gap-3 rounded-2xl border-2 border-emerald-600 p-4">
               <h2 className="text-lg font-black text-slate-900">Pro</h2>

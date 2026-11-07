@@ -82,7 +82,7 @@ export function calculateRemainingTrialDays(subscription: UserSubscription): num
   return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 }
 
-// Introductory policy: 15-day Pro trial, then Basic until day 60. Codes affect price only.
+// Temporary testing policy: 15-day Pro trial, then Basic until day 75. Codes affect price only.
 export function createInitialSubscription(appliedCode?: string | null): UserSubscription {
   const codeNormalized = (appliedCode || '').trim().toUpperCase();
   const isCodeValid = Boolean(VALID_AFFILIATE_CODES[codeNormalized]);

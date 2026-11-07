@@ -29,7 +29,7 @@ function subscriptionLabel(record: SubscriptionInfo | undefined) {
   const phase = stageFor({ trialStartedAt: record.trialStartedAt || '', isPaid: record.isPaid === true, paidExpiresAt: record.paidExpiresAt });
   if (phase === 'paid') return { tier: 'paid', plan: record.planName || record.planId || record.plan || 'Pro' };
   if (phase === 'pro-trial') return { tier: 'trial', plan: 'Pro trial (first 15 days)' };
-  if (phase === 'basic-free') return { tier: 'trial', plan: 'Basic introductory (until day 60)' };
+  if (phase === 'basic-free') return { tier: 'trial', plan: 'Basic introductory (until day 75)' };
   return { tier: 'free', plan: 'Introductory period ended' };
 }
 

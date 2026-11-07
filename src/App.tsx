@@ -1380,21 +1380,44 @@ export default function App() {
               <div className="flex items-center justify-between gap-3">
                 <h1 className="min-w-0 text-base sm:text-lg font-black text-slate-800 leading-relaxed">{greetingText}</h1>
                 {authUser && (userSubscription || subscriptionError) && (() => {
-                  const days = userSubscription ? calculateRemainingTrialDays(userSubscription) : null;
-                  const uncertain = Boolean(subscriptionError || userSubscription?.trialDatesStored === false);
-                  const urgent = !userSubscription?.isPaid && days !== null && days <= 3;
                   const phase = userSubscription ? stageFor(userSubscription) : null;
-                  const proTrialDaysLeft = userSubscription ? Math.max(0, Math.ceil((Date.parse(userSubscription.trialStartedAt) + 15 * 86400000 - Date.now()) / 86400000)) : 0;
-                  return <button type="button" onClick={() => subscriptionError ? setSubscriptionRetry((n) => n + 1) : openSubscriptionPage('trial-details')}
-                    title={lang === 'ar' ? 'تفاصيل التجربة والاشتراك' : 'Trial and subscription details'}
-                    className={`shrink-0 max-w-[47%] flex items-center gap-1.5 rounded-xl border px-2.5 py-2 text-xs font-bold leading-5 transition-colors ${uncertain || urgent ? 'border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'}`}>
+                  const trialStart = userSubscription ? Date.parse(userSubscription.trialStartedAt) : NaN;
+                  const proRemaining = Number.isFinite(trialStart)
+                    ? Math.max(0, Math.ceil((trialStart + 15 * 86400000 - Date.now()) / 86400000))
+                    : null;
+                  const basicRemaining = userSubscription ? calculateRemainingTrialDays(userSubscription) : null;
+                  const isUnconfirmed = userSubscription?.trialDatesStored === false;
+                  const isExpired = phase === 'expired';
+                  const remaining = phase === 'pro-trial' ? proRemaining : phase === 'basic-free' ? basicRemaining : null;
+                  const isUrgent = remaining !== null && remaining <= 3;
+                  const plan = phase === 'pro-trial' || phase === 'paid' ? 'Pro' : 'Basic';
+                  const heading = subscriptionError
+                    ? (lang === 'ar' ? 'تعذر قراءة الاشتراك' : 'Subscription unavailable')
+                    : isUnconfirmed
+                    ? (lang === 'ar' ? 'بيانات الاشتراك غير مؤكدة' : 'Subscription dates unconfirmed')
+                    : isExpired
+                    ? (lang === 'ar' ? 'انتهت الفترة المجانية' : 'Free trial ended')
+                    : (lang === 'ar' ? `أنت الآن على خطة ${plan}` : `You are on the ${plan} plan`);
+                  const detail = subscriptionError
+                    ? (lang === 'ar' ? 'اضغط لإعادة المحاولة' : 'Tap to retry')
+                    : isUnconfirmed
+                    ? (lang === 'ar' ? 'راجع تفاصيل اشتراكك' : 'Review your subscription details')
+                    : phase === 'paid'
+                    ? (lang === 'ar' ? 'اشتراك مدفوع نشط' : 'Active paid subscription')
+                    : isExpired
+                    ? (lang === 'ar' ? 'عرض خطط الاشتراك' : 'View subscription plans')
+                    : (lang === 'ar' ? `الأيام المتبقية: ${remaining} ${remaining === 1 ? 'يوم' : 'أيام'}` : `${remaining} ${remaining === 1 ? 'day' : 'days'} remaining`);
+                  return <button
+                    type="button"
+                    onClick={() => subscriptionError ? setSubscriptionRetry(n => n + 1) : openSubscriptionPage('subscription')}
+                    title={lang === 'ar' ? 'عرض الخطط ومدة التجربة' : 'View plans and trial details'}
+                    aria-label={`${heading}، ${detail}`}
+                    className={`min-w-0 shrink-0 max-w-[61%] sm:max-w-[52%] rounded-xl border px-3 py-2 text-start transition-colors flex items-center gap-2 ${subscriptionError || isUnconfirmed || isUrgent || isExpired ? 'border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100' : 'border-emerald-200 bg-emerald-50 text-emerald-950 hover:bg-emerald-100'}`}>
                     <Clock className="h-4 w-4 shrink-0" />
-                    <span>{subscriptionError ? (lang === 'ar' ? 'تحقق من التجربة' : 'Check trial')
-                      : userSubscription?.trialDatesStored === false ? (lang === 'ar' ? 'بيانات غير مؤكدة' : 'Unconfirmed')
-                      : userSubscription?.isPaid ? (lang === 'ar' ? 'اشتراك نشط' : 'Active plan')
-                      : days === 0 ? (lang === 'ar' ? 'انتهت الفترة المجانية' : 'Trial ended')
-                      : phase === 'basic-free' ? (lang === 'ar' ? `Basic: ${days} يوم` : `Basic: ${days} days`)
-                      : (lang === 'ar' ? `تجربة Pro: ${proTrialDaysLeft} يوم` : `Pro trial: ${proTrialDaysLeft} days`)}</span>
+                    <span className="min-w-0 flex flex-col leading-tight gap-0.5">
+                      <span className="text-[11px] sm:text-xs font-extrabold break-words">{heading}</span>
+                      <span className="text-[10px] sm:text-[11px] font-semibold opacity-80">{detail}</span>
+                    </span>
                   </button>;
                 })()}
               </div>

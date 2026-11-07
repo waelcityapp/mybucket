@@ -139,6 +139,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ ok: true, data: { subscription } });
       }
       case 'ai.interpret': {
+        const subscription = await getOrCreateSubscription(user.uid);
+        if (subscription.status === 'expired') return res.status(403).json({ ok: false, error: 'subscription_expired', message: 'Choose a subscription to continue AI operations.' });
         const { text, accounts, categories, currentDateTime, userTimezone, lang, currentProposal, learnedMemory } = payload;
         if (!text || typeof text !== 'string') {
           return res.status(400).json({ ok: false, error: 'invalid_ai_input', message: 'Missing or invalid text.' });

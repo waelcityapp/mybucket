@@ -61,3 +61,7 @@ These rules are mandatory for every conversation and every implementation in thi
 - Use modal dialogs only for small confirmations or truly minor choices.
 - Replace existing major modals incrementally when their feature is edited; do not rewrite all screens at once.
 - Support mobile and desktop, Arabic RTL and English LTR, and light/dark modes when introduced.
+
+
+## Superseding decisions (November 2026)
+The older 10/35-day trial description above is superseded. The current Pro trial is configurable and starts at initial registration; the Basic introductory period is also configurable, temporarily 75 days for testing. Marketer codes discount Pro and never extend free days. Admin trial-day changes apply to **all existing and new accounts**, not only new registrants. Individual subscription exemptions and paid Basic/Pro feature entitlements remain future work. Do not deploy expiry write restrictions without first verifying the live Firebase Rules target, date-source completeness, rollback and authorization behavior.

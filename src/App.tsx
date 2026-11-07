@@ -72,6 +72,7 @@ import {
   onAuthChange,
   testFirestoreConnection,
   auth,
+  setFinancialWriteBlocked,
   createFinancialTransaction,
   InsufficientBalanceError,
   initializeDefaultDocuments,
@@ -626,6 +627,14 @@ export default function App() {
     }, setSubscriptionError);
   }, [authUser?.uid, subscriptionRetry, trialSettingsReady]);
 
+  // Reflect an expired subscription in the current user's financial controls.
+  // The database rules are the remaining enforcement boundary (not shipped in this phase).
+  const currentTrialExpired = Boolean(trialSettingsReady && userSubscription && stageFor(userSubscription) === 'expired');
+  useEffect(() => {
+    setFinancialWriteBlocked(currentTrialExpired);
+    return () => setFinancialWriteBlocked(false);
+  }, [currentTrialExpired, authUser?.uid]);
+
   // Google Login Handler
   const handleGoogleLogin = async () => {
     try {
@@ -698,6 +707,7 @@ export default function App() {
 
   // Open Add Modal manually
   const handleOpenAddModal = (type: TransactionType = 'expense') => {
+    if (currentTrialExpired) { setToastMessage(lang === 'ar' ? 'انتهت الفترة المجانية. اختر خطة للاشتراك قبل تسجيل عمليات جديدة.' : 'Your free period ended. Choose a plan before recording new transactions.'); return; }
     setAnalyzerFeedbackContext(null);
     setPrefilledDraft(null);
     setDraftMissingFields([]);
@@ -718,6 +728,7 @@ export default function App() {
 
   // Handle Natural Language / Voice input parsed draft via Gemini AI
   const handleTransactionDraft = (draft: Partial<Transaction>, missingFields: string[], feedback:AnalyzerFeedbackContext) => {
+    if (currentTrialExpired) { setToastMessage(lang === 'ar' ? 'انتهت الفترة المجانية. اختر خطتك.' : 'Your trial expired. Choose a plan.'); return; }
     setAnalyzerFeedbackContext(feedback);
     setPrefilledDraft(draft);
     setDraftMissingFields(missingFields || []);
@@ -782,6 +793,7 @@ export default function App() {
 
   // Save only after an atomic, server-confirmed transaction and balance update.
   const handleSaveTransaction = async (newTxData: Omit<Transaction, 'id' | 'createdAt'>): Promise<{ ok: boolean; message?: string }> => {
+    if (currentTrialExpired) return { ok: false, message: lang === 'ar' ? 'انتهت الفترة المجانية. اختر خطتك للاستمرار.' : 'Your free trial ended. Choose your plan to continue.' };
     if (saveInFlight.current) return { ok: false };
     if (!authUser || !financialLoaded.accounts || !financialLoaded.transactions) {
       const message = lang === 'ar' ? 'انتظر تحميل بيانات حسابك وتأكد من الاتصال.' : 'Wait for your account data and check your connection.';
@@ -1474,6 +1486,7 @@ export default function App() {
                   </button>;
                 })()}
               </div>
+              {currentTrialExpired && <div role="status" className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs font-bold text-amber-900 flex items-center justify-between gap-2"><span>{lang === 'ar' ? 'انتهت الفترة المجانية: يمكنك مشاهدة بياناتك، لكن تسجيل العمليات متوقف.' : 'Your free period ended: records remain visible; new transactions are disabled.'}</span><button type="button" onClick={() => openSubscriptionPage('subscription')} className="shrink-0 underline">{lang === 'ar' ? 'اختر خطتك' : 'Choose plan'}</button></div>}
               {subscriptionError && (
                 <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950 space-y-1 break-words">
                   <p>{lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn}</p>

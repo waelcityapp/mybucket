@@ -193,8 +193,17 @@ export function subscribeUserCategories(
   );
 }
 
+// User-interface safety guard for expiry testing. Firestore Rules enforcement is
+// required before this becomes a security boundary; users can bypass browser code.
+let financialWriteBlocked = false;
+export function setFinancialWriteBlocked(blocked: boolean): void { financialWriteBlocked = blocked; }
+function requireFinancialWriteAccess(): void {
+  if (financialWriteBlocked) throw new Error('subscription-expired');
+}
+
 // Save single account to Firestore
 export async function saveAccountToFirestore(userId: string, account: FinancialAccount) {
+  requireFinancialWriteAccess();
   if (account.type === 'credit') validateBalance(account, account.balance);
   else if (!isNonNegativeBalance(account.balance)) throw new Error('invalid-balance');
   const accountRef = doc(db, 'users', userId, 'accounts', account.id);
@@ -203,6 +212,7 @@ export async function saveAccountToFirestore(userId: string, account: FinancialA
 
 // Save all accounts (batch)
 export async function saveAllAccountsToFirestore(userId: string, accounts: FinancialAccount[]) {
+  requireFinancialWriteAccess();
   for (const account of accounts) {
     if (account.type === 'credit') validateBalance(account, account.balance);
     else if (!isNonNegativeBalance(account.balance)) throw new Error('invalid-balance');
@@ -218,6 +228,7 @@ export async function saveAllAccountsToFirestore(userId: string, accounts: Finan
 // Delete an unused account only. Existing transactions and linked payment methods
 // must never be orphaned or silently deleted.
 export async function deleteUnusedAccountFromFirestore(userId: string, accountId: string): Promise<void> {
+  requireFinancialWriteAccess();
   if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
 
   const accountsSnapshot = await getDocsFromServer(collection(db, 'users', userId, 'accounts'));
@@ -252,6 +263,7 @@ export async function deleteUnusedAccountFromFirestore(userId: string, accountId
 
 // Reset only current account balances, without overwriting account settings or transactions.
 export async function zeroAccountBalances(userId: string): Promise<void> {
+  requireFinancialWriteAccess();
   if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
   const snapshot = await getDocsFromServer(collection(db, 'users', userId, 'accounts'));
   if (snapshot.size > 450) throw new Error('too-many-accounts');
@@ -267,6 +279,7 @@ export async function zeroAccountBalances(userId: string): Promise<void> {
 
 // Create defaults only if still absent, preventing concurrent sign-ins from resetting data.
 export async function initializeDefaultDocuments(userId: string, group: 'accounts' | 'categories', items: Array<FinancialAccount | Category>): Promise<void> {
+  requireFinancialWriteAccess();
   if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
   const refs = items.map(item => doc(db, 'users', userId, group, item.id));
   await runTransaction(db, async transaction => {
@@ -286,6 +299,7 @@ export class InsufficientBalanceError extends Error {
 
 // A movement records both the chosen method and the actual balance account.
 async function applyFinancialChange(userId: string, expected: Transaction | null, proposed: Transaction | null): Promise<'changed' | 'already-done'> {
+  requireFinancialWriteAccess();
   if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
   const id = expected?.id || proposed?.id;
   if (!id || (expected && proposed && (expected.id !== proposed.id || expected.type !== proposed.type || expected.currency !== proposed.currency))) throw new Error('invalid-transaction');
@@ -373,6 +387,7 @@ export async function deleteTransactionFromFirestore(userId: string, transaction
 
 // Save all categories (batch)
 export async function saveAllCategoriesToFirestore(userId: string, categories: Category[]) {
+  requireFinancialWriteAccess();
   const batch = writeBatch(db);
   categories.forEach((cat) => {
     const catRef = doc(db, 'users', userId, 'categories', cat.id);
@@ -383,6 +398,7 @@ export async function saveAllCategoriesToFirestore(userId: string, categories: C
 
 // Save learned AI memory to Firestore
 export async function saveLearnedMemoryToFirestore(userId: string, memory: any[]) {
+  requireFinancialWriteAccess();
   try {
     const memoryRef = doc(db, 'users', userId, 'preferences', 'learned_memory');
     await setDoc(memoryRef, { items: memory, updatedAt: new Date().toISOString() }, { merge: true });

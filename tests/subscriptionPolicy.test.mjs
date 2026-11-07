@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { stageFor, addDays, PRO_TRIAL_DAYS, BASIC_FREE_DAYS, PRO_PRICE_EGP, PRO_MARKETER_PRICE_EGP, BASIC_PRICE_EGP } from '../src/config/subscriptionPolicy.ts';
+import { stageFor, addDays, getTrialDurations, setTrialDurations, PRO_TRIAL_DAYS, BASIC_FREE_DAYS, PRO_PRICE_EGP, PRO_MARKETER_PRICE_EGP, BASIC_PRICE_EGP } from '../src/config/subscriptionPolicy.ts';
 
 const start = '2026-11-01T00:00:00.000Z';
 const moment = (days) => Date.parse(start) + days * 86400000;
@@ -30,4 +30,12 @@ test('paid entitlement requires an unexpired paid term', () => {
   const paid = { ...trial, isPaid: true, paidExpiresAt: addDays(start, 90) };
   assert.equal(stageFor(paid, moment(80)), 'paid');
   assert.equal(stageFor(paid, moment(90)), 'expired');
+});
+
+test('global admin policy applies to past accounts without resetting their start date', () => {
+  setTrialDurations({ proDays: 1, basicDays: 30 });
+  assert.deepEqual(getTrialDurations(), { proDays: 1, basicDays: 30 });
+  assert.equal(stageFor(trial, moment(2)), 'basic-free');
+  assert.equal(stageFor(trial, moment(31)), 'expired');
+  setTrialDurations({ proDays: PRO_TRIAL_DAYS, basicDays: BASIC_FREE_DAYS });
 });

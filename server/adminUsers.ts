@@ -1,7 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin.js';
 import { SubscriptionError } from './subscriptionService.js';
-import { stageFor, type TrialDurations } from '../src/config/subscriptionPolicy';
+import { stageFor, type TrialDurations } from '../src/config/subscriptionPolicy.js';
 import { readTrialSettings } from './trialSettings.js';
 
 const OWNER_EMAIL = 'waelvts@gmail.com';

@@ -2,7 +2,7 @@ import type { Request } from 'express';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin.js';
 import type { AffiliateCodeRecord, UserSubscription } from '../src/types/subscription';
-import { BASIC_FREE_DAYS, PRO_PRICE_EGP, addDays, stageFor, type TrialDurations } from '../src/config/subscriptionPolicy';
+import { BASIC_FREE_DAYS, PRO_PRICE_EGP, addDays, stageFor, type TrialDurations } from '../src/config/subscriptionPolicy.js';
 
 const BASE_TRIAL_DAYS = BASIC_FREE_DAYS;
 const DEFAULT_MONTHLY_PRICE_EGP = PRO_PRICE_EGP;

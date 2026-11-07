@@ -8,6 +8,7 @@ import type { AuthUser, Language } from '../../types';
 import { translations } from '../../data/translations';
 import { AdminAiUsageCard } from '../AdminAiUsageCard';
 import { AdminAppUsersView } from './AdminAppUsersView';
+import { AdminTrialSettingsView } from './AdminTrialSettingsView';
 
 interface AdminViewProps {
   lang: Language;
@@ -34,7 +35,7 @@ export function AdminView({
 
   const sections = [
     { id: 'users' as const, icon: Users, title: ar ? 'مستخدمى التطبيق' : 'App users', desc: ar ? 'التسجيل والتثبيت والاشتراكات والتحكم بالحسابات' : 'Registrations, installs, plans and account controls', ready: true },
-    { id: 'subscriptions' as const, icon: CreditCard, title: ar ? 'الاشتراكات' : 'Subscriptions', desc: ar ? 'الخطط وفترات التجربة' : 'Plans and trials', ready: false },
+    { id: 'subscriptions' as const, icon: CreditCard, title: ar ? 'الاشتراكات' : 'Subscriptions', desc: ar ? 'التحكم في مدد Pro وBasic لجميع المستخدمين' : 'Global Pro and Basic trial days', ready: true },
     { id: 'marketers' as const, icon: Megaphone, title: ar ? 'المسوقون' : 'Marketers', desc: ar ? 'الأكواد والعمولات' : 'Codes and commissions', ready: false },
     { id: 'ads' as const, icon: PanelsTopLeft, title: ar ? 'إدارة الإعلانات' : 'Ads management', desc: ar ? 'الإعلانات والعروض المنشورة' : 'Published ads and offers', ready: false },
     { id: 'reports' as const, icon: MessageSquareText, title: ar ? 'البلاغات' : 'Reports', desc: ar ? 'تقييمات المحلل المحلي والتحكم فيها' : 'Local analyzer feedback and controls', ready: true },
@@ -131,6 +132,7 @@ export function AdminView({
           )}
 
           {selected === 'users' && <AdminAppUsersView lang={lang} />}
+          {selected === 'subscriptions' && <AdminTrialSettingsView lang={lang} />}
           {selected === 'ai' && <AdminAiUsageCard lang={lang} />}
 
           {selected === 'system' && (

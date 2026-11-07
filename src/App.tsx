@@ -57,7 +57,7 @@ import { AuthPage } from './components/views/AuthPage';
 import { InitialSetupView } from './components/views/InitialSetupView';
 import { UsageGuideView } from './components/views/UsageGuideView';
 import { UserSubscription, UserDailyUsage } from './types/prototypeSubscription';
-import { stageFor } from './config/subscriptionPolicy';
+import { stageFor, getTrialDurations, setTrialDurations } from './config/subscriptionPolicy';
 import {
   createInitialSubscription,
   applyAffiliateCodeToExistingSubscription,
@@ -288,6 +288,7 @@ export default function App() {
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
   const [subscriptionError, setSubscriptionError] = useState<SubscriptionReadIssue | null>(null);
   const [subscriptionRetry, setSubscriptionRetry] = useState(0);
+  const [trialSettingsReady, setTrialSettingsReady] = useState(false);
   const [dailyUsage, setDailyUsage] = useState<UserDailyUsage>({
     date: new Date().toISOString().slice(0, 10),
     expenseAiCount: 0,
@@ -576,15 +577,54 @@ export default function App() {
     };
   }, [authUser?.uid]);
 
+  // One authenticated configuration read on sign-in, and again on focus or admin save.
+  // Avoid routing everyday Firestore financial operations through Vercel.
+  useEffect(() => {
+    if (!authUser) { setTrialSettingsReady(false); return; }
+    let live = true;
+    const sync = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user || user.uid !== authUser.uid) return;
+        const response = await fetch('/api/gateway', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + await user.getIdToken() },
+          body: JSON.stringify({ action: 'subscription.trialSettings' }),
+        });
+        const json = await response.json();
+        if (!response.ok || !json.ok || !json.data) throw new Error(json.message || 'Cannot read trial settings');
+        if (!live) return;
+        setTrialDurations({ proDays: json.data.proDays, basicDays: json.data.basicDays });
+        setTrialSettingsReady(true);
+        setSubscriptionRetry(n => n + 1);
+      } catch (error) {
+        if (live) {
+          // No fabricated expiry from unverified configuration.
+          setTrialSettingsReady(false);
+          console.error('Unable to verify Firebase subscription settings', error);
+        }
+      }
+    };
+    const onFocus = () => { if (document.visibilityState === 'visible') void sync(); };
+    void sync();
+    document.addEventListener('visibilitychange', onFocus);
+    window.addEventListener('mybucket:trial-settings-changed', sync);
+    return () => {
+      live = false;
+      document.removeEventListener('visibilitychange', onFocus);
+      window.removeEventListener('mybucket:trial-settings-changed', sync);
+    };
+  }, [authUser?.uid]);
+
   useEffect(() => {
     setUserSubscription(null);
     setSubscriptionError(null);
-    if (!authUser) return;
+    if (!authUser || !trialSettingsReady) return;
     return subscribeUserSubscription(authUser.uid, (subscription) => {
       setUserSubscription(subscription);
       setSubscriptionError(null);
     }, setSubscriptionError);
-  }, [authUser?.uid, subscriptionRetry]);
+  }, [authUser?.uid, subscriptionRetry, trialSettingsReady]);
 
   // Google Login Handler
   const handleGoogleLogin = async () => {
@@ -1383,7 +1423,7 @@ export default function App() {
                   const phase = userSubscription ? stageFor(userSubscription) : null;
                   const trialStart = userSubscription ? Date.parse(userSubscription.trialStartedAt) : NaN;
                   const proRemaining = Number.isFinite(trialStart)
-                    ? Math.max(0, Math.ceil((trialStart + 15 * 86400000 - Date.now()) / 86400000))
+                    ? Math.max(0, Math.ceil((trialStart + getTrialDurations().proDays * 86400000 - Date.now()) / 86400000))
                     : null;
                   const basicRemaining = userSubscription ? calculateRemainingTrialDays(userSubscription) : null;
                   const isExpired = phase === 'expired';

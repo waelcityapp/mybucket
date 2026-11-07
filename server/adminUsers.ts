@@ -1,7 +1,8 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin.js';
 import { SubscriptionError } from './subscriptionService.js';
-import { stageFor } from '../src/config/subscriptionPolicy';
+import { stageFor, type TrialDurations } from '../src/config/subscriptionPolicy';
+import { readTrialSettings } from './trialSettings.js';
 
 const OWNER_EMAIL = 'waelvts@gmail.com';
 const MAX_USERS_TO_COUNT = 5000;
@@ -24,12 +25,12 @@ function mustBeOwner(actor: AdminActor) {
     throw new SubscriptionError(403, 'admin_only', 'Only the approved app owner can manage users.');
   }
 }
-function subscriptionLabel(record: SubscriptionInfo | undefined) {
+function subscriptionLabel(record: SubscriptionInfo | undefined, durations: TrialDurations, registrationDate: string | null) {
   if (!record) return { tier: 'unknown', plan: 'Not recorded' };
-  const phase = stageFor({ trialStartedAt: record.trialStartedAt || '', isPaid: record.isPaid === true, paidExpiresAt: record.paidExpiresAt });
+  const phase = stageFor({ trialStartedAt: record.trialStartedAt || registrationDate || '', isPaid: record.isPaid === true, paidExpiresAt: record.paidExpiresAt }, Date.now(), durations);
   if (phase === 'paid') return { tier: 'paid', plan: record.planName || record.planId || record.plan || 'Pro' };
-  if (phase === 'pro-trial') return { tier: 'trial', plan: 'Pro trial (first 15 days)' };
-  if (phase === 'basic-free') return { tier: 'trial', plan: 'Basic introductory (until day 75)' };
+  if (phase === 'pro-trial') return { tier: 'trial', plan: 'Pro trial (first ' + durations.proDays + ' days)' };
+  if (phase === 'basic-free') return { tier: 'trial', plan: 'Basic introductory (until day ' + durations.basicDays + ')' };
   return { tier: 'free', plan: 'Introductory period ended' };
 }
 
@@ -40,6 +41,7 @@ export async function listAppUsers(actor: AdminActor) {
   mustBeOwner(actor);
   const auth = getAdminAuth();
   const db = getAdminFirestore();
+  const durations = await readTrialSettings();
   const users: Array<{
     uid: string;
     name: string;
@@ -79,7 +81,7 @@ export async function listAppUsers(actor: AdminActor) {
       const sub = subscriptions[j].exists ? subscriptions[j].data() as SubscriptionInfo : undefined;
       rows.push({
         ...batch[j],
-        ...subscriptionLabel(sub),
+        ...subscriptionLabel(sub, durations, batch[j].createdAt),
         installed: installations[j].exists,
       });
     }

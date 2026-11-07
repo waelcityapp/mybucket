@@ -31,18 +31,13 @@ export function TrialSubscriptionPages({ lang, subscription, error, page, onBack
           <div className="inline-flex rounded-full bg-emerald-50 p-3 text-emerald-700"><CalendarDays className="h-6 w-6" /></div>
           <h1 id="subscription-page-title" className="text-xl sm:text-2xl font-black text-slate-900">{page === 'trial-details' ? (ar ? 'تفاصيل تجربتك' : 'Your trial details') : (ar ? 'الاشتراك الشهري' : 'Monthly subscription')}</h1>
         </div>
-        {error ? <p role="alert" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{error}</p> : !subscription ? <p className="text-sm text-slate-600">{ar ? 'جارٍ قراءة بيانات الاشتراك...' : 'Loading subscription details...'}</p> : subscription.trialDatesStored === false && page === 'trial-details' ? <>
-          <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-950">
-            {ar ? 'لا يوجد تاريخ بداية ونهاية مؤكَّدان للتجربة في سجل الاشتراك المتاح. لا يمكن تحديد المدة أو الأيام المتبقية بدقة حاليًا.' : 'Confirmed trial start and end dates are not available in the subscription record. The duration and remaining days cannot be determined accurately.'}
-          </div>
-          <p className="text-sm text-slate-700">{subscription.hasAppliedAffiliateCode && subscription.affiliateCode ? (ar ? `كود المسوّق الموجود في البيانات: ${subscription.affiliateCode}` : `Marketer code found in available data: ${subscription.affiliateCode}`) : (ar ? 'لم يظهر كود مسوّق في البيانات المتاحة؛ قد يحتاج سجلك السابق إلى مراجعة.' : 'No marketer code appeared in the available data; your earlier record may require review.')}</p>
-          <button type="button" onClick={onSubscription} className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-black text-white hover:bg-emerald-800">{ar ? 'الانتقال إلى صفحة الاشتراك' : 'Go to subscription'}</button>
-        </> : page === 'trial-details' ? <>
+        {error ? <p role="alert" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{error}</p> : !subscription ? <p className="text-sm text-slate-600">{ar ? 'جارٍ قراءة بيانات الاشتراك...' : 'Loading subscription details...'}</p> : page === 'trial-details' ? <>
           <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 space-y-3 text-sm text-slate-700">
             <p className="font-black text-slate-900">{stage === 'paid' ? (ar ? 'اشتراك نشط' : 'Subscription active') : stage === 'pro-trial' ? (ar ? 'تجربة Pro نشطة' : 'Pro trial active') : stage === 'basic-free' ? (ar ? 'فترة Basic المجانية' : 'Basic introductory period') : (ar ? 'انتهت الفترة المجانية' : 'Introductory period ended')}</p>
             <p>{ar ? 'أول 15 يومًا لتجربة Pro، وBasic مجانًا حتى نهاية اليوم 60 من التسجيل.' : 'Try Pro for 15 days; Basic is free until day 60 after signup.'}</p>
             <p>{ar ? 'الأيام المجانية المتبقية: ' : 'Introductory days remaining: '}{days}</p>
-            {start && <p>{ar ? `تاريخ بداية التجربة: ${start}` : `Trial start date: ${start}`}</p>}
+            {start && <p>{ar ? `تاريخ تسجيلك: ${start}` : `Registration date: ${start}`}</p>}
+            {subscription.trialDatesStored === false && <p className="text-xs text-slate-500">{ar ? 'المدة محسوبة من تاريخ إنشاء حسابك المسجل في Firebase لعدم وجود تاريخ تجربة منفصل.' : 'The period is calculated from your recorded Firebase account creation date because no separate trial record is available.'}</p>}
             {expiry && <p>{ar ? `تاريخ نهاية التجربة: ${expiry}` : `Trial end date: ${expiry}`}</p>}
             <p>{subscription.hasAppliedAffiliateCode && subscription.affiliateCode ? (ar ? `كود المسوّق المسجل: ${subscription.affiliateCode}` : `Recorded marketer code: ${subscription.affiliateCode}`) : (ar ? 'لا يوجد كود مسوّق مسجّل في البيانات المتاحة.' : 'No marketer code is recorded in the available data.')}</p>
           </div>
@@ -53,7 +48,8 @@ export function TrialSubscriptionPages({ lang, subscription, error, page, onBack
           <p className="text-sm leading-7 text-slate-600">{ar ? 'اختر الخطة المناسبة لك. جميع بياناتك المالية محفوظة عند تغيير الخطة.' : 'Choose the plan that suits you. Your financial records remain saved when you change plans.'}</p>
           {stage === 'pro-trial' && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-900">{ar ? 'تجربة Pro في أول 15 يومًا، مع إمكانية مقارنة Basic.' : 'Your Pro trial is active during the first 15 days.'}</p>}
           {stage === 'basic-free' && <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm font-bold text-sky-900">{ar ? 'انتهت تجربة Pro؛ Basic مجانية حتى اليوم 60. المتبقي: ' : 'Basic remains free until day 60. Days remaining: '}{days}</p>}
-          {stage === 'expired' && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">{ar ? 'انتهت الفترة المجانية. الدفع قيد التجهيز، وبياناتك المالية محفوظة.' : 'The introductory period ended. Payments are not enabled yet; your records are safe.'}</p>}
+          {stage === 'expired' && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">{ar ? 'انتهت الفترة المجانية — اختر خطتك. الدفع قيد التجهيز، وبياناتك المالية محفوظة.' : 'Your introductory period has ended — choose your plan. Payments are not enabled yet; your records are safe.'}</p>}
+          {start && <p className="text-xs text-slate-500">{ar ? `تاريخ تسجيلك: ${start}` : `Registration date: ${start}`}</p>}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4">
               <h2 className="text-lg font-black text-slate-900">Basic</h2>

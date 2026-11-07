@@ -1386,37 +1386,43 @@ export default function App() {
                     ? Math.max(0, Math.ceil((trialStart + 15 * 86400000 - Date.now()) / 86400000))
                     : null;
                   const basicRemaining = userSubscription ? calculateRemainingTrialDays(userSubscription) : null;
-                  const isUnconfirmed = userSubscription?.trialDatesStored === false;
                   const isExpired = phase === 'expired';
+                  const registeredAt = Number.isFinite(trialStart)
+                    ? new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'numeric', year: 'numeric' }).format(new Date(trialStart))
+                    : null;
                   const remaining = phase === 'pro-trial' ? proRemaining : phase === 'basic-free' ? basicRemaining : null;
                   const isUrgent = remaining !== null && remaining <= 3;
                   const plan = phase === 'pro-trial' || phase === 'paid' ? 'Pro' : 'Basic';
                   const heading = subscriptionError
                     ? (lang === 'ar' ? 'تعذر قراءة الاشتراك' : 'Subscription unavailable')
-                    : isUnconfirmed
-                    ? (lang === 'ar' ? 'بيانات الاشتراك غير مؤكدة' : 'Subscription dates unconfirmed')
+                    : !registeredAt
+                    ? (lang === 'ar' ? 'تاريخ التسجيل غير متاح' : 'Registration date unavailable')
                     : isExpired
                     ? (lang === 'ar' ? 'انتهت الفترة المجانية' : 'Free trial ended')
                     : (lang === 'ar' ? `أنت الآن على خطة ${plan}` : `You are on the ${plan} plan`);
                   const detail = subscriptionError
                     ? (lang === 'ar' ? 'اضغط لإعادة المحاولة' : 'Tap to retry')
-                    : isUnconfirmed
-                    ? (lang === 'ar' ? 'راجع تفاصيل اشتراكك' : 'Review your subscription details')
+                    : !registeredAt
+                    ? (lang === 'ar' ? 'راجع تفاصيل اشتراكك' : 'Review subscription details')
                     : phase === 'paid'
                     ? (lang === 'ar' ? 'اشتراك مدفوع نشط' : 'Active paid subscription')
                     : isExpired
-                    ? (lang === 'ar' ? 'عرض خطط الاشتراك' : 'View subscription plans')
+                    ? (lang === 'ar' ? 'اختر خطتك' : 'Choose your plan')
                     : (lang === 'ar' ? `الأيام المتبقية: ${remaining} ${remaining === 1 ? 'يوم' : 'أيام'}` : `${remaining} ${remaining === 1 ? 'day' : 'days'} remaining`);
+                  const registeredLabel = registeredAt
+                    ? (lang === 'ar' ? `تاريخ تسجيلك: ${registeredAt}` : `Registered: ${registeredAt}`)
+                    : null;
                   return <button
                     type="button"
                     onClick={() => subscriptionError ? setSubscriptionRetry(n => n + 1) : openSubscriptionPage('subscription')}
                     title={lang === 'ar' ? 'عرض الخطط ومدة التجربة' : 'View plans and trial details'}
                     aria-label={`${heading}، ${detail}`}
-                    className={`min-w-0 shrink-0 max-w-[61%] sm:max-w-[52%] rounded-xl border px-3 py-2 text-start transition-colors flex items-center gap-2 ${subscriptionError || isUnconfirmed || isUrgent || isExpired ? 'border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100' : 'border-emerald-200 bg-emerald-50 text-emerald-950 hover:bg-emerald-100'}`}>
+                    className={`min-w-0 shrink-0 max-w-[61%] sm:max-w-[52%] rounded-xl border px-3 py-2 text-start transition-colors flex items-center gap-2 ${subscriptionError || isUrgent || isExpired ? 'border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100' : 'border-emerald-200 bg-emerald-50 text-emerald-950 hover:bg-emerald-100'}`}>
                     <Clock className="h-4 w-4 shrink-0" />
                     <span className="min-w-0 flex flex-col leading-tight gap-0.5">
                       <span className="text-[11px] sm:text-xs font-extrabold break-words">{heading}</span>
                       <span className="text-[10px] sm:text-[11px] font-semibold opacity-80">{detail}</span>
+                      {registeredLabel && <span className="text-[10px] sm:text-[11px] font-medium opacity-75">{registeredLabel}</span>}
                     </span>
                   </button>;
                 })()}

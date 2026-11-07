@@ -100,7 +100,7 @@ function withCode(subscription: UserSubscription, code: string, temporaryLocalOn
     hasAppliedAffiliateCode: true,
     monthlyPriceEgp: 120,
     temporaryLocalOnly,
-    trialDatesStored: false,
+    trialDatesStored: subscription.trialDatesStored,
   };
 }
 

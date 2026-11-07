@@ -6,49 +6,49 @@ export const VALID_AFFILIATE_CODES: Record<string, AffiliateCodeInfo> = {
   WAEL2026: {
     code: 'WAEL2026',
     name: 'كود الشريك الذهبي - وائل',
-    bonusDays: 25, // 10 base + 25 = 35 days
+    bonusDays: 0, // marketer discounts do not extend the introductory period
     discountMonthlyRate: 120, // 4 EGP / day
     regularMonthlyRate: 180, // 6 EGP / day
   },
   VIP2025: {
     code: 'VIP2025',
     name: 'كود شركاء النجاح VIP',
-    bonusDays: 25,
+    bonusDays: 0,
     discountMonthlyRate: 120,
     regularMonthlyRate: 180,
   },
   VIP35: {
     code: 'VIP35',
     name: 'كود شركاء النجاح VIP 35',
-    bonusDays: 25,
+    bonusDays: 0,
     discountMonthlyRate: 120,
     regularMonthlyRate: 180,
   },
   MARKET50: {
     code: 'MARKET50',
     name: 'كود التسويق الحصري',
-    bonusDays: 25,
+    bonusDays: 0,
     discountMonthlyRate: 120,
     regularMonthlyRate: 180,
   },
   OCTOBER2025: {
     code: 'OCTOBER2025',
     name: 'كود مجتمع أكتوبر',
-    bonusDays: 25,
+    bonusDays: 0,
     discountMonthlyRate: 120,
     regularMonthlyRate: 180,
   },
   SAVE35: {
     code: 'SAVE35',
     name: 'كود التوفير 35',
-    bonusDays: 25,
+    bonusDays: 0,
     discountMonthlyRate: 120,
     regularMonthlyRate: 180,
   },
   MYBUCKET35: {
     code: 'MYBUCKET35',
     name: 'كود مجتمع My Bucket الحصري',
-    bonusDays: 25,
+    bonusDays: 0,
     discountMonthlyRate: 120,
     regularMonthlyRate: 180,
   },
@@ -82,7 +82,7 @@ export function calculateRemainingTrialDays(subscription: UserSubscription): num
   return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 }
 
-// Create default trial subscription (10 days without affiliate code, 35 days with valid code)
+// Introductory policy: 15-day Pro trial, then Basic until day 60. Codes affect price only.
 export function createInitialSubscription(appliedCode?: string | null): UserSubscription {
   const codeNormalized = (appliedCode || '').trim().toUpperCase();
   const isCodeValid = Boolean(VALID_AFFILIATE_CODES[codeNormalized]);
@@ -107,7 +107,7 @@ export function createInitialSubscription(appliedCode?: string | null): UserSubs
   };
 }
 
-// Upgrade existing subscription when entering affiliate code (calculating used days, no retroactive resets)
+// Attach marketer discount without extending the trial clock.
 export function applyAffiliateCodeToExistingSubscription(
   currentSub: UserSubscription,
   inputCode: string

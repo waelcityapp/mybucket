@@ -155,7 +155,7 @@ async function startServer() {
           if (phase === 'expired') {
             return res.status(403).json({ ok: false, error: 'subscription_expired', message: 'Your free period has ended. Choose a paid plan to continue.' });
           }
-          if (phase !== 'pro-trial' || subscription.selectedPlan !== 'pro') {
+          if (phase !== 'paid' && (phase !== 'pro-trial' || subscription.selectedPlan !== 'pro')) {
             return res.status(403).json({ ok: false, error: 'pro_plan_required', message: 'Gemini AI is available on the Pro plan only. Basic uses the local analyzer.' });
           }
           const { text, accounts, categories, currentDateTime, userTimezone, lang, currentProposal, learnedMemory } = payload;

@@ -91,7 +91,7 @@ export type AiQuotaDecision = {
  * and dates are deliberately ignored. Each plan/engine/operation has its own
  * counter, so switching plans cannot replenish an earlier bucket.
  */
-export async function reserveAiQuota(uid: string, rawText: unknown): Promise<AiQuotaDecision> {
+export async function reserveAiQuota(uid: string, rawText: unknown, forceLocal = false): Promise<AiQuotaDecision> {
   if (typeof rawText !== 'string' || !rawText.trim() || rawText.length > 12000) {
     throw new SubscriptionError(400, 'invalid_ai_input', 'Missing or invalid AI input.');
   }
@@ -115,10 +115,12 @@ export async function reserveAiQuota(uid: string, rawText: unknown): Promise<AiQ
     const attempts: Array<{ engine: 'local' | 'gemini'; key: string; limit: number; fallback: boolean }> =
       plan === 'basic'
         ? [{ engine: 'local', key: `basicLocal${operation === 'entry' ? 'Entries' : 'Inquiries'}`, limit: operation === 'entry' ? limits.basicLocalEntries : limits.basicLocalInquiries, fallback: false }]
-        : [
-            { engine: 'gemini', key: `proGemini${operation === 'entry' ? 'Entries' : 'Inquiries'}`, limit: operation === 'entry' ? limits.proGeminiEntries : limits.proGeminiInquiries, fallback: false },
-            { engine: 'local', key: `proLocal${operation === 'entry' ? 'Entries' : 'Inquiries'}`, limit: operation === 'entry' ? limits.proLocalEntries : limits.proLocalInquiries, fallback: true },
-          ];
+        : forceLocal
+          ? [{ engine: 'local', key: `proLocal${operation === 'entry' ? 'Entries' : 'Inquiries'}`, limit: operation === 'entry' ? limits.proLocalEntries : limits.proLocalInquiries, fallback: true }]
+          : [
+              { engine: 'gemini', key: `proGemini${operation === 'entry' ? 'Entries' : 'Inquiries'}`, limit: operation === 'entry' ? limits.proGeminiEntries : limits.proGeminiInquiries, fallback: false },
+              { engine: 'local', key: `proLocal${operation === 'entry' ? 'Entries' : 'Inquiries'}`, limit: operation === 'entry' ? limits.proLocalEntries : limits.proLocalInquiries, fallback: true },
+            ];
 
     for (const attempt of attempts) {
       const used = Number(current[attempt.key] || 0);

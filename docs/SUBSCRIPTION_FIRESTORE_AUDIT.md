@@ -39,8 +39,9 @@
 ## Work started on this preview branch (2026-11-08)
 
 - Restricted `ai.interpret` in both Vercel `api/gateway.ts` and local `server.ts`: Gemini is allowed only during the Pro trial stage or an active paid Pro subscription. Basic requests are rejected by the server because Basic must use the local analyzer.
-- Updated `VoiceNaturalInput` to route Pro trial/paid users to `geminiClient` and Basic users to `aiClient` (the deterministic local interpreter). Removed the obsolete 15-entry/5-query localStorage AI quota checks; those were not the agreed Basic policy.
-- Removed the temporary `server/aiQuota.ts` helper because Basic does not consume Gemini tokens.
+- Updated `VoiceNaturalInput` to route selected Pro trial/paid Pro users to `geminiClient` and Basic users to `aiClient` (the deterministic local interpreter). Removed obsolete localStorage AI quota checks.
+- Added server-authoritative daily quotas in `server/aiQuota.ts`: Basic local 10/2, Pro Gemini 15/5, and Pro local fallback 30/10 by default; all six limits are admin-configurable and counters are stored per user/day in Firestore.
+- Added atomic reservation and fallback from exhausted/failed Gemini to the separately limited Pro local analyzer. Basic never calls Gemini.
 - Updated the local query history range selection to distinguish Basic from Pro.
 - Updated `firestore.subscription-draft.rules` to allow-list client-editable profile fields, reject client-supplied role/admin/entitlement fields, validate legacy marketer codes, preserve server-owned suspension fields, and deny client deletion of the profile.
 - Extended the Firestore emulator tests with profile escalation/deletion cases.
@@ -48,7 +49,9 @@
 ## Policy and implementation gate
 
 - Free-period financial writes are allowed only until the admin-configured total Basic period expires; after that the intended behavior is read-only, with all previous financial data preserved.
-- The current policy helper still models the free period as Pro trial first, then Basic free. The user's latest requirement allows switching between Basic and Pro during the free period according to admin-configured limits. The exact day-accounting and switching semantics still need to be implemented before Rules deployment.
+- The current policy helper retains the admin-configured Pro period followed by the admin-configured Basic free period. New accounts default to Pro; users can switch between Basic and Pro during the Pro trial window. After that window, Basic continues until the admin-configured total free-period end date.
+- The selected plan is stored server-side in `users/{uid}/billing/subscription.selectedPlan`. Switching does not change `trialStartedAt` or reset daily quota buckets. Server quota reservation and Gemini access use the stored plan, not a browser-supplied plan.
+- Existing subscription documents missing `selectedPlan` are safely defaulted to Pro by the authenticated subscription bootstrap.
 - Do not deploy the draft Rules until the plan-switching policy, all Firestore paths, and Emulator tests are verified.
 
 ## Verification status

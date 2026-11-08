@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Send, Sparkles, Loader2, HelpCircle } from 'lucide-react';
 import { Language, FinancialAccount, Category, Transaction, CurrencyCode } from '../types';
-import { UserSubscription, UserDailyUsage } from '../types/prototypeSubscription';
 import { translations } from '../data/translations';
 import { aiClient, geminiClient } from '../services/ai/aiClient';
 import { AIFinancialQuery, AIInterpretationResult, AICorrection } from '../services/ai/types';
@@ -12,15 +11,10 @@ interface VoiceNaturalInputProps {
   lang: Language;
   accounts: FinancialAccount[];
   categories: Category[];
-  userDailyUsage?: UserDailyUsage;
-  userSubscription?: UserSubscription | null;
   aiEnabled: boolean;
   onTransactionDraft: (draft: Partial<Transaction>, missingFields: string[], feedback:AnalyzerFeedbackContext) => void;
   onFinancialQuery: (query: AIFinancialQuery, questionText: string) => void;
   onAICorrection?: (correction: AICorrection) => void;
-  onAiEntryUsed?: () => void;
-  onAiQueryUsed?: () => void;
-  onOpenManualAdd?: () => void;
   subscriptionExpired?: boolean;
   onExpiredAttempt?: () => void;
 }
@@ -53,15 +47,10 @@ export function VoiceNaturalInput({
   lang,
   accounts,
   categories,
-  userDailyUsage,
-  userSubscription,
   aiEnabled,
   onTransactionDraft,
   onFinancialQuery,
   onAICorrection,
-  onAiEntryUsed,
-  onAiQueryUsed,
-  onOpenManualAdd,
   subscriptionExpired = false,
   onExpiredAttempt,
 }: VoiceNaturalInputProps) {

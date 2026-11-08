@@ -74,6 +74,13 @@ service cloud.firestore {
           !('prototypeAffiliateAppliedAt' in resource.data)
           || request.resource.data.prototypeAffiliateAppliedAt == resource.data.prototypeAffiliateAppliedAt
         )
+        && (
+          !('prototypeAffiliateCode' in request.resource.data)
+          || request.resource.data.prototypeAffiliateCode in [
+            'WAEL2026', 'VIP2025', 'VIP35', 'MARKET50',
+            'OCTOBER2025', 'SAVE35', 'MYBUCKET35'
+          ]
+        )
         && (!('email' in request.resource.data) || request.resource.data.email is string)
         && (!('displayName' in request.resource.data) || request.resource.data.displayName is string)
         && (!('photoURL' in request.resource.data) || request.resource.data.photoURL is string)

@@ -43,7 +43,7 @@
 - Removed the temporary `server/aiQuota.ts` helper because Basic does not consume Gemini tokens.
 - Updated the local query history range selection to distinguish Basic from Pro.
 - Updated `firestore.subscription-draft.rules` to allow-list client-editable profile fields, reject client-supplied role/admin/entitlement fields, validate legacy marketer codes, preserve server-owned suspension fields, and deny client deletion of the profile.
-- Extended the Firestore emulator tests with profile escalation/deletion and client AI-usage write-denial cases.
+- Extended the Firestore emulator tests with profile escalation/deletion cases.
 
 ## Policy and implementation gate
 

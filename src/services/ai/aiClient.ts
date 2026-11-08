@@ -19,6 +19,20 @@ import {
   matchTransferAccountsFromText,
 } from '../../utils/entityMatcher';
 
+async function reserveLocalQuota(text: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Google authentication is required for AI operations');
+  const response = await fetch('/api/gateway', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
+    body: JSON.stringify({ action: 'ai.quota.reserveLocal', payload: { text } }),
+  });
+  const result = await response.json();
+  if (!response.ok || result?.ok !== true) {
+    throw new Error(result?.message || 'تعذر التحقق من الحصة اليومية للمحلل المحلي.');
+  }
+}
+
 export class GeminiAIClient implements AIInterpretationProvider {
   async interpret(request: AIInterpretationRequest): Promise<AIInterpretationResult> {
     try {

@@ -112,6 +112,20 @@ async function startServer() {
           const { updateFeedbackStatus } = await import('./server/analyzerFeedback');
           return res.json({ ok:true, data:await updateFeedbackStatus(payload) });
         }
+        case 'admin.aiQuota.get': {
+          if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+          const { readAiDailyLimits } = await import('./server/aiQuota');
+          return res.json({ ok: true, data: await readAiDailyLimits() });
+        }
+        case 'admin.aiQuota.save': {
+          if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+          const { saveAiDailyLimits } = await import('./server/aiQuota');
+          return res.json({ ok: true, data: await saveAiDailyLimits(payload, user.uid) });
+        }
+        case 'ai.quota.reserveLocal': {
+          const { reserveAiQuota } = await import('./server/aiQuota');
+          return res.json({ ok: true, data: await reserveAiQuota(user.uid, payload.text, true) });
+        }
         case 'subscription.get': {
           const subscription = await getOrCreateSubscription(user.uid);
           return res.json({ ok: true, data: { subscription } });
@@ -135,6 +149,8 @@ async function startServer() {
           if (!text || typeof text !== 'string') {
             return res.status(400).json({ ok: false, error: 'invalid_ai_input', message: 'Missing or invalid text.' });
           }
+          const { reserveAiQuota } = await import('./server/aiQuota');
+          await reserveAiQuota(user.uid, text, false);
           const result = await interpretNaturalLanguageWithGemini({
             text,
             accounts: Array.isArray(accounts) ? accounts : [],

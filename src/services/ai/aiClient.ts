@@ -66,7 +66,8 @@ export class GeminiAIClient implements AIInterpretationProvider {
       }
       return this.validateAndSanitize(gatewayResponse.data as AIInterpretationResult, request);
     } catch (err) {
-      console.warn('AI Server call failed or offline, using safe fallback parser:', err);
+      console.warn('Gemini request failed; reserving the separate local quota before fallback:', err);
+      await reserveLocalQuota(request.text);
       return this.fallbackInterpretation(request);
     }
   }

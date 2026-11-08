@@ -96,7 +96,6 @@ export function AdminTrialSettingsView({ lang }: { lang: Language }) {
     catch (err) { setQuotaError(err instanceof Error ? err.message : String(err)); } finally { setQuotaBusy(false); }
   };
   const proposedPro = Number(pro), proposedBasic = Number(basic);
-  const proposedPro = Number(pro), proposedBasic = Number(basic);
   const valid = pro.trim() !== '' && basic.trim() !== '' &&
     Number.isInteger(proposedPro) && Number.isInteger(proposedBasic) &&
     proposedPro >= 1 && proposedPro <= 365 && proposedBasic >= proposedPro && proposedBasic <= 365;

@@ -18,7 +18,6 @@ import { SubscriptionCard } from '../SubscriptionCard';
 interface SettingsViewProps {
   lang: Language;
   onSetLanguage: (lang: Language) => void;
-  onResetDemoData: () => void;
   onZeroAllBalances?: () => Promise<boolean>;
   user: AuthUser | null;
   subscription?: UserSubscription | null;
@@ -31,7 +30,6 @@ interface SettingsViewProps {
 export function SettingsView({
   lang,
   onSetLanguage,
-  onResetDemoData,
   onZeroAllBalances,
   user,
   subscription,
@@ -41,15 +39,7 @@ export function SettingsView({
   onOpenMobileLink,
 }: SettingsViewProps) {
   const t = translations[lang];
-  const [resetConfirmed, setResetConfirmed] = useState(false);
   const [zeroConfirmed, setZeroConfirmed] = useState(false);
-
-
-  const handleReset = () => {
-    onResetDemoData();
-    setResetConfirmed(true);
-    setTimeout(() => setResetConfirmed(false), 3000);
-  };
 
   const handleZeroBalances = async () => {
     if (onZeroAllBalances && await onZeroAllBalances()) {
@@ -260,14 +250,6 @@ export function SettingsView({
             <span>{t.zeroAllBalances}</span>
           </button>
 
-          <button
-            type="button"
-            onClick={handleReset}
-            className="w-full py-2.5 px-4 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-2"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>{t.resetDemoData}</span>
-          </button>
         </div>
 
         {zeroConfirmed && (
@@ -277,12 +259,6 @@ export function SettingsView({
           </div>
         )}
 
-        {resetConfirmed && (
-          <div className="p-2.5 bg-emerald-50 text-emerald-800 text-xs font-bold rounded-xl flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>{lang === 'ar' ? 'تمت استعادة البيانات الافتراضية بنجاح' : 'Demo data reset successfully'}</span>
-          </div>
-        )}
       </div>
 
 

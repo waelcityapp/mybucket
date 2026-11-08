@@ -179,7 +179,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { readTrialSettings } = await import('../server/trialSettings.js');
         const { stageFor } = await import('../src/config/subscriptionPolicy.js');
         const phase = stageFor(subscription, Date.now(), await readTrialSettings());
-        if (phase !== 'pro-trial' || subscription.selectedPlan !== 'pro') {
+        if (phase !== 'paid' && (phase !== 'pro-trial' || subscription.selectedPlan !== 'pro')) {
           return res.status(403).json({ ok: false, error: 'pro_plan_required', message: 'Gemini AI is available on the Pro plan only. Basic uses the local analyzer.' });
         }
         const { text, accounts, categories, currentDateTime, userTimezone, lang, currentProposal, learnedMemory } = payload;

@@ -154,25 +154,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ ok: true, data: { subscription } });
       }
       case 'ai.interpret': {
-        const subscription = await getOrCreateSubscription(user.uid);
-        if (subscription.status === 'expired') return res.status(403).json({ ok: false, error: 'subscription_expired', message: 'Choose a subscription to continue AI operations.' });
         const { text, accounts, categories, currentDateTime, userTimezone, lang, currentProposal, learnedMemory } = payload;
-        if (!text || typeof text !== 'string') {
-          return res.status(400).json({ ok: false, error: 'invalid_ai_input', message: 'Missing or invalid text.' });
+        if (typeof text !== 'string' || !text.trim() || text.length > 5000) {
+          return res.status(400).json({ ok: false, error: 'invalid_ai_input', message: 'Enter text between 1 and 5000 characters.' });
+        }
+
+        const subscription = await getOrCreateSubscription(user.uid);
+        const { readTrialSettings } = await import('../server/trialSettings.js');
+        const { stageFor } = await import('../src/config/subscriptionPolicy.js');
+        const durations = await readTrialSettings();
+        const phase = stageFor(subscription, Date.now(), durations);
+        if (phase === 'expired') {
+          return res.status(403).json({ ok: false, error: 'subscription_expired', message: 'Choose a subscription to continue AI operations.' });
+        }
+
+        // Basic users have server-enforced daily quotas. Browser localStorage is
+        // retained only for displaying an early warning and is never trusted.
+        let aiUsage = null;
+        if (phase === 'basic-free') {
+          const { isFinancialQueryText } = await import('../src/utils/semanticParser.js');
+          const { reserveDailyAiUsage } = await import('../server/aiQuota.js');
+          const kind = isFinancialQueryText(text) ? 'inquiry' : 'entry';
+          const limit = kind === 'inquiry'
+            ? (subscription.dailyAiInquiryLimit ?? 5)
+            : (subscription.dailyAiEntryLimit ?? 15);
+          aiUsage = await reserveDailyAiUsage(user.uid, kind, limit);
         }
 
         const { interpretNaturalLanguageWithGemini } = await import('../server/geminiService.js');
         const result = await interpretNaturalLanguageWithGemini({
-          text,
+          text: text.trim(),
           accounts: Array.isArray(accounts) ? accounts : [],
           categories: Array.isArray(categories) ? categories : [],
           currentDateTime: typeof currentDateTime === 'string' ? currentDateTime : new Date().toISOString(),
           userTimezone: typeof userTimezone === 'string' ? userTimezone : 'Africa/Cairo',
           lang: lang === 'en' ? 'en' : 'ar',
-          currentProposal: payload.currentProposal as never,
-          learnedMemory: Array.isArray(learnedMemory) ? learnedMemory : [],
+          currentProposal: currentProposal as never,
+          learnedMemory: Array.isArray(learnedMemory) ? learnedMemory.slice(0, 50) : [],
         });
-        return res.status(200).json({ ok: true, data: result });
+        return res.status(200).json({ ok: true, data: result, ...(aiUsage ? { usage: aiUsage } : {}) });
       }
       default:
         return res.status(404).json({ ok: false, error: 'gateway_action_not_found', message: 'The requested gateway action is not available.' });

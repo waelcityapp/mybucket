@@ -34,3 +34,21 @@
 - Firestore Rules on financial subcollections must cover both transaction and balance updates to prevent partial writes.
 - The global `basicDays` applies to new and existing accounts at request time; any policy change takes effect on the next write.
 - The rule draft is NOT deployed, NOT tested against a running emulator yet, and is intentionally in `firestore.subscription-draft.rules` rather than the production `firestore.rules`.
+
+
+## Work started on this preview branch (2026-11-08)
+
+- Added `server/aiQuota.ts`: atomic, server-side daily counters under `users/{uid}/aiUsage/daily_YYYY-MM-DD`, using Africa/Cairo calendar dates. It enforces the existing Basic limits (15 AI entries and 5 AI inquiries by default); Pro trial and paid requests do not use this Basic quota.
+- Wired the quota check into both production Vercel `api/gateway.ts` and local `server.ts`, after validating the request and resolving the subscription stage. The browser's localStorage counter is not treated as an authorization boundary.
+- Updated `firestore.subscription-draft.rules` to allow-list client-editable profile fields, reject client-supplied role/admin/entitlement fields, preserve server-owned suspension fields, and deny client deletion of the profile. Legacy prototype marketer fields remain temporarily allow-listed and immutable after first write for compatibility.
+- Extended the Firestore emulator test file with profile escalation/deletion and client AI-usage write-denial cases.
+
+## Important policy gate before Rules deployment
+
+The current app code blocks all new financial transactions after the 75-day introductory period until a plan is chosen. The candidate Rules currently mirror that behavior. This must be explicitly reconciled with the product decision about whether a post-trial Free plan should retain manual transaction entry. Do not deploy the expiry-based financial write condition until that decision is confirmed and the plan-selection flow is implemented consistently.
+
+## Verification status
+
+- Changes are committed only to `subscription-firestore-security-prep`.
+- No production Rules, Firestore documents, Auth users, Vercel production deployment, or `main` branch were changed.
+- Emulator tests and a full TypeScript/Vercel build have **not** yet been executed. Passing GitHub writes is not evidence of a successful build.

@@ -625,7 +625,7 @@ export default function App() {
   // Reflect an expired subscription in the current user's financial controls.
   // The database rules are the remaining enforcement boundary (not shipped in this phase).
   const currentTrialExpired = Boolean(trialSettingsReady && userSubscription && stageFor(userSubscription) === 'expired');
-  const proAiEnabled = Boolean(userSubscription && ['pro-trial', 'paid'].includes(stageFor(userSubscription)));
+  const proAiEnabled = Boolean(userSubscription && (stageFor(userSubscription) === 'paid' || (stageFor(userSubscription) === 'pro-trial' && userSubscription.selectedPlan === 'pro')));
   useEffect(() => {
     setFinancialWriteBlocked(currentTrialExpired);
     return () => setFinancialWriteBlocked(false);
@@ -1639,7 +1639,7 @@ export default function App() {
         )}
 
         {(activeTab === 'trial-details' || activeTab === 'subscription') && (
-          <TrialSubscriptionPages lang={lang} subscription={userSubscription} error={subscriptionError ? (lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn) : null} page={activeTab} onBack={() => { window.history.pushState({}, '', activeTab === 'subscription' ? '/trial' : '/'); setActiveTab(activeTab === 'subscription' ? 'trial-details' : 'home'); }} onSubscription={() => openSubscriptionPage('subscription')} />
+          <TrialSubscriptionPages lang={lang} subscription={userSubscription} error={subscriptionError ? (lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn) : null} page={activeTab} onBack={() => { window.history.pushState({}, '', activeTab === 'subscription' ? '/trial' : '/'); setActiveTab(activeTab === 'subscription' ? 'trial-details' : 'home'); }} onSubscription={() => openSubscriptionPage('subscription')} onPlanChange={async (plan) => { const user = auth.currentUser; if (!user) throw new Error(lang === 'ar' ? 'سجّل الدخول أولاً.' : 'Sign in first.'); const response = await fetch('/api/gateway', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + await user.getIdToken() }, body: JSON.stringify({ action: 'subscription.selectPlan', payload: { plan } }) }); const json = await response.json(); if (!response.ok || !json.ok) throw new Error(json.message || (lang === 'ar' ? 'تعذر تغيير الخطة.' : 'Could not change plan.')); setSubscriptionRetry(n => n + 1); }} />
         )}
 
         {activeTab === 'settings' && (

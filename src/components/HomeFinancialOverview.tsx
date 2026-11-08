@@ -284,7 +284,10 @@ export function HomeFinancialOverview({
           <div className="flex min-w-0 items-start gap-2 @min-[490px]:flex-1 @min-[490px]:flex-row-reverse">
             <span className="shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-amber-100 text-amber-600"><CalendarDays size={17}/></span>
             <div className="min-w-0 flex-1">
-              <span className="block text-[11px] sm:text-sm font-extrabold leading-4 text-slate-950">{isAr ? 'مصروف اليوم' : "Today's expenses"}</span>
+              <div className="flex min-w-0 items-center justify-between gap-2">
+                <span className="text-[11px] sm:text-sm font-extrabold leading-4 text-slate-950">{isAr ? 'مصروف اليوم' : "Today's expenses"}</span>
+                <ChevronLeft aria-hidden="true" className={'shrink-0 h-4 w-4 text-slate-700 ' + (!isAr ? 'rotate-180' : '')} />
+              </div>
               <div className="mt-0.5 flex items-baseline gap-1 whitespace-nowrap overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <strong dir="ltr" style={amountSize(isBalanceHidden ? '••••' : formatNumber(todayExpenses), 'clamp(13px, 2.4cqw, 19px)')} className="whitespace-nowrap leading-tight font-black text-slate-950 tabular-nums">{isBalanceHidden ? '••••' : formatNumber(todayExpenses)}</strong>
                 <span className="text-[10px] text-slate-600">{currencyLabel}</span>
@@ -296,7 +299,6 @@ export function HomeFinancialOverview({
             <div className="flex h-6 items-end gap-[3px]" aria-label={isAr ? 'مبالغ العمليات اليوم' : 'Today transaction amounts'}>
               {(spendingSparklines.daily.length ? spendingSparklines.daily : [0,0,0,0,0]).map((amount,i)=><span key={i} className="w-2.5 rounded-t-full bg-amber-200/90" style={{height: (isBalanceHidden ? 3 : amount > 0 ? 5 + 18 * amount / todayBarsMax : 3) + 'px'}} />)}
             </div>
-            <ChevronLeft className={'shrink-0 h-4 w-4 text-slate-800 ' + (!isAr ? 'rotate-180' : '')} />
           </div>
         </button>
         <button type="button" onClick={() => onViewTransactions?.('month', primaryCurrency)}
@@ -304,7 +306,10 @@ export function HomeFinancialOverview({
           <div className="flex min-w-0 items-start gap-2 @min-[490px]:flex-1 @min-[490px]:flex-row-reverse">
             <span className="shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-rose-100 text-rose-500"><CalendarDays size={17}/></span>
             <div className="min-w-0 flex-1">
-              <span className="block text-[11px] sm:text-sm font-extrabold leading-4 text-slate-950">{isAr ? 'مصروف الشهر' : 'Monthly expenses'}</span>
+              <div className="flex min-w-0 items-center justify-between gap-2">
+                <span className="text-[11px] sm:text-sm font-extrabold leading-4 text-slate-950">{isAr ? 'مصروف الشهر' : 'Monthly expenses'}</span>
+                <ChevronLeft aria-hidden="true" className={'shrink-0 h-4 w-4 text-slate-700 ' + (!isAr ? 'rotate-180' : '')} />
+              </div>
               <div className="mt-0.5 flex items-baseline gap-1 whitespace-nowrap overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <strong dir="ltr" style={amountSize(isBalanceHidden ? '••••' : formatNumber(monthExpenses), 'clamp(13px, 2.4cqw, 19px)')} className="whitespace-nowrap leading-tight font-black text-rose-700 tabular-nums">{isBalanceHidden ? '••••' : formatNumber(monthExpenses)}</strong>
                 <span className="text-[10px] text-slate-600">{currencyLabel}</span>
@@ -316,7 +321,6 @@ export function HomeFinancialOverview({
             <div className="flex h-6 items-end gap-[3px]" aria-label={isAr ? 'المصروفات في آخر 7 أيام' : 'Expenses during the last 7 days'}>
               {spendingSparklines.weekly.map((amount,i)=><span key={i} className="w-2.5 rounded-t-full bg-rose-200/90" style={{height: (isBalanceHidden ? 3 : amount > 0 ? 5 + 18 * amount / monthBarsMax : 3) + 'px'}} />)}
             </div>
-            <ChevronLeft className={'shrink-0 h-4 w-4 text-slate-800 ' + (!isAr ? 'rotate-180' : '')} />
           </div>
         </button>
       </div>

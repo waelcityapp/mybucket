@@ -170,7 +170,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // Basic users have server-enforced daily quotas. Browser localStorage is
         // retained only for displaying an early warning and is never trusted.
-        let aiUsage = null;
+        let aiUsage: { date: string; kind: 'entry' | 'inquiry'; used: number; limit: number; remaining: number } | null = null;
         if (phase === 'basic-free') {
           const { isFinancialQueryText } = await import('../src/utils/semanticParser.js');
           const { reserveDailyAiUsage } = await import('../server/aiQuota.js');

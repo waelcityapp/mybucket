@@ -1,7 +1,9 @@
 export type SubscriptionStatus = 'trial' | 'paid' | 'expired';
+export type SelectedPlan = 'basic' | 'pro';
 
 export interface UserSubscription {
   status: SubscriptionStatus;
+  selectedPlan: SelectedPlan; // Server-owned user choice during the Pro trial.
   trialStartedAt: string;
   trialExpiresAt: string;
   totalTrialDays: number;

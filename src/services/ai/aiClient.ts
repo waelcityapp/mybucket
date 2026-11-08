@@ -298,6 +298,7 @@ export class GeminiAIClient implements AIInterpretationProvider {
 export const geminiClient: AIInterpretationProvider = new GeminiAIClient();
 export const aiClient: AIInterpretationProvider = {
   async interpret(request: AIInterpretationRequest): Promise<AIInterpretationResult> {
+    await reserveLocalQuota(request.text);
     return interpretLocalFinancialRequest(request);
   },
 };

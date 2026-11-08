@@ -64,7 +64,6 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
   const ar = lang === 'ar';
   const [data, setData] = useState<UserSummary | null>(null);
   const [error, setError] = useState('');
-  const [presenceStale, setPresenceStale] = useState(false);
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
   const [workingUid, setWorkingUid] = useState<string | null>(null);
@@ -88,19 +87,6 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
   }, [ar]);
 
   useEffect(() => { void reload(); }, [reload]);
-
-  useEffect(() => {
-    let live = true;
-    const refreshPresence = async () => {
-      if (document.visibilityState !== 'visible') return;
-      try {
-        const result = await requestAdmin('admin.users.list') as UserSummary;
-        if (live) { setData(result); setPresenceStale(false); }
-      } catch (e) { if (live) setPresenceStale(true); console.warn('Presence refresh failed:', e); }
-    };
-    const timer = window.setInterval(() => void refreshPresence(), 30_000);
-    return () => { live = false; window.clearInterval(timer); };
-  }, []);
 
   const filtered = useMemo(() => (data?.users || []).filter(user => {
     const matching = (user.name + ' ' + user.email + ' ' + user.uid).toLowerCase().includes(search.trim().toLowerCase());
@@ -180,7 +166,6 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
       </div>
 
       {error && <p role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700"><AlertCircle className="h-4 w-4 shrink-0"/>{error}</p>}
-      {presenceStale && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{ar ? 'تعذر تحديث حالة الوجود؛ الحالات المعروضة قد تكون قديمة.' : 'Presence could not be refreshed; displayed statuses may be out of date.'}</p>}
       {notice && <p role="status" className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800"><CheckCircle2 className="h-4 w-4 shrink-0"/>{notice}</p>}
       {loading && <p className="rounded-xl bg-white p-5 text-center text-xs text-slate-500">{ar ? 'جارٍ تحميل بيانات المستخدمين الحقيقية...' : 'Loading real user records...'}</p>}
       {!loading && data && (
@@ -236,7 +221,7 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
           </div>
           <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] leading-5 text-slate-600">
             <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-700"/>
-            {ar ? 'حالة الوجود تقريبية وتتحدث تلقائيًا؛ قد يستغرق ظهور الخروج نحو ٣ دقائق بعد إغلاق التطبيق أو انقطاع الإنترنت. البيانات للإدارة فقط، ولا تعرض أرصدة المستخدمين أو معاملاتهم.' : 'Presence is approximate and refreshes automatically; going offline may take about 3 minutes after closing the app or losing connectivity. Financial balances and transactions are not shown.'}
+            {ar ? 'حالة الوجود تقريبية وتُحدّث عند فتح الصفحة أو الضغط على تحديث؛ قد يستغرق ظهور الخروج نحو ٣ دقائق بعد إغلاق التطبيق أو انقطاع الإنترنت. البيانات للإدارة فقط، ولا تعرض أرصدة المستخدمين أو معاملاتهم.' : 'Presence is approximate and updates when opening this page or pressing Refresh; going offline may take about 3 minutes after closing the app or losing connectivity. Financial balances and transactions are not shown.'}
           </div>
         </>
       )}

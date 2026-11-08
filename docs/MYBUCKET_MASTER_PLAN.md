@@ -3,7 +3,7 @@
 ## Presence (November 2026)
 
 - Signed-in foreground clients send a heartbeat once per minute via the authenticated gateway; the server records its own timestamp in per-user telemetry.
-- Admin users see approximate online status (2.5-minute heartbeat expiry, refreshed every 30 seconds) and last seen in Africa/Cairo time. Previously untracked activity is shown as unavailable; suspended status is separate.
+- Admin users see approximate online status (2.5-minute heartbeat expiry, loaded on opening the user list and on manual refresh) and last seen in Africa/Cairo time. Previously untracked activity is shown as unavailable; suspended status is separate.
 - No financial details or individual user actions are collected for presence. No Firestore rule deployment is needed for the server-owned telemetry.
 
 This file is the durable source of truth for the MyBucket project. Update it after every approved phase so work can continue safely across new conversations.

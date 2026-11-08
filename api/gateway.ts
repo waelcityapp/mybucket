@@ -145,6 +145,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { saveTrialSettings } = await import('../server/trialSettings.js');
         return res.status(200).json({ ok: true, data: await saveTrialSettings(payload, user.uid) });
       }
+      case 'admin.aiQuota.get': {
+        if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+        const { readAiDailyLimits } = await import('../server/aiQuota.js');
+        return res.status(200).json({ ok: true, data: await readAiDailyLimits() });
+      }
+      case 'admin.aiQuota.save': {
+        if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+        const { saveAiDailyLimits } = await import('../server/aiQuota.js');
+        return res.status(200).json({ ok: true, data: await saveAiDailyLimits(payload, user.uid) });
+      }
+      case 'ai.quota.reserveLocal': {
+        const { reserveAiQuota } = await import('../server/aiQuota.js');
+        const decision = await reserveAiQuota(user.uid, payload.text, true);
+        return res.status(200).json({ ok: true, data: decision });
+      }
       case 'subscription.get': {
         const subscription = await getOrCreateSubscription(user.uid);
         return res.status(200).json({ ok: true, data: { subscription } });
@@ -167,6 +182,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ ok: false, error: 'invalid_ai_input', message: 'Missing or invalid text.' });
         }
 
+        const { reserveAiQuota } = await import('../server/aiQuota.js');
+        await reserveAiQuota(user.uid, text, false);
         const { interpretNaturalLanguageWithGemini } = await import('../server/geminiService.js');
         const result = await interpretNaturalLanguageWithGemini({
           text,

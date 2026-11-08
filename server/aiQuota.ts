@@ -119,7 +119,6 @@ export async function reserveAiQuota(uid: string, rawText: unknown, forceLocal =
           ? [{ engine: 'local', key: `proLocal${operation === 'entry' ? 'Entries' : 'Inquiries'}`, limit: operation === 'entry' ? limits.proLocalEntries : limits.proLocalInquiries, fallback: true }]
           : [
               { engine: 'gemini', key: `proGemini${operation === 'entry' ? 'Entries' : 'Inquiries'}`, limit: operation === 'entry' ? limits.proGeminiEntries : limits.proGeminiInquiries, fallback: false },
-              { engine: 'local', key: `proLocal${operation === 'entry' ? 'Entries' : 'Inquiries'}`, limit: operation === 'entry' ? limits.proLocalEntries : limits.proLocalInquiries, fallback: true },
             ];
 
     for (const attempt of attempts) {

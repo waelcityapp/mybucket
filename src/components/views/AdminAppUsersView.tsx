@@ -10,7 +10,9 @@ type AppUser = {
   createdAt: string | null;
   lastSignInAt: string | null;
   lastSeenAt: string | null;
-  online: boolean;
+  online: boolean | null;
+  onlineDevices: string[];
+  lastSeenDevice: string;
   disabled: boolean;
   tier: 'paid' | 'trial' | 'free' | 'unknown';
   plan: string;
@@ -58,6 +60,9 @@ function niceCairoDateTime(input: string | null, ar: boolean) {
   return new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', {
     timeZone: 'Africa/Cairo', dateStyle: 'medium', timeStyle: 'short',
   }).format(date);
+}
+function deviceLabel(device: string, ar: boolean) {
+  return device === 'mobile' ? (ar ? 'موبايل' : 'Mobile') : device === 'computer' ? (ar ? 'كمبيوتر' : 'Computer') : (ar ? 'جهاز غير محدد' : 'Unknown device');
 }
 
 export function AdminAppUsersView({ lang }: { lang: Language }) {
@@ -184,12 +189,13 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
                       <p className="break-words text-sm font-black text-slate-900">{record.name || (ar ? 'بدون اسم' : 'Unnamed user')}</p>
                       {isOwner && <span className="rounded-lg bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">{ar ? 'المدير' : 'Owner'}</span>}
                       {record.disabled && <span className="rounded-lg bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">{ar ? 'موقوف' : 'Disabled'}</span>}
-                      <span className={'rounded-lg px-2 py-0.5 text-[10px] font-semibold ' + (record.online ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600')}>{record.online ? (ar ? 'نشط الآن' : 'Online now') : (ar ? 'غير متصل' : 'Offline')}</span>
+                      <span className={'rounded-lg px-2 py-0.5 text-[10px] font-semibold ' + (record.online ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600')}>{record.online === null ? (ar ? 'حالة الوجود غير متاحة' : 'Presence unavailable') : record.online ? (ar ? 'نشط الآن' : 'Online now') : (ar ? 'غير متصل' : 'Offline')}</span>
+                      {record.online && <span className="text-[10px] text-slate-600">{(record.onlineDevices || []).map(device => deviceLabel(device, ar)).join(ar ? ' و' : ' and ')}</span>}
                     </div>
                     <p className="mt-0.5 break-all text-xs text-slate-600" dir="ltr">{record.email || '—'}</p>
                     <p className="mt-1 text-xs font-semibold text-slate-700">{accountPlan(record, ar)}</p>
                     <p className="mt-1 text-[11px] text-slate-500">{ar ? 'إنشاء:' : 'Created:'} {niceDate(record.createdAt, ar)}</p>
-                    <p className="mt-1 text-[11px] text-slate-500">{ar ? 'آخر ظهور:' : 'Last seen:'} {niceCairoDateTime(record.lastSeenAt, ar)} {ar ? '(توقيت القاهرة)' : '(Cairo time)'}</p>
+                    <p className="mt-1 text-[11px] text-slate-500">{ar ? 'آخر ظهور:' : 'Last seen:'} {niceCairoDateTime(record.lastSeenAt, ar)} {record.lastSeenAt && <> · {deviceLabel(record.lastSeenDevice, ar)}</>} {ar ? '(توقيت القاهرة)' : '(Cairo time)'}</p>
                     {record.installed && <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5"/>{ar ? 'تم رصد نسخة مثبتة' : 'Installed-app usage reported'}</p>}
                   </div>
                   {!isOwner && <div className="flex shrink-0 flex-wrap gap-1">
@@ -221,7 +227,7 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
           </div>
           <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] leading-5 text-slate-600">
             <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-700"/>
-            {ar ? 'حالة الوجود تقريبية وتُحدّث عند فتح الصفحة أو الضغط على تحديث؛ قد يستغرق ظهور الخروج نحو ٣ دقائق بعد إغلاق التطبيق أو انقطاع الإنترنت. البيانات للإدارة فقط، ولا تعرض أرصدة المستخدمين أو معاملاتهم.' : 'Presence is approximate and updates when opening this page or pressing Refresh; going offline may take about 3 minutes after closing the app or losing connectivity. Financial balances and transactions are not shown.'}
+            {ar ? 'تُحدّث حالة الوجود عند فتح الصفحة أو الضغط على تحديث، وقد يتأخر رصد انقطاع الاتصال. نوع الجهاز تقريبي. البيانات للإدارة فقط، ولا تعرض أرصدة المستخدمين أو معاملاتهم.' : 'Presence updates on opening this page or pressing Refresh; disconnect detection may be delayed. Device type is approximate. Financial balances and transactions are not shown.'}
           </div>
         </>
       )}

@@ -1,9 +1,9 @@
 import { FieldValue } from 'firebase-admin/firestore';
-import { getAdminAuth, getAdminFirestore } from './firebaseAdmin.js';
+import { getAdminApp, getAdminAuth, getAdminFirestore } from './firebaseAdmin.js';
+import { getDatabaseWithUrl } from 'firebase-admin/database';
 import { SubscriptionError } from './subscriptionService.js';
 import { stageFor, type TrialDurations } from '../src/config/subscriptionPolicy.js';
 import { readTrialSettings } from './trialSettings.js';
-import { isRecentlyPresent } from './presence.js';
 
 const OWNER_EMAIL = 'waelvts@gmail.com';
 const MAX_USERS_TO_COUNT = 5000;
@@ -72,23 +72,43 @@ export async function listAppUsers(actor: AdminActor) {
   users.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   const visible = users.slice(0, MAX_USER_ROWS);
   const rows = [];
+  const realtime = getDatabaseWithUrl('https://mybucket-8b6f0-default-rtdb.europe-west1.firebasedatabase.app', getAdminApp());
   for (let i = 0; i < visible.length; i += 40) {
     const batch = visible.slice(i, i + 40);
-    const [subscriptions, installations, presence] = await Promise.all([
+    const [subscriptions, installations, presence, realtimePresence] = await Promise.all([
       db.getAll(...batch.map(u => db.doc('users/' + u.uid + '/billing/subscription'))),
       db.getAll(...batch.map(u => db.doc('users/' + u.uid + '/telemetry/pwaInstall'))),
       db.getAll(...batch.map(u => db.doc('users/' + u.uid + '/telemetry/presence'))),
+      Promise.all(batch.map(async u => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          return await Promise.race([
+            realtime.ref('presence/' + u.uid).get(),
+            new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), 3000); }),
+          ]);
+        } catch (error) { console.warn('[admin-users] Presence unavailable:', error); return null; }
+        finally { if (timer) clearTimeout(timer); }
+      })),
     ]);
     for (let j = 0; j < batch.length; j++) {
       const sub = subscriptions[j].exists ? subscriptions[j].data() as SubscriptionInfo : undefined;
       const lastSeenDate = presence[j].data()?.lastSeenAt?.toDate?.();
       const lastSeenMs = lastSeenDate instanceof Date && Number.isFinite(lastSeenDate.getTime()) ? lastSeenDate.getTime() : null;
+      const presenceAvailable = realtimePresence[j] !== null;
+      const live = realtimePresence[j]?.val() || {};
+      const sessions = Object.values(live.sessions || {}) as Array<{ device?: string; since?: number }>;
+      const devices = Array.from(new Set(sessions.map(s => ['mobile', 'computer', 'unknown'].includes(s.device || '') ? s.device : 'unknown')));
+      const recentConnection = sessions.reduce((latest, session) => Math.max(latest, typeof session.since === 'number' ? session.since : 0), 0);
+      const recentTime = typeof live.lastSeen?.at === 'number' ? live.lastSeen.at : 0;
+      const currentLastSeen = Math.max(recentConnection, recentTime);
       rows.push({
         ...batch[j],
         ...subscriptionLabel(sub, durations, batch[j].createdAt),
         installed: installations[j].exists,
-        lastSeenAt: lastSeenMs === null ? null : new Date(lastSeenMs).toISOString(),
-        online: !batch[j].disabled && isRecentlyPresent(lastSeenMs, Date.now()),
+        lastSeenAt: sessions.length ? new Date().toISOString() : currentLastSeen ? new Date(currentLastSeen).toISOString() : lastSeenMs === null ? null : new Date(lastSeenMs).toISOString(),
+        lastSeenDevice: recentConnection >= recentTime && recentConnection ? sessions.find(s => s.since === recentConnection)?.device || 'unknown' : live.lastSeen?.device || 'unknown',
+        online: presenceAvailable ? !batch[j].disabled && sessions.length > 0 : null,
+        onlineDevices: devices,
       });
     }
   }

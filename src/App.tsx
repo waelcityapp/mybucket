@@ -23,6 +23,7 @@ import { Header } from './components/Header';
 import { VoiceNaturalInput } from './components/VoiceNaturalInput';
 import type { AnalyzerFeedbackContext } from './services/ai/analyzerFeedbackClient';
 import { APP_REVISION } from './config/appRevision';
+import { closePresenceBeforeSignOut, startPresence } from './services/presenceClient';
 import { QuickActions } from './components/QuickActions';
 import { MoneySources } from './components/MoneySources';
 import { RecentTransactions } from './components/RecentTransactions';
@@ -474,33 +475,10 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // A foreground heartbeat provides approximate presence without tracking actions.
+  // Each visible tab tracks its own connection; disconnects are handled by Firebase.
   useEffect(() => {
     if (!authUser?.uid) return;
-    let disposed = false;
-    let sending = false;
-    const sendPresence = async () => {
-      if (disposed || sending || document.visibilityState !== 'visible') return;
-      const user = auth.currentUser;
-      if (!user || user.uid !== authUser.uid) return;
-      sending = true;
-      try {
-        const token = await user.getIdToken();
-        if (disposed || document.visibilityState !== 'visible') return;
-        await fetch('/api/gateway', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-          body: JSON.stringify({ action: 'app.presence', payload: {} }),
-        });
-      } catch (error) {
-        console.warn('Presence update failed:', error);
-      } finally { sending = false; }
-    };
-    const onVisible = () => { if (document.visibilityState === 'visible') void sendPresence(); };
-    void sendPresence();
-    const timer = window.setInterval(() => void sendPresence(), 60_000);
-    document.addEventListener('visibilitychange', onVisible);
-    return () => { disposed = true; window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
+    return startPresence(authUser.uid);
   }, [authUser?.uid]);
 
   // Record installed-PWA usage only once per signed-in account on this device.
@@ -710,6 +688,7 @@ export default function App() {
   const handleGoogleLogout = async () => {
     setAdminPinVerified(false);
     try {
+      await closePresenceBeforeSignOut();
       await logoutUser();
       setToastMessage(lang === 'ar' ? 'تم تسجيل الخروج بنجاح' : 'Signed out successfully');
       setTimeout(() => setToastMessage(null), 3000);

@@ -2,9 +2,10 @@
 
 ## Presence (November 2026)
 
-- Signed-in foreground clients send a heartbeat once per minute via the authenticated gateway; the server records its own timestamp in per-user telemetry.
-- Admin users see approximate online status (2.5-minute heartbeat expiry, loaded on opening the user list and on manual refresh) and last seen in Africa/Cairo time. Previously untracked activity is shown as unavailable; suspended status is separate.
-- No financial details or individual user actions are collected for presence. No Firestore rule deployment is needed for the server-owned telemetry.
+- Signed-in foreground clients register an independent Realtime Database session for each browser tab or device. Firebase on-disconnect operations remove the session and record the last-seen time and approximate device type.
+- The admin user list shows presence and device type when opened or manually refreshed, and last seen in Africa/Cairo time. Unknown devices are labeled as such. If realtime data cannot be read, presence is shown as unavailable; account suspension is separate.
+- New versions no longer send the once-per-minute Firestore heartbeat. The older gateway action remains temporarily for already-open old app versions; legacy last-seen timestamps may be displayed without a device type.
+- The dedicated Realtime Database rules are in database.presence.rules.json. Presence contains no financial details or individual actions. The realtime rules must be deployed before this app version, and no Firestore rule change is required.
 
 This file is the durable source of truth for the MyBucket project. Update it after every approved phase so work can continue safely across new conversations.
 

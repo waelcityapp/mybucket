@@ -1,0 +1,27 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "presence": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || (auth.token.email === 'waelvts@gmail.com' && auth.token.email_verified === true))",
+        ".write": "auth != null && auth.uid === $uid",
+        "sessions": {
+          "$session": {
+            ".validate": "newData.hasChildren(['device', 'since'])",
+            "device": { ".validate": "newData.val() === 'mobile' || newData.val() === 'computer' || newData.val() === 'unknown'" },
+            "since": { ".validate": "newData.isNumber() && newData.val() <= now + 5000 && newData.val() >= now - 60000" },
+            "$other": { ".validate": false }
+          }
+        },
+        "lastSeen": {
+          ".validate": "newData.hasChildren(['at', 'device'])",
+          "device": { ".validate": "newData.val() === 'mobile' || newData.val() === 'computer' || newData.val() === 'unknown'" },
+          "at": { ".validate": "newData.isNumber() && newData.val() <= now + 5000 && newData.val() >= now - 60000" },
+          "$other": { ".validate": false }
+        },
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}

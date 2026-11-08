@@ -15,7 +15,7 @@
 - `paidUntil`: Firestore Timestamp or null, copied only from server-owned billing with `isPaid===true` and valid `paidExpiresAt`. No payment activation here.
 - `schemaVersion: 1`, `syncedAt`: Timestamp. No financial records, balances, or client profile data altered.
 - The authenticated `subscription.trialSettings` gateway read bootstraps/refreshes access for the signed-in uid. Existing users who have not reopened the app will not yet have an access document, **so never deploy restrictive Rules before preflight/backfill verification**.
-- Per-user exceptions/selected Basic vs Pro remain separate future requirements. Basic duration controls global finance-write access; Pro trial durations affect entitlements only when those feature limits are implemented.
+- Per-user duration exceptions remain a future requirement. Basic duration controls global finance-write access; the Pro trial duration controls the selectable Basic/Pro window and the Gemini entitlement.
 
 ## Preflight and migration checklist (not yet run on live database)
 1. Verify exact Firebase project and named database, compare Rules shown in Firebase Console to approved candidate.

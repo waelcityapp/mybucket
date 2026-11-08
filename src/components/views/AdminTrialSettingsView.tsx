@@ -3,6 +3,8 @@ import { auth } from '../../lib/firebase';
 import type { Language } from '../../types';
 
 type Settings = { proDays: number; basicDays: number; updatedAt: string | null };
+type Quotas = { basicLocalEntries:number; basicLocalInquiries:number; proGeminiEntries:number; proGeminiInquiries:number; proLocalEntries:number; proLocalInquiries:number; updatedAt:string|null };
+const DEFAULT_QUOTAS: Quotas = { basicLocalEntries:10, basicLocalInquiries:2, proGeminiEntries:15, proGeminiInquiries:5, proLocalEntries:30, proLocalInquiries:10, updatedAt:null };
 type Change = { id: string; timestamp: string; previous: { proDays: number; basicDays: number }; next: { proDays: number; basicDays: number } };
 async function gateway(action: string, payload: Record<string, unknown> = {}) {
   const user = auth.currentUser;
@@ -29,6 +31,11 @@ export function AdminTrialSettingsView({ lang }: { lang: Language }) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
   const [archivePendingId, setArchivePendingId] = useState<string | null>(null);
+  const [quotas, setQuotas] = useState<Quotas>(DEFAULT_QUOTAS);
+  const [quotaBusy, setQuotaBusy] = useState(false);
+  const [quotaError, setQuotaError] = useState('');
+  const [quotaSuccess, setQuotaSuccess] = useState('');
+  const [quotaConfirm, setQuotaConfirm] = useState(false);
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const archiveHistoryEntry = async (id: string) => {
     if (archivingId || archivePendingId !== id) return;
@@ -68,6 +75,27 @@ export function AdminTrialSettingsView({ lang }: { lang: Language }) {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    gateway('admin.aiQuota.get').then(data => { if (active) setQuotas({ ...DEFAULT_QUOTAS, ...(data as Partial<Quotas>) }); })
+      .catch(err => { if (active) setQuotaError(err instanceof Error ? err.message : String(err)); });
+    return () => { active = false; };
+  }, []);
+  const quotaFields: Array<[keyof Omit<Quotas, 'updatedAt'>, string]> = [
+    ['basicLocalEntries', ar ? 'Basic — تسجيلات المحلي' : 'Basic — local entries'],
+    ['basicLocalInquiries', ar ? 'Basic — استعلامات المحلي' : 'Basic — local inquiries'],
+    ['proGeminiEntries', ar ? 'Pro — تسجيلات Gemini' : 'Pro — Gemini entries'],
+    ['proGeminiInquiries', ar ? 'Pro — استعلامات Gemini' : 'Pro — Gemini inquiries'],
+    ['proLocalEntries', ar ? 'Pro — تسجيلات المحلي' : 'Pro — local entries'],
+    ['proLocalInquiries', ar ? 'Pro — استعلامات المحلي' : 'Pro — local inquiries'],
+  ];
+  const saveQuotas = async () => {
+    if (!quotaConfirm || quotaBusy) return;
+    setQuotaBusy(true); setQuotaError(''); setQuotaSuccess('');
+    try { const saved = await gateway('admin.aiQuota.save', quotas) as Quotas; setQuotas({ ...DEFAULT_QUOTAS, ...saved }); setQuotaConfirm(false); setQuotaSuccess(ar ? 'تم حفظ حدود الاستخدام اليومية في Firebase.' : 'Daily limits saved to Firebase.'); }
+    catch (err) { setQuotaError(err instanceof Error ? err.message : String(err)); } finally { setQuotaBusy(false); }
+  };
+  const proposedPro = Number(pro), proposedBasic = Number(basic);
   const proposedPro = Number(pro), proposedBasic = Number(basic);
   const valid = pro.trim() !== '' && basic.trim() !== '' &&
     Number.isInteger(proposedPro) && Number.isInteger(proposedBasic) &&
@@ -89,6 +117,16 @@ export function AdminTrialSettingsView({ lang }: { lang: Language }) {
     <h3 className="font-extrabold text-slate-900">{ar ? 'إدارة مدد التجربة' : 'Manage trial durations'}</h3>
     <p className="text-sm text-slate-600">{ar ? 'تتحكم هنا في مدد جميع الحسابات، القديمة والجديدة. يبدأ الحساب من تاريخ التسجيل الأصلي، ولا تُمس البيانات المالية.' : 'Changes apply globally to old and new accounts using their original registration dates; financial data is preserved.'}</p>
     {!value && !error && <p className="text-sm text-slate-500">{ar ? 'جارٍ تحميل إعدادات Firebase...' : 'Loading Firebase settings...'}</p>}
+    <div className="border-t border-slate-100 pt-4 space-y-3">
+      <h4 className="font-extrabold text-slate-900">{ar ? 'حدود الاستخدام اليومية' : 'Daily usage limits'}</h4>
+      <p className="text-xs text-slate-600">{ar ? 'العدادات مستقلة ولا تُصفّر عند التبديل بين الخطط. بعد نفاد Gemini في Pro ينتقل المستخدم إلى حصة المحلي المستقلة.' : 'Counters remain separate across plan switches. Pro uses its independent local allowance after Gemini is exhausted.'}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {quotaFields.map(([key, label]) => <label key={key} className="text-xs font-bold text-slate-700">{label}<input type="number" min="0" max="10000" step="1" value={quotas[key]} onChange={e => { setQuotas(old => ({ ...old, [key]: Number(e.target.value) })); setQuotaConfirm(false); setQuotaSuccess(''); }} className="mt-2 block w-full border rounded-xl px-3 py-2 text-base" /></label>)}
+      </div>
+      <label className="flex items-start gap-2 text-sm text-slate-700"><input type="checkbox" checked={quotaConfirm} onChange={e=>setQuotaConfirm(e.target.checked)} />{ar ? 'أؤكد حفظ حدود الاستخدام اليومية' : 'Confirm daily limit changes'}</label>
+      {quotaError && <p role="alert" className="text-sm text-rose-700">{quotaError}</p>}{quotaSuccess && <p role="status" className="text-sm text-emerald-700">{quotaSuccess}</p>}
+      <button type="button" disabled={!quotaConfirm || quotaBusy || quotaFields.some(([key]) => !Number.isInteger(quotas[key]) || quotas[key] < 0 || quotas[key] > 10000)} onClick={saveQuotas} className="rounded-xl px-5 py-2.5 bg-slate-800 text-white font-bold text-sm disabled:opacity-40">{quotaBusy ? (ar ? 'جارٍ الحفظ...' : 'Saving...') : (ar ? 'حفظ حدود الاستخدام' : 'Save usage limits')}</button>
+    </div>
     <div className="grid grid-cols-2 gap-3">
       <label className="text-xs font-bold text-slate-700">{ar ? 'تجربة Pro بالأيام' : 'Pro trial (days)'}<input type="number" min="1" max="365" step="1" value={pro} onChange={e=>{setPro(e.target.value);setConfirm(false);setSuccess('');}} className="mt-2 block w-full border rounded-xl px-3 py-2 text-base" /></label>
       <label className="text-xs font-bold text-slate-700">{ar ? 'فترة Basic بالأيام' : 'Basic period (days)'}<input type="number" min="1" max="365" step="1" value={basic} onChange={e=>{setBasic(e.target.value);setConfirm(false);setSuccess('');}} className="mt-2 block w-full border rounded-xl px-3 py-2 text-base" /></label>

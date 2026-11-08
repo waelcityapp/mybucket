@@ -142,6 +142,7 @@ export async function selectSubscriptionPlan(uid: string, rawPlan: unknown): Pro
     throw new SubscriptionError(400, 'invalid_subscription_plan', 'Choose Basic or Pro.');
   }
   const { readTrialSettings } = await import('./trialSettings.js');
+  const plan = rawPlan as 'basic' | 'pro';
   const durations = await readTrialSettings();
   const db = getAdminFirestore();
   const ref = db.doc(`users/${uid}/billing/subscription`);
@@ -153,8 +154,8 @@ export async function selectSubscriptionPlan(uid: string, rawPlan: unknown): Pro
     if (stageFor(current, Date.now(), durations) !== 'pro-trial') {
       throw new SubscriptionError(409, 'plan_selection_period_ended', 'The plan selection period has ended. Basic continues until the free period expires.');
     }
-    const next = { ...current, selectedPlan: rawPlan, updatedAt: new Date().toISOString() };
-    tx.set(ref, { selectedPlan: rawPlan, updatedAt: next.updatedAt }, { merge: true });
+    const next: UserSubscription = { ...current, selectedPlan: plan, updatedAt: new Date().toISOString() };
+    tx.set(ref, { selectedPlan: plan, updatedAt: next.updatedAt }, { merge: true });
     return next;
   });
   return withComputedStatus(updated, durations);

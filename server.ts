@@ -9,6 +9,7 @@ import { GEMINI_MODEL_OPTIONS, getGeminiAdminSettings, setSelectedGeminiModel } 
 import {
   applyAffiliateCode,
   getOrCreateSubscription,
+  selectSubscriptionPlan,
   SubscriptionError,
   verifyAuthenticatedUser,
 } from './server/subscriptionService';
@@ -134,6 +135,10 @@ async function startServer() {
           const subscription = await applyAffiliateCode(user.uid, payload.code);
           return res.json({ ok: true, data: { subscription } });
         }
+        case 'subscription.selectPlan': {
+          const subscription = await selectSubscriptionPlan(user.uid, payload.plan);
+          return res.json({ ok: true, data: { subscription } });
+        }
         case 'ai.interpret': {
           const subscription = await getOrCreateSubscription(user.uid);
           const { readTrialSettings } = await import('./server/trialSettings.js');
@@ -142,7 +147,7 @@ async function startServer() {
           if (phase === 'expired') {
             return res.status(403).json({ ok: false, error: 'subscription_expired', message: 'Your free period has ended. Choose a paid plan to continue.' });
           }
-          if (phase === 'basic-free') {
+          if (phase !== 'pro-trial' || subscription.selectedPlan !== 'pro') {
             return res.status(403).json({ ok: false, error: 'pro_plan_required', message: 'Gemini AI is available on the Pro plan only. Basic uses the local analyzer.' });
           }
           const { text, accounts, categories, currentDateTime, userTimezone, lang, currentProposal, learnedMemory } = payload;

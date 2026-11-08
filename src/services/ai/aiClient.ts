@@ -277,9 +277,9 @@ export class GeminiAIClient implements AIInterpretationProvider {
   }
 }
 
-// Keep the Gemini client available for a future, explicitly approved feature.
-// Everyday entries and financial inquiries use the local parser ONLY and make
-// no AI gateway request, including when local interpretation is incomplete.
+// Basic uses the deterministic local interpreter and never calls the AI gateway.
+// Pro trial and paid Pro are routed to geminiClient by VoiceNaturalInput; the
+// server independently checks the user's entitlement before processing Gemini.
 export const geminiClient: AIInterpretationProvider = new GeminiAIClient();
 export const aiClient: AIInterpretationProvider = {
   async interpret(request: AIInterpretationRequest): Promise<AIInterpretationResult> {

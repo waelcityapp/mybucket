@@ -57,7 +57,8 @@ service cloud.firestore {
       return isOwner(userId)
         && request.resource.data.keys().hasOnly([
           'userId', 'email', 'displayName', 'photoURL', 'lastLoginAt',
-          'updatedAt', 'prototypeAffiliateCode', 'prototypeAffiliateAppliedAt'
+          'updatedAt', 'prototypeAffiliateCode', 'prototypeAffiliateAppliedAt',
+          'accessDisabled', 'accessUpdatedAt'
         ])
         && request.resource.data.userId == resource.data.userId
         && request.resource.data.userId == userId
@@ -77,7 +78,9 @@ service cloud.firestore {
         && (!('displayName' in request.resource.data) || request.resource.data.displayName is string)
         && (!('photoURL' in request.resource.data) || request.resource.data.photoURL is string)
         && (!('lastLoginAt' in request.resource.data) || request.resource.data.lastLoginAt is string)
-        && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is string);
+        && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is string)
+        && (!('accessDisabled' in resource.data) || request.resource.data.accessDisabled == resource.data.accessDisabled)
+        && (!('accessUpdatedAt' in resource.data) || request.resource.data.accessUpdatedAt == resource.data.accessUpdatedAt);
     }
 
     match /users/{userId} {

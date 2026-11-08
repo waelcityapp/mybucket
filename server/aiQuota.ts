@@ -103,7 +103,9 @@ export async function reserveAiQuota(uid: string, rawText: unknown, forceLocal =
     throw new SubscriptionError(403, 'subscription_expired', 'Your free period has ended. Choose a paid plan to continue.');
   }
 
-  const plan: 'basic' | 'pro' = phase === 'basic-free' ? 'basic' : 'pro';
+  // The first Pro-trial window lets the user switch plans; after it ends,
+  // the existing Basic-free period applies automatically until its admin-set expiry.
+  const plan: 'basic' | 'pro' = phase === 'pro-trial' && subscription.selectedPlan === 'pro' ? 'pro' : 'basic';
   const operation: 'entry' | 'inquiry' = isFinancialQueryText(rawText) ? 'inquiry' : 'entry';
   const limits = await readAiDailyLimits();
   const day = cairoDay();

@@ -7,13 +7,13 @@ export interface UserSubscription {
   trialDatesStored?: boolean;
   affiliateCode?: string | null;
   hasAppliedAffiliateCode: boolean;
-  totalTrialDays: number; // 10 without code, 35 with code
+  totalTrialDays: number; // Admin-configured total free period.
   trialStartedAt: string; // ISO string date
   trialExpiresAt: string; // ISO string date
   isPaid: boolean;
   paidExpiresAt?: string | null;
-  dailyExpenseAiLimit: number; // 15 per day
-  dailyInquiryAiLimit: number; // 5 per day
+  dailyExpenseAiLimit: number; // Legacy compatibility; current quotas are server-configured.
+  dailyInquiryAiLimit: number; // Legacy compatibility; current quotas are server-configured.
   maxHistoricalQueryDays: number; // 35 days in trial, unlimited (3650) in pro
   discountPricePerMonth?: number; // 120 EGP (4 EGP/day) vs 180 EGP regular
 }

@@ -37,7 +37,7 @@ export function TrialSubscriptionPages({ lang, subscription, error, page, onBack
         </div>
         {error ? <p role="alert" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{error}</p> : !subscription ? <p className="text-sm text-slate-600">{ar ? 'جارٍ قراءة بيانات الاشتراك...' : 'Loading subscription details...'}</p> : page === 'trial-details' ? <>
           <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 space-y-3 text-sm text-slate-700">
-            <p className="font-black text-slate-900">{stage === 'paid' ? (ar ? 'اشتراك نشط' : 'Subscription active') : stage === 'pro-trial' ? (ar ? 'تجربة Pro نشطة' : 'Pro trial active') : stage === 'basic-free' ? (ar ? 'فترة Basic المجانية' : 'Basic introductory period') : (ar ? 'انتهت الفترة المجانية' : 'Introductory period ended')}</p>
+            <p className="font-black text-slate-900">{stage === 'paid' ? (ar ? 'اشتراك نشط' : 'Subscription active') : stage === 'pro-trial' ? (subscription.selectedPlan === 'basic' ? (ar ? 'اخترت Basic خلال تجربة Pro' : 'Basic selected during Pro trial') : (ar ? 'تجربة Pro نشطة' : 'Pro trial active')) : stage === 'basic-free' ? (ar ? 'فترة Basic المجانية' : 'Basic introductory period') : (ar ? 'انتهت الفترة المجانية' : 'Introductory period ended')}</p>
             <p>{ar ? `تجربة Pro تبدأ من التسجيل لمدة ${getTrialDurations().proDays} يومًا، وBasic مجانية حتى اليوم ${getTrialDurations().basicDays}.` : `Pro is free for ${getTrialDurations().proDays} days, and Basic until day ${getTrialDurations().basicDays} after signup.`}</p>
             <p>{ar ? 'الأيام المجانية المتبقية: ' : 'Introductory days remaining: '}{days}</p>
             {start && <p>{ar ? `تاريخ تسجيلك: ${start}` : `Registration date: ${start}`}</p>}

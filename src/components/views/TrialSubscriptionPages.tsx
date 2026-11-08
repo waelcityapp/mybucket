@@ -69,7 +69,7 @@ export function TrialSubscriptionPages({ lang, subscription, error, page, onBack
               <p className="mt-auto rounded-xl bg-emerald-50 px-3 py-2 text-center text-sm font-bold text-emerald-800">{ar ? 'الاشتراك والدفع قيد التجهيز' : 'Payment activation coming later'}</p>
             </div>
           </div>
-          <div className="flex gap-2 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-700"><ShieldCheck className="h-5 w-5 shrink-0 text-emerald-700" /><p>{ar ? 'بعد انتهاء مدة Pro المجانية، تستمر Basic حتى نهاية المدة المجانية الكاملة التي تحددها الإدارة. بعدها تتوقف المحللات والكتابة المالية، وتظل بياناتك متاحة للقراءة.' : 'This page only shows plans. No payment is collected and your plan is not changed here yet.'}</p></div>
+          <div className="flex gap-2 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-700"><ShieldCheck className="h-5 w-5 shrink-0 text-emerald-700" /><p>{ar ? 'بعد انتهاء مدة Pro المجانية، تستمر Basic حتى نهاية المدة المجانية الكاملة التي تحددها الإدارة. بعدها تتوقف المحللات والكتابة المالية، وتظل بياناتك متاحة للقراءة.' : 'After the Pro trial, Basic remains available until the full admin-configured free period ends. Then AI analyzers and financial writes stop, while your records remain available to view.'}</p></div>
         </>}
       </div>
     </section>

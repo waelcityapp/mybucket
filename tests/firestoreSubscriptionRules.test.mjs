@@ -18,6 +18,17 @@ test('draft subscription rules: owner expiry, global changes, cross-account and 
     const guest = env.unauthenticatedContext().firestore();
     const account = doc(alice, 'users/alice/accounts/cash');
     const transaction = doc(alice, 'users/alice/transactions/tx1');
+    const profile = doc(alice, 'users/alice');
+    await assertSucceeds(setDoc(profile, {
+      userId: 'alice', email: 'alice@example.com', displayName: 'Alice',
+      photoURL: '', lastLoginAt: new Date().toISOString()
+    }));
+    await assertSucceeds(setDoc(profile, { displayName: 'Alicia', updatedAt: new Date().toISOString() }, { merge: true }));
+    await assertFails(setDoc(profile, { isAdmin: true }, { merge: true }));
+    await assertFails(setDoc(profile, { role: 'owner' }, { merge: true }));
+    await assertFails(deleteDoc(profile));
+    await assertFails(setDoc(doc(alice, 'users/alice/aiUsage/daily_2026-11-08'), { expenseAiCount: 0 }));
+
     const yesterday40 = Timestamp.fromMillis(Date.now() - 40 * 86400000);
     const paidFuture = Timestamp.fromMillis(Date.now() + 10 * 86400000);
 

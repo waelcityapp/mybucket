@@ -56,15 +56,12 @@ import { AnalyzerFeedbackAdmin } from './components/views/AnalyzerFeedbackAdmin'
 import { AuthPage } from './components/views/AuthPage';
 import { InitialSetupView } from './components/views/InitialSetupView';
 import { UsageGuideView } from './components/views/UsageGuideView';
-import { UserSubscription, UserDailyUsage } from './types/prototypeSubscription';
+import { UserSubscription } from './types/prototypeSubscription';
 import { stageFor, getTrialDurations, setTrialDurations } from './config/subscriptionPolicy';
 import {
   createInitialSubscription,
   applyAffiliateCodeToExistingSubscription,
   calculateRemainingTrialDays,
-  getTodayUsage,
-  incrementExpenseAiUsage,
-  incrementInquiryAiUsage,
 } from './utils/subscriptionUtils';
 import {
   loginWithGoogle,
@@ -520,7 +517,6 @@ export default function App() {
   useEffect(() => {
     if (!authUser) return;
 
-    setDailyUsage(getTodayUsage(authUser.uid));
 
     // 1. Subscribe to User's Accounts
     const unsubAccounts = subscribeUserAccounts(authUser.uid, (cloudAccounts) => {
@@ -634,6 +630,7 @@ export default function App() {
   // Reflect an expired subscription in the current user's financial controls.
   // The database rules are the remaining enforcement boundary (not shipped in this phase).
   const currentTrialExpired = Boolean(trialSettingsReady && userSubscription && stageFor(userSubscription) === 'expired');
+  const proAiEnabled = Boolean(userSubscription && ['pro-trial', 'paid'].includes(stageFor(userSubscription)));
   useEffect(() => {
     setFinancialWriteBlocked(currentTrialExpired);
     return () => setFinancialWriteBlocked(false);
@@ -717,17 +714,6 @@ export default function App() {
     setDraftMissingFields([]);
     setAddModalInitialType(type);
     setIsAddModalOpen(true);
-  };
-
-  // Usage quota tracking for AI entries & inquiries
-  const handleAiEntryUsed = () => {
-    const updated = incrementExpenseAiUsage(authUser!.uid);
-    setDailyUsage(updated);
-  };
-
-  const handleAiQueryUsed = () => {
-    const updated = incrementInquiryAiUsage(authUser!.uid);
-    setDailyUsage(updated);
   };
 
   // Handle Natural Language / Voice input parsed draft via Gemini AI
@@ -1538,16 +1524,12 @@ export default function App() {
               lang={lang}
               accounts={accounts}
               categories={categories}
-              userDailyUsage={dailyUsage}
-              userSubscription={userSubscription}
+              aiEnabled={proAiEnabled}
               subscriptionExpired={currentTrialExpired}
               onExpiredAttempt={showExpiredNotice}
               onTransactionDraft={handleTransactionDraft}
               onFinancialQuery={handleFinancialQuery}
               onAICorrection={handleAICorrection}
-              onAiEntryUsed={handleAiEntryUsed}
-              onAiQueryUsed={handleAiQueryUsed}
-              onOpenManualAdd={() => handleOpenAddModal('expense')}
             />
 
             {/* AI Financial Query Result Card */}

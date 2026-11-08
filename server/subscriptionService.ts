@@ -75,6 +75,7 @@ function isoAfterDays(startIso: string, days: number): string {
 function createBaseSubscription(nowIso: string, basicDays = BASE_TRIAL_DAYS): UserSubscription {
   return {
     status: 'trial',
+    selectedPlan: 'pro',
     trialStartedAt: nowIso,
     trialExpiresAt: isoAfterDays(nowIso, basicDays),
     totalTrialDays: basicDays,
@@ -105,8 +106,11 @@ export async function getOrCreateSubscription(uid: string): Promise<UserSubscrip
   const snapshot = await subscriptionRef.get();
   if (snapshot.exists) {
     const stored = snapshot.data() as UserSubscription;
+    const selectedPlan = stored.selectedPlan === 'basic' || stored.selectedPlan === 'pro' ? stored.selectedPlan : 'pro';
+    if (stored.selectedPlan !== selectedPlan) await subscriptionRef.set({ selectedPlan }, { merge: true });
     return withComputedStatus({
       ...stored,
+      selectedPlan,
       totalTrialDays: durations.basicDays,
       trialExpiresAt: addDays(stored.trialStartedAt, durations.basicDays),
     }, durations);
@@ -127,9 +131,33 @@ export async function getOrCreateSubscription(uid: string): Promise<UserSubscrip
   const stored = latest.exists ? latest.data() as UserSubscription : created;
   return withComputedStatus({
     ...stored,
+    selectedPlan: stored.selectedPlan === 'basic' ? 'basic' : 'pro',
     totalTrialDays: durations.basicDays,
     trialExpiresAt: addDays(stored.trialStartedAt, durations.basicDays),
   }, durations);
+}
+
+export async function selectSubscriptionPlan(uid: string, rawPlan: unknown): Promise<UserSubscription> {
+  if (rawPlan !== 'basic' && rawPlan !== 'pro') {
+    throw new SubscriptionError(400, 'invalid_subscription_plan', 'Choose Basic or Pro.');
+  }
+  const { readTrialSettings } = await import('./trialSettings.js');
+  const durations = await readTrialSettings();
+  const db = getAdminFirestore();
+  const ref = db.doc(`users/${uid}/billing/subscription`);
+  const updated = await db.runTransaction(async tx => {
+    const snapshot = await tx.get(ref);
+    if (!snapshot.exists) throw new SubscriptionError(404, 'subscription_not_found', 'Subscription record is unavailable.');
+    const current = snapshot.data() as UserSubscription;
+    if (current.isPaid) throw new SubscriptionError(409, 'paid_plan_change_unavailable', 'Paid plan changes are not available here yet.');
+    if (stageFor(current, Date.now(), durations) !== 'pro-trial') {
+      throw new SubscriptionError(409, 'plan_selection_period_ended', 'The plan selection period has ended. Basic continues until the free period expires.');
+    }
+    const next = { ...current, selectedPlan: rawPlan, updatedAt: new Date().toISOString() };
+    tx.set(ref, { selectedPlan: rawPlan, updatedAt: next.updatedAt }, { merge: true });
+    return next;
+  });
+  return withComputedStatus(updated, durations);
 }
 
 function validateAffiliateCodeRecord(data: AffiliateCodeRecord | undefined, normalizedCode: string) {

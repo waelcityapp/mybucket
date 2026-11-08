@@ -287,11 +287,6 @@ export default function App() {
   const [subscriptionError, setSubscriptionError] = useState<SubscriptionReadIssue | null>(null);
   const [subscriptionRetry, setSubscriptionRetry] = useState(0);
   const [trialSettingsReady, setTrialSettingsReady] = useState(false);
-  const [dailyUsage, setDailyUsage] = useState<UserDailyUsage>({
-    date: new Date().toISOString().slice(0, 10),
-    expenseAiCount: 0,
-    inquiryAiCount: 0,
-  });
 
   const isAdmin = authUser?.email?.trim().toLowerCase() === 'waelvts@gmail.com';
   // This PIN is a temporary UI gate, not a server-side security boundary.
@@ -765,9 +760,11 @@ export default function App() {
 
   // Handle AI Financial Query with Deterministic Math Engine
   const handleFinancialQuery = (query: AIFinancialQuery, questionText: string) => {
-    const isPaid = userSubscription?.isPaid || userSubscription?.tier === 'trial'; // Full Pro trial
-    // For free/trial users: clamp query history window to max 35 days as per business rule
-    const maxDaysHistory = isPaid ? undefined : (userSubscription?.maxHistoricalQueryDays || 35);
+    const phase = userSubscription ? stageFor(userSubscription) : 'expired';
+    // Pro trial and paid Pro have the Pro query range; Basic remains within its configured history window.
+    const maxDaysHistory = phase === 'pro-trial' || phase === 'paid'
+      ? undefined
+      : (userSubscription?.maxHistoricalQueryDays || 35);
 
     const result = executeDeterministicQuery(
       query,

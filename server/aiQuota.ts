@@ -105,7 +105,7 @@ export async function reserveAiQuota(uid: string, rawText: unknown, forceLocal =
 
   // The first Pro-trial window lets the user switch plans; after it ends,
   // the existing Basic-free period applies automatically until its admin-set expiry.
-  const plan: 'basic' | 'pro' = phase === 'pro-trial' && subscription.selectedPlan === 'pro' ? 'pro' : 'basic';
+  const plan: 'basic' | 'pro' = phase === 'paid' || (phase === 'pro-trial' && subscription.selectedPlan === 'pro') ? 'pro' : 'basic';
   const operation: 'entry' | 'inquiry' = isFinancialQueryText(rawText) ? 'inquiry' : 'entry';
   const limits = await readAiDailyLimits();
   const day = cairoDay();

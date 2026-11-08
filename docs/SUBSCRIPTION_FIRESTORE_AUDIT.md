@@ -38,17 +38,21 @@
 
 ## Work started on this preview branch (2026-11-08)
 
-- Added `server/aiQuota.ts`: atomic, server-side daily counters under `users/{uid}/aiUsage/daily_YYYY-MM-DD`, using Africa/Cairo calendar dates. It enforces the existing Basic limits (15 AI entries and 5 AI inquiries by default); Pro trial and paid requests do not use this Basic quota.
-- Wired the quota check into both production Vercel `api/gateway.ts` and local `server.ts`, after validating the request and resolving the subscription stage. The browser's localStorage counter is not treated as an authorization boundary.
-- Updated `firestore.subscription-draft.rules` to allow-list client-editable profile fields, reject client-supplied role/admin/entitlement fields, preserve server-owned suspension fields, and deny client deletion of the profile. Legacy prototype marketer fields remain temporarily allow-listed and immutable after first write for compatibility.
-- Extended the Firestore emulator test file with profile escalation/deletion and client AI-usage write-denial cases.
+- Restricted `ai.interpret` in both Vercel `api/gateway.ts` and local `server.ts`: Gemini is allowed only during the Pro trial stage or an active paid Pro subscription. Basic requests are rejected by the server because Basic must use the local analyzer.
+- Updated `VoiceNaturalInput` to route Pro trial/paid users to `geminiClient` and Basic users to `aiClient` (the deterministic local interpreter). Removed the obsolete 15-entry/5-query localStorage AI quota checks; those were not the agreed Basic policy.
+- Removed the temporary `server/aiQuota.ts` helper because Basic does not consume Gemini tokens.
+- Updated the local query history range selection to distinguish Basic from Pro.
+- Updated `firestore.subscription-draft.rules` to allow-list client-editable profile fields, reject client-supplied role/admin/entitlement fields, validate legacy marketer codes, preserve server-owned suspension fields, and deny client deletion of the profile.
+- Extended the Firestore emulator tests with profile escalation/deletion and client AI-usage write-denial cases.
 
-## Important policy gate before Rules deployment
+## Policy and implementation gate
 
-The current app code blocks all new financial transactions after the 75-day introductory period until a plan is chosen. The candidate Rules currently mirror that behavior. This must be explicitly reconciled with the product decision about whether a post-trial Free plan should retain manual transaction entry. Do not deploy the expiry-based financial write condition until that decision is confirmed and the plan-selection flow is implemented consistently.
+- Free-period financial writes are allowed only until the admin-configured total Basic period expires; after that the intended behavior is read-only, with all previous financial data preserved.
+- The current policy helper still models the free period as Pro trial first, then Basic free. The user's latest requirement allows switching between Basic and Pro during the free period according to admin-configured limits. The exact day-accounting and switching semantics still need to be implemented before Rules deployment.
+- Do not deploy the draft Rules until the plan-switching policy, all Firestore paths, and Emulator tests are verified.
 
 ## Verification status
 
 - Changes are committed only to `subscription-firestore-security-prep`.
 - No production Rules, Firestore documents, Auth users, Vercel production deployment, or `main` branch were changed.
-- Emulator tests and a full TypeScript/Vercel build have **not** yet been executed. Passing GitHub writes is not evidence of a successful build.
+- Emulator tests and a full TypeScript/Vercel build have **not** yet been executed.

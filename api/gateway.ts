@@ -122,6 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { ensureFirestoreAccessRecord } = await import('../server/financialAccess.js');
         const { readTrialSettings } = await import('../server/trialSettings.js');
         const settings = await readTrialSettings();
+        await getOrCreateSubscription(user.uid);
         await ensureFirestoreAccessRecord(user.uid);
         return res.status(200).json({ ok: true, data: { proDays: settings.proDays, basicDays: settings.basicDays } });
       }

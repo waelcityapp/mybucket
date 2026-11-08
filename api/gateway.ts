@@ -20,7 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { applyAffiliateCode, getOrCreateSubscription, verifyAuthenticatedUser } = await import('../server/subscriptionService.js');
+    const { applyAffiliateCode, getOrCreateSubscription, selectSubscriptionPlan, verifyAuthenticatedUser } = await import('../server/subscriptionService.js');
     const authorizationHeader = req.headers.authorization;
     const authorization = Array.isArray(authorizationHeader)
       ? authorizationHeader[0] || ''
@@ -168,13 +168,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const subscription = await applyAffiliateCode(user.uid, payload.code);
         return res.status(200).json({ ok: true, data: { subscription } });
       }
+      case 'subscription.selectPlan': {
+        const subscription = await selectSubscriptionPlan(user.uid, payload.plan);
+        return res.status(200).json({ ok: true, data: { subscription } });
+      }
       case 'ai.interpret': {
         const subscription = await getOrCreateSubscription(user.uid);
         if (subscription.status === 'expired') return res.status(403).json({ ok: false, error: 'subscription_expired', message: 'Choose a subscription to continue AI operations.' });
         const { readTrialSettings } = await import('../server/trialSettings.js');
         const { stageFor } = await import('../src/config/subscriptionPolicy.js');
         const phase = stageFor(subscription, Date.now(), await readTrialSettings());
-        if (phase === 'basic-free') {
+        if (phase !== 'pro-trial' || subscription.selectedPlan !== 'pro') {
           return res.status(403).json({ ok: false, error: 'pro_plan_required', message: 'Gemini AI is available on the Pro plan only. Basic uses the local analyzer.' });
         }
         const { text, accounts, categories, currentDateTime, userTimezone, lang, currentProposal, learnedMemory } = payload;

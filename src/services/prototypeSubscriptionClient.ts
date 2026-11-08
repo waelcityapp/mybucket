@@ -8,6 +8,7 @@ import { stageFor } from '../config/subscriptionPolicy';
 function toPrototype(sub: StoredSubscription): UserSubscription {
   return {
     tier: stageFor(sub) === 'basic-free' ? 'basic' : stageFor(sub) === 'pro-trial' ? 'trial' : stageFor(sub) === 'paid' ? 'pro' : 'expired',
+    selectedPlan: stageFor(sub) === 'pro-trial' && sub.selectedPlan === 'basic' ? 'basic' : 'pro',
     trialDatesStored: sub.trialDatesStored === true,
     affiliateCode: sub.affiliateCode,
     hasAppliedAffiliateCode: sub.hasAppliedAffiliateCode,

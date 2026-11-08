@@ -34,9 +34,60 @@ service cloud.firestore {
           )
         );
     }
+    function validProfileCreate(userId) {
+      return isOwner(userId)
+        && request.resource.data.keys().hasOnly([
+          'userId', 'email', 'displayName', 'photoURL', 'lastLoginAt',
+          'updatedAt', 'prototypeAffiliateCode', 'prototypeAffiliateAppliedAt'
+        ])
+        && request.resource.data.userId == userId
+        && request.resource.data.email is string
+        && request.resource.data.displayName is string
+        && request.resource.data.photoURL is string
+        && request.resource.data.lastLoginAt is string
+        && (
+          !('prototypeAffiliateCode' in request.resource.data)
+          || request.resource.data.prototypeAffiliateCode in [
+            'WAEL2026', 'VIP2025', 'VIP35', 'MARKET50',
+            'OCTOBER2025', 'SAVE35', 'MYBUCKET35'
+          ]
+        );
+    }
+    function validProfileUpdate(userId) {
+      return isOwner(userId)
+        && request.resource.data.keys().hasOnly([
+          'userId', 'email', 'displayName', 'photoURL', 'lastLoginAt',
+          'updatedAt', 'prototypeAffiliateCode', 'prototypeAffiliateAppliedAt'
+        ])
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.userId == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'email', 'displayName', 'photoURL', 'lastLoginAt', 'updatedAt',
+          'prototypeAffiliateCode', 'prototypeAffiliateAppliedAt'
+        ])
+        && (
+          !('prototypeAffiliateCode' in resource.data)
+          || request.resource.data.prototypeAffiliateCode == resource.data.prototypeAffiliateCode
+        )
+        && (
+          !('prototypeAffiliateAppliedAt' in resource.data)
+          || request.resource.data.prototypeAffiliateAppliedAt == resource.data.prototypeAffiliateAppliedAt
+        )
+        && (!('email' in request.resource.data) || request.resource.data.email is string)
+        && (!('displayName' in request.resource.data) || request.resource.data.displayName is string)
+        && (!('photoURL' in request.resource.data) || request.resource.data.photoURL is string)
+        && (!('lastLoginAt' in request.resource.data) || request.resource.data.lastLoginAt is string)
+        && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is string);
+    }
+
     match /users/{userId} {
-      // Profile stays editable without granting the user billing permissions.
-      allow read, write: if isOwner(userId);
+      // Profile fields are allow-listed. Billing, role, and entitlement fields
+      // cannot be introduced or changed by a client.
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if validProfileCreate(userId);
+      allow update: if validProfileUpdate(userId);
+      allow delete: if false;
       match /accounts/{accountId} {
         allow read: if isOwner(userId);
         allow create, update, delete: if allowedFinancialWrite(userId);

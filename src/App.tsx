@@ -1667,7 +1667,6 @@ export default function App() {
           <SettingsView
             lang={lang}
             onSetLanguage={(newLang) => setLang(newLang)}
-            onResetDemoData={handleResetDemoData}
             onZeroAllBalances={handleZeroAllBalances}
             user={authUser}
             subscription={userSubscription}

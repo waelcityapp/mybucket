@@ -121,7 +121,18 @@ async function startServer() {
           return res.json({ ok: true, data: { subscription } });
         }
         case 'ai.interpret': {
-          const { text, accounts, categories, currentDateTime, userTimezone, lang, currentProposal, learnedMemory } = payload;
+          const subscription = await getOrCreateSubscription(user.uid);
+        const { readTrialSettings } = await import('./server/trialSettings.js');
+        const { stageFor } = await import('./src/config/subscriptionPolicy.js');
+        const durations = await readTrialSettings();
+        const phase = stageFor(subscription, Date.now(), durations);
+        if (phase === 'expired') {
+          return res.json({ ok: false, error: 'subscription_expired', message: 'Your free period has ended. Choose a paid plan to continue.' });
+        }
+        if (phase === 'basic-free') {
+          return res.status(403).json({ ok: false, error: 'pro_plan_required', message: 'Gemini AI is available on the Pro plan only. Basic uses the local analyzer.' });
+        }
+        const { text, accounts, categories, currentDateTime, userTimezone, lang, currentProposal, learnedMemory } = payload;
           if (!text || typeof text !== 'string') {
             return res.status(400).json({ ok: false, error: 'invalid_ai_input', message: 'Missing or invalid text.' });
           }

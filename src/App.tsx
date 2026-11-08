@@ -1445,7 +1445,7 @@ export default function App() {
                     ? Math.max(0, Math.ceil((paidExpiresAt - Date.now()) / 86400000))
                     : null;
                   const isUrgent = remaining !== null && remaining <= 3;
-                  const plan = phase === 'pro-trial' || phase === 'paid' ? 'Pro' : 'Basic';
+                  const plan = phase === 'pro-trial' ? (userSubscription?.selectedPlan === 'basic' ? 'Basic' : 'Pro') : phase === 'paid' ? 'Pro' : 'Basic';
                   const heading = subscriptionError
                     ? (lang === 'ar' ? 'تعذر قراءة الاشتراك' : 'Subscription unavailable')
                     : !registeredAt

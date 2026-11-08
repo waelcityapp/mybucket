@@ -1,4 +1,5 @@
-import { ArrowRight, CalendarDays, Tag, ShieldCheck } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowRight, CalendarDays, Tag, ShieldCheck, Check } from 'lucide-react';
 import type { Language } from '../../types';
 import type { UserSubscription } from '../../types/prototypeSubscription';
 import { calculateRemainingTrialDays } from '../../utils/subscriptionUtils';
@@ -11,9 +12,12 @@ interface Props {
   page: 'trial-details' | 'subscription';
   onBack: () => void;
   onSubscription: () => void;
+  onPlanChange: (plan: 'basic' | 'pro') => Promise<void>;
 }
 
-export function TrialSubscriptionPages({ lang, subscription, error, page, onBack, onSubscription }: Props) {
+export function TrialSubscriptionPages({ lang, subscription, error, page, onBack, onSubscription, onPlanChange }: Props) {
+  const [changingPlan, setChangingPlan] = useState(false);
+  const [planError, setPlanError] = useState('');
   const ar = lang === 'ar';
   const days = subscription ? calculateRemainingTrialDays(subscription) : null;
   const stage = subscription ? stageFor(subscription) : null;
@@ -45,7 +49,8 @@ export function TrialSubscriptionPages({ lang, subscription, error, page, onBack
           <p className="text-sm leading-7 text-slate-700">{subscription.hasAppliedAffiliateCode ? (ar ? 'حسابك مرتبط بكود مسوّق؛ يظهر سعر الخصم في تفاصيل الاشتراك.' : 'Your account has a marketer code; the discounted price appears in subscription details.') : (ar ? 'يمكن استخدام كود مسوّق للحصول على خصم الاشتراك، دون بدء تجربة جديدة بعد انتهائها.' : 'A marketer code can provide a subscription discount without starting another trial after expiry.')}</p>
           <button type="button" onClick={onSubscription} className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-black text-white hover:bg-emerald-800">{ar ? 'الانتقال إلى صفحة الاشتراك' : 'Go to subscription'}</button>
         </> : <>
-          <p className="text-sm leading-7 text-slate-600">{ar ? 'اختر الخطة المناسبة لك. جميع بياناتك المالية محفوظة عند تغيير الخطة.' : 'Choose the plan that suits you. Your financial records remain saved when you change plans.'}</p>
+          <p className="text-sm leading-7 text-slate-600">{ar ? 'يمكنك التبديل بين Basic وPro خلال أول مدة Pro المجانية التي يحددها المسؤول. التبديل لا يعيد عدادات الاستخدام ولا يغير تاريخ بداية التجربة.' : 'You can switch between Basic and Pro during the admin-configured Pro trial. Switching never resets usage counters or changes your trial start date.'}</p>
+          {stage === 'pro-trial' && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 space-y-3"><p className="text-sm font-extrabold text-emerald-950">{ar ? `أنت في تجربة Pro المجانية (${getTrialDurations().proDays} يومًا). اختر الخطة التي تريد استخدامها الآن:` : `Your free Pro trial is active for ${getTrialDurations().proDays} days. Choose which plan to use now:`}</p><div className="grid grid-cols-2 gap-2">{(['basic','pro'] as const).map(plan => <button key={plan} type="button" disabled={changingPlan || subscription.selectedPlan === plan} onClick={async () => { setChangingPlan(true); setPlanError(''); try { await onPlanChange(plan); } catch (e) { setPlanError(e instanceof Error ? e.message : String(e)); } finally { setChangingPlan(false); } }} className={`rounded-xl border px-3 py-3 text-sm font-black transition-colors disabled:opacity-60 ${subscription.selectedPlan === plan ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-300 bg-white text-slate-800 hover:border-emerald-500'}`}>{subscription.selectedPlan === plan && <Check className="inline h-4 w-4 me-1" />}{plan === 'basic' ? 'Basic' : 'Pro'}{subscription.selectedPlan === plan ? (ar ? ' — الحالية' : ' — Current') : ''}</button>)}</div>{changingPlan && <p className="text-xs text-emerald-900">{ar ? 'جارٍ حفظ اختيارك...' : 'Saving your choice...'}</p>}{planError && <p role="alert" className="text-xs text-rose-700">{planError}</p>}</div>}
           {stage === 'pro-trial' && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-900">{ar ? `تجربة Pro في أول ${getTrialDurations().proDays} يومًا، مع إمكانية مقارنة Basic.` : `Your Pro trial is active during the first ${getTrialDurations().proDays} days.`}</p>}
           {stage === 'basic-free' && <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm font-bold text-sky-900">{ar ? `انتهت تجربة Pro؛ Basic مجانية حتى اليوم ${getTrialDurations().basicDays}. المتبقي: ` : `Basic remains free until day ${getTrialDurations().basicDays}. Days remaining: `}{days}</p>}
           {stage === 'expired' && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">{ar ? 'انتهت الفترة المجانية — اختر خطتك. الدفع قيد التجهيز، وبياناتك المالية محفوظة.' : 'Your introductory period has ended — choose your plan. Payments are not enabled yet; your records are safe.'}</p>}

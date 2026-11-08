@@ -1,7 +1,9 @@
 export type SubscriptionTier = 'trial' | 'basic' | 'pro' | 'expired';
+export type SelectedPlan = 'basic' | 'pro';
 
 export interface UserSubscription {
   tier: SubscriptionTier;
+  selectedPlan: SelectedPlan;
   trialDatesStored?: boolean;
   affiliateCode?: string | null;
   hasAppliedAffiliateCode: boolean;

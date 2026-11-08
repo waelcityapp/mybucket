@@ -32,9 +32,10 @@ export async function reserveDailyAiUsage(
 
   return getAdminFirestore().runTransaction(async transaction => {
     const snapshot = await transaction.get(ref);
-    const current = snapshot.exists ? snapshot.data() : undefined;
-    const usedBefore = typeof current?.[field] === 'number' && Number.isFinite(current[field])
-      ? Math.max(0, Math.floor(current[field]))
+    const current: Record<string, unknown> | undefined = snapshot.exists ? snapshot.data() : undefined;
+    const rawUsed = current?.[field];
+    const usedBefore = typeof rawUsed === 'number' && Number.isFinite(rawUsed)
+      ? Math.max(0, Math.floor(rawUsed))
       : 0;
 
     if (usedBefore >= limit) {

@@ -761,8 +761,9 @@ export default function App() {
   // Handle AI Financial Query with Deterministic Math Engine
   const handleFinancialQuery = (query: AIFinancialQuery, questionText: string) => {
     const phase = userSubscription ? stageFor(userSubscription) : 'expired';
-    // Pro trial and paid Pro have the Pro query range; Basic remains within its configured history window.
-    const maxDaysHistory = phase === 'pro-trial' || phase === 'paid'
+    // Query history follows the selected entitlement, not just the calendar trial phase.
+    const usingPro = phase === 'paid' || (phase === 'pro-trial' && userSubscription?.selectedPlan === 'pro');
+    const maxDaysHistory = usingPro
       ? undefined
       : (userSubscription?.maxHistoricalQueryDays || 35);
 

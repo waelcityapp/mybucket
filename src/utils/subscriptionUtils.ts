@@ -93,6 +93,7 @@ export function createInitialSubscription(appliedCode?: string | null): UserSubs
 
   return {
     tier: 'trial',
+    selectedPlan: 'pro',
     affiliateCode: isCodeValid ? codeNormalized : null,
     hasAppliedAffiliateCode: isCodeValid,
     totalTrialDays: totalDays,

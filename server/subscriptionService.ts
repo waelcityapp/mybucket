@@ -216,6 +216,7 @@ export async function applyAffiliateCode(uid: string, rawCode: unknown): Promise
     const nowIso = new Date().toISOString();
     const next: UserSubscription = {
       ...current,
+      selectedPlan: current.selectedPlan === 'basic' ? 'basic' : 'pro',
       status: current.isPaid ? 'paid' : 'trial',
       totalTrialDays: durations.basicDays,
       trialExpiresAt: addDays(current.trialStartedAt, durations.basicDays),

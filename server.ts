@@ -113,6 +113,14 @@ async function startServer() {
           const { updateFeedbackStatus } = await import('./server/analyzerFeedback');
           return res.json({ ok:true, data:await updateFeedbackStatus(payload) });
         }
+        case 'subscription.trialSettings': {
+          const { ensureFirestoreAccessRecord } = await import('./server/financialAccess');
+          const { readTrialSettings } = await import('./server/trialSettings');
+          const settings = await readTrialSettings();
+          await getOrCreateSubscription(user.uid);
+          await ensureFirestoreAccessRecord(user.uid);
+          return res.json({ ok: true, data: { proDays: settings.proDays, basicDays: settings.basicDays } });
+        }
         case 'admin.aiQuota.get': {
           if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
           const { readAiDailyLimits } = await import('./server/aiQuota');

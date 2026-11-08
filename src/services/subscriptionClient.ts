@@ -54,6 +54,7 @@ function normalizeSubscription(raw: LegacySubscription): UserSubscription | null
 
   return {
     status: phase === 'paid' ? 'paid' : phase === 'expired' ? 'expired' : 'trial',
+    selectedPlan: source.selectedPlan === 'basic' ? 'basic' : 'pro',
     trialStartedAt,
     trialExpiresAt: expiry,
     totalTrialDays: totalDays,

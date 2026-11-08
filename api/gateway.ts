@@ -37,6 +37,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     switch (action) {
+      case 'app.presence': {
+        const { recordPresence } = await import('../server/presence.js');
+        await recordPresence(user.uid);
+        return res.status(200).json({ ok: true });
+      }
       case 'app.installSeen': {
         const { recordSignedInInstallation } = await import('../server/adminUsers.js');
         return res.status(200).json({ ok: true, data: await recordSignedInInstallation(user.uid, payload) });

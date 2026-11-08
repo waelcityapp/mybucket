@@ -9,6 +9,8 @@ type AppUser = {
   email: string;
   createdAt: string | null;
   lastSignInAt: string | null;
+  lastSeenAt: string | null;
+  online: boolean;
   disabled: boolean;
   tier: 'paid' | 'trial' | 'free' | 'unknown';
   plan: string;
@@ -49,11 +51,20 @@ function niceDate(input: string | null, ar: boolean) {
   const date = new Date(input);
   return Number.isNaN(date.getTime()) ? input : new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'medium' }).format(date);
 }
+function niceCairoDateTime(input: string | null, ar: boolean) {
+  if (!input) return ar ? 'لم يُسجّل بعد' : 'Not recorded yet';
+  const date = new Date(input);
+  if (Number.isNaN(date.getTime())) return ar ? 'غير متاح' : 'Unavailable';
+  return new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', {
+    timeZone: 'Africa/Cairo', dateStyle: 'medium', timeStyle: 'short',
+  }).format(date);
+}
 
 export function AdminAppUsersView({ lang }: { lang: Language }) {
   const ar = lang === 'ar';
   const [data, setData] = useState<UserSummary | null>(null);
   const [error, setError] = useState('');
+  const [presenceStale, setPresenceStale] = useState(false);
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
   const [workingUid, setWorkingUid] = useState<string | null>(null);
@@ -77,6 +88,19 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
   }, [ar]);
 
   useEffect(() => { void reload(); }, [reload]);
+
+  useEffect(() => {
+    let live = true;
+    const refreshPresence = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const result = await requestAdmin('admin.users.list') as UserSummary;
+        if (live) { setData(result); setPresenceStale(false); }
+      } catch (e) { if (live) setPresenceStale(true); console.warn('Presence refresh failed:', e); }
+    };
+    const timer = window.setInterval(() => void refreshPresence(), 30_000);
+    return () => { live = false; window.clearInterval(timer); };
+  }, []);
 
   const filtered = useMemo(() => (data?.users || []).filter(user => {
     const matching = (user.name + ' ' + user.email + ' ' + user.uid).toLowerCase().includes(search.trim().toLowerCase());
@@ -156,6 +180,7 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
       </div>
 
       {error && <p role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700"><AlertCircle className="h-4 w-4 shrink-0"/>{error}</p>}
+      {presenceStale && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{ar ? 'تعذر تحديث حالة الوجود؛ الحالات المعروضة قد تكون قديمة.' : 'Presence could not be refreshed; displayed statuses may be out of date.'}</p>}
       {notice && <p role="status" className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800"><CheckCircle2 className="h-4 w-4 shrink-0"/>{notice}</p>}
       {loading && <p className="rounded-xl bg-white p-5 text-center text-xs text-slate-500">{ar ? 'جارٍ تحميل بيانات المستخدمين الحقيقية...' : 'Loading real user records...'}</p>}
       {!loading && data && (
@@ -173,11 +198,13 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
                     <div className="flex flex-wrap items-center gap-1.5">
                       <p className="break-words text-sm font-black text-slate-900">{record.name || (ar ? 'بدون اسم' : 'Unnamed user')}</p>
                       {isOwner && <span className="rounded-lg bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">{ar ? 'المدير' : 'Owner'}</span>}
-                      <span className={'rounded-lg px-2 py-0.5 text-[10px] font-semibold ' + (record.disabled ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700')}>{record.disabled ? (ar ? 'موقوف' : 'Disabled') : (ar ? 'نشط' : 'Active')}</span>
+                      {record.disabled && <span className="rounded-lg bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">{ar ? 'موقوف' : 'Disabled'}</span>}
+                      <span className={'rounded-lg px-2 py-0.5 text-[10px] font-semibold ' + (record.online ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600')}>{record.online ? (ar ? 'نشط الآن' : 'Online now') : (ar ? 'غير متصل' : 'Offline')}</span>
                     </div>
                     <p className="mt-0.5 break-all text-xs text-slate-600" dir="ltr">{record.email || '—'}</p>
                     <p className="mt-1 text-xs font-semibold text-slate-700">{accountPlan(record, ar)}</p>
-                    <p className="mt-1 text-[11px] text-slate-500">{ar ? 'إنشاء:' : 'Created:'} {niceDate(record.createdAt, ar)} · {ar ? 'آخر دخول:' : 'Last login:'} {niceDate(record.lastSignInAt, ar)}</p>
+                    <p className="mt-1 text-[11px] text-slate-500">{ar ? 'إنشاء:' : 'Created:'} {niceDate(record.createdAt, ar)}</p>
+                    <p className="mt-1 text-[11px] text-slate-500">{ar ? 'آخر ظهور:' : 'Last seen:'} {niceCairoDateTime(record.lastSeenAt, ar)} {ar ? '(توقيت القاهرة)' : '(Cairo time)'}</p>
                     {record.installed && <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5"/>{ar ? 'تم رصد نسخة مثبتة' : 'Installed-app usage reported'}</p>}
                   </div>
                   {!isOwner && <div className="flex shrink-0 flex-wrap gap-1">
@@ -209,7 +236,7 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
           </div>
           <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] leading-5 text-slate-600">
             <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-700"/>
-            {ar ? 'هذه البيانات للإدارة فقط. الإيقاف والتفعيل والحذف ينفذهم Firebase Admin من الخادم مع التحقق من صلاحية المدير؛ لا يتم عرض الأرصدة أو المعاملات المالية للمستخدمين.' : 'Admin-only: access changes run via Firebase Admin on the server. Users’ financial balances and transactions are not displayed.'}
+            {ar ? 'حالة الوجود تقريبية وتتحدث تلقائيًا؛ قد يستغرق ظهور الخروج نحو ٣ دقائق بعد إغلاق التطبيق أو انقطاع الإنترنت. البيانات للإدارة فقط، ولا تعرض أرصدة المستخدمين أو معاملاتهم.' : 'Presence is approximate and refreshes automatically; going offline may take about 3 minutes after closing the app or losing connectivity. Financial balances and transactions are not shown.'}
           </div>
         </>
       )}

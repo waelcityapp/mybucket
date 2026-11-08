@@ -3,6 +3,7 @@ import { getAdminAuth, getAdminFirestore } from './firebaseAdmin.js';
 import { SubscriptionError } from './subscriptionService.js';
 import { stageFor, type TrialDurations } from '../src/config/subscriptionPolicy.js';
 import { readTrialSettings } from './trialSettings.js';
+import { isRecentlyPresent } from './presence.js';
 
 const OWNER_EMAIL = 'waelvts@gmail.com';
 const MAX_USERS_TO_COUNT = 5000;
@@ -73,16 +74,21 @@ export async function listAppUsers(actor: AdminActor) {
   const rows = [];
   for (let i = 0; i < visible.length; i += 40) {
     const batch = visible.slice(i, i + 40);
-    const [subscriptions, installations] = await Promise.all([
+    const [subscriptions, installations, presence] = await Promise.all([
       db.getAll(...batch.map(u => db.doc('users/' + u.uid + '/billing/subscription'))),
       db.getAll(...batch.map(u => db.doc('users/' + u.uid + '/telemetry/pwaInstall'))),
+      db.getAll(...batch.map(u => db.doc('users/' + u.uid + '/telemetry/presence'))),
     ]);
     for (let j = 0; j < batch.length; j++) {
       const sub = subscriptions[j].exists ? subscriptions[j].data() as SubscriptionInfo : undefined;
+      const lastSeenDate = presence[j].data()?.lastSeenAt?.toDate?.();
+      const lastSeenMs = lastSeenDate instanceof Date && Number.isFinite(lastSeenDate.getTime()) ? lastSeenDate.getTime() : null;
       rows.push({
         ...batch[j],
         ...subscriptionLabel(sub, durations, batch[j].createdAt),
         installed: installations[j].exists,
+        lastSeenAt: lastSeenMs === null ? null : new Date(lastSeenMs).toISOString(),
+        online: !batch[j].disabled && isRecentlyPresent(lastSeenMs, Date.now()),
       });
     }
   }

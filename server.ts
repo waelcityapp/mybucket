@@ -41,6 +41,11 @@ async function startServer() {
       }
 
       switch (action) {
+        case 'app.presence': {
+          const { recordPresence } = await import('./server/presence');
+          await recordPresence(user.uid);
+          return res.json({ ok: true });
+        }
         case 'app.installSeen': {
           const { recordSignedInInstallation } = await import('./server/adminUsers');
           return res.json({ ok: true, data: await recordSignedInInstallation(user.uid, payload) });

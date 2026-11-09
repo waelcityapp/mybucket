@@ -62,6 +62,10 @@ function effective(master: Reminder, index: number) {
     amount: exception.amount ?? segment?.amount ?? master.amount,
     currency: exception.currency ?? segment?.currency ?? master.currency,
     note: exception.note ?? segment?.note ?? master.note,
+    leadDays: exception.leadDays ?? segment?.leadDays ?? master.leadDays,
+    tone: exception.tone ?? segment?.tone ?? master.tone,
+    remindTime: exception.remindTime ?? segment?.remindTime ?? master.remindTime,
+    repeat: exception.repeat ?? segment?.repeat ?? master.repeat,
     dueDate: exception.dueDate ?? occurrenceDate(master.dueDate, master.frequency || 'none', index, changes),
   };
 }
@@ -130,11 +134,11 @@ export async function reminderAction(uid: string, action: string, payload: Recor
         const scope = payload.scope === 'future' ? 'future' : 'once';
         if (scope === 'future') {
           const changes = (master.changes || []).filter(x => x.fromIndex !== index);
-          changes.push({ fromIndex:index, title:fields.title, amount:fields.amount, currency:fields.currency, note:fields.note, anchorDate:fields.dueDate });
+          changes.push({ fromIndex:index, title:fields.title, amount:fields.amount, currency:fields.currency, note:fields.note, anchorDate:fields.dueDate, leadDays:fields.leadDays, tone:fields.tone, remindTime:fields.remindTime, repeat:fields.repeat });
           changes.sort((a,b)=>a.fromIndex-b.fromIndex);
           transaction.update(ref,{changes,updatedAt:Date.now()});
         } else {
-          const overrides = {...master.overrides,[String(index)]:{title:fields.title,amount:fields.amount,currency:fields.currency,note:fields.note,dueDate:fields.dueDate}};
+          const overrides = {...master.overrides,[String(index)]:{title:fields.title,amount:fields.amount,currency:fields.currency,note:fields.note,dueDate:fields.dueDate, leadDays:fields.leadDays, tone:fields.tone, remindTime:fields.remindTime, repeat:fields.repeat}};
           transaction.update(ref,{overrides,updatedAt:Date.now()});
         }
       } else {

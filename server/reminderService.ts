@@ -27,9 +27,9 @@ function normalized(payload: Record<string, unknown>) {
   if (!Number.isInteger(leadDays) || leadDays < 0 || leadDays > 365) fail('invalid_reminder_days');
   if (!Number.isInteger(tone) || tone < 1 || tone > 4) fail('invalid_reminder_tone');
   const remindTime = payload.remindTime === undefined ? '09:00' : String(payload.remindTime);
-  const repeat = payload.repeat === undefined ? 'daily' : payload.repeat;
+  const repeat: 'daily' | 'once' = payload.repeat === 'once' ? 'once' : 'daily';
   if (!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(remindTime)) fail('invalid_reminder_time');
-  if (repeat !== 'daily' && repeat !== 'once') fail('invalid_reminder_repeat');
+  if (payload.repeat !== undefined && payload.repeat !== 'daily' && payload.repeat !== 'once') fail('invalid_reminder_repeat');
   return { title, amount, currency, note, dueDate: validateDate(payload.dueDate), leadDays, tone, remindTime, repeat };
 
 }

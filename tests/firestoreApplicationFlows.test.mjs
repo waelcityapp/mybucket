@@ -45,6 +45,23 @@ test('realistic setup, linked transfer, legacy profile, expiry and owner isolati
     }));
     assert.equal((await getDoc(cash)).data().balance,90);
     assert.equal((await getDoc(bank)).data().balance,60);
+    const extras = writeBatch(db);
+    extras.set(doc(db,'users/alice/accounts/bank2'), { userId:'alice', type:'bank', currency:'EGP', balance:50, linkedBankId:null });
+    extras.set(doc(db,'users/alice/accounts/wallet2'), { userId:'alice', type:'wallet', linkedBankId:'bank2', currency:'EGP', balance:0 });
+    await assertSucceeds(extras.commit());
+    const bank2 = doc(db,'users/alice/accounts/bank2');
+    await assertSucceeds(runTransaction(db, async t => {
+      const [from,to] = await Promise.all([t.get(bank),t.get(bank2)]);
+      t.update(bank,{ balance:from.data().balance-5 });
+      t.update(bank2,{ balance:to.data().balance+5 });
+      t.set(doc(db,'users/alice/transactions/two-linked'), { userId:'alice', type:'transfer', amount:5, currency:'EGP', accountId:'card', toAccountId:'wallet2', balanceAccountId:'bank', toBalanceAccountId:'bank2' });
+    }));
+    await assertSucceeds(runTransaction(db, async t => {
+      const [from,to] = await Promise.all([t.get(bank2),t.get(cash)]);
+      t.update(bank2,{ balance:from.data().balance-5 });
+      t.update(cash,{ balance:to.data().balance+5 });
+      t.set(doc(db,'users/alice/transactions/null-link'), { userId:'alice', type:'transfer', amount:5, currency:'EGP', accountId:'bank2', toAccountId:'cash', balanceAccountId:'bank2', toBalanceAccountId:'cash' });
+    }));
     await assertFails(getDoc(doc(other,'users/alice/accounts/cash')));
     await assertFails(updateDoc(doc(other,'users/alice/accounts/cash'), { balance:0 }));
     await env.withSecurityRulesDisabled(async ctx => setDoc(doc(ctx.firestore(),'users/alice/billing/access'), { registeredAt:Timestamp.fromMillis(Date.now()-80*86400000), paidUntil:null, schemaVersion:1 }));

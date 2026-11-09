@@ -21,7 +21,7 @@ service cloud.firestore {
     }
     function balanceMatchesMethod(uid, methodId, balanceId) {
       let method = get(accountPath(uid, methodId)).data;
-      return ('linkedBankId' in method)
+      return ('linkedBankId' in method && method.linkedBankId != null && method.linkedBankId != '')
         ? method.linkedBankId == balanceId && method.type in ['card', 'wallet']
           && get(accountPath(uid, balanceId)).data.type == 'bank'
         : methodId == balanceId;

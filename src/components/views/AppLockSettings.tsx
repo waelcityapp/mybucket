@@ -18,7 +18,7 @@ export function AppLockSettings({ lang, status, onChange }: { lang: 'ar' | 'en';
     if (mode === 'disable' && !six(pin)) { setMessage(ar ? 'أدخل الرقم السري الحالي' : 'Enter current PIN'); return; }
     setBusy(true); setMessage('');
     try {
-      const result = await lockRequest(mode, mode === 'enable' ? { pin: nextPin, inactivityMinutes: timeout } : mode === 'change' ? { pin, newPin: nextPin } : { pin });
+      await lockRequest(mode, mode === 'enable' ? { pin: nextPin, inactivityMinutes: timeout } : mode === 'change' ? { pin, newPin: nextPin } : { pin });
       onChange({ enabled: mode === 'disable' ? false : true, inactivityMinutes: mode === 'enable' ? timeout : status?.inactivityMinutes || 1 });
       setPin(''); setNextPin(''); setConfirm('');
       setMessage(ar ? 'تم حفظ إعدادات القفل' : 'Lock settings saved');
@@ -39,7 +39,7 @@ export function AppLockSettings({ lang, status, onChange }: { lang: 'ar' | 'en';
       <input aria-label="Confirm PIN" type="password" inputMode="numeric" maxLength={6} placeholder={ar ? 'تأكيد الرقم' : 'Confirm PIN'} value={confirm} onChange={e => setConfirm(e.target.value.replace(/[^0-9]/g, '').slice(0,6))} className="border rounded-xl p-2 w-full" />
     </>}
     {mode === 'enable' && <label className="text-xs flex items-center gap-2">{ar ? 'القفل بعد عدم الاستخدام' : 'Lock after inactivity'}<select value={timeout} onChange={e => setTimeoutMinutes(Number(e.target.value))} className="border rounded-lg p-2">{[1,2,3].map(n => <option key={n} value={n}>{n} {ar ? 'دقيقة' : 'min'}</option>)}</select></label>}
-    {status.enabled && <label className="text-xs flex items-center gap-2">{ar ? 'مدة عدم الاستخدام' : 'Inactivity'}<select value={timeout} onChange={async e => { const n = Number(e.target.value); try { await lockRequest('timeout', { pin, inactivityMinutes: n }); onChange({ enabled: true, inactivityMinutes: n }); } catch { setMessage(ar ? 'أدخل الرقم الحالي أولاً' : 'Enter current PIN first'); } }} className="border rounded-lg p-2">{[1,2,3].map(n => <option key={n} value={n}>{n}</option>)}</select></label>}
+    {status.enabled && <label className="text-xs flex items-center gap-2">{ar ? 'مدة عدم الاستخدام' : 'Inactivity'}<select value={timeout} onChange={async e => { const n = Number(e.target.value); if (!six(pin)) { setMessage(ar ? 'أدخل الرقم الحالي أولاً' : 'Enter current PIN first'); return; } try { await lockRequest('timeout', { pin, inactivityMinutes: n }); onChange({ enabled: true, inactivityMinutes: n }); setMessage(ar ? 'تم تحديث المدة' : 'Timeout updated'); } catch { setMessage(ar ? 'تعذر تغيير المدة' : 'Could not change timeout'); } }} className="border rounded-lg p-2">{[1,2,3].map(n => <option key={n} value={n}>{n}</option>)}</select></label>}
     <button disabled={busy} onClick={() => void save()} className="bg-emerald-600 text-white rounded-xl px-4 py-2 text-xs font-bold">{mode === 'disable' ? (ar ? 'تأكيد الإلغاء' : 'Disable lock') : (ar ? 'حفظ' : 'Save')}</button>
     {message && <p role="status" className="text-xs text-slate-600">{message}</p>}
     <p className="text-xs text-amber-700">{ar ? 'تجربة مؤقتة: استعادة الرقم السري غير متاحة الآن. احتفظ بالرقم جيداً.' : 'Temporary test: PIN recovery is unavailable.'}</p>

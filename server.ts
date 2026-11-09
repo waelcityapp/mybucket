@@ -40,7 +40,7 @@ async function startServer() {
         return res.status(400).json({ ok: false, error: 'invalid_gateway_action', message: 'A valid gateway action is required.' });
       }
 
-      if (action === 'appLock.status' || action === 'appLock.enable' || action === 'appLock.verify' || action === 'appLock.disable' || action === 'appLock.change' || action === 'appLock.timeout') {
+      if (action === 'appLock.status' || action === 'appLock.enable' || action === 'appLock.verify' || action === 'appLock.disable' || action === 'appLock.change' || action === 'appLock.timeout' || action === 'appLock.toggle') {
         const { appLockAction } = await import('./server/appLock');
         return res.json({ ok: true, data: await appLockAction(user.uid, action, payload) });
       }

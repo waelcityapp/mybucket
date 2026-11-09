@@ -69,7 +69,6 @@ export function ReminderHomeCards({ lang, onOpen }: { lang: Language; onOpen: (k
         </div>
       </div>
       <div className="flex items-center gap-1.5 shrink-0">
-        <span className="text-[10px] font-bold rounded-md bg-slate-100 text-slate-600 px-1.5 py-0.5 whitespace-nowrap">{ar ? 'إنشاء البنود' : 'Manage items'}</span>
         <span className="hidden sm:inline text-xs font-bold text-slate-600 whitespace-nowrap">{ar ? 'عرض القائمة' : 'View list'}</span>
         <ChevronLeft className={`w-4 h-4 text-slate-500 shrink-0 ${ar ? '' : 'rotate-180'}`}/>
       </div>

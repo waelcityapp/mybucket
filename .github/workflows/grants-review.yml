@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - free-grants-review-20261109
+  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

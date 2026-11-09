@@ -19,9 +19,18 @@ export async function appLockAction(uid: string, action: string, payload: any) {
   const ref = refFor(uid);
   const snapshot = await ref.get();
   const data = (snapshot.data() || {}) as LockDoc;
-  if (action === 'appLock.status') return { enabled: !!data.enabled, inactivityMinutes: [1,2,3].includes(data.inactivityMinutes || 0) ? data.inactivityMinutes : 1 };
+  if (action === 'appLock.status') return { enabled: !!data.enabled, hasPin: !!(data.salt && data.hash), inactivityMinutes: [1,2,3].includes(data.inactivityMinutes || 0) ? data.inactivityMinutes : 1 };
+  // Settings is only accessible after the user has unlocked the application.
+  // The PIN stays intact when the user turns the optional privacy lock off.
+  if (action === 'appLock.toggle') {
+    if (typeof payload.enabled !== 'boolean') reject('invalid_lock_state');
+    if (payload.enabled && !(data.salt && data.hash)) reject('pin_not_set');
+    await ref.set({ enabled: payload.enabled, failures: 0, blockedUntil: 0 }, { merge: true });
+    return { enabled: payload.enabled, hasPin: !!(data.salt && data.hash), inactivityMinutes: [1,2,3].includes(data.inactivityMinutes || 0) ? data.inactivityMinutes : 1 };
+  }
   if (action === 'appLock.enable') {
     if (data.enabled) reject('already_enabled');
+    if (data.salt && data.hash) reject('pin_already_set');
     if (!pinPattern.test(String(payload.pin ?? ''))) reject('invalid_pin');
     if (![1,2,3].includes(payload.inactivityMinutes)) reject('invalid_timeout');
     const salt = randomBytes(32).toString('hex');

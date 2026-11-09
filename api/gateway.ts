@@ -57,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'admin.users.list': {
         if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
         const { listAppUsers } = await import('../server/adminUsers.js');
-        return res.status(200).json({ ok: true, data: await listAppUsers(user) });
+        return res.status(200).json({ ok: true, data: await listAppUsers(user, payload) });
       }
       case 'admin.users.setDisabled': {
         if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });

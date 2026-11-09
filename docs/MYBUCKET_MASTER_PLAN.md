@@ -425,3 +425,6 @@ The owner can prepare a server-managed `adminUserDirectory` from Firebase Authen
 
 ## Revision #131 — Directory search preparation
 Directory synchronization additionally stores normalized search grams and a sortable registration date for later paged search. The current administration list remains unchanged. Existing accounts require one rerun of the owner directory preparation action. Search also requires a separate Firestore composite index before the later interface can be enabled. No financial records or database rules change.
+
+## Revision #132 — Paginated administration directory
+The user directory is queried in bounded pages, newest registration first, with substring search over the complete synchronized index and Cairo calendar date filters. User status filters scan candidate pages server-side; sparse filters may require loading more. The searchable Firestore composite index must be enabled and the directory synchronized before use. Financial data is not edited; only candidate account summaries are read. Directory totals may differ from Authentication when users are not synchronized.

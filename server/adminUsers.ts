@@ -4,11 +4,10 @@ import { getDatabaseWithUrl } from 'firebase-admin/database';
 import { SubscriptionError } from './subscriptionService.js';
 import { stageFor, type TrialDurations } from '../src/config/subscriptionPolicy.js';
 import { readTrialSettings } from './trialSettings.js';
+import { readDirectoryPage, parseDirectoryFilter } from './directoryPage.js';
+import { collectDirectoryRows, type UserFilter } from './directoryCollect.js';
 
 const OWNER_EMAIL = 'waelvts@gmail.com';
-const MAX_USERS_TO_COUNT = 5000;
-const MAX_USER_ROWS = 200;
-
 type AdminActor = { uid: string; email: string | null };
 type SubscriptionInfo = {
   isPaid?: boolean;
@@ -35,42 +34,11 @@ function subscriptionLabel(record: SubscriptionInfo | undefined, durations: Tria
   return { tier: 'free', plan: 'Introductory period ended' };
 }
 
-/** Auth is the source of truth for registered accounts and disabled status.
- *  Limit is explicit, not silently presented as an exhaustive result.
- */
-export async function listAppUsers(actor: AdminActor) {
-  mustBeOwner(actor);
-  const auth = getAdminAuth();
+type DirectoryUser = { uid: string; name: string; email: string; createdAt: string | null; lastSignInAt: string | null; disabled: boolean };
+
+async function enrichDirectoryUsers(visible: DirectoryUser[]) {
   const db = getAdminFirestore();
   const durations = await readTrialSettings();
-  const users: Array<{
-    uid: string;
-    name: string;
-    email: string;
-    createdAt: string | null;
-    lastSignInAt: string | null;
-    disabled: boolean;
-  }> = [];
-  let cursor: string | undefined;
-  let hasMore = false;
-  do {
-    const chunk = await auth.listUsers(1000, cursor);
-    for (const record of chunk.users) {
-      users.push({
-        uid: record.uid,
-        name: record.displayName || '',
-        email: record.email || '',
-        createdAt: record.metadata.creationTime || null,
-        lastSignInAt: record.metadata.lastSignInTime || null,
-        disabled: record.disabled,
-      });
-    }
-    cursor = chunk.pageToken;
-    hasMore = Boolean(cursor);
-  } while (cursor && users.length < MAX_USERS_TO_COUNT);
-
-  users.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-  const visible = users.slice(0, MAX_USER_ROWS);
   const rows = [];
   const realtime = getDatabaseWithUrl('https://mybucket-8b6f0-default-rtdb.europe-west1.firebasedatabase.app', getAdminApp());
   for (let i = 0; i < visible.length; i += 40) {
@@ -112,17 +80,42 @@ export async function listAppUsers(actor: AdminActor) {
       });
     }
   }
-  const metrics = await db.doc('systemStats/pwaInstall').get();
-  const installationsCount = Number(metrics.data()?.count || 0);
-  return {
-    registeredCount: users.length,
-    registeredCountComplete: !hasMore,
-    installsWithSignedInAccounts: Math.max(0, installationsCount),
-    installsTrackingFrom: '2026-11-06',
-    displayedCount: rows.length,
-    users: rows,
-    note: 'Install count covers unique authenticated accounts with a recorded appinstalled event or standalone launch, starting with this release. It excludes guest installs, older installs without a later standalone launch, and multiple devices per account.',
-  };
+  return rows;
+}
+
+/** Directory candidates are paged; financial documents are fetched only for candidates. */
+export async function listAppUsers(actor: AdminActor, payload: Record<string, unknown> = {}) {
+  mustBeOwner(actor);
+  const parsed = parseDirectoryFilter(payload);
+  const db = getAdminFirestore();
+  // Do not silently omit accounts whose search fields have not been populated.
+  if (!parsed.cursor) {
+    const [all, indexed] = await Promise.all([
+      db.collection('adminUserDirectory').count().get(),
+      db.collection('adminUserDirectory').orderBy('createdAtSort').count().get(),
+    ]);
+    if (all.data().count !== indexed.data().count) {
+      throw new SubscriptionError(409, 'directory_needs_sync', 'Prepare the user directory again before using this list.');
+    }
+  }
+  const filter = typeof payload.filter === 'string' ? payload.filter : 'all';
+  if (!['all', 'paid', 'trial', 'free', 'disabled', 'installed'].includes(filter)) throw new SubscriptionError(400, 'invalid_filter', 'Invalid filter.');
+  const { selected, nextCursor } = await collectDirectoryRows(async cursor => {
+    const page = await readDirectoryPage(actor, { search: parsed.search, period: parsed.period, cursor });
+    const candidates = page.users.map((user: Record<string, unknown>) => ({
+      uid: String(user.uid), name: String(user.name || ''), email: String(user.email || ''),
+      createdAt: typeof user.createdAt === 'string' ? user.createdAt : null,
+      lastSignInAt: null, disabled: user.disabled === true,
+    }));
+    return { rows: candidates.length ? await enrichDirectoryUsers(candidates) : [], nextCursor: page.nextCursor };
+  }, filter as UserFilter, parsed.cursor);
+  const [count, metrics] = await Promise.all([
+    db.collection('adminUserDirectory').count().get(), db.doc('systemStats/pwaInstall').get(),
+  ]);
+  return { registeredCount: count.data().count, registeredCountComplete: false,
+    installsWithSignedInAccounts: Math.max(0, Number(metrics.data()?.count || 0)),
+    displayedCount: selected.length, users: selected, nextCursor,
+    note: 'Directory count may differ from Authentication if synchronization is incomplete.' };
 }
 
 export async function changeAppUserAccess(actor: AdminActor, payload: Record<string, unknown>) {

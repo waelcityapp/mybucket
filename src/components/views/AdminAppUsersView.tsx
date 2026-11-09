@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle2, Download, RefreshCw, Search, ShieldBan, ShieldCheck, Trash2, Users, UserRoundCheck } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import type { Language } from '../../types';
@@ -25,6 +25,7 @@ type UserSummary = {
   displayedCount: number;
   note: string;
   users: AppUser[];
+  nextCursor: string | null;
 };
 async function requestAdmin(action: string, payload: Record<string, unknown> = {}) {
   const user = auth.currentUser;
@@ -78,22 +79,43 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
   const [deleteUid, setDeleteUid] = useState<string | null>(null);
   const [typedEmail, setTypedEmail] = useState('');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [period, setPeriod] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [loadingMore, setLoadingMore] = useState(false);
+  const requestVersion = useRef(0);
   const [filter, setFilter] = useState<'all' | 'paid' | 'trial' | 'free' | 'disabled' | 'installed'>('all');
 
   const reload = useCallback(async () => {
+    const version = ++requestVersion.current;
     setLoading(true); setError('');
     try {
-      const result = await requestAdmin('admin.users.list') as UserSummary;
-      setData(result);
+      const result = await requestAdmin('admin.users.list', { search: debouncedSearch, filter, period }) as UserSummary;
+      if (version === requestVersion.current) setData(result);
     } catch (err) {
-      setError(ar ? 'تعذر قراءة المستخدمين من الخادم. تأكد من إعداد Firebase Admin وصلاحيات الإدارة.' : 'Could not load users from the server. Check Firebase Admin setup and admin permissions.');
+      if (version === requestVersion.current) setError(err instanceof Error && err.message === 'directory_needs_sync'
+        ? (ar ? 'اضغط «تجهيز دليل المستخدمين» لتحديث الحسابات قبل عرض القائمة.' : 'Prepare the user directory before loading the list.')
+        : (ar ? 'تعذر قراءة المستخدمين من الخادم. تأكد من إعداد Firebase Admin وصلاحيات الإدارة.' : 'Could not load users from the server. Check Firebase Admin setup and admin permissions.'));
       console.warn('Admin user list failed:', err);
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
-  }, [ar]);
+  }, [ar, debouncedSearch, filter, period]);
 
+  useEffect(() => { const timer = window.setTimeout(() => setDebouncedSearch(search), 350); return () => window.clearTimeout(timer); }, [search]);
   useEffect(() => { void reload(); }, [reload]);
+
+  const loadMore = async () => {
+    if (!data?.nextCursor || loadingMore) return;
+    const version = requestVersion.current;
+    setLoadingMore(true); setError('');
+    try {
+      const page = await requestAdmin('admin.users.list', { search: debouncedSearch, filter, period, cursor: data.nextCursor }) as UserSummary;
+      if (version === requestVersion.current) setData(previous => previous ? { ...page, users: [...previous.users, ...page.users] } : page);
+    } catch (err) {
+      if (version === requestVersion.current) setError(ar ? 'تعذر تحميل المزيد. اضغط تحديث وحاول مجددًا.' : 'Could not load more. Refresh and try again.');
+      console.warn('Load more failed:', err);
+    } finally { setLoadingMore(false); }
+  };
 
   const syncDirectory = async () => {
     if (syncing) return;
@@ -113,20 +135,14 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
       setNotice(ar
         ? `تمت مراجعة ${examined} حسابًا، وتطابقت بيانات ${verified} منها عند الفحص. عدد سجلات الدليل ${result.count}. قد تتغير الحسابات أثناء الفحص.`
         : `Reviewed ${examined} accounts; ${verified} matched at verification. The directory contains ${result.count} records. Accounts can change during the check.`);
+      await reload();
     } catch (err) {
       setError(ar ? `تعذرت إكمال المزامنة بعد مراجعة ${examined} حسابًا. يمكنك إعادة المحاولة؛ الحسابات التي لم تتغير لن تُكتب مجددًا.` : `Synchronization stopped after ${examined} accounts. You can retry; unchanged records will not be rewritten.`);
       console.warn('Directory sync failed:', err);
     } finally { setSyncing(false); }
   };
 
-  const filtered = useMemo(() => (data?.users || []).filter(user => {
-    const matching = (user.name + ' ' + user.email + ' ' + user.uid).toLowerCase().includes(search.trim().toLowerCase());
-    if (!matching) return false;
-    if (filter === 'all') return true;
-    if (filter === 'disabled') return user.disabled;
-    if (filter === 'installed') return user.installed;
-    return user.tier === filter;
-  }), [data, filter, search]);
+  const filtered = data?.users || [];
 
   const changeStatus = async (record: AppUser) => {
     if (workingUid) return;
@@ -161,8 +177,8 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
       <div className="grid grid-cols-2 gap-2.5">
         <div className="rounded-2xl border border-slate-200 bg-white p-3.5">
           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600"><Users className="h-4 w-4 text-emerald-700" />{ar ? 'حسابات مسجلة' : 'Registered accounts'}</div>
-          <p className="mt-2 text-2xl font-black tabular-nums text-slate-900">{data ? data.registeredCount.toLocaleString('en-US') + (data.registeredCountComplete ? '' : '+') : '—'}</p>
-          <p className="mt-1 text-[10px] text-slate-500">{ar ? 'من Firebase Authentication' : 'From Firebase Authentication'}</p>
+          <p className="mt-2 text-2xl font-black tabular-nums text-slate-900">{data ? data.registeredCount.toLocaleString('en-US') : '—'}</p>
+          <p className="mt-1 text-[10px] text-slate-500">{ar ? 'في دليل الإدارة' : 'In admin directory'}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-3.5">
           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600"><Download className="h-4 w-4 text-emerald-700" />{ar ? 'مستخدمو النسخة المثبتة' : 'Installed-app users'}</div>
@@ -193,6 +209,12 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
           <Search className="h-4 w-4 shrink-0 text-slate-400"/>
           <input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder={ar ? 'بحث بالاسم أو البريد' : 'Search name or email'} className="min-w-0 w-full bg-transparent text-xs outline-none" />
         </div>
+        <select aria-label={ar ? 'تاريخ التسجيل' : 'Registration period'} value={period} onChange={e => setPeriod(e.target.value as typeof period)} className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700">
+          <option value="all">{ar ? 'كل التواريخ' : 'All dates'}</option>
+          <option value="today">{ar ? 'اليوم' : 'Today'}</option>
+          <option value="week">{ar ? 'هذا الأسبوع' : 'This week'}</option>
+          <option value="month">{ar ? 'هذا الشهر' : 'This month'}</option>
+        </select>
         <select value={filter} onChange={e => setFilter(e.target.value as typeof filter)} className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700">
           <option value="all">{ar ? 'الكل' : 'All'}</option>
           <option value="paid">{ar ? 'مدفوع' : 'Paid'}</option>
@@ -208,8 +230,9 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
       {loading && <p className="rounded-xl bg-white p-5 text-center text-xs text-slate-500">{ar ? 'جارٍ تحميل بيانات المستخدمين الحقيقية...' : 'Loading real user records...'}</p>}
       {!loading && data && (
         <>
-          <p className="text-[11px] text-slate-500">{ar ? 'المعروض:' : 'Showing:'} {filtered.length} / {data.displayedCount}{data.registeredCount > data.displayedCount ? (ar ? ' (أحدث 200 مستخدم كحد أقصى؛ البحث في المعروض فقط)' : ' (up to 200 recent users; search covers this list only)') : ''}</p>
-          {filtered.length === 0 && <p className="rounded-xl border border-slate-200 bg-white p-5 text-center text-xs text-slate-500">{ar ? 'لا يوجد مستخدمون يطابقون البحث.' : 'No users match your search.'}</p>}
+          <p className="text-[11px] text-slate-500">{ar ? 'المعروض:' : 'Showing:'} {filtered.length} {ar ? '· الأحدث أولًا · توقيت القاهرة' : '· newest first · Cairo time'}</p>
+          {filtered.length === 0 && !data.nextCursor && <p className="rounded-xl border border-slate-200 bg-white p-5 text-center text-xs text-slate-500">{ar ? 'لا يوجد مستخدمون يطابقون البحث.' : 'No users match your search.'}</p>}
+          {filtered.length === 0 && data.nextCursor && <p className="text-xs text-slate-500">{ar ? 'لا توجد نتيجة في هذه الدفعة؛ اضغط عرض المزيد للمتابعة.' : 'No matches in this batch; load more to continue.'}</p>}
           <div className="space-y-2.5">
             {filtered.map(record => {
               const isOwner = record.email.trim().toLowerCase() === 'waelvts@gmail.com';
@@ -258,6 +281,7 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
               </article>;
             })}
           </div>
+          {data.nextCursor && <button type="button" disabled={loadingMore} onClick={() => void loadMore()} className="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-bold text-emerald-800 disabled:opacity-50">{loadingMore ? (ar ? 'جارٍ التحميل...' : 'Loading...') : (ar ? 'عرض المزيد' : 'Load more')}</button>}
           <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] leading-5 text-slate-600">
             <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-700"/>
             {ar ? 'تُحدّث حالة الوجود عند فتح الصفحة أو الضغط على تحديث، وقد يتأخر رصد انقطاع الاتصال. نوع الجهاز تقريبي. البيانات للإدارة فقط، ولا تعرض أرصدة المستخدمين أو معاملاتهم.' : 'Presence updates on opening this page or pressing Refresh; disconnect detection may be delayed. Device type is approximate. Financial balances and transactions are not shown.'}

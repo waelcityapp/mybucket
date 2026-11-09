@@ -69,7 +69,7 @@ async function startServer() {
         }
         case 'admin.users.list': {
           const { listAppUsers } = await import('./server/adminUsers');
-          return res.json({ ok: true, data: await listAppUsers(user) });
+          return res.json({ ok: true, data: await listAppUsers(user, payload) });
         }
         case 'admin.users.setDisabled': {
           const { changeAppUserAccess } = await import('./server/adminUsers');

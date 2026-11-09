@@ -122,6 +122,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ ok:true, data:await updateFeedbackStatus(payload) });
       }
       case 'subscription.trialSettings': {
+        const { ensureTrialAccess } = await import('../server/trialAccessBootstrap.js');
+        await ensureTrialAccess(user.uid);
         const { readTrialSettings } = await import('../server/trialSettings.js');
         const { proDays, basicDays } = await readTrialSettings();
         return res.status(200).json({ ok: true, data: { proDays, basicDays } });

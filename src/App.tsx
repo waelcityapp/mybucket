@@ -433,6 +433,7 @@ export default function App() {
     const unsubscribe = onAuthChange((firebaseUser) => {
       const nextId = firebaseUser?.uid || null;
       if (lastUserId.current !== nextId) {
+        setTrialSettingsReady(false);
         lastUserId.current = nextId;
         pendingTransaction.current = null;
         setAccounts([]);
@@ -567,7 +568,7 @@ export default function App() {
       if (auth.currentUser?.uid !== authUser.uid) return;
       if (cloudCats && cloudCats.length > 0) {
         setCategories(cloudCats);
-      } else {
+      } else if (trialSettingsReady) {
         initializeDefaultDocuments(authUser.uid, 'categories', INITIAL_CATEGORIES).catch(() => setToastMessage(lang === 'ar' ? 'تعذر إعداد التصنيفات.' : 'Could not initialize categories.'));
       }
     });
@@ -585,7 +586,7 @@ export default function App() {
       unsubCategories();
       unsubLearnedMemory();
     };
-  }, [authUser?.uid]);
+  }, [authUser?.uid, trialSettingsReady]);
 
   // One authenticated configuration read on sign-in, and again on focus or admin save.
   // Avoid routing everyday Firestore financial operations through Vercel.
@@ -1345,6 +1346,7 @@ export default function App() {
   if (needsInitialSetup && financialLoaded.accounts) {
     return <InitialSetupView lang={lang} onSave={async draft => {
       if (!auth.currentUser || auth.currentUser.uid !== authUser.uid) throw new Error('auth-changed');
+      if (!trialSettingsReady) throw new Error('trial-access-not-ready');
       const signature = JSON.stringify(draft);
       if (initialSetupAttempt.current && initialSetupAttempt.current.signature !== signature) {
         throw new Error('check-previous-setup');

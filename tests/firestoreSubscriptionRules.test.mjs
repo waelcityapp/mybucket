@@ -95,3 +95,31 @@ test('draft subscription rules: owner expiry, global changes, cross-account and 
     await env.cleanup();
   }
 });
+
+test('DIAGNOSTIC: demonstrate remaining gaps, not approval for deployment', async () => {
+  const env = await initializeTestEnvironment({
+    projectId: 'demo-mybucket-rules',
+    firestore: { rules: readFileSync('firestore.subscription-draft.rules', 'utf8') }
+  });
+  try {
+    const db = env.authenticatedContext('probe').firestore();
+    await env.withSecurityRulesDisabled(async ctx => {
+      const admin = ctx.firestore();
+      await setDoc(doc(admin, 'appSettings/subscriptionTrials'), { proDays: 15, basicDays: 72 });
+      await setDoc(doc(admin, 'users/probe/billing/access'), { registeredAt: Timestamp.now(), paidUntil: null });
+      for (const [id, currency] of [['one','EGP'],['two','EGP'],['usd','USD']]) {
+        await setDoc(doc(admin, `users/probe/accounts/${id}`), { currency, balance: 100 });
+      }
+    });
+    const transaction = { type: 'transfer', amount: 10, currency: 'EGP', accountId: 'one', toAccountId: 'two', balanceAccountId: 'one', toBalanceAccountId: 'two' };
+    await assertSucceeds(setDoc(doc(db, 'users/probe/transactions/missing-type'), { ...transaction, type: 'income' }));
+    console.log('GAP: transfer-shaped record can be labeled income');
+    await assertSucceeds(setDoc(doc(db, 'users/probe/accounts/one'), { currency: 'EGP', balance: 1 }));
+    console.log('GAP: owner can update a balance without a transfer record');
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'users/probe/accounts/two'), { currency: 'USD', balance: 110 });
+    batch.set(doc(db, 'users/probe/transactions/currency-change'), transaction);
+    await assertSucceeds(batch.commit());
+    console.log('GAP: account currency can change within the same batch');
+  } finally { await env.cleanup(); }
+});

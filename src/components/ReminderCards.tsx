@@ -64,11 +64,13 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
     catch { setError(ar ? 'تعذر تحديث حالة البند' : 'Failed to update item'); }
     finally { setBusy(false); }
   }
-  async function remove(item: Reminder) {
-
+  async function remove(item: Reminder, entireSeries = false) {
     setBusy(true); setError('');
-    try { await request('delete', { id: item.id }); await refresh(); }
-    catch { setError(ar ? 'تعذر حذف البند' : 'Failed to delete item'); }
+    try {
+      await request('delete', { id: entireSeries && item.seriesId ? item.seriesId : item.id });
+      await refresh();
+      setPendingDelete(null);
+    } catch { setError(ar ? 'تعذر حذف البند' : 'Failed to delete item'); }
     finally { setBusy(false); }
   }
   async function alertAction(item: Reminder, mode: 'stop' | 'resume' | 'tomorrow') {
@@ -190,10 +192,11 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
     {pendingDelete && <div role="dialog" aria-modal="true" aria-labelledby="reminder-delete-title" dir={ar ? 'rtl' : 'ltr'} className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/60 p-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl space-y-4">
         <div className="flex items-center gap-2 text-red-600"><Trash2 className="w-5 h-5" /><h3 id="reminder-delete-title" className="text-base font-bold">{ar ? 'حذف البند؟' : 'Delete item?'}</h3></div>
-        <p className="text-sm text-slate-700">{ar ? `هل تريد حذف «${pendingDelete.title}» نهائيًا؟ ستُلغى تنبيهاته، ولن تتأثر العمليات المالية.` : `Permanently delete “${pendingDelete.title}”? Its reminders will stop; financial transactions will not change.`}</p>
+        <p className="text-sm text-slate-700">{ar ? `هل تريد حذف «${pendingDelete.title}»؟ السجلات المالية لا تتأثر. عند حذف سلسلة متكررة ستُحذف جميع استحقاقاتها.` : `Permanently delete “${pendingDelete.title}”? Its reminders will stop; financial transactions will not change.`}</p>
         <div className="flex justify-end gap-2">
           <button type="button" disabled={busy} onClick={() => setPendingDelete(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold">{ar ? 'تراجع' : 'Cancel'}</button>
-          <button type="button" disabled={busy} onClick={async () => { const item = pendingDelete; await remove(item); setPendingDelete(null); }} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{ar ? 'حذف البند' : 'Delete'}</button>
+          <button type="button" disabled={busy} onClick={() => void remove(pendingDelete)} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{pendingDelete.frequency && pendingDelete.frequency !== 'none' ? (ar ? 'حذف هذا الاستحقاق' : 'Delete this occurrence') : (ar ? 'حذف البند' : 'Delete')}</button>
+          {pendingDelete.frequency && pendingDelete.frequency !== 'none' && <button type="button" disabled={busy} onClick={() => void remove(pendingDelete, true)} className="rounded-xl border border-red-300 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50">{ar ? 'حذف السلسلة بالكامل' : 'Delete entire series'}</button>}
         </div>
       </div>
     </div>}

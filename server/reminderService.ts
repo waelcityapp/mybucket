@@ -36,7 +36,7 @@ function fieldsOf(payload: Record<string, unknown>) {
   const leadDays = payload.leadDays === undefined ? 7 : Number(payload.leadDays);
   const tone = payload.tone === undefined ? 1 : Number(payload.tone);
   const remindTime = payload.remindTime === undefined ? '09:00' : String(payload.remindTime);
-  const repeat = payload.repeat === 'once' ? 'once' : 'daily';
+  const repeat: 'daily' | 'once' = payload.repeat === 'once' ? 'once' : 'daily';
   if (!title) fail('reminder_title_required');
   if (!Number.isFinite(amount) || amount < 0 || amount > 1_000_000_000_000) fail('invalid_reminder_amount');
   if (!validCurrencies.has(currency)) fail('invalid_reminder_currency');

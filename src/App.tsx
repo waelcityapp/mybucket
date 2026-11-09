@@ -1,3 +1,4 @@
+import { ReminderCards } from './components/ReminderCards';
 import { LockScreen, lockRequest, type LockStatus } from './components/AppLock';
 import { TrialSubscriptionPages } from './components/views/TrialSubscriptionPages';
 import { currencyName, SUPPORTED_CURRENCIES } from './types';
@@ -1675,6 +1676,9 @@ export default function App() {
               }}
               onEditBalance={handleOpenEditBalance}
             />
+
+            {/* Separate obligation and receivable reminders; no changes to financial ledger. */}
+            {authUser && <ReminderCards lang={lang} userId={authUser.uid} />}
 
             {/* 5. "أحدث العمليات" - Recent Transactions List */}
             <RecentTransactions

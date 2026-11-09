@@ -1,3 +1,4 @@
+import { LockScreen, lockRequest, type LockStatus } from './components/AppLock';
 import { TrialSubscriptionPages } from './components/views/TrialSubscriptionPages';
 import { currencyName, SUPPORTED_CURRENCIES } from './types';
 import { ArrowLeftRight, RefreshCw } from 'lucide-react';
@@ -288,6 +289,48 @@ export default function App() {
 
   // 6. User Auth State & Subscription
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+
+  const [appLockStatus, setAppLockStatus] = useState<LockStatus | null>(null);
+  const [appLockUnlocked, setAppLockUnlocked] = useState(false);
+  const appLockLastActivity = useRef(Date.now());
+  const appLockBackgrounded = useRef(false);
+  useEffect(() => {
+    let active = true;
+    setAppLockStatus(null);
+    setAppLockUnlocked(false);
+    if (!authUser?.uid) return;
+    lockRequest('status').then((status: LockStatus) => {
+      if (active && auth.currentUser?.uid === authUser.uid) {
+        setAppLockStatus(status);
+        setAppLockUnlocked(!status.enabled);
+      }
+    }).catch(() => { if (active) setAppLockStatus(null); });
+    return () => { active = false; };
+  }, [authUser?.uid]);
+  useEffect(() => {
+    if (!authUser || !appLockStatus?.enabled || !appLockUnlocked) return;
+    const onActivity = () => { appLockLastActivity.current = Date.now(); };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') appLockBackgrounded.current = true;
+      else if (appLockBackgrounded.current) {
+        appLockBackgrounded.current = false;
+        setAppLockUnlocked(false);
+      }
+    };
+    const checkIdle = () => {
+      if (Date.now() - appLockLastActivity.current >= appLockStatus.inactivityMinutes * 60_000) setAppLockUnlocked(false);
+    };
+    appLockLastActivity.current = Date.now();
+    for (const event of ['pointerdown','keydown','touchstart','scroll']) window.addEventListener(event, onActivity, { passive: true });
+    document.addEventListener('visibilitychange', onVisibility);
+    const interval = window.setInterval(checkIdle, 1000);
+    return () => {
+      for (const event of ['pointerdown','keydown','touchstart','scroll']) window.removeEventListener(event, onActivity);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.clearInterval(interval);
+    };
+  }, [authUser?.uid, appLockStatus?.enabled, appLockStatus?.inactivityMinutes, appLockUnlocked]);
+
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
   const [subscriptionError, setSubscriptionError] = useState<SubscriptionReadIssue | null>(null);
@@ -1313,6 +1356,14 @@ export default function App() {
     );
   }
 
+  // Keep all signed-in financial screens hidden while checking or enforcing the PIN.
+  if (authUser && !appLockStatus) {
+    return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 text-sm">{lang === 'ar' ? 'جاري التحقق من قفل التطبيق...' : 'Checking app lock...'}</div>;
+  }
+  if (authUser && appLockStatus?.enabled && !appLockUnlocked) {
+    return <LockScreen lang={lang} onUnlock={() => { appLockLastActivity.current = Date.now(); setAppLockUnlocked(true); }} />;
+  }
+
   // Advertisement creation is a public draft/review experience; no publishing occurs client-side.
   if (window.location.pathname === '/offers/new') {
     return <CreateOfferPage lang={lang} onBack={() => window.location.assign('/offers')} />;
@@ -1698,6 +1749,8 @@ export default function App() {
         {activeTab === 'settings' && (
           <SettingsView
             lang={lang}
+            appLockStatus={appLockStatus}
+            onAppLockChange={(next) => { setAppLockStatus(next); setAppLockUnlocked(true); }}
             onSetLanguage={(newLang) => setLang(newLang)}
             onZeroAllBalances={handleZeroAllBalances}
             user={authUser}

@@ -22,7 +22,7 @@ export function AppLockSettings({ lang, status, onChange }: { lang: 'ar' | 'en';
       onChange({ enabled: mode === 'disable' ? false : true, inactivityMinutes: mode === 'enable' ? timeout : status?.inactivityMinutes || 1 });
       setPin(''); setNextPin(''); setConfirm('');
       setMessage(ar ? 'تم حفظ إعدادات القفل' : 'Lock settings saved');
-    } catch { setMessage(ar ? 'تعذر الحفظ. تحقق من الرقم السري والاتصال' : 'Could not save. Check PIN and connection'); }
+    } catch (error) { const code = error instanceof Error ? error.message : 'unknown_error'; setMessage((ar ? 'تعذر حفظ القفل. رمز الخطأ: ' : 'Could not save lock. Error code: ') + code); }
     finally { setBusy(false); }
   }
   if (!status) return <p className="text-xs text-slate-500">{ar ? 'جاري قراءة حالة القفل...' : 'Loading lock settings...'}</p>;

@@ -25,6 +25,11 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Test grant controls on desktop and mobile
         run: node tests/grantUiPreview.mjs
+      - name: Save sample screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: grant-ui-sample
+          path: grant-preview-*.png
       - name: Test Firestore rules in a disposable emulator
         run: |
           printf '%s\n' '{"firestore":{"rules":"firestore.grants-draft.rules"},"emulators":{"firestore":{"port":8080},"ui":{"enabled":false},"singleProjectMode":false}}' > firebase.grants-ci.json

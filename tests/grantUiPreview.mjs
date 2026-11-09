@@ -16,6 +16,7 @@ try {
     page.on('response', response => { if (response.status() >= 400) console.log('http-error:', response.status(), response.url()); });
     await page.goto('http://127.0.0.1:4178/tests/grant-preview/index.html');
     await page.getByText('سارة محمد').waitFor();
+    await page.screenshot({path:`grant-preview-${viewport.width}.png`,fullPage:true});
     await page.locator('select').first().selectOption('pro');
     await page.getByRole('button',{name:'3 شهور'}).click();
     assert.ok(await page.locator('input[type=date]').inputValue());

@@ -304,7 +304,7 @@ export default function App() {
         setAppLockStatus(status);
         setAppLockUnlocked(!status.enabled);
       }
-    }).catch(() => { if (active) setAppLockStatus(null); });
+    }).catch(() => { if (active) { setAppLockStatus({ enabled: false, inactivityMinutes: 1 }); setAppLockUnlocked(true); } });
     return () => { active = false; };
   }, [authUser?.uid]);
   useEffect(() => {
@@ -1359,7 +1359,7 @@ export default function App() {
   // Keep all signed-in financial screens hidden while checking or enforcing the PIN.
   // Never block access indefinitely when the optional lock service is unavailable.
   // The lock feature is temporarily disabled until its gateway can be verified.
-  if (false && authUser && appLockStatus?.enabled && !appLockUnlocked) {
+  if (authUser && appLockStatus?.enabled && !appLockUnlocked) {
     return <LockScreen lang={lang} onUnlock={() => { appLockLastActivity.current = Date.now(); setAppLockUnlocked(true); }} />;
   }
 
@@ -1749,6 +1749,7 @@ export default function App() {
           <SettingsView
             lang={lang}
             appLockStatus={appLockStatus}
+            onAppLockChange={(next) => { setAppLockStatus(next); setAppLockUnlocked(true); }}
 
             onSetLanguage={(newLang) => setLang(newLang)}
             onZeroAllBalances={handleZeroAllBalances}

@@ -3,7 +3,7 @@ import { getAdminFirestore } from './firebaseAdmin.js';
 import { SubscriptionError } from './subscriptionService.js';
 
 export type ReminderKind = 'obligation' | 'receivable';
-type Reminder = { id: string; kind: ReminderKind; title: string; amount: number; currency: string; dueDate: string; note: string; done: boolean; leadDays: number; tone: number; createdAt: number; updatedAt: number };
+type Reminder = { id: string; kind: ReminderKind; title: string; amount: number; currency: string; dueDate: string; note: string; done: boolean; leadDays: number; tone: number; remindTime: string; repeat: 'daily' | 'once'; alertDisabled: boolean; snoozedUntil: string | null; createdAt: number; updatedAt: number };
 
 function fail(code: string, statusCode = 400): never { throw new SubscriptionError(statusCode, code, code); }
 function safeKind(value: unknown): ReminderKind { if (value === 'obligation' || value === 'receivable') return value; return fail('invalid_reminder_kind'); }
@@ -26,7 +26,12 @@ function normalized(payload: Record<string, unknown>) {
   const tone = payload.tone === undefined ? 1 : Number(payload.tone);
   if (!Number.isInteger(leadDays) || leadDays < 0 || leadDays > 365) fail('invalid_reminder_days');
   if (!Number.isInteger(tone) || tone < 1 || tone > 4) fail('invalid_reminder_tone');
-  return { title, amount, currency, note, dueDate: validateDate(payload.dueDate), leadDays, tone };
+  const remindTime = payload.remindTime === undefined ? '09:00' : String(payload.remindTime);
+  const repeat = payload.repeat === undefined ? 'daily' : payload.repeat;
+  if (!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(remindTime)) fail('invalid_reminder_time');
+  if (repeat !== 'daily' && repeat !== 'once') fail('invalid_reminder_repeat');
+  return { title, amount, currency, note, dueDate: validateDate(payload.dueDate), leadDays, tone, remindTime, repeat };
+
 }
 export async function reminderAction(uid: string, action: string, payload: Record<string, unknown>) {
   const ref = getAdminFirestore().collection('users').doc(uid).collection('reminders');
@@ -40,7 +45,7 @@ export async function reminderAction(uid: string, action: string, payload: Recor
     const fields = normalized(payload);
     const doc = ref.doc(randomUUID());
     const now = Date.now();
-    const item: Reminder = { id: doc.id, kind, ...fields, done: false, createdAt: now, updatedAt: now };
+    const item: Reminder = { id: doc.id, kind, ...fields, done: false, alertDisabled: false, snoozedUntil: null, createdAt: now, updatedAt: now };
     await doc.set(item);
     return { reminder: item };
   }
@@ -54,13 +59,27 @@ export async function reminderAction(uid: string, action: string, payload: Recor
     const existingKind = safeKind(snapshot.data()?.kind);
     const kind = payload.kind === undefined ? existingKind : safeKind(payload.kind);
     const done = typeof payload.done === 'boolean' ? payload.done : !!snapshot.data()?.done;
-    await doc.update({ ...fields, kind, done, updatedAt: Date.now() });
+    await doc.update({ ...fields, kind, done, alertDisabled: snapshot.data()?.alertDisabled === true, snoozedUntil: snapshot.data()?.snoozedUntil ?? null, updatedAt: Date.now() });
     return { id, updated: true };
   }
   if (action === 'reminders.toggle') {
     if (typeof payload.done !== 'boolean') fail('invalid_reminder_state');
     await doc.update({ done: payload.done, updatedAt: Date.now() });
     return { id, done: payload.done };
+  }
+  if (action === 'reminders.alert') {
+    const mode = payload.mode;
+    if (mode !== 'stop' && mode !== 'resume' && mode !== 'tomorrow') fail('invalid_alert_action');
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
+    const tomorrow = new Date(today + 'T12:00:00Z');
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    const nextDay = tomorrow.toISOString().slice(0, 10);
+    await doc.update({
+      alertDisabled: mode === 'stop' ? true : false,
+      snoozedUntil: mode === 'tomorrow' ? nextDay : null,
+      updatedAt: Date.now()
+    });
+    return { id, alertDisabled: mode === 'stop', snoozedUntil: mode === 'tomorrow' ? nextDay : null };
   }
   if (action === 'reminders.delete') {
     await doc.delete();

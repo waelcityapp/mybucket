@@ -1,3 +1,5 @@
+import { AppLockSettings } from './AppLockSettings';
+import type { LockStatus } from '../AppLock';
 import { useState } from 'react';
 import {
   Globe,
@@ -17,6 +19,8 @@ import { SubscriptionCard } from '../SubscriptionCard';
 
 interface SettingsViewProps {
   lang: Language;
+  appLockStatus?: LockStatus | null;
+  onAppLockChange?: (status: LockStatus) => void;
   onSetLanguage: (lang: Language) => void;
   onZeroAllBalances?: () => Promise<boolean>;
   user: AuthUser | null;
@@ -31,6 +35,8 @@ interface SettingsViewProps {
 
 export function SettingsView({
   lang,
+  appLockStatus,
+  onAppLockChange,
   onSetLanguage,
   onZeroAllBalances,
   user,
@@ -199,6 +205,8 @@ export function SettingsView({
           <span>{lang === 'ar' ? 'خطوات تثبيت التطبيق' : 'Install app instructions'}</span>
         </button>
       </div>
+
+      {user && onAppLockChange && <AppLockSettings lang={lang} status={appLockStatus || null} onChange={onAppLockChange} />}
 
       {/* 3. Language Preference */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">

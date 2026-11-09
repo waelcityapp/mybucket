@@ -37,6 +37,10 @@ test('draft subscription rules: owner expiry, global changes, cross-account and 
       await setDoc(doc(admin, 'appSettings/subscriptionTrials'), { proDays: 15, basicDays: 75 });
       await setDoc(doc(admin, 'users/alice/billing/access'), { registeredAt: yesterday40, paidUntil: null, schemaVersion: 1 });
       await setDoc(doc(admin, 'users/alice/accounts/cash'), { userId:'alice', balance:100 });
+      await setDoc(doc(admin, 'users/alice/accounts/egp1'), { currency:'EGP', balance:100 });
+      await setDoc(doc(admin, 'users/alice/accounts/egp2'), { currency:'EGP', balance:100 });
+      await setDoc(doc(admin, 'users/alice/accounts/usd'), { currency:'USD', balance:100 });
+      await setDoc(doc(admin, 'users/alice/accounts/card'), { currency:'EGP', linkedBankId:'egp2', balance:0 });
       await setDoc(doc(admin, 'users/alice/transactions/tx1'), { userId:'alice', amount:25 });
     });
 
@@ -47,6 +51,12 @@ test('draft subscription rules: owner expiry, global changes, cross-account and 
     await assertFails(setDoc(doc(alice, 'users/alice/billing/access'), {registeredAt: Timestamp.now()}));
     await assertFails(setDoc(doc(alice, 'appSettings/subscriptionTrials'), {basicDays:365,proDays:15}));
     await assertSucceeds(setDoc(doc(alice, 'users/alice/transactions/current'), {amount:1}));
+    const transfer = { type:'transfer', amount:10, currency:'EGP', accountId:'egp1', toAccountId:'egp2', balanceAccountId:'egp1', toBalanceAccountId:'egp2' };
+    await assertSucceeds(setDoc(doc(alice, 'users/alice/transactions/same-currency'), transfer));
+    await assertFails(setDoc(doc(alice, 'users/alice/transactions/mixed-currency'), { ...transfer, toAccountId:'usd', toBalanceAccountId:'usd' }));
+    await assertSucceeds(setDoc(doc(alice, 'users/alice/transactions/linked-card'), { ...transfer, toAccountId:'card' }));
+    await assertFails(setDoc(doc(alice, 'users/alice/transactions/forged-balance'), { ...transfer, toBalanceAccountId:'usd' }));
+    await assertFails(setDoc(doc(alice, 'users/alice/transactions/missing-account'), { ...transfer, toAccountId:'missing' }));
 
     // Admin reduces Basic from 75 to 30 for ALL accounts: expiry applies immediately.
     await env.withSecurityRulesDisabled(async ctx => {

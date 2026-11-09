@@ -14,6 +14,27 @@ service cloud.firestore {
     function accessPath(uid) {
       return /databases/$(database)/documents/users/$(uid)/billing/access;
     }
+    // Draft: validate a transfer record against the four referenced accounts.
+    // This does not by itself protect separate direct account-balance writes.
+    function accountPath(uid, id) {
+      return /databases/$(database)/documents/users/$(uid)/accounts/$(id);
+    }
+    function validTransferCurrency(uid, tx) {
+      return tx.type != 'transfer' || (
+        tx.accountId is string && tx.toAccountId is string
+        && tx.balanceAccountId is string && tx.toBalanceAccountId is string
+        && tx.currency is string
+        && tx.balanceAccountId != tx.toBalanceAccountId
+        && exists(accountPath(uid, tx.accountId))
+        && exists(accountPath(uid, tx.toAccountId))
+        && exists(accountPath(uid, tx.balanceAccountId))
+        && exists(accountPath(uid, tx.toBalanceAccountId))
+        && get(accountPath(uid, tx.accountId)).data.currency == tx.currency
+        && get(accountPath(uid, tx.toAccountId)).data.currency == tx.currency
+        && get(accountPath(uid, tx.balanceAccountId)).data.currency == tx.currency
+        && get(accountPath(uid, tx.toBalanceAccountId)).data.currency == tx.currency
+      );
+    }
     function allowedFinancialWrite(uid) {
       let settingsExist = exists(settingsPath());
       let accessExist = exists(accessPath(uid));
@@ -104,7 +125,9 @@ service cloud.firestore {
       }
       match /transactions/{transactionId} {
         allow read: if isOwner(userId);
-        allow create, update, delete: if allowedFinancialWrite(userId);
+        allow create, update: if allowedFinancialWrite(userId)
+          && (!('type' in request.resource.data) || validTransferCurrency(userId, request.resource.data));
+        allow delete: if allowedFinancialWrite(userId);
       }
       match /categories/{categoryId} {
         allow read: if isOwner(userId);

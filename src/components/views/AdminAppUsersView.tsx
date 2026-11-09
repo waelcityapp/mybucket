@@ -87,6 +87,7 @@ export function AdminAppUsersView({ lang, onOpenGrant }: { lang: Language; onOpe
   const [showUsers, setShowUsers] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const requestVersion = useRef(0);
+  const searchAfterListOpened = useRef(false);
   const [filter, setFilter] = useState<'all' | 'paid' | 'trial_pro' | 'trial_basic' | 'free' | 'disabled' | 'installed'>('all');
 
   const invalidate = () => {
@@ -122,12 +123,29 @@ export function AdminAppUsersView({ lang, onOpenGrant }: { lang: Language; onOpe
 
   useEffect(() => { void reload(); }, []); // Initial unfiltered count; later searches run only on request.
 
+  // Search the entire directory after typing pauses. Counting stays optional.
+  useEffect(() => {
+    if (!searchAfterListOpened.current) return;
+    const version = requestVersion.current;
+    const timer = window.setTimeout(async () => {
+      setLoadingMore(true); setError('');
+      try {
+        const result = await requestAdmin('admin.users.list', { search: search.trim(), filter, period, from, to }) as UserSummary;
+        if (version === requestVersion.current) { setData(result); setShowUsers(true); }
+      } catch (err) {
+        if (version === requestVersion.current) setError(ar ? 'تعذر البحث عن المستخدمين. حاول مرة أخرى.' : 'Could not search users. Please try again.');
+        console.warn('Admin user search failed:', err);
+      } finally { if (version === requestVersion.current) setLoadingMore(false); }
+    }, 600);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
   const showList = async () => {
     const version = requestVersion.current;
     setLoadingMore(true); setError('');
     try {
       const result = await requestAdmin('admin.users.list', query) as UserSummary;
-      if (version === requestVersion.current) { setData(result); setShowUsers(true); }
+      if (version === requestVersion.current) { setData(result); setShowUsers(true); searchAfterListOpened.current = true; }
     } catch (err) {
       if (version === requestVersion.current) setError(ar ? 'تعذر عرض المستخدمين. حاول مرة أخرى.' : 'Could not load users.');
       console.warn('Admin user list failed:', err);
@@ -239,7 +257,7 @@ export function AdminAppUsersView({ lang, onOpenGrant }: { lang: Language; onOpe
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex min-w-40 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
           <Search className="h-4 w-4 shrink-0 text-slate-400"/>
-          <input type="search" value={search} onChange={e => { invalidate(); setSearch(e.target.value); }} placeholder={ar ? 'بحث بالاسم أو البريد' : 'Search name or email'} className="min-w-0 w-full bg-transparent text-xs outline-none" />
+          <input type="search" value={search} onChange={e => { searchAfterListOpened.current = true; invalidate(); setLoadingMore(false); setSearch(e.target.value); }} placeholder={ar ? 'بحث بالاسم أو البريد' : 'Search name or email'} className="min-w-0 w-full bg-transparent text-xs outline-none" />
         </div>
         <select aria-label={ar ? 'تاريخ التسجيل' : 'Registration period'} value={period} onChange={e => { invalidate(); setPeriod(e.target.value as typeof period); }} className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700">
           <option value="all">{ar ? 'كل التواريخ' : 'All dates'}</option>
@@ -277,6 +295,7 @@ export function AdminAppUsersView({ lang, onOpenGrant }: { lang: Language; onOpe
       {error && <p role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700"><AlertCircle className="h-4 w-4 shrink-0"/>{error}</p>}
       {notice && <p role="status" className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800"><CheckCircle2 className="h-4 w-4 shrink-0"/>{notice}</p>}
       {loading && <p className="rounded-xl bg-white p-5 text-center text-xs text-slate-500">{ar ? 'جارٍ تحميل بيانات المستخدمين الحقيقية...' : 'Loading real user records...'}</p>}
+      {!loading && loadingMore && !showUsers && <p role="status" className="rounded-xl bg-white p-5 text-center text-xs text-slate-500">{ar ? 'جارٍ البحث في المستخدمين...' : 'Searching users...'}</p>}
       {!loading && showUsers && data && (
         <>
           <p className="text-[11px] text-slate-500">{ar ? 'المعروض:' : 'Showing:'} {filtered.length} {ar ? '· الأحدث أولًا · توقيت القاهرة' : '· newest first · Cairo time'}</p>

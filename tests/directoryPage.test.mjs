@@ -44,6 +44,14 @@ test('only administrator can query the directory', async () => {
   await assert.rejects(readDirectoryPage({email:'other@example.com'}, {}, fakeDb(fixtures())), e => e.code === 'admin_only');
 });
 
+test('one-character search reaches matching users beyond the first 200', async () => {
+  const db = fakeDb(fixtures());
+  let cursor = null, ids = [];
+  do { const page = await readDirectoryPage(owner, {search:'س',cursor}, db); ids.push(...page.users.map(u => u.uid)); cursor = page.nextCursor; } while (cursor);
+  assert.ok(ids.includes('u030'));
+  assert.equal(new Set(ids).size, ids.length);
+});
+
 test('custom date range applies both inclusive days using Cairo time', async () => {
   const db = fakeDb(fixtures());
   const page = await readDirectoryPage(owner, { period: 'custom', from: '2026-01-03', to: '2026-01-05' }, db);

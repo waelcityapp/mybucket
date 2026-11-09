@@ -437,3 +437,6 @@ A feature branch prepares owner-only Basic/Pro grants, separate from paid subscr
 
 ## Revisions #134–#135 — Grants and custom duration
 Revision #134 shipped the grant and quota feature after emulator and mock UI checks; the owner confirmed publishing its Firestore rules. Authenticated end-to-end verification remains needed. Revision #135 makes the owner's grant directly accessible and adds a custom day count, with the current Cairo calendar day counting as day one and the last day inclusive. Paid access still takes priority while active. Trial plan switching and complete paid-plan features remain separate unfinished work.
+
+## Revision #136 — Search user directory while typing
+Typing in user search automatically loads a bounded page from the synchronized directory after a short pause, including for one-character queries. Counting remains optional and filters still require an explicit count. Search depends on a complete, synchronized directory; registration-time ordering and pagination remain in place.

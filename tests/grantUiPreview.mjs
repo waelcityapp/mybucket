@@ -29,6 +29,13 @@ try {
     await page.getByLabel('Pro: تسجيلات Gemini').fill('17');
     await page.getByRole('button',{name:'حفظ حدود الاستخدام'}).click();
     await page.getByText('تم حفظ الحدود اليومية.').waitFor();
+    await page.getByRole('button',{name:'عرض المستخدمين'}).click();
+    await page.getByText('وائل عوض').waitFor();
+    await page.getByPlaceholder('بحث بالاسم أو البريد').fill('و');
+    await page.getByText('وائل عوض').waitFor();
+    assert.equal(await page.getByText('سارة محمد', { exact: true }).count(), 1); // Grant preview only; no user row.
+    await page.getByPlaceholder('بحث بالاسم أو البريد').fill('لا يوجد');
+    await page.getByText('لا يوجد مستخدمون يطابقون البحث.').waitFor();
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth);
     assert.ok(overflow<=1,`horizontal overflow at ${viewport.width}px: ${overflow}`);
     await page.close();

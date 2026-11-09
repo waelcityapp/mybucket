@@ -37,10 +37,10 @@ test('draft subscription rules: owner expiry, global changes, cross-account and 
       await setDoc(doc(admin, 'appSettings/subscriptionTrials'), { proDays: 15, basicDays: 75 });
       await setDoc(doc(admin, 'users/alice/billing/access'), { registeredAt: yesterday40, paidUntil: null, schemaVersion: 1 });
       await setDoc(doc(admin, 'users/alice/accounts/cash'), { userId:'alice', balance:100 });
-      await setDoc(doc(admin, 'users/alice/accounts/egp1'), { currency:'EGP', balance:100 });
-      await setDoc(doc(admin, 'users/alice/accounts/egp2'), { currency:'EGP', balance:100 });
-      await setDoc(doc(admin, 'users/alice/accounts/usd'), { currency:'USD', balance:100 });
-      await setDoc(doc(admin, 'users/alice/accounts/card'), { currency:'EGP', linkedBankId:'egp2', balance:0 });
+      await setDoc(doc(admin, 'users/alice/accounts/egp1'), { type:'cash', currency:'EGP', balance:100 });
+      await setDoc(doc(admin, 'users/alice/accounts/egp2'), { type:'bank', currency:'EGP', balance:100 });
+      await setDoc(doc(admin, 'users/alice/accounts/usd'), { type:'bank', currency:'USD', balance:100 });
+      await setDoc(doc(admin, 'users/alice/accounts/card'), { type:'card', currency:'EGP', linkedBankId:'egp2', balance:0 });
       await setDoc(doc(admin, 'users/alice/transactions/tx1'), { userId:'alice', amount:25 });
     });
 
@@ -56,6 +56,7 @@ test('draft subscription rules: owner expiry, global changes, cross-account and 
     await assertFails(setDoc(doc(alice, 'users/alice/transactions/mixed-currency'), { ...transfer, toAccountId:'usd', toBalanceAccountId:'usd' }));
     await assertSucceeds(setDoc(doc(alice, 'users/alice/transactions/linked-card'), { ...transfer, toAccountId:'card' }));
     await assertFails(setDoc(doc(alice, 'users/alice/transactions/forged-balance'), { ...transfer, toBalanceAccountId:'usd' }));
+    await assertFails(setDoc(doc(alice, 'users/alice/transactions/forged-link'), { ...transfer, toAccountId:'card', toBalanceAccountId:'egp1', balanceAccountId:'egp2' }));
     await assertFails(setDoc(doc(alice, 'users/alice/transactions/missing-account'), { ...transfer, toAccountId:'missing' }));
 
     // Admin reduces Basic from 75 to 30 for ALL accounts: expiry applies immediately.
@@ -96,7 +97,7 @@ test('draft subscription rules: owner expiry, global changes, cross-account and 
   }
 });
 
-test('DIAGNOSTIC: demonstrate remaining gaps, not approval for deployment', async () => {
+test('balance edits remain allowed; batch currency changes are rejected', async () => {
   const env = await initializeTestEnvironment({
     projectId: 'demo-mybucket-rules',
     firestore: { rules: readFileSync('firestore.subscription-draft.rules', 'utf8') }
@@ -112,14 +113,10 @@ test('DIAGNOSTIC: demonstrate remaining gaps, not approval for deployment', asyn
       }
     });
     const transaction = { type: 'transfer', amount: 10, currency: 'EGP', accountId: 'one', toAccountId: 'two', balanceAccountId: 'one', toBalanceAccountId: 'two' };
-    await assertSucceeds(setDoc(doc(db, 'users/probe/transactions/missing-type'), { ...transaction, type: 'income' }));
-    console.log('GAP: transfer-shaped record can be labeled income');
     await assertSucceeds(setDoc(doc(db, 'users/probe/accounts/one'), { currency: 'EGP', balance: 1 }));
-    console.log('GAP: owner can update a balance without a transfer record');
     const batch = writeBatch(db);
     batch.set(doc(db, 'users/probe/accounts/two'), { currency: 'USD', balance: 110 });
     batch.set(doc(db, 'users/probe/transactions/currency-change'), transaction);
-    await assertSucceeds(batch.commit());
-    console.log('GAP: account currency can change within the same batch');
+    await assertFails(batch.commit());
   } finally { await env.cleanup(); }
 });

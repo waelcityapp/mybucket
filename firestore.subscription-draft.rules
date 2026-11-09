@@ -19,6 +19,13 @@ service cloud.firestore {
     function accountPath(uid, id) {
       return /databases/$(database)/documents/users/$(uid)/accounts/$(id);
     }
+    function balanceMatchesMethod(uid, methodId, balanceId) {
+      let method = get(accountPath(uid, methodId)).data;
+      return ('linkedBankId' in method)
+        ? method.linkedBankId == balanceId && method.type in ['card', 'wallet']
+          && get(accountPath(uid, balanceId)).data.type == 'bank'
+        : methodId == balanceId;
+    }
     function validTransferCurrency(uid, tx) {
       return tx.type != 'transfer' || (
         tx.accountId is string && tx.toAccountId is string
@@ -33,6 +40,12 @@ service cloud.firestore {
         && get(accountPath(uid, tx.toAccountId)).data.currency == tx.currency
         && get(accountPath(uid, tx.balanceAccountId)).data.currency == tx.currency
         && get(accountPath(uid, tx.toBalanceAccountId)).data.currency == tx.currency
+        && getAfter(accountPath(uid, tx.accountId)).data.currency == tx.currency
+        && getAfter(accountPath(uid, tx.toAccountId)).data.currency == tx.currency
+        && getAfter(accountPath(uid, tx.balanceAccountId)).data.currency == tx.currency
+        && getAfter(accountPath(uid, tx.toBalanceAccountId)).data.currency == tx.currency
+        && balanceMatchesMethod(uid, tx.accountId, tx.balanceAccountId)
+        && balanceMatchesMethod(uid, tx.toAccountId, tx.toBalanceAccountId)
       );
     }
     function allowedFinancialWrite(uid) {

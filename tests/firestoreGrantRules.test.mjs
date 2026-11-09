@@ -23,11 +23,15 @@ test('grant rules protect financial writes and server-owned access', async () =>
     for (const uid of ['basic','pro']) {
       const db=env.authenticatedContext(uid).firestore();
       await assertSucceeds(updateDoc(doc(db,`users/${uid}/accounts/cash`),{balance:11}));
+      await assertSucceeds(setDoc(doc(db,`users/${uid}/transactions/expense1`),{type:'expense',amount:1,currency:'EGP'}));
+      await assertSucceeds(setDoc(doc(db,`users/${uid}/categories/category1`),{name:'test'}));
+      await assertSucceeds(setDoc(doc(db,`users/${uid}/preferences/main`),{language:'ar'}));
       const access = await assertSucceeds(getDoc(doc(db,`users/${uid}/billing/access`)));
       const decoded = grantFromAccess(access.data());
       assert.equal(stageFor({trialStartedAt:new Date(old.toMillis()).toISOString(),isPaid:false,grant:decoded},now), uid==='pro'?'pro-trial':'basic-free');
       await assertFails(updateDoc(doc(db,`users/${uid}/billing/access`),{grantUntil:Timestamp.fromMillis(now+10*86400000)}));
       await assertFails(setDoc(doc(db,`users/${uid}/aiUsage/daily_2026-11-09`),{proGeminiEntries:0}));
+      await assertFails(getDoc(doc(db,`adminGrants/${uid}`)));
     }
     for (const uid of ['trial','paid']) {
       const db=env.authenticatedContext(uid).firestore();
@@ -37,6 +41,9 @@ test('grant rules protect financial writes and server-owned access', async () =>
       const db=env.authenticatedContext(uid).firestore();
       await assertSucceeds(getDoc(doc(db,`users/${uid}/accounts/cash`)));
       await assertFails(updateDoc(doc(db,`users/${uid}/accounts/cash`),{balance:11}));
+      await assertFails(setDoc(doc(db,`users/${uid}/transactions/expense1`),{type:'expense',amount:1,currency:'EGP'}));
+      await assertFails(setDoc(doc(db,`users/${uid}/categories/category1`),{name:'test'}));
+      await assertFails(setDoc(doc(db,`users/${uid}/preferences/main`),{language:'ar'}));
     }
     await assertFails(getDoc(doc(env.authenticatedContext('other').firestore(),'users/basic/accounts/cash')));
   } finally { await env.cleanup(); }

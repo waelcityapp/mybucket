@@ -6,9 +6,10 @@ import { playReminderTone } from '../utils/reminderSounds';
 import { BellRing, Volume2 } from 'lucide-react';
 
 export type ReminderKind = 'obligation' | 'receivable';
-type Reminder = { id: string; kind: ReminderKind; title: string; amount: number; currency: string; dueDate: string; note: string; done: boolean; leadDays?: number; tone?: number; remindTime?: string; repeat?: 'daily' | 'once'; alertDisabled?: boolean; snoozedUntil?: string | null };
-type Fields = { title: string; amount: string; currency: string; dueDate: string; note: string; leadDays: number; tone: number; remindTime: string; repeat: 'daily' | 'once' };
-const blank = (): Fields => ({ title: '', amount: '', currency: 'EGP', dueDate: new Date().toLocaleDateString('en-CA'), note: '', leadDays: 7, tone: 1, remindTime: '09:00', repeat: 'daily' });
+type Frequency = 'none' | 'weekly' | 'monthly' | 'yearly' | 'installments';
+type Reminder = { id: string; kind: ReminderKind; title: string; amount: number; currency: string; dueDate: string; note: string; done: boolean; leadDays?: number; tone?: number; remindTime?: string; repeat?: 'daily' | 'once'; alertDisabled?: boolean; snoozedUntil?: string | null; frequency?: Frequency; installmentCount?: number | null; seriesId?: string; occurrenceIndex?: number };
+type Fields = { title: string; amount: string; currency: string; dueDate: string; note: string; leadDays: number; tone: number; remindTime: string; repeat: 'daily' | 'once'; frequency: Frequency; installmentCount: number };
+const blank = (): Fields => ({ title: '', amount: '', currency: 'EGP', dueDate: new Date().toLocaleDateString('en-CA'), note: '', leadDays: 7, tone: 1, remindTime: '09:00', repeat: 'daily', frequency: 'none', installmentCount: 12 });
 const currencies = ['EGP', 'USD', 'EUR', 'SAR', 'AED', 'GBP', 'KWD', 'QAR'];
 
 async function request(action: string, payload: Record<string, unknown> = {}) {
@@ -31,6 +32,7 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pendingDelete, setPendingDelete] = useState<Reminder | null>(null);
+  const [editScope, setEditScope] = useState<'once' | 'future'>('once');
   const [currentMinute, setCurrentMinute] = useState(() => new Date().toTimeString().slice(0,5));
   const sounded = useRef(new Set<string>());
   const [currentDay, setCurrentDay] = useState(() => new Date().toLocaleDateString('en-CA'));
@@ -44,14 +46,14 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
 
   const heading = (kind: ReminderKind) => kind === 'obligation' ? (ar ? 'تذكير بالالتزامات' : 'Obligation Reminders') : (ar ? 'تذكير بمستحقات لي' : 'Money Owed to Me');
   function open(kind: ReminderKind) { setSelected(kind); setEditingId(null); setFields(blank()); setShowEditor(false); setError(''); }
-  function edit(item: Reminder) { setEditingId(item.id); setFields({ title: item.title, amount: String(item.amount), currency: item.currency, dueDate: item.dueDate, note: item.note, leadDays: item.leadDays ?? 7, tone: item.tone ?? 1, remindTime: item.remindTime ?? '09:00', repeat: item.repeat ?? 'daily' }); setShowEditor(true); setError(''); }
+  function edit(item: Reminder) { setEditingId(item.id); setEditScope('once'); setFields({ title: item.title, amount: String(item.amount), currency: item.currency, dueDate: item.dueDate, note: item.note, leadDays: item.leadDays ?? 7, tone: item.tone ?? 1, remindTime: item.remindTime ?? '09:00', repeat: item.repeat ?? 'daily', frequency: item.frequency ?? 'none', installmentCount: item.installmentCount ?? 12 }); setShowEditor(true); setError(''); }
   async function save() {
     if (!selected || !fields.title.trim() || !fields.dueDate || fields.amount === '' || !Number.isFinite(Number(fields.amount)) || Number(fields.amount) < 0) {
       setError(ar ? 'أدخل اسم البند والمبلغ والتاريخ بشكل صحيح' : 'Enter a valid item, amount and date'); return;
     }
     setBusy(true); setError('');
     try {
-      await request(editingId ? 'update' : 'create', { ...(editingId ? { id: editingId } : {}), kind: selected, title: fields.title, amount: Number(fields.amount), currency: fields.currency, dueDate: fields.dueDate, note: fields.note, leadDays: fields.leadDays, tone: fields.tone, remindTime: fields.remindTime, repeat: fields.repeat });
+      await request(editingId ? 'update' : 'create', { ...(editingId ? { id: editingId } : {}), kind: selected, title: fields.title, amount: Number(fields.amount), currency: fields.currency, dueDate: fields.dueDate, note: fields.note, leadDays: fields.leadDays, tone: fields.tone, remindTime: fields.remindTime, repeat: fields.repeat, frequency: fields.frequency, installmentCount: fields.frequency === 'installments' ? fields.installmentCount : null, scope: editScope });
       await refresh(); setShowEditor(false); setEditingId(null); setFields(blank());
     } catch (e) { setError((ar ? 'تعذر الحفظ: ' : 'Save failed: ') + (e instanceof Error ? e.message : 'error')); }
     finally { setBusy(false); }
@@ -135,11 +137,27 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
             <label className="block text-xs font-semibold">{ar ? 'المبلغ' : 'Amount'}<input required inputMode="decimal" type="number" min="0" step="0.01" value={fields.amount} onChange={e => setFields(s => ({ ...s, amount: e.target.value }))} className="w-full mt-1 p-2.5 rounded-lg border bg-white" /></label>
             <label className="block text-xs font-semibold">{ar ? 'العملة' : 'Currency'}<select value={fields.currency} onChange={e => setFields(s => ({ ...s, currency: e.target.value }))} className="w-full mt-1 p-2.5 rounded-lg border bg-white">{currencies.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
           </div>
+          {(!editingId || fields.frequency === 'none') && <label className="block text-xs font-semibold">{ar ? 'نوع التكرار' : 'Recurrence'}
+            <select value={fields.frequency} onChange={e => setFields(s => ({ ...s, frequency: e.target.value as Frequency }))} className="w-full mt-1 p-2.5 rounded-lg border bg-white">
+              <option value="none">{ar ? 'مرة واحدة' : 'One time'}</option>
+              <option value="weekly">{ar ? 'أسبوعيًا' : 'Weekly'}</option>
+              <option value="monthly">{ar ? 'شهريًا' : 'Monthly'}</option>
+              <option value="yearly">{ar ? 'سنويًا' : 'Yearly'}</option>
+              <option value="installments">{ar ? 'أقساط شهرية محددة العدد' : 'Fixed monthly installments'}</option>
+            </select>
+          </label>}
+          {fields.frequency === 'installments' && !editingId && <label className="block text-xs font-semibold">{ar ? 'عدد الأقساط' : 'Number of installments'}<input type="number" min={1} max={240} step={1} required value={fields.installmentCount} onChange={e => setFields(s => ({ ...s, installmentCount: Number(e.target.value) }))} className="w-full mt-1 p-2.5 rounded-lg border bg-white" /></label>}
+          {editingId && fields.frequency !== 'none' && <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
+            <p className="text-xs font-semibold">{ar ? 'نطاق تعديل البند' : 'Apply changes to'}</p>
+            <label className="flex items-center gap-2 text-xs"><input type="radio" name="reminder-edit-scope" checked={editScope === 'once'} onChange={() => setEditScope('once')}/>{ar ? 'الاستحقاق الحالي فقط' : 'This occurrence only'}</label>
+            <label className="flex items-center gap-2 text-xs"><input type="radio" name="reminder-edit-scope" checked={editScope === 'future'} onChange={() => setEditScope('future')}/>{ar ? 'هذا الاستحقاق وكل المواعيد القادمة' : 'This and future occurrences'}</label>
+            <p className="text-[11px] text-slate-500">{ar ? 'الاستحقاقات السابقة لن تتغير.' : 'Previous installments will not change.'}</p>
+          </div>}
           <label className="block text-xs font-semibold">{ar ? 'تاريخ الاستحقاق' : 'Due date'}<input required type="date" value={fields.dueDate} onChange={e => setFields(s => ({ ...s, dueDate: e.target.value }))} className="w-full mt-1 p-2.5 rounded-lg border bg-white" /></label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="block text-xs font-semibold">{ar ? 'ذكرني قبل الاستحقاق' : 'Remind me before due date'}
               <select value={fields.leadDays} onChange={e => setFields(s => ({ ...s, leadDays: Number(e.target.value) }))} className="w-full mt-1 p-2.5 rounded-lg border bg-white">
-                {[0,1,2,3,5,7,10,14,21,30,60,90].map(days => <option key={days} value={days}>{days === 0 ? (ar ? 'يوم الاستحقاق' : 'On the due date') : `${days} ${ar ? 'يوم' : 'days'}`}</option>)}
+                {[0,1,2,3,4,5,7,10,14,21,30,60,90].map(days => <option key={days} value={days}>{days === 0 ? (ar ? 'يوم الاستحقاق' : 'On the due date') : `${days} ${ar ? 'يوم' : 'days'}`}</option>)}
               </select>
             </label>
             <label className="block text-xs font-semibold">{ar ? 'نغمة التنبيه' : 'Alert sound'}
@@ -161,7 +179,7 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
         {error && <p role="alert" className="text-xs text-red-600">{error}</p>}
         {loading ? <p className="text-sm text-slate-500">{ar ? 'جاري تحميل البنود...' : 'Loading items...'}</p> : items.filter(item => item.kind === selected).length === 0 ? <p className="text-sm text-slate-500">{ar ? 'لا توجد بنود مسجلة حتى الآن.' : 'No items yet.'}</p> : <div className="space-y-2">{items.filter(item => item.kind === selected).map(item => <div key={item.id} className="border border-slate-200 rounded-xl p-3 flex items-start gap-3">
           <button type="button" aria-label={ar ? 'تغيير الحالة' : 'Toggle complete'} disabled={busy} onClick={() => void toggle(item)} className={item.done ? 'text-emerald-600' : 'text-slate-400'}><CheckCircle2 className="w-5 h-5"/></button>
-          <div className="flex-1 min-w-0"><p className={`font-semibold text-sm break-words ${item.done ? 'line-through text-slate-400' : 'text-slate-900'}`}>{item.title}</p><p className="text-xs text-slate-600">{item.amount.toLocaleString(ar ? 'ar-EG' : 'en-US')} {item.currency} · {item.dueDate}{typeof item.leadDays === 'number' ? <> · {ar ? 'التذكير قبل' : 'Remind'} {item.leadDays} {ar ? 'يوم' : 'days ahead'} · {item.remindTime ?? '09:00'} · {item.repeat === 'once' ? (ar ? 'مرة واحدة' : 'once') : (ar ? 'يوميًا' : 'daily')}</> : null}</p>{item.note && <p className="text-xs text-slate-400 break-words">{item.note}</p>}{!item.done && item.dueDate < today && <p className="text-xs font-bold text-red-600">{ar ? 'متأخر عن موعده' : 'Overdue'}</p>}</div>
+          <div className="flex-1 min-w-0"><p className={`font-semibold text-sm break-words ${item.done ? 'line-through text-slate-400' : 'text-slate-900'}`}>{item.title}</p><p className="text-xs text-slate-600">{item.amount.toLocaleString(ar ? 'ar-EG' : 'en-US')} {item.currency} · {item.dueDate}{item.frequency && item.frequency !== 'none' ? <> · {item.frequency === 'installments' ? (ar ? `قسط ${(item.occurrenceIndex ?? 0) + 1} من ${item.installmentCount ?? '?'}` : `Installment ${(item.occurrenceIndex ?? 0) + 1}/${item.installmentCount ?? '?'}`) : item.frequency === 'weekly' ? (ar ? 'أسبوعي' : 'Weekly') : item.frequency === 'yearly' ? (ar ? 'سنوي' : 'Yearly') : (ar ? 'شهري' : 'Monthly')}</> : null}{typeof item.leadDays === 'number' ? <> · {ar ? 'التذكير قبل' : 'Remind'} {item.leadDays} {ar ? 'يوم' : 'days ahead'} · {item.remindTime ?? '09:00'} · {item.repeat === 'once' ? (ar ? 'مرة واحدة' : 'once') : (ar ? 'يوميًا' : 'daily')}</> : null}</p>{item.note && <p className="text-xs text-slate-400 break-words">{item.note}</p>}{!item.done && item.dueDate < today && <p className="text-xs font-bold text-red-600">{ar ? 'متأخر عن موعده' : 'Overdue'}</p>}</div>
           {item.alertDisabled && !item.done && <button type="button" disabled={busy} onClick={() => void alertAction(item, 'resume')} className="text-xs text-emerald-700 underline">{ar ? 'إعادة التنبيه' : 'Resume'}</button>}
           <button type="button" aria-label={ar ? 'تعديل' : 'Edit'} disabled={busy} onClick={() => edit(item)} className="text-slate-500"><Pencil className="w-4 h-4"/></button>
           <button type="button" aria-label={ar ? 'حذف' : 'Delete'} disabled={busy} onClick={() => setPendingDelete(item)} className="text-red-500"><Trash2 className="w-4 h-4"/></button>

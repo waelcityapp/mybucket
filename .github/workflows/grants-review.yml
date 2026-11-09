@@ -4,6 +4,7 @@ on:
     branches:
       - free-grants-review-20261109
       - grant-custom-days-review
+  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

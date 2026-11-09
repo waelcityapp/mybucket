@@ -4,7 +4,7 @@ import { SubscriptionError } from './subscriptionService.js';
 import { occurrenceDate, occurrenceId, parseOccurrenceId, isoDate, type Frequency, type OccurrenceChange, type OccurrenceOverride } from './recurrence.js';
 
 type Kind = 'obligation' | 'receivable';
-type Status = { done?: boolean; alertDisabled?: boolean; snoozedUntil?: string | null };
+type Status = { done?: boolean; alertDisabled?: boolean; snoozedUntil?: string | null; cancelled?: boolean };
 type Reminder = {
   id: string; kind: Kind; title: string; amount: number; currency: string; dueDate: string; note: string;
   done: boolean; leadDays: number; tone: number; remindTime: string; repeat: 'daily' | 'once';
@@ -78,6 +78,7 @@ function expand(master: Reminder, today: string) {
     const item = effective(master,index);
     if (item.dueDate > horizon) break;
     const state = master.states?.[String(index)] || {};
+    if (state.cancelled) continue;
     const completed = !!state.done;
     const past = item.dueDate < today;
     const showHistory = past && item.dueDate >= shiftBack(today,90);

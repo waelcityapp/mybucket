@@ -29,8 +29,8 @@ function subscriptionLabel(record: SubscriptionInfo | undefined, durations: Tria
   if (!record && !registrationDate) return { tier: 'unknown', plan: 'Registration date unavailable' };
   const phase = stageFor({ trialStartedAt: record?.trialStartedAt || registrationDate || '', isPaid: record?.isPaid === true, paidExpiresAt: record?.paidExpiresAt }, Date.now(), durations);
   if (phase === 'paid') return { tier: 'paid', plan: record?.planName || record?.planId || record?.plan || 'Pro' };
-  if (phase === 'pro-trial') return { tier: 'trial', plan: 'Pro trial (first ' + durations.proDays + ' days)' };
-  if (phase === 'basic-free') return { tier: 'trial', plan: 'Basic introductory (until day ' + durations.basicDays + ')' };
+  if (phase === 'pro-trial') return { tier: 'trial', trialPlan: 'pro' as const, plan: 'Pro trial (first ' + durations.proDays + ' days)' };
+  if (phase === 'basic-free') return { tier: 'trial', trialPlan: 'basic' as const, plan: 'Basic introductory (until day ' + durations.basicDays + ')' };
   return { tier: 'free', plan: 'Introductory period ended' };
 }
 
@@ -83,6 +83,51 @@ async function enrichDirectoryUsers(visible: DirectoryUser[]) {
   return rows;
 }
 
+/** Counts in bounded chunks; no presence/device or financial-transaction reads. */
+export async function countFilteredUsers(actor: AdminActor, payload: Record<string, unknown> = {}, deps?: { db: ReturnType<typeof getAdminFirestore>; readPage: typeof readDirectoryPage; readSettings: typeof readTrialSettings }) {
+  mustBeOwner(actor);
+  const parsed = parseDirectoryFilter(payload);
+  const filter = typeof payload.filter === 'string' ? payload.filter : 'all';
+  if (!['all', 'paid', 'trial', 'trial_pro', 'trial_basic', 'free', 'disabled', 'installed'].includes(filter)) throw new SubscriptionError(400, 'invalid_filter', 'Invalid filter.');
+  const db = deps?.db || getAdminFirestore();
+  if (!parsed.cursor && !parsed.search && filter === 'all') {
+    let query: FirebaseFirestore.Query = db.collection('adminUserDirectory');
+    if (parsed.since) query = query.where('createdAtSort', '>=', parsed.since);
+    if (parsed.until) query = query.where('createdAtSort', '<', parsed.until);
+    const [matching, total, indexed, metrics] = await Promise.all([
+      query.count().get(), db.collection('adminUserDirectory').count().get(),
+      db.collection('adminUserDirectory').orderBy('createdAtSort').count().get(),
+      db.doc('systemStats/pwaInstall').get(),
+    ]);
+    if (total.data().count !== indexed.data().count) throw new SubscriptionError(409, 'directory_needs_sync', 'Prepare the directory first.');
+    return { count: matching.data().count, nextCursor: null, registeredCount: total.data().count, installsWithSignedInAccounts: Math.max(0, Number(metrics.data()?.count || 0)) };
+  }
+  let cursor = parsed.cursor, nextCursor: string | null = null, count = 0;
+  const durations = ['paid', 'trial', 'trial_pro', 'trial_basic', 'free'].includes(filter) ? await (deps?.readSettings || readTrialSettings)() : null;
+  for (let step = 0; step < 4; step++) {
+    const page = await (deps?.readPage || readDirectoryPage)(actor, { search: parsed.search, period: parsed.period, from: parsed.from, to: parsed.to, cursor });
+    const records = page.users;
+    const snapshots = records.length && (durations || filter === 'installed')
+      ? await db.getAll(...records.map((u: Record<string, unknown>) => db.doc(`users/${u.uid}/${filter === 'installed' ? 'telemetry/pwaInstall' : 'billing/subscription'}`)))
+      : [];
+    records.forEach((user: Record<string, unknown>, index: number) => {
+      if (filter === 'all' || (filter === 'disabled' && user.disabled === true) || (filter === 'installed' && snapshots[index]?.exists)) count++;
+      else if (durations) {
+        const label = subscriptionLabel(snapshots[index]?.exists ? snapshots[index].data() as SubscriptionInfo : undefined, durations, typeof user.createdAt === 'string' ? user.createdAt : null);
+        if (filter === 'trial_pro' ? label.tier === 'trial' && label.trialPlan === 'pro' : filter === 'trial_basic' ? label.tier === 'trial' && label.trialPlan === 'basic' : label.tier === filter) count++;
+      }
+    });
+    nextCursor = page.nextCursor;
+    if (!nextCursor) break;
+    cursor = nextCursor;
+  }
+  const [total, indexed, metrics] = !parsed.cursor ? await Promise.all([
+    db.collection('adminUserDirectory').count().get(), db.collection('adminUserDirectory').orderBy('createdAtSort').count().get(), db.doc('systemStats/pwaInstall').get(),
+  ]) : [null, null, null];
+  if (total && indexed && total.data().count !== indexed.data().count) throw new SubscriptionError(409, 'directory_needs_sync', 'Prepare the directory first.');
+  return { count, nextCursor, registeredCount: total?.data().count ?? null, installsWithSignedInAccounts: metrics ? Math.max(0, Number(metrics.data()?.count || 0)) : null };
+}
+
 /** Directory candidates are paged; financial documents are fetched only for candidates. */
 export async function listAppUsers(actor: AdminActor, payload: Record<string, unknown> = {}) {
   mustBeOwner(actor);
@@ -99,9 +144,9 @@ export async function listAppUsers(actor: AdminActor, payload: Record<string, un
     }
   }
   const filter = typeof payload.filter === 'string' ? payload.filter : 'all';
-  if (!['all', 'paid', 'trial', 'free', 'disabled', 'installed'].includes(filter)) throw new SubscriptionError(400, 'invalid_filter', 'Invalid filter.');
+  if (!['all', 'paid', 'trial', 'trial_pro', 'trial_basic', 'free', 'disabled', 'installed'].includes(filter)) throw new SubscriptionError(400, 'invalid_filter', 'Invalid filter.');
   const { selected, nextCursor } = await collectDirectoryRows(async cursor => {
-    const page = await readDirectoryPage(actor, { search: parsed.search, period: parsed.period, cursor });
+    const page = await readDirectoryPage(actor, { search: parsed.search, period: parsed.period, from: parsed.from, to: parsed.to, cursor });
     const candidates = page.users.map((user: Record<string, unknown>) => ({
       uid: String(user.uid), name: String(user.name || ''), email: String(user.email || ''),
       createdAt: typeof user.createdAt === 'string' ? user.createdAt : null,

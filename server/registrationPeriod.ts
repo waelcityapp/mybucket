@@ -30,3 +30,21 @@ export function registrationPeriodStart(period: RegistrationPeriod, now = Date.n
   if (period === 'week') date.setUTCDate(date.getUTCDate() - (date.getUTCDay() + 1) % 7);
   return new Date(cairoMidnight(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate())).toISOString();
 }
+
+/** Return an inclusive Cairo date range as [start, exclusive end). */
+export function customRegistrationRange(from: string, to: string): { start: string; endExclusive: string } {
+  const parseDate = (text: string) => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+    if (!match) throw new Error('Invalid date');
+    const year = Number(match[1]), month = Number(match[2]), day = Number(match[3]);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) throw new Error('Invalid date');
+    return date;
+  };
+  const startDate = parseDate(from), endDate = parseDate(to);
+  if (startDate > endDate) throw new Error('Start date must not be after end date');
+  const start = cairoMidnight(startDate.getUTCFullYear(), startDate.getUTCMonth() + 1, startDate.getUTCDate());
+  endDate.setUTCDate(endDate.getUTCDate() + 1);
+  const end = cairoMidnight(endDate.getUTCFullYear(), endDate.getUTCMonth() + 1, endDate.getUTCDate());
+  return { start: new Date(start).toISOString(), endExclusive: new Date(end).toISOString() };
+}

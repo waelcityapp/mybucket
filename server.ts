@@ -71,6 +71,10 @@ async function startServer() {
           const { listAppUsers } = await import('./server/adminUsers');
           return res.json({ ok: true, data: await listAppUsers(user, payload) });
         }
+        case 'admin.users.countFiltered': {
+          const { countFilteredUsers } = await import('./server/adminUsers');
+          return res.json({ ok: true, data: await countFilteredUsers(user, payload) });
+        }
         case 'admin.users.setDisabled': {
           const { changeAppUserAccess } = await import('./server/adminUsers');
           return res.json({ ok: true, data: await changeAppUserAccess(user, payload) });

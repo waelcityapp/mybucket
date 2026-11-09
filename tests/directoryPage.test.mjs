@@ -13,7 +13,7 @@ function fakeDb(users) {
     startAfter(doc) { this.after = doc.id; return this; }
     limit(size) { this.size = size; return this; }
     async get() {
-      let values = users.filter(u => this.conditions.every(c => c.op === 'array-contains' ? u[c.field].includes(c.value) : u[c.field] >= c.value));
+      let values = users.filter(u => this.conditions.every(c => c.op === 'array-contains' ? u[c.field].includes(c.value) : c.op === '<' ? u[c.field] < c.value : u[c.field] >= c.value));
       values.sort((a,b) => b.createdAtSort.localeCompare(a.createdAtSort) || b.uid.localeCompare(a.uid));
       if (this.after) values = values.slice(values.findIndex(u => u.uid === this.after) + 1);
       return { docs: values.slice(0,this.size).map(u => ({ id: u.uid, data: () => u })) };
@@ -42,4 +42,10 @@ test('search finds a matching account beyond first 200 and pages preserve newest
 
 test('only administrator can query the directory', async () => {
   await assert.rejects(readDirectoryPage({email:'other@example.com'}, {}, fakeDb(fixtures())), e => e.code === 'admin_only');
+});
+
+test('custom date range applies both inclusive days using Cairo time', async () => {
+  const db = fakeDb(fixtures());
+  const page = await readDirectoryPage(owner, { period: 'custom', from: '2026-01-03', to: '2026-01-05' }, db);
+  assert.deepEqual(page.users.map(u => u.uid), ['u004','u003','u002']);
 });

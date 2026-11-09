@@ -79,37 +79,65 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
   const [deleteUid, setDeleteUid] = useState<string | null>(null);
   const [typedEmail, setTypedEmail] = useState('');
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [period, setPeriod] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [period, setPeriod] = useState<'all' | 'today' | 'week' | 'month' | 'custom'>('all');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [matchingCount, setMatchingCount] = useState<number | null>(null);
+  const [showUsers, setShowUsers] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const requestVersion = useRef(0);
-  const [filter, setFilter] = useState<'all' | 'paid' | 'trial' | 'free' | 'disabled' | 'installed'>('all');
+  const [filter, setFilter] = useState<'all' | 'paid' | 'trial_pro' | 'trial_basic' | 'free' | 'disabled' | 'installed'>('all');
 
+  const invalidate = () => {
+    requestVersion.current++;
+    setMatchingCount(null); setShowUsers(false); setLoading(false); setError('');
+  };
+  const query = { search: search.trim(), filter, period, from, to };
   const reload = useCallback(async () => {
     const version = ++requestVersion.current;
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setMatchingCount(null); setShowUsers(false);
+    let cursor: string | null = null, count = 0;
+    let summary: { registeredCount: number; installsWithSignedInAccounts: number } | null = null;
     try {
-      const result = await requestAdmin('admin.users.list', { search: debouncedSearch, filter, period }) as UserSummary;
-      if (version === requestVersion.current) setData(result);
+      do {
+        const page = await requestAdmin('admin.users.countFiltered', { search: search.trim(), filter, period, from, to, cursor }) as { count: number; nextCursor: string | null; registeredCount: number | null; installsWithSignedInAccounts: number | null };
+        if (version !== requestVersion.current) return;
+        if (page.registeredCount !== null) summary = { registeredCount: page.registeredCount, installsWithSignedInAccounts: page.installsWithSignedInAccounts || 0 };
+        count += page.count; cursor = page.nextCursor;
+      } while (cursor);
+      if (version === requestVersion.current) {
+        setMatchingCount(count);
+        if (summary) setData({ ...summary, registeredCountComplete: false, displayedCount: 0, note: '', users: [], nextCursor: null });
+      }
     } catch (err) {
       if (version === requestVersion.current) setError(err instanceof Error && err.message === 'directory_needs_sync'
-        ? (ar ? 'اضغط «تجهيز دليل المستخدمين» لتحديث الحسابات قبل عرض القائمة.' : 'Prepare the user directory before loading the list.')
-        : (ar ? 'تعذر قراءة المستخدمين من الخادم. تأكد من إعداد Firebase Admin وصلاحيات الإدارة.' : 'Could not load users from the server. Check Firebase Admin setup and admin permissions.'));
+        ? (ar ? 'اضغط «تجهيز دليل المستخدمين» لتحديث الحسابات.' : 'Prepare the user directory first.')
+        : err instanceof Error && err.message === 'invalid_date_range'
+          ? (ar ? 'تأكد من صحة تاريخ البداية والنهاية وترتيبهما.' : 'Check the start and end dates.')
+          : (ar ? 'تعذر حساب العدد. حاول مرة أخرى.' : 'Could not calculate the count.'));
+      console.warn('Admin count failed:', err);
+    } finally { if (version === requestVersion.current) setLoading(false); }
+  }, [ar, search, filter, period, from, to]);
+
+  useEffect(() => { void reload(); }, []); // Initial unfiltered count; later searches run only on request.
+
+  const showList = async () => {
+    const version = requestVersion.current;
+    setLoadingMore(true); setError('');
+    try {
+      const result = await requestAdmin('admin.users.list', query) as UserSummary;
+      if (version === requestVersion.current) { setData(result); setShowUsers(true); }
+    } catch (err) {
+      if (version === requestVersion.current) setError(ar ? 'تعذر عرض المستخدمين. حاول مرة أخرى.' : 'Could not load users.');
       console.warn('Admin user list failed:', err);
-    } finally {
-      if (version === requestVersion.current) setLoading(false);
-    }
-  }, [ar, debouncedSearch, filter, period]);
-
-  useEffect(() => { const timer = window.setTimeout(() => setDebouncedSearch(search), 350); return () => window.clearTimeout(timer); }, [search]);
-  useEffect(() => { void reload(); }, [reload]);
-
+    } finally { setLoadingMore(false); }
+  };
   const loadMore = async () => {
     if (!data?.nextCursor || loadingMore) return;
     const version = requestVersion.current;
     setLoadingMore(true); setError('');
     try {
-      const page = await requestAdmin('admin.users.list', { search: debouncedSearch, filter, period, cursor: data.nextCursor }) as UserSummary;
+      const page = await requestAdmin('admin.users.list', { ...query, cursor: data.nextCursor }) as UserSummary;
       if (version === requestVersion.current) setData(previous => previous ? { ...page, users: [...previous.users, ...page.users] } : page);
     } catch (err) {
       if (version === requestVersion.current) setError(ar ? 'تعذر تحميل المزيد. اضغط تحديث وحاول مجددًا.' : 'Could not load more. Refresh and try again.');
@@ -207,28 +235,45 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex min-w-40 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
           <Search className="h-4 w-4 shrink-0 text-slate-400"/>
-          <input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder={ar ? 'بحث بالاسم أو البريد' : 'Search name or email'} className="min-w-0 w-full bg-transparent text-xs outline-none" />
+          <input type="search" value={search} onChange={e => { invalidate(); setSearch(e.target.value); }} placeholder={ar ? 'بحث بالاسم أو البريد' : 'Search name or email'} className="min-w-0 w-full bg-transparent text-xs outline-none" />
         </div>
-        <select aria-label={ar ? 'تاريخ التسجيل' : 'Registration period'} value={period} onChange={e => setPeriod(e.target.value as typeof period)} className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700">
+        <select aria-label={ar ? 'تاريخ التسجيل' : 'Registration period'} value={period} onChange={e => { invalidate(); setPeriod(e.target.value as typeof period); }} className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700">
           <option value="all">{ar ? 'كل التواريخ' : 'All dates'}</option>
           <option value="today">{ar ? 'اليوم' : 'Today'}</option>
           <option value="week">{ar ? 'هذا الأسبوع' : 'This week'}</option>
           <option value="month">{ar ? 'هذا الشهر' : 'This month'}</option>
+          <option value="custom">{ar ? 'فترة مخصصة' : 'Custom range'}</option>
         </select>
-        <select value={filter} onChange={e => setFilter(e.target.value as typeof filter)} className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700">
+        <select value={filter} onChange={e => { invalidate(); setFilter(e.target.value as typeof filter); }} className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700">
           <option value="all">{ar ? 'الكل' : 'All'}</option>
-          <option value="paid">{ar ? 'مدفوع' : 'Paid'}</option>
-          <option value="trial">{ar ? 'تجربة برو' : 'Pro trial'}</option>
-          <option value="free">{ar ? 'مجاني' : 'Free'}</option>
+          <option value="paid">{ar ? 'مسجّل كمدفوع' : 'Recorded as paid'}</option>
+          <option value="trial_pro">{ar ? 'فترة Pro التجريبية (حسب المدة)' : 'Pro trial period (by duration)'}</option>
+          <option value="trial_basic">{ar ? 'فترة Basic التجريبية (حسب المدة)' : 'Basic trial period (by duration)'}</option>
+          <option value="free">{ar ? 'انتهت التجربة' : 'Trial ended'}</option>
           <option value="disabled">{ar ? 'موقوف' : 'Disabled'}</option>
           <option value="installed">{ar ? 'نسخة مثبتة' : 'Installed'}</option>
         </select>
       </div>
 
+      {period === 'custom' && <div className="flex flex-wrap gap-2 text-xs font-bold text-slate-700">
+        <label>{ar ? 'من' : 'From'} <input aria-label={ar ? 'من تاريخ' : 'From date'} type="date" value={from} onChange={e => { invalidate(); setFrom(e.target.value); }} className="rounded-lg border border-slate-200 bg-white p-2" /></label>
+        <label>{ar ? 'إلى' : 'To'} <input aria-label={ar ? 'إلى تاريخ' : 'To date'} type="date" value={to} onChange={e => { invalidate(); setTo(e.target.value); }} className="rounded-lg border border-slate-200 bg-white p-2" /></label>
+      </div>}
+      <div className="rounded-xl border border-emerald-100 bg-white p-3 text-xs text-slate-700">
+        <p>{ar ? 'الفترة حسب تاريخ تسجيل الحساب · بتوقيت القاهرة' : 'Period uses registration date · Cairo time'}</p>
+        <p className="mt-2 text-sm font-bold">{ar ? 'عدد الحسابات المطابقة:' : 'Matching accounts:'} {loading ? (ar ? 'جارٍ الحساب...' : 'Calculating...') : matchingCount === null ? '—' : matchingCount.toLocaleString('en-US')}</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button type="button" disabled={loading || (period === 'custom' && (!from || !to))} onClick={() => void reload()} className="rounded-lg bg-emerald-700 px-3 py-2 font-bold text-white disabled:opacity-50">{ar ? 'احسب العدد' : 'Calculate count'}</button>
+          <button type="button" disabled={loading || loadingMore || matchingCount === null || matchingCount === 0} onClick={() => void showList()} className="rounded-lg border border-emerald-200 bg-white px-3 py-2 font-bold text-emerald-800 disabled:opacity-50">{ar ? 'عرض المستخدمين' : 'Show users'}</button>
+          <button type="button" onClick={() => { invalidate(); setSearch(''); setFilter('all'); setPeriod('all'); setFrom(''); setTo(''); }} className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-bold">{ar ? 'مسح الفلاتر' : 'Clear filters'}</button>
+        </div>
+        <p className="mt-2 text-[11px] text-slate-500">{ar ? 'فلاتر التجربة تصنّف الحساب حسب مدة التسجيل، ولا تثبت الخطة التي اختارها المستخدم. فلاتر الاشتراك قد تقرأ سجل اشتراك لكل حساب مطابق. «مسجّل كمدفوع» حالة اشتراك وليست إثبات دفع. المنح وتواريخ الدفع غير متاحة حتى تجهيز سجلاتها.' : 'Trial filters classify the account by registration duration, not the plan chosen by the user. Subscription filters may read one record per account. Recorded as paid is not proof of payment. Grants and payment dates are not available yet.'}</p>
+      </div>
+
       {error && <p role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700"><AlertCircle className="h-4 w-4 shrink-0"/>{error}</p>}
       {notice && <p role="status" className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800"><CheckCircle2 className="h-4 w-4 shrink-0"/>{notice}</p>}
       {loading && <p className="rounded-xl bg-white p-5 text-center text-xs text-slate-500">{ar ? 'جارٍ تحميل بيانات المستخدمين الحقيقية...' : 'Loading real user records...'}</p>}
-      {!loading && data && (
+      {!loading && showUsers && data && (
         <>
           <p className="text-[11px] text-slate-500">{ar ? 'المعروض:' : 'Showing:'} {filtered.length} {ar ? '· الأحدث أولًا · توقيت القاهرة' : '· newest first · Cairo time'}</p>
           {filtered.length === 0 && !data.nextCursor && <p className="rounded-xl border border-slate-200 bg-white p-5 text-center text-xs text-slate-500">{ar ? 'لا يوجد مستخدمون يطابقون البحث.' : 'No users match your search.'}</p>}

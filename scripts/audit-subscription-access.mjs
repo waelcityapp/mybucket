@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { initializeApp, deleteApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { buildTrialAccessPlan } from './trial-access-plan.mjs';
 
 const projectId = 'mybucket-8b6f0';
 let cachedToken = '';
@@ -48,6 +49,7 @@ const totals = {
   accessPresent: 0, accessMissing: 0, accessRegistrationMismatch: 0,
   accessPaidUntilMismatch: 0,
 };
+const planInputs = [];
 
 try {
   const setting = await readDocument('appSettings/subscriptionTrials');
@@ -65,6 +67,7 @@ try {
         if (validRegistration) totals.creationDateValid++; else totals.creationDateInvalid++;
         const billing = docs[2 * i];
         const access = docs[2 * i + 1];
+        planInputs.push({ uid: user.uid, creationTime: user.metadata.creationTime, billingExists: Boolean(billing), accessExists: Boolean(access) });
         if (billing) {
           totals.billingPresent++;
           const trial = field(billing, 'trialStartedAt');
@@ -91,7 +94,9 @@ try {
     }
     pageToken = page.pageToken;
   } while (pageToken);
-  console.log(JSON.stringify({ project: projectId, database: '(default)', settings, totals }, null, 2));
+  const plan = buildTrialAccessPlan(planInputs);
+  // Only aggregate counts leave this process; do not print the proposed records.
+  console.log(JSON.stringify({ project: projectId, database: '(default)', settings, totals, trialAccessPreview: plan.summary }, null, 2));
 } catch (error) {
   // Do not print credential-bearing command output or per-user data.
   console.error('Read-only audit failed. No data was modified. Error code:', error?.code || 'unavailable');

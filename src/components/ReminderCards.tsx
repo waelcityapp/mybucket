@@ -30,7 +30,6 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState<Reminder[]>([]);
   const sounded = useRef(new Set<string>());
   const [currentDay, setCurrentDay] = useState(() => new Date().toLocaleDateString('en-CA'));
   const refresh = useCallback(async () => {
@@ -70,7 +69,7 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
   }
   const today = currentDay;
   const dateLead = (item: Reminder) => { const date = new Date(item.dueDate + 'T12:00:00'); date.setDate(date.getDate() - (item.leadDays ?? 7)); return date.toLocaleDateString('en-CA'); };
-  const dueNow = items.filter(item => !item.done && dateLead(item) <= today);
+  const dueNow = items.filter(item => !item.done && typeof item.leadDays === 'number' && dateLead(item) <= today);
   useEffect(() => {
     const updateDay = () => setCurrentDay(new Date().toLocaleDateString('en-CA'));
     const timer = window.setInterval(updateDay, 60_000);
@@ -81,7 +80,6 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
     const alertedToday = dueNow.filter(item => !sounded.current.has(item.id + ':' + today));
     if (!alertedToday.length) return;
     alertedToday.forEach(item => sounded.current.add(item.id + ':' + today));
-    setNotice(dueNow);
     // Browser audio may be blocked until a user gesture. Keep the visible notice regardless.
     void playReminderTone(alertedToday[0].tone ?? 1).catch(() => {});
   }, [items, today]);
@@ -146,7 +144,7 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
         {error && <p role="alert" className="text-xs text-red-600">{error}</p>}
         {loading ? <p className="text-sm text-slate-500">{ar ? 'جاري تحميل البنود...' : 'Loading items...'}</p> : items.filter(item => item.kind === selected).length === 0 ? <p className="text-sm text-slate-500">{ar ? 'لا توجد بنود مسجلة حتى الآن.' : 'No items yet.'}</p> : <div className="space-y-2">{items.filter(item => item.kind === selected).map(item => <div key={item.id} className="border border-slate-200 rounded-xl p-3 flex items-start gap-3">
           <button type="button" aria-label={ar ? 'تغيير الحالة' : 'Toggle complete'} disabled={busy} onClick={() => void toggle(item)} className={item.done ? 'text-emerald-600' : 'text-slate-400'}><CheckCircle2 className="w-5 h-5"/></button>
-          <div className="flex-1 min-w-0"><p className={`font-semibold text-sm break-words ${item.done ? 'line-through text-slate-400' : 'text-slate-900'}`}>{item.title}</p><p className="text-xs text-slate-600">{item.amount.toLocaleString(ar ? 'ar-EG' : 'en-US')} {item.currency} · {item.dueDate} · {ar ? 'التذكير قبل' : 'Remind'} {item.leadDays ?? 7} {ar ? 'يوم' : 'days ahead'}</p>{item.note && <p className="text-xs text-slate-400 break-words">{item.note}</p>}{!item.done && item.dueDate < today && <p className="text-xs font-bold text-red-600">{ar ? 'متأخر عن موعده' : 'Overdue'}</p>}</div>
+          <div className="flex-1 min-w-0"><p className={`font-semibold text-sm break-words ${item.done ? 'line-through text-slate-400' : 'text-slate-900'}`}>{item.title}</p><p className="text-xs text-slate-600">{item.amount.toLocaleString(ar ? 'ar-EG' : 'en-US')} {item.currency} · {item.dueDate}{typeof item.leadDays === 'number' ? <> · {ar ? 'التذكير قبل' : 'Remind'} {item.leadDays} {ar ? 'يوم' : 'days ahead'}</> : null}</p>{item.note && <p className="text-xs text-slate-400 break-words">{item.note}</p>}{!item.done && item.dueDate < today && <p className="text-xs font-bold text-red-600">{ar ? 'متأخر عن موعده' : 'Overdue'}</p>}</div>
           <button type="button" aria-label={ar ? 'تعديل' : 'Edit'} disabled={busy} onClick={() => edit(item)} className="text-slate-500"><Pencil className="w-4 h-4"/></button>
           <button type="button" aria-label={ar ? 'حذف' : 'Delete'} disabled={busy} onClick={() => void remove(item)} className="text-red-500"><Trash2 className="w-4 h-4"/></button>
         </div>)}</div>}

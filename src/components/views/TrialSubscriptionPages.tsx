@@ -4,6 +4,7 @@ import type { UserSubscription } from '../../types/prototypeSubscription';
 import { calculateRemainingTrialDays } from '../../utils/subscriptionUtils';
 import { getTrialDurations, BASIC_PRICE_EGP, stageFor } from '../../config/subscriptionPolicy';
 import { activeGrant } from '../../config/grantPolicy';
+import { AffiliateCodeSection } from '../AffiliateCodeSection';
 
 interface Props {
   lang: Language;
@@ -12,9 +13,10 @@ interface Props {
   page: 'trial-details' | 'subscription';
   onBack: () => void;
   onSubscription: () => void;
+  onUpdateSubscription: (sub: UserSubscription) => Promise<void>;
 }
 
-export function TrialSubscriptionPages({ lang, subscription, error, page, onBack, onSubscription }: Props) {
+export function TrialSubscriptionPages({ lang, subscription, error, page, onBack, onSubscription, onUpdateSubscription }: Props) {
   const ar = lang === 'ar';
   const days = subscription ? calculateRemainingTrialDays(subscription) : null;
   const stage = subscription ? stageFor(subscription) : null;
@@ -49,6 +51,7 @@ export function TrialSubscriptionPages({ lang, subscription, error, page, onBack
           <button type="button" onClick={onSubscription} className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-black text-white hover:bg-emerald-800">{ar ? 'الانتقال إلى صفحة الاشتراك' : 'Go to subscription'}</button>
         </> : <>
           <p className="text-sm leading-7 text-slate-600">{ar ? 'اختر الخطة المناسبة لك. جميع بياناتك المالية محفوظة عند تغيير الخطة.' : 'Choose the plan that suits you. Your financial records remain saved when you change plans.'}</p>
+          <AffiliateCodeSection subscription={subscription} lang={lang} onUpdateSubscription={onUpdateSubscription} />
           {!grant && stage === 'pro-trial' && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-900">{ar ? `تجربة Pro في أول ${getTrialDurations().proDays} يومًا، مع إمكانية مقارنة Basic.` : `Your Pro trial is active during the first ${getTrialDurations().proDays} days.`}</p>}
           {!grant && stage === 'basic-free' && <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm font-bold text-sky-900">{ar ? `انتهت تجربة Pro؛ Basic مجانية حتى اليوم ${getTrialDurations().basicDays}. المتبقي: ` : `Basic remains free until day ${getTrialDurations().basicDays}. Days remaining: `}{days}</p>}
           {stage === 'expired' && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">{ar ? 'انتهت الفترة المجانية — اختر خطتك. الدفع قيد التجهيز، وبياناتك المالية محفوظة.' : 'Your introductory period has ended — choose your plan. Payments are not enabled yet; your records are safe.'}</p>}

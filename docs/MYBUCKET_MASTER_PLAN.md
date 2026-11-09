@@ -446,3 +446,6 @@ Show the subscription card for valid account-derived trial dates and remove the 
 
 ## Revision #148 — Daily usage in subscription card
 The subscription card reads the authenticated user's current effective plan and Cairo-day quota counters through the server gateway. Basic shows the local allowance; Pro shows Gemini and a separate local fallback allowance. Usage is counted at analysis start, not only for successfully saved transactions. The displayed snapshot can be refreshed; it does not modify counters or subscription records. Actual authenticated production behavior still requires end-to-end verification.
+
+## Revision #151 — Simpler subscription card
+The settings card reloads the usage snapshot when opened and when the app becomes visible again, without polling or a permanent refresh control. The existing marketer-code workflow is available on the full subscription page rather than in the settings card. User records and Firebase rules are unchanged.

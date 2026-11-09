@@ -1753,7 +1753,7 @@ export default function App() {
         )}
 
         {(activeTab === 'trial-details' || activeTab === 'subscription') && (
-          <TrialSubscriptionPages lang={lang} subscription={userSubscription} error={subscriptionError ? (lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn) : null} page={activeTab} onBack={() => { window.history.pushState({}, '', activeTab === 'subscription' ? '/trial' : '/'); setActiveTab(activeTab === 'subscription' ? 'trial-details' : 'home'); }} onSubscription={() => openSubscriptionPage('subscription')} />
+          <TrialSubscriptionPages lang={lang} subscription={userSubscription} error={subscriptionError ? (lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn) : null} page={activeTab} onBack={() => { window.history.pushState({}, '', activeTab === 'subscription' ? '/trial' : '/'); setActiveTab(activeTab === 'subscription' ? 'trial-details' : 'home'); }} onSubscription={() => openSubscriptionPage('subscription')} onUpdateSubscription={async updated => { const saved = await saveUserSubscriptionToFirestore(authUser.uid, updated); setUserSubscription(saved); }} />
         )}
 
         {activeTab === 'settings' && (

@@ -39,6 +39,13 @@ try {
     await page.getByText('الخطة الحالية: Basic').waitFor();
     await page.getByText('التسجيلات: 3 من 10 · المتبقي 7').waitFor();
     await page.getByText('الاستعلامات: 1 من 2 · المتبقي 1').waitFor();
+    assert.equal(await page.getByText('تحديث الاستخدام').count(), 0);
+    const readsBefore = await page.evaluate(() => window.__quotaReads);
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.waitForFunction(previous => window.__quotaReads > previous, readsBefore);
+    await page.locator('#affiliate-redeem-input').fill('WAEL2026');
+    await page.locator('#btn-apply-promo-code').click();
+    await page.getByText('تم تطبيق خصم Pro دون إضافة أيام تجربة.').waitFor();
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth);
     assert.ok(overflow<=1,`horizontal overflow at ${viewport.width}px: ${overflow}`);
     await page.close();

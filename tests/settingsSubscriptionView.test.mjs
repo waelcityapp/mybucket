@@ -22,7 +22,8 @@ test('settings shows the subscription for a valid account-derived trial without 
   assert.match(html, /خطة الاشتراك وفترة التجربة/);
   assert.doesNotMatch(html, /تعذر تأكيد مدة التجربة/);
   assert.doesNotMatch(html, /يرفع مدة التجربة إلى 35/);
-  assert.match(html, /لا يغيّر مدة التجربة/);
+  assert.doesNotMatch(html, /هل حصلت على كود مسوّق لاحقاً/);
+  assert.doesNotMatch(html, /تحديث الاستخدام/);
 });
 
 test('a grant remains visible in settings when trial dates come from account registration', () => {
@@ -50,4 +51,11 @@ test('trial detail page omits technical record-source language', () => {
   }));
   assert.match(html, /تاريخ تسجيلك/);
   assert.doesNotMatch(html, /لعدم وجود تاريخ تجربة منفصل/);
+});
+
+test('marketer code is available on the subscription page', () => {
+  const html = renderToStaticMarkup(React.createElement(TrialSubscriptionPages, {
+    lang: 'ar', subscription: sub, error: null, page: 'subscription', onBack: noop, onSubscription: noop, onUpdateSubscription: async () => {},
+  }));
+  assert.match(html, /هل حصلت على كود مسوّق لاحقاً/);
 });

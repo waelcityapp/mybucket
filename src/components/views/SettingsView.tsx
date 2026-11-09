@@ -176,7 +176,6 @@ export function SettingsView({
         <SubscriptionCard
           subscription={subscription}
           lang={lang}
-          onUpdateSubscription={onUpdateSubscription}
         />
       )}
 

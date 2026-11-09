@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 
-const server=spawn('node_modules/.bin/vite',['--config','tests/grant-preview/vite.config.ts'],{stdio:'ignore'});
+const server=spawn('node_modules/.bin/vite',['--config','tests/grant-preview/vite.config.ts'],{stdio:'inherit'});
 let browser;
 try {
   let ready=false;
@@ -11,6 +11,9 @@ try {
   browser=await chromium.launch({headless:true,args:['--no-sandbox']});
   for(const viewport of [{width:1280,height:900},{width:390,height:844}]){
     const page=await browser.newPage({viewport});
+    page.on('console', msg => console.log('browser:', msg.type(), msg.text()));
+    page.on('pageerror', err => console.log('browser-error:', err.message));
+    page.on('response', response => { if (response.status() >= 400) console.log('http-error:', response.status(), response.url()); });
     await page.goto('http://127.0.0.1:4178/tests/grant-preview/index.html');
     await page.getByText('سارة محمد').waitFor();
     await page.locator('select').first().selectOption('pro');

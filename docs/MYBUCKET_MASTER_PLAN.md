@@ -422,3 +422,6 @@ Replaced blue active and hover colors in `src/components/BottomNav.tsx` with the
 
 ## User directory foundation — prepared for verification
 The owner can prepare a server-managed `adminUserDirectory` from Firebase Authentication in pages of 100. Each page reads existing index records and writes only changed records. Account sign-in and admin disable/delete actions attempt to synchronize the index. This does not change financial records or Firestore rules. Directory counts are informational and do not prove identity-by-identity equality; concurrent account changes and synchronization failures require reconciliation. The existing user list, search and filters still cover only the most recent 200 records. Pagination and comprehensive search are future work; do not claim completion until the directory has been populated and verified against the live authentication source.
+
+## Revision #131 — Directory search preparation
+Directory synchronization additionally stores normalized search grams and a sortable registration date for later paged search. The current administration list remains unchanged. Existing accounts require one rerun of the owner directory preparation action. Search also requires a separate Firestore composite index before the later interface can be enabled. No financial records or database rules change.

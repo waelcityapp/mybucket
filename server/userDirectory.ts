@@ -1,12 +1,20 @@
 import type { UserRecord } from 'firebase-admin/auth';
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin.js';
 import { SubscriptionError } from './subscriptionService.js';
+import { directorySearchTrigrams } from './directorySearch.js';
 
 // A private server-maintained index; Firebase Authentication remains authoritative.
 export function directoryFields(user: Pick<UserRecord, 'uid' | 'displayName' | 'email' | 'disabled' | 'metadata'>) {
   const name = user.displayName || '';
   const email = user.email || '';
-  return { uid: user.uid, name, email, nameSearch: name.toLocaleLowerCase('ar'), emailSearch: email.toLowerCase(), disabled: user.disabled, createdAt: user.metadata.creationTime || null };
+  const registered = Date.parse(user.metadata.creationTime || '');
+  return { uid: user.uid, name, email, nameSearch: name.toLocaleLowerCase('ar'), emailSearch: email.toLowerCase(), searchGrams: directorySearchTrigrams(name, email), disabled: user.disabled, createdAt: user.metadata.creationTime || null, createdAtSort: Number.isFinite(registered) ? new Date(registered).toISOString() : '' };
+}
+
+function fieldsMatch(data: FirebaseFirestore.DocumentData | undefined, fields: ReturnType<typeof directoryFields>): boolean {
+  return Object.entries(fields).every(([key, value]) => Array.isArray(value)
+    ? Array.isArray(data?.[key]) && value.length === data[key].length && value.every((item, i) => item === data[key][i])
+    : data?.[key] === value);
 }
 
 export async function syncDirectoryUser(uid: string) {
@@ -15,7 +23,7 @@ export async function syncDirectoryUser(uid: string) {
   const fields = directoryFields(user);
   const existing = await ref.get();
   const data = existing.data();
-  if (!existing.exists || Object.entries(fields).some(([key, value]) => data?.[key] !== value)) {
+  if (!existing.exists || !fieldsMatch(data, fields)) {
     await ref.set(fields, { merge: true });
   }
 }
@@ -33,7 +41,7 @@ export async function backfillUserDirectory(actor: { email: string | null }, tok
   page.users.forEach((user, index) => {
     const fields = directoryFields(user);
     const data = existing[index].data();
-    if (!existing[index].exists || Object.entries(fields).some(([key, value]) => data?.[key] !== value)) {
+    if (!existing[index].exists || !fieldsMatch(data, fields)) {
       batch.set(refs[index], fields, { merge: true });
       updated++;
     }
@@ -42,7 +50,7 @@ export async function backfillUserDirectory(actor: { email: string | null }, tok
   const verifiedSnapshots = refs.length ? await db.getAll(...refs) : [];
   const verified = page.users.reduce((count, user, index) => {
     const data = verifiedSnapshots[index].data();
-    return count + Number(verifiedSnapshots[index].exists && Object.entries(directoryFields(user)).every(([key, value]) => data?.[key] === value));
+    return count + Number(verifiedSnapshots[index].exists && fieldsMatch(data, directoryFields(user)));
   }, 0);
   return { examined: page.users.length, updated, verified, nextPageToken: page.pageToken || null };
 }

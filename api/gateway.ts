@@ -42,6 +42,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, data: await appLockAction(user.uid, action, payload) });
     }
 
+    if (action === 'reminders.list' || action === 'reminders.create' || action === 'reminders.update' || action === 'reminders.toggle' || action === 'reminders.delete') {
+      const { reminderAction } = await import('../server/reminderService.js');
+      const result = await reminderAction(user.uid, action, payload);
+      return res.status(200).json({ ok: true, data: result });
+    }
+
     switch (action) {
       case 'app.presence': {
         const { recordPresence } = await import('../server/presence.js');

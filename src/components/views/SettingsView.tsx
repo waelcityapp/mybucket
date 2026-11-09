@@ -21,6 +21,8 @@ interface SettingsViewProps {
   onZeroAllBalances?: () => Promise<boolean>;
   user: AuthUser | null;
   subscription?: UserSubscription | null;
+  subscriptionUnavailable?: boolean;
+  onRetrySubscription?: () => void;
   onUpdateSubscription?: (sub: UserSubscription) => Promise<void>;
   onLogin: () => void;
   onLogout: () => void;
@@ -33,6 +35,8 @@ export function SettingsView({
   onZeroAllBalances,
   user,
   subscription,
+  subscriptionUnavailable,
+  onRetrySubscription,
   onUpdateSubscription,
   onLogin,
   onLogout,
@@ -161,10 +165,8 @@ export function SettingsView({
       </div>
 
       {/* 2. Subscription & Promo Code Card */}
-      {subscription?.trialDatesStored === false && (
-        <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{lang === 'ar' ? 'تعذر تأكيد مدة التجربة من سجل محفوظ. راجع تفاصيل الاشتراك.' : 'The trial duration could not be confirmed from a saved record. Check subscription details.'}</p>
-      )}
-      {subscription && subscription.trialDatesStored !== false && onUpdateSubscription && (
+      {subscriptionUnavailable && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p>{lang === 'ar' ? 'تعذر تحميل حالة اشتراكك. تحقق من الاتصال وحاول مرة أخرى.' : 'Could not load your subscription. Check your connection and try again.'}</p>{onRetrySubscription && <button type="button" onClick={onRetrySubscription} className="mt-2 font-bold underline">{lang === 'ar' ? 'إعادة المحاولة' : 'Try again'}</button>}</div>}
+      {!subscriptionUnavailable && subscription && onUpdateSubscription && (
         <SubscriptionCard
           subscription={subscription}
           lang={lang}

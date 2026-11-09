@@ -81,21 +81,16 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
           </span>
           <span className="font-bold text-slate-900">
             {subscription.totalTrialDays} {isAr ? 'يوماً' : 'days'}
-            {subscription.hasAppliedAffiliateCode && (
-              <span className="mr-1 text-[10px] text-emerald-600 font-black">
-                ({isAr ? 'مع كود المسوّق' : 'with promo code'})
-              </span>
-            )}
           </span>
         </div>
 
         <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60 text-[11px]">
           <div className="bg-white p-2 rounded-lg border border-slate-200">
-            <span className="block text-slate-500 text-[10px]">{isAr ? 'تسجيلات AI اليومية' : 'Daily AI Entries'}</span>
+            <span className="block text-slate-500 text-[10px]">{isAr ? 'التسجيلات اليومية' : 'Daily entries'}</span>
             <span className="font-black text-slate-800">{isAr ? 'حسب حدود الخطة' : 'According to plan limits'}</span>
           </div>
           <div className="bg-white p-2 rounded-lg border border-slate-200">
-            <span className="block text-slate-500 text-[10px]">{isAr ? 'استعلامات AI وسقف البحث' : 'AI Queries & History'}</span>
+            <span className="block text-slate-500 text-[10px]">{isAr ? 'الاستعلامات اليومية' : 'Daily inquiries'}</span>
             <span className="font-black text-slate-800">{isAr ? 'حسب حدود الخطة' : 'According to plan limits'}</span>
           </div>
         </div>
@@ -175,8 +170,8 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
           </div>
           <p className="text-[10px] text-slate-500 leading-relaxed">
             {isAr
-              ? 'تفعيل الكود يرفع مدة التجربة إلى 35 يوماً (مع خصم الأيام التي قضيتها بالفعل دون تصفيرها)، ويضمن سعر 4 ج/يوم عند التجديد.'
-              : 'Deducts used days from 35 total trial days and grants renewal discount.'}
+              ? 'كود المسوّق يمنح خصمًا على الاشتراك الشهري، ولا يغيّر مدة التجربة.'
+              : 'A marketer code provides a monthly subscription discount and does not change the trial duration.'}
           </p>
 
           {feedback && (

@@ -440,3 +440,6 @@ Revision #134 shipped the grant and quota feature after emulator and mock UI che
 
 ## Revision #136 — Search user directory while typing
 Typing in user search automatically loads a bounded page from the synchronized directory after a short pause, including for one-character queries. Counting remains optional and filters still require an explicit count. Search depends on a complete, synchronized directory; registration-time ordering and pagination remain in place.
+
+## Revision #137 — Clear subscription information in settings
+Show the subscription card for valid account-derived trial dates and remove the technical record-source notice. When a subscription read fails, show a clear retry action rather than stale subscription details. Correct the old marketer-code text: a code discounts the monthly subscription and does not extend the trial. No subscription dates or Firebase data are changed by this UI revision; live account data has not been independently verified.

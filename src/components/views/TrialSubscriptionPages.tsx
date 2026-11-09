@@ -41,7 +41,6 @@ export function TrialSubscriptionPages({ lang, subscription, error, page, onBack
             <p>{ar ? `تجربة Pro تبدأ من التسجيل لمدة ${getTrialDurations().proDays} يومًا، وBasic مجانية حتى اليوم ${getTrialDurations().basicDays}.` : `Pro is free for ${getTrialDurations().proDays} days, and Basic until day ${getTrialDurations().basicDays} after signup.`}</p>
             <p>{grant ? (ar ? 'الأيام المتبقية للتجربة الأصلية: ' : 'Original trial days remaining: ') : (ar ? 'الأيام المجانية المتبقية: ' : 'Introductory days remaining: ')}{days}</p>
             {start && <p>{ar ? `تاريخ تسجيلك: ${start}` : `Registration date: ${start}`}</p>}
-            {subscription.trialDatesStored === false && <p className="text-xs text-slate-500">{ar ? 'المدة محسوبة من تاريخ إنشاء حسابك المسجل في Firebase لعدم وجود تاريخ تجربة منفصل.' : 'The period is calculated from your recorded Firebase account creation date because no separate trial record is available.'}</p>}
             {expiry && <p>{ar ? `تاريخ نهاية التجربة: ${expiry}` : `Trial end date: ${expiry}`}</p>}
             <p>{subscription.hasAppliedAffiliateCode && subscription.affiliateCode ? (ar ? `كود المسوّق المسجل: ${subscription.affiliateCode}` : `Recorded marketer code: ${subscription.affiliateCode}`) : (ar ? 'لا يوجد كود مسوّق مسجّل في البيانات المتاحة.' : 'No marketer code is recorded in the available data.')}</p>
           </div>

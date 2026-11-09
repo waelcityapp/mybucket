@@ -1702,6 +1702,8 @@ export default function App() {
             onZeroAllBalances={handleZeroAllBalances}
             user={authUser}
             subscription={userSubscription}
+            subscriptionUnavailable={!!subscriptionError}
+            onRetrySubscription={() => setSubscriptionRetry(n => n + 1)}
             onUpdateSubscription={async (updatedSub) => {
               if (authUser) {
                 const saved = await saveUserSubscriptionToFirestore(authUser.uid, updatedSub);

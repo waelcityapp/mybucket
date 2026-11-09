@@ -1,4 +1,5 @@
 import { ReminderHomeCards } from './components/ReminderHomeCards';
+import { ReminderAlerts } from './components/ReminderAlerts';
 import { ReminderWorkspace } from './components/views/ReminderWorkspace';
 import { LockScreen, lockRequest, type LockStatus } from './components/AppLock';
 import { TrialSubscriptionPages } from './components/views/TrialSubscriptionPages';
@@ -1429,8 +1430,9 @@ export default function App() {
 
   // Reminder management uses real pages and browser history, never modal dialogs.
   if (activeTab === 'reminders' && window.location.pathname.startsWith('/reminders/')) {
+    if (window.location.pathname === '/reminders/alerts') return <ReminderAlerts page uid={authUser.uid} lang={lang} onBack={() => window.history.back()} />;
     const reminderKind = window.location.pathname.split('/')[2] === 'receivable' ? 'receivable' : 'obligation';
-    return <ReminderWorkspace lang={lang} kind={reminderKind} userId={authUser.uid} onHome={() => { window.history.pushState({ myBucketTab: 'home' }, '', '/'); setActiveTab('home'); }} />;
+    return <><ReminderAlerts uid={authUser.uid} lang={lang} onOpen={() => { window.history.pushState({ myBucketTab: 'reminders' }, '', '/reminders/alerts'); setAdminRoute('/reminders/alerts'); }} /><ReminderWorkspace lang={lang} kind={reminderKind} userId={authUser.uid} onHome={() => { window.history.pushState({ myBucketTab: 'home' }, '', '/'); setActiveTab('home'); }} /></>;
   }
 
   const showBottomNavigation = (
@@ -1454,6 +1456,7 @@ export default function App() {
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
       className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col font-sans selection:bg-emerald-500 selection:text-white"
     >
+      {authUser && <ReminderAlerts uid={authUser.uid} lang={lang} onOpen={() => { window.history.pushState({ myBucketTab: 'reminders' }, '', '/reminders/alerts'); setActiveTab('reminders'); }} />}
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-60 bg-emerald-600 text-white px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-2 text-xs font-bold animate-in fade-in slide-in-from-top duration-200">

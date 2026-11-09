@@ -449,3 +449,6 @@ The subscription card reads the authenticated user's current effective plan and 
 
 ## Revision #151 — Simpler subscription card
 The settings card reloads the usage snapshot when opened and when the app becomes visible again, without polling or a permanent refresh control. The existing marketer-code workflow is available on the full subscription page rather than in the settings card. User records and Firebase rules are unchanged.
+
+## Revision #153 — In-app reminder alert banner
+Show one red in-app banner for actionable reminder occurrences and a full-page list with paid/collected, tomorrow and stop controls. Closing stores the current alert IDs for the current Cairo day on that device; a newly due ID reopens the banner and outstanding alerts return the next day. The in-app alert remains eligible until acted on, including when a once-only reminder day was missed. No background/mobile push or automatic sound is implemented. Existing reminder-list limits still apply and should be addressed separately.

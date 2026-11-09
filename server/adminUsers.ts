@@ -143,6 +143,10 @@ export async function changeAppUserAccess(actor: AdminActor, payload: Record<str
 
   if (target.disabled !== disabled) await auth.updateUser(uid, { disabled });
   if (disabled) await auth.revokeRefreshTokens(uid);
+  try {
+    const { syncDirectoryUser } = await import('./userDirectory.js');
+    await syncDirectoryUser(uid);
+  } catch (error) { console.error('[directory] status sync failed', error); }
 
   const db = getAdminFirestore();
   const timestamp = new Date().toISOString();
@@ -201,6 +205,7 @@ export async function deleteAppUserIdentity(actor: AdminActor, payload: Record<s
     firestoreDataPreserved: true,
   });
   await auth.deleteUser(uid);
+  await db.collection('adminUserDirectory').doc(uid).delete().catch(error => console.error('[directory] deletion sync failed', error));
   await db.collection('adminAudit').add({
     actorUid: actor.uid,
     subjectUid: uid,

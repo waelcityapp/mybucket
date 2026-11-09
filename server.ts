@@ -44,6 +44,8 @@ async function startServer() {
         case 'subscription.trialSettings': {
           const { ensureTrialAccess } = await import('./server/trialAccessBootstrap');
           const { readTrialSettings } = await import('./server/trialSettings');
+          const { syncDirectoryUser } = await import('./server/userDirectory');
+          await syncDirectoryUser(user.uid).catch(error => console.error('[directory] sync failed', error));
           await ensureTrialAccess(user.uid);
           const { proDays, basicDays } = await readTrialSettings();
           return res.json({ ok: true, data: { proDays, basicDays } });
@@ -52,6 +54,14 @@ async function startServer() {
           const { recordPresence } = await import('./server/presence');
           await recordPresence(user.uid);
           return res.json({ ok: true });
+        }
+        case 'admin.directory.backfill': {
+          const { backfillUserDirectory } = await import('./server/userDirectory');
+          return res.json({ ok: true, data: await backfillUserDirectory(user, payload.pageToken) });
+        }
+        case 'admin.directory.count': {
+          const { countUserDirectory } = await import('./server/userDirectory');
+          return res.json({ ok: true, data: await countUserDirectory(user) });
         }
         case 'app.installSeen': {
           const { recordSignedInInstallation } = await import('./server/adminUsers');

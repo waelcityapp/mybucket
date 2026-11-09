@@ -42,6 +42,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await recordPresence(user.uid);
         return res.status(200).json({ ok: true });
       }
+      case 'admin.directory.backfill': {
+        const { backfillUserDirectory } = await import('../server/userDirectory.js');
+        return res.status(200).json({ ok: true, data: await backfillUserDirectory(user, payload.pageToken) });
+      }
+      case 'admin.directory.count': {
+        const { countUserDirectory } = await import('../server/userDirectory.js');
+        return res.status(200).json({ ok: true, data: await countUserDirectory(user) });
+      }
       case 'app.installSeen': {
         const { recordSignedInInstallation } = await import('../server/adminUsers.js');
         return res.status(200).json({ ok: true, data: await recordSignedInInstallation(user.uid, payload) });
@@ -123,6 +131,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       case 'subscription.trialSettings': {
         const { ensureTrialAccess } = await import('../server/trialAccessBootstrap.js');
+        const { syncDirectoryUser } = await import('../server/userDirectory.js');
+        await syncDirectoryUser(user.uid).catch(error => console.error('[directory] sync failed', error));
         await ensureTrialAccess(user.uid);
         const { readTrialSettings } = await import('../server/trialSettings.js');
         const { proDays, basicDays } = await readTrialSettings();

@@ -71,6 +71,8 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(0);
   const [workingUid, setWorkingUid] = useState<string | null>(null);
   const [confirmUid, setConfirmUid] = useState<string | null>(null);
   const [deleteUid, setDeleteUid] = useState<string | null>(null);
@@ -92,6 +94,30 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
   }, [ar]);
 
   useEffect(() => { void reload(); }, [reload]);
+
+  const syncDirectory = async () => {
+    if (syncing) return;
+    setSyncing(true); setSyncProgress(0); setNotice(''); setError('');
+    let token: string | undefined;
+    let examined = 0;
+    let verified = 0;
+    try {
+      do {
+        const page = await requestAdmin('admin.directory.backfill', token ? { pageToken: token } : {}) as { examined: number; verified: number; nextPageToken: string | null };
+        examined += page.examined;
+        verified += page.verified;
+        setSyncProgress(examined);
+        token = page.nextPageToken || undefined;
+      } while (token);
+      const result = await requestAdmin('admin.directory.count') as { count: number };
+      setNotice(ar
+        ? `تمت مراجعة ${examined} حسابًا، وتطابقت بيانات ${verified} منها عند الفحص. عدد سجلات الدليل ${result.count}. قد تتغير الحسابات أثناء الفحص.`
+        : `Reviewed ${examined} accounts; ${verified} matched at verification. The directory contains ${result.count} records. Accounts can change during the check.`);
+    } catch (err) {
+      setError(ar ? `تعذرت إكمال المزامنة بعد مراجعة ${examined} حسابًا. يمكنك إعادة المحاولة؛ الحسابات التي لم تتغير لن تُكتب مجددًا.` : `Synchronization stopped after ${examined} accounts. You can retry; unchanged records will not be rewritten.`);
+      console.warn('Directory sync failed:', err);
+    } finally { setSyncing(false); }
+  };
 
   const filtered = useMemo(() => (data?.users || []).filter(user => {
     const matching = (user.name + ' ' + user.email + ' ' + user.uid).toLowerCase().includes(search.trim().toLowerCase());
@@ -148,6 +174,13 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
       <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] leading-5 text-amber-900">
         {ar ? 'عدد التثبيتات ليس عدد الأجهزة أو كل من ثبّت التطبيق منذ البداية؛ هو عدد الحسابات التي أبلغت عن تثبيت التطبيق أو استخدمته من الأيقونة بعد تشغيل التتبع. لا نعرض تقديرات كأنها أرقام مؤكدة.' : 'The installed-app figure counts signed-in accounts reporting an installation or a standalone launch since tracking began. It does not count devices or all older installs.'}
       </p>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700">
+        <p>{ar ? 'تجهيز دليل مختصر للحسابات الحالية والجديدة، تمهيدًا للبحث في جميع المستخدمين.' : 'Prepare a compact account directory for future search across all users.'}</p>
+        <button type="button" onClick={() => void syncDirectory()} disabled={syncing} className="mt-2 rounded-lg bg-emerald-700 px-3 py-2 font-bold text-white disabled:opacity-50">
+          {syncing ? (ar ? `جارٍ التجهيز: ${syncProgress}` : `Preparing: ${syncProgress}`) : (ar ? 'تجهيز دليل المستخدمين' : 'Prepare user directory')}
+        </button>
+      </div>
 
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-base font-black text-slate-900">{ar ? 'قائمة المستخدمين' : 'User directory'}</h3>

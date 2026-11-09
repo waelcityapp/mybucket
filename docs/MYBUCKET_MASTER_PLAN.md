@@ -419,3 +419,6 @@ Subscription trial history allows the owner to hide individual obsolete entries 
 
 ## Revision #122 — Bottom navigation brand green
 Replaced blue active and hover colors in `src/components/BottomNav.tsx` with the existing emerald-green visual theme, including the elevated center Search button. Navigation behavior, layout, and financial functionality remain unchanged.
+
+## User directory foundation — prepared for verification
+The owner can prepare a server-managed `adminUserDirectory` from Firebase Authentication in pages of 100. Each page reads existing index records and writes only changed records. Account sign-in and admin disable/delete actions attempt to synchronize the index. This does not change financial records or Firestore rules. Directory counts are informational and do not prove identity-by-identity equality; concurrent account changes and synchronization failures require reconciliation. The existing user list, search and filters still cover only the most recent 200 records. Pagination and comprehensive search are future work; do not claim completion until the directory has been populated and verified against the live authentication source.

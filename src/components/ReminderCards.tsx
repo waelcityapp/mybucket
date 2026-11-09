@@ -6,9 +6,9 @@ import { playReminderTone } from '../utils/reminderSounds';
 import { BellRing, Volume2 } from 'lucide-react';
 
 export type ReminderKind = 'obligation' | 'receivable';
-type Reminder = { id: string; kind: ReminderKind; title: string; amount: number; currency: string; dueDate: string; note: string; done: boolean; leadDays?: number; tone?: number };
-type Fields = { title: string; amount: string; currency: string; dueDate: string; note: string; leadDays: number; tone: number };
-const blank = (): Fields => ({ title: '', amount: '', currency: 'EGP', dueDate: new Date().toLocaleDateString('en-CA'), note: '', leadDays: 7, tone: 1 });
+type Reminder = { id: string; kind: ReminderKind; title: string; amount: number; currency: string; dueDate: string; note: string; done: boolean; leadDays?: number; tone?: number; remindTime?: string; repeat?: 'daily' | 'once'; alertDisabled?: boolean; snoozedUntil?: string | null };
+type Fields = { title: string; amount: string; currency: string; dueDate: string; note: string; leadDays: number; tone: number; remindTime: string; repeat: 'daily' | 'once' };
+const blank = (): Fields => ({ title: '', amount: '', currency: 'EGP', dueDate: new Date().toLocaleDateString('en-CA'), note: '', leadDays: 7, tone: 1, remindTime: '09:00', repeat: 'daily' });
 const currencies = ['EGP', 'USD', 'EUR', 'SAR', 'AED', 'GBP', 'KWD', 'QAR'];
 
 async function request(action: string, payload: Record<string, unknown> = {}) {
@@ -30,6 +30,8 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<Reminder | null>(null);
+  const [currentMinute, setCurrentMinute] = useState(() => new Date().toTimeString().slice(0,5));
   const sounded = useRef(new Set<string>());
   const [currentDay, setCurrentDay] = useState(() => new Date().toLocaleDateString('en-CA'));
   const refresh = useCallback(async () => {
@@ -42,14 +44,14 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
 
   const heading = (kind: ReminderKind) => kind === 'obligation' ? (ar ? 'تذكير بالالتزامات' : 'Obligation Reminders') : (ar ? 'تذكير بمستحقات لي' : 'Money Owed to Me');
   function open(kind: ReminderKind) { setSelected(kind); setEditingId(null); setFields(blank()); setShowEditor(false); setError(''); }
-  function edit(item: Reminder) { setEditingId(item.id); setFields({ title: item.title, amount: String(item.amount), currency: item.currency, dueDate: item.dueDate, note: item.note, leadDays: item.leadDays ?? 7, tone: item.tone ?? 1 }); setShowEditor(true); setError(''); }
+  function edit(item: Reminder) { setEditingId(item.id); setFields({ title: item.title, amount: String(item.amount), currency: item.currency, dueDate: item.dueDate, note: item.note, leadDays: item.leadDays ?? 7, tone: item.tone ?? 1, remindTime: item.remindTime ?? '09:00', repeat: item.repeat ?? 'daily' }); setShowEditor(true); setError(''); }
   async function save() {
     if (!selected || !fields.title.trim() || !fields.dueDate || fields.amount === '' || !Number.isFinite(Number(fields.amount)) || Number(fields.amount) < 0) {
       setError(ar ? 'أدخل اسم البند والمبلغ والتاريخ بشكل صحيح' : 'Enter a valid item, amount and date'); return;
     }
     setBusy(true); setError('');
     try {
-      await request(editingId ? 'update' : 'create', { ...(editingId ? { id: editingId } : {}), kind: selected, title: fields.title, amount: Number(fields.amount), currency: fields.currency, dueDate: fields.dueDate, note: fields.note, leadDays: fields.leadDays, tone: fields.tone });
+      await request(editingId ? 'update' : 'create', { ...(editingId ? { id: editingId } : {}), kind: selected, title: fields.title, amount: Number(fields.amount), currency: fields.currency, dueDate: fields.dueDate, note: fields.note, leadDays: fields.leadDays, tone: fields.tone, remindTime: fields.remindTime, repeat: fields.repeat });
       await refresh(); setShowEditor(false); setEditingId(null); setFields(blank());
     } catch (e) { setError((ar ? 'تعذر الحفظ: ' : 'Save failed: ') + (e instanceof Error ? e.message : 'error')); }
     finally { setBusy(false); }
@@ -61,17 +63,23 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
     finally { setBusy(false); }
   }
   async function remove(item: Reminder) {
-    if (!window.confirm(ar ? 'هل تريد حذف هذا البند؟' : 'Delete this item?')) return;
+
     setBusy(true); setError('');
     try { await request('delete', { id: item.id }); await refresh(); }
     catch { setError(ar ? 'تعذر حذف البند' : 'Failed to delete item'); }
     finally { setBusy(false); }
   }
+  async function alertAction(item: Reminder, mode: 'stop' | 'resume' | 'tomorrow') {
+    setBusy(true); setError('');
+    try { await request('alert', { id: item.id, mode }); await refresh(); }
+    catch { setError(ar ? 'تعذر تحديث التنبيه' : 'Could not update reminder'); }
+    finally { setBusy(false); }
+  }
   const today = currentDay;
   const dateLead = (item: Reminder) => { const date = new Date(item.dueDate + 'T12:00:00'); date.setDate(date.getDate() - (item.leadDays ?? 7)); return date.toLocaleDateString('en-CA'); };
-  const dueNow = items.filter(item => !item.done && typeof item.leadDays === 'number' && dateLead(item) <= today);
+  const dueNow = items.filter(item => !item.done && typeof item.leadDays === 'number' && !item.alertDisabled && (!item.snoozedUntil || item.snoozedUntil <= today) && dateLead(item) <= today && (item.repeat !== 'once' || dateLead(item) === today) && (item.remindTime ?? '09:00') <= currentMinute);
   useEffect(() => {
-    const updateDay = () => setCurrentDay(new Date().toLocaleDateString('en-CA'));
+    const updateDay = () => { const now = new Date(); setCurrentDay(now.toLocaleDateString('en-CA')); setCurrentMinute(now.toTimeString().slice(0,5)); };
     const timer = window.setInterval(updateDay, 60_000);
     window.addEventListener('focus', updateDay);
     return () => { window.clearInterval(timer); window.removeEventListener('focus', updateDay); };
@@ -82,7 +90,7 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
     alertedToday.forEach(item => sounded.current.add(item.id + ':' + today));
     // Browser audio may be blocked until a user gesture. Keep the visible notice regardless.
     void playReminderTone(alertedToday[0].tone ?? 1).catch(() => {});
-  }, [items, today]);
+  }, [items, today, currentMinute]);
 
   return <div className="space-y-2.5">
     {dueNow.length > 0 && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 flex items-start gap-3" role="status">
@@ -91,6 +99,11 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
         <p className="text-sm font-extrabold text-amber-950">{ar ? `لديك ${dueNow.length} تذكير مالي يحتاج انتباهك` : `${dueNow.length} financial reminders need attention`}</p>
         <p className="text-xs text-amber-800">{ar ? 'افتح القائمة لمراجعة البنود ومواعيدها.' : 'Open a list to review amounts and dates.'}</p>
         {dueNow.slice(0,3).map(item => <button key={item.id} type="button" onClick={() => open(item.kind)} className="block text-start text-xs text-amber-900 underline mt-1">{item.title} — {item.amount.toLocaleString(ar ? 'ar-EG' : 'en-US')} {item.currency} — {item.dueDate}</button>)}
+        <div className="flex flex-wrap gap-2 mt-2">
+          <button type="button" disabled={busy} onClick={() => void toggle(dueNow[0])} className="rounded-lg bg-emerald-600 text-white px-3 py-1.5 text-xs font-bold">{dueNow[0].kind === 'obligation' ? (ar ? 'تم السداد' : 'Paid') : (ar ? 'تم التحصيل' : 'Collected')}</button>
+          <button type="button" disabled={busy} onClick={() => void alertAction(dueNow[0], 'tomorrow')} className="rounded-lg border border-amber-400 px-3 py-1.5 text-xs font-bold">{ar ? 'ذكّرني غدًا' : 'Remind tomorrow'}</button>
+          <button type="button" disabled={busy} onClick={() => void alertAction(dueNow[0], 'stop')} className="rounded-lg border border-amber-400 px-3 py-1.5 text-xs font-bold">{ar ? 'إيقاف التنبيه' : 'Stop alerts'}</button>
+        </div>
         <button type="button" onClick={() => void playReminderTone(dueNow[0].tone ?? 1).catch(() => {})} className="flex items-center gap-1 text-xs font-bold text-emerald-800 mt-2"><Volume2 className="w-4 h-4" />{ar ? 'تشغيل جرس التذكير' : 'Play reminder sound'}</button>
       </div>
     </div>}
@@ -138,17 +151,32 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
               </div>
             </label>
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="block text-xs font-semibold">{ar ? 'ساعة التذكير اليومية' : 'Reminder time'}<input type="time" required value={fields.remindTime} onChange={e => setFields(s => ({ ...s, remindTime: e.target.value }))} className="w-full mt-1 p-2.5 rounded-lg border bg-white" /></label>
+            <label className="block text-xs font-semibold">{ar ? 'تكرار التنبيه' : 'Reminder frequency'}<select value={fields.repeat} onChange={e => setFields(s => ({ ...s, repeat: e.target.value as 'daily' | 'once' }))} className="w-full mt-1 p-2.5 rounded-lg border bg-white"><option value="daily">{ar ? 'كل يوم حتى الإتمام أو الإيقاف' : 'Daily until completed or stopped'}</option><option value="once">{ar ? 'مرة واحدة فقط' : 'Once only'}</option></select></label>
+          </div>
           <label className="block text-xs font-semibold">{ar ? 'ملاحظات (اختياري)' : 'Notes (optional)'}<textarea maxLength={500} rows={2} value={fields.note} onChange={e => setFields(s => ({ ...s, note: e.target.value }))} className="w-full mt-1 p-2.5 rounded-lg border bg-white" /></label>
           <div className="flex gap-2"><button type="submit" disabled={busy} className="bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{ar ? 'حفظ البند' : 'Save item'}</button><button type="button" onClick={() => setShowEditor(false)} disabled={busy} className="border rounded-lg px-4 py-2 text-sm">{ar ? 'إلغاء' : 'Cancel'}</button></div>
         </form>}
         {error && <p role="alert" className="text-xs text-red-600">{error}</p>}
         {loading ? <p className="text-sm text-slate-500">{ar ? 'جاري تحميل البنود...' : 'Loading items...'}</p> : items.filter(item => item.kind === selected).length === 0 ? <p className="text-sm text-slate-500">{ar ? 'لا توجد بنود مسجلة حتى الآن.' : 'No items yet.'}</p> : <div className="space-y-2">{items.filter(item => item.kind === selected).map(item => <div key={item.id} className="border border-slate-200 rounded-xl p-3 flex items-start gap-3">
           <button type="button" aria-label={ar ? 'تغيير الحالة' : 'Toggle complete'} disabled={busy} onClick={() => void toggle(item)} className={item.done ? 'text-emerald-600' : 'text-slate-400'}><CheckCircle2 className="w-5 h-5"/></button>
-          <div className="flex-1 min-w-0"><p className={`font-semibold text-sm break-words ${item.done ? 'line-through text-slate-400' : 'text-slate-900'}`}>{item.title}</p><p className="text-xs text-slate-600">{item.amount.toLocaleString(ar ? 'ar-EG' : 'en-US')} {item.currency} · {item.dueDate}{typeof item.leadDays === 'number' ? <> · {ar ? 'التذكير قبل' : 'Remind'} {item.leadDays} {ar ? 'يوم' : 'days ahead'}</> : null}</p>{item.note && <p className="text-xs text-slate-400 break-words">{item.note}</p>}{!item.done && item.dueDate < today && <p className="text-xs font-bold text-red-600">{ar ? 'متأخر عن موعده' : 'Overdue'}</p>}</div>
+          <div className="flex-1 min-w-0"><p className={`font-semibold text-sm break-words ${item.done ? 'line-through text-slate-400' : 'text-slate-900'}`}>{item.title}</p><p className="text-xs text-slate-600">{item.amount.toLocaleString(ar ? 'ar-EG' : 'en-US')} {item.currency} · {item.dueDate}{typeof item.leadDays === 'number' ? <> · {ar ? 'التذكير قبل' : 'Remind'} {item.leadDays} {ar ? 'يوم' : 'days ahead'} · {item.remindTime ?? '09:00'} · {item.repeat === 'once' ? (ar ? 'مرة واحدة' : 'once') : (ar ? 'يوميًا' : 'daily')}</> : null}</p>{item.note && <p className="text-xs text-slate-400 break-words">{item.note}</p>}{!item.done && item.dueDate < today && <p className="text-xs font-bold text-red-600">{ar ? 'متأخر عن موعده' : 'Overdue'}</p>}</div>
+          {item.alertDisabled && !item.done && <button type="button" disabled={busy} onClick={() => void alertAction(item, 'resume')} className="text-xs text-emerald-700 underline">{ar ? 'إعادة التنبيه' : 'Resume'}</button>}
           <button type="button" aria-label={ar ? 'تعديل' : 'Edit'} disabled={busy} onClick={() => edit(item)} className="text-slate-500"><Pencil className="w-4 h-4"/></button>
-          <button type="button" aria-label={ar ? 'حذف' : 'Delete'} disabled={busy} onClick={() => void remove(item)} className="text-red-500"><Trash2 className="w-4 h-4"/></button>
+          <button type="button" aria-label={ar ? 'حذف' : 'Delete'} disabled={busy} onClick={() => setPendingDelete(item)} className="text-red-500"><Trash2 className="w-4 h-4"/></button>
         </div>)}</div>}
         <p className="text-[11px] text-slate-400">{ar ? 'التذكيرات لا تسجل مصروفًا أو دخلًا تلقائيًا.' : 'Reminders do not automatically create transactions.'}</p>
+      </div>
+    </div>}
+    {pendingDelete && <div role="dialog" aria-modal="true" aria-labelledby="reminder-delete-title" dir={ar ? 'rtl' : 'ltr'} className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/60 p-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl space-y-4">
+        <div className="flex items-center gap-2 text-red-600"><Trash2 className="w-5 h-5" /><h3 id="reminder-delete-title" className="text-base font-bold">{ar ? 'حذف البند؟' : 'Delete item?'}</h3></div>
+        <p className="text-sm text-slate-700">{ar ? `هل تريد حذف «${pendingDelete.title}» نهائيًا؟ ستُلغى تنبيهاته، ولن تتأثر العمليات المالية.` : `Permanently delete “${pendingDelete.title}”? Its reminders will stop; financial transactions will not change.`}</p>
+        <div className="flex justify-end gap-2">
+          <button type="button" disabled={busy} onClick={() => setPendingDelete(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold">{ar ? 'تراجع' : 'Cancel'}</button>
+          <button type="button" disabled={busy} onClick={async () => { const item = pendingDelete; await remove(item); setPendingDelete(null); }} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{ar ? 'حذف البند' : 'Delete'}</button>
+        </div>
       </div>
     </div>}
   </div>;

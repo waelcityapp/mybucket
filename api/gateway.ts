@@ -37,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Vercel production uses this serverless gateway, not the Express server.ts route.
-    if (action === 'appLock.status' || action === 'appLock.enable' || action === 'appLock.verify' || action === 'appLock.disable' || action === 'appLock.change' || action === 'appLock.timeout') {
+    if (action === 'appLock.status' || action === 'appLock.enable' || action === 'appLock.verify' || action === 'appLock.disable' || action === 'appLock.change' || action === 'appLock.timeout' || action === 'appLock.toggle') {
       const { appLockAction } = await import('../server/appLock.js');
       return res.status(200).json({ ok: true, data: await appLockAction(user.uid, action, payload) });
     }

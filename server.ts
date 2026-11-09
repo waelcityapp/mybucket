@@ -107,6 +107,10 @@ async function startServer() {
           const { reserveAiQuota } = await import('./server/aiQuota');
           return res.json({ ok: true, data: await reserveAiQuota(user.uid, payload.text, true) });
         }
+        case 'ai.quota.status': {
+          const { readOwnAiQuota } = await import('./server/aiQuota');
+          return res.json({ ok: true, data: await readOwnAiQuota(user.uid) });
+        }
         case 'admin.users.countFiltered': {
           const { countFilteredUsers } = await import('./server/adminUsers');
           return res.json({ ok: true, data: await countFilteredUsers(user, payload) });

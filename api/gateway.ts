@@ -97,6 +97,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { reserveAiQuota } = await import('../server/aiQuota.js');
         return res.status(200).json({ ok: true, data: await reserveAiQuota(user.uid, payload.text, true) });
       }
+      case 'ai.quota.status': {
+        const { readOwnAiQuota } = await import('../server/aiQuota.js');
+        return res.status(200).json({ ok: true, data: await readOwnAiQuota(user.uid) });
+      }
       case 'admin.users.countFiltered': {
         const { countFilteredUsers } = await import('../server/adminUsers.js');
         return res.status(200).json({ ok: true, data: await countFilteredUsers(user, payload) });

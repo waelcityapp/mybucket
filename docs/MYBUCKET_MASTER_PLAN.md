@@ -443,3 +443,6 @@ Typing in user search automatically loads a bounded page from the synchronized d
 
 ## Revision #137 — Clear subscription information in settings
 Show the subscription card for valid account-derived trial dates and remove the technical record-source notice. When a subscription read fails, show a clear retry action rather than stale subscription details. Correct the old marketer-code text: a code discounts the monthly subscription and does not extend the trial. No subscription dates or Firebase data are changed by this UI revision; live account data has not been independently verified.
+
+## Revision #148 — Daily usage in subscription card
+The subscription card reads the authenticated user's current effective plan and Cairo-day quota counters through the server gateway. Basic shows the local allowance; Pro shows Gemini and a separate local fallback allowance. Usage is counted at analysis start, not only for successfully saved transactions. The displayed snapshot can be refreshed; it does not modify counters or subscription records. Actual authenticated production behavior still requires end-to-end verification.

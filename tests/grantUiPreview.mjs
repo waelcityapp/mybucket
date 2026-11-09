@@ -36,6 +36,9 @@ try {
     assert.equal(await page.getByText('سارة محمد', { exact: true }).count(), 1); // Grant preview only; no user row.
     await page.getByPlaceholder('بحث بالاسم أو البريد').fill('لا يوجد');
     await page.getByText('لا يوجد مستخدمون يطابقون البحث.').waitFor();
+    await page.getByText('الخطة الحالية: Basic').waitFor();
+    await page.getByText('التسجيلات: 3 من 10 · المتبقي 7').waitFor();
+    await page.getByText('الاستعلامات: 1 من 2 · المتبقي 1').waitFor();
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth);
     assert.ok(overflow<=1,`horizontal overflow at ${viewport.width}px: ${overflow}`);
     await page.close();

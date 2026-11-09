@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { auth } from '../lib/firebase';
 
-export type LockStatus = { enabled: boolean; inactivityMinutes: number };
+export type LockStatus = { enabled: boolean; hasPin?: boolean; inactivityMinutes: number };
 export async function lockRequest(action: string, payload: Record<string, unknown> = {}): Promise<any> {
   const user = auth.currentUser;
   if (!user) throw new Error('login_required');

@@ -80,7 +80,7 @@ function expand(master: Reminder, today: string) {
   const limit = master.frequency === 'installments' ? Math.min(master.installmentCount ?? 1, 240) : 400;
   for (let index=0; index<limit; index++) {
     const item = effective(master,index);
-    if (item.dueDate > horizon) break;
+    if (item.dueDate > horizon && index > 0) break;
     const state = master.states?.[String(index)] || {};
     if (state.cancelled) continue;
     const completed = !!state.done;
@@ -143,7 +143,7 @@ export async function reminderAction(uid: string, action: string, payload: Recor
         }
       } else {
         const schedule = scheduleOf(payload);
-        transaction.update(ref,{...fields,kind:nextKind,...schedule,done:master.done,updatedAt:Date.now()});
+        transaction.update(ref,{...fields,kind:nextKind,...schedule,done:master.done,states:schedule.frequency === 'none' ? (master.states || {}) : {'0':{done:master.done}},updatedAt:Date.now()});
       }
       return { id, updated:true };
     }

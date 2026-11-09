@@ -118,15 +118,6 @@ export function SettingsView({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={onOpenMobileLink}
-                className="flex-1 py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
-                <span>{t.mobileLinkTitle}</span>
-              </button>
-
-              <button
-                type="button"
                 onClick={onLogout}
                 className="py-2 px-3 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
               >

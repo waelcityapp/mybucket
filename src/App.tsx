@@ -1,4 +1,5 @@
-import { ReminderCards } from './components/ReminderCards';
+import { ReminderHomeCards } from './components/ReminderHomeCards';
+import { ReminderWorkspace } from './components/views/ReminderWorkspace';
 import { LockScreen, lockRequest, type LockStatus } from './components/AppLock';
 import { TrialSubscriptionPages } from './components/views/TrialSubscriptionPages';
 import { currencyName, SUPPORTED_CURRENCIES } from './types';
@@ -208,7 +209,7 @@ export default function App() {
   });
 
   // 2. Active Tab State
-  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname.startsWith('/admin') ? 'admin-pin' : window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : 'home');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname.startsWith('/admin') ? 'admin-pin' : window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : window.location.pathname.startsWith('/reminders/') ? 'reminders' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : 'home');
   // Keep in-app tab changes in browser history so the device Back button can restore them.
   const [transactionQuickFilter, setTransactionQuickFilter] = useState<{ period: 'today' | 'month'; currency: string } | null>(null);
   const navigateTab = (tab: ActiveTab, quickFilter: { period: 'today' | 'month'; currency: string } | null = null) => {
@@ -508,7 +509,7 @@ export default function App() {
         setIsExpenseCategoriesModalOpen(false);
         setIsCategoryDetailModalOpen(false);
         setSelectedCategoryForDetail(null);
-        setActiveTab((window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : firebaseUser && window.location.pathname.startsWith('/admin') ? 'admin-pin': firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : 'home');
+        setActiveTab((window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : firebaseUser && window.location.pathname.startsWith('/admin') ? 'admin-pin': firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && window.location.pathname.startsWith('/reminders/') ? 'reminders' : firebaseUser && (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : 'home');
         setToastMessage(null);
         aiLearnedMemory.clear();
       }
@@ -1426,6 +1427,12 @@ export default function App() {
     }} />;
   }
 
+  // Reminder management uses real pages and browser history, never modal dialogs.
+  if (activeTab === 'reminders' && window.location.pathname.startsWith('/reminders/')) {
+    const reminderKind = window.location.pathname.split('/')[2] === 'receivable' ? 'receivable' : 'obligation';
+    return <ReminderWorkspace key={reminderKind} lang={lang} kind={reminderKind} userId={authUser.uid} onHome={() => { window.history.pushState({ myBucketTab: 'home' }, '', '/'); setActiveTab('home'); }} />;
+  }
+
   const showBottomNavigation = (
     ['home', 'transactions', 'search', 'categories', 'settings', 'accounts'].includes(activeTab)
     && window.location.pathname !== '/accounts/new'
@@ -1678,7 +1685,7 @@ export default function App() {
             />
 
             {/* Separate obligation and receivable reminders; no changes to financial ledger. */}
-            {authUser && <ReminderCards lang={lang} userId={authUser.uid} />}
+            {authUser && <ReminderHomeCards lang={lang} onOpen={kind => { window.history.pushState({ myBucketTab: 'reminders' }, '', '/reminders/' + kind); setActiveTab('reminders'); }} />}
 
             {/* 5. "أحدث العمليات" - Recent Transactions List */}
             <RecentTransactions

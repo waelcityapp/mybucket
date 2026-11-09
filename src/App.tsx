@@ -1357,10 +1357,9 @@ export default function App() {
   }
 
   // Keep all signed-in financial screens hidden while checking or enforcing the PIN.
-  if (authUser && !appLockStatus) {
-    return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 text-sm">{lang === 'ar' ? 'جاري التحقق من قفل التطبيق...' : 'Checking app lock...'}</div>;
-  }
-  if (authUser && appLockStatus?.enabled && !appLockUnlocked) {
+  // Never block access indefinitely when the optional lock service is unavailable.
+  // The lock feature is temporarily disabled until its gateway can be verified.
+  if (false && authUser && appLockStatus?.enabled && !appLockUnlocked) {
     return <LockScreen lang={lang} onUnlock={() => { appLockLastActivity.current = Date.now(); setAppLockUnlocked(true); }} />;
   }
 
@@ -1750,7 +1749,7 @@ export default function App() {
           <SettingsView
             lang={lang}
             appLockStatus={appLockStatus}
-            onAppLockChange={(next) => { setAppLockStatus(next); setAppLockUnlocked(true); }}
+
             onSetLanguage={(newLang) => setLang(newLang)}
             onZeroAllBalances={handleZeroAllBalances}
             user={authUser}

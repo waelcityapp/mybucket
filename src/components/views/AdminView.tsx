@@ -9,6 +9,7 @@ import { translations } from '../../data/translations';
 import { AdminAiUsageCard } from '../AdminAiUsageCard';
 import { AdminAppUsersView } from './AdminAppUsersView';
 import { AdminTrialSettingsView } from './AdminTrialSettingsView';
+import { AdminAiQuotaSettings } from './AdminAiQuotaSettings';
 
 interface AdminViewProps {
   lang: Language;
@@ -20,13 +21,14 @@ interface AdminViewProps {
   sectionId?: SectionId | null;
   onOpenSection: (section: SectionId) => void;
   onBackToSections: () => void;
+  onOpenGrant: (uid: string) => void;
 }
 
 export type SectionId = 'users' | 'subscriptions' | 'marketers' | 'reports' | 'ai' | 'system' | 'ads';
 
 export function AdminView({
   lang, user, onBack, onResetDemoData, onZeroAllBalances, onOpenFeedbackAdmin,
-  sectionId = null, onOpenSection, onBackToSections,
+  sectionId = null, onOpenSection, onBackToSections, onOpenGrant,
 }: AdminViewProps) {
   const t = translations[lang];
   const ar = lang === 'ar';
@@ -131,8 +133,8 @@ export function AdminView({
             </button>
           )}
 
-          {selected === 'users' && <AdminAppUsersView lang={lang} />}
-          {selected === 'subscriptions' && <AdminTrialSettingsView lang={lang} />}
+          {selected === 'users' && <AdminAppUsersView lang={lang} onOpenGrant={onOpenGrant} />}
+          {selected === 'subscriptions' && <><AdminTrialSettingsView lang={lang} /><AdminAiQuotaSettings lang={lang} /></>}
           {selected === 'ai' && <AdminAiUsageCard lang={lang} />}
 
           {selected === 'system' && (

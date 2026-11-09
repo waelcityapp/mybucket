@@ -16,6 +16,7 @@ type AppUser = {
   disabled: boolean;
   tier: 'paid' | 'trial' | 'free' | 'unknown';
   plan: string;
+  grant?: { plan: 'basic' | 'pro'; startsAt: string; endsAt: string } | null;
   installed: boolean;
 };
 type UserSummary = {
@@ -66,7 +67,7 @@ function deviceLabel(device: string, ar: boolean) {
   return device === 'mobile' ? (ar ? 'موبايل' : 'Mobile') : device === 'computer' ? (ar ? 'كمبيوتر' : 'Computer') : (ar ? 'جهاز غير محدد' : 'Unknown device');
 }
 
-export function AdminAppUsersView({ lang }: { lang: Language }) {
+export function AdminAppUsersView({ lang, onOpenGrant }: { lang: Language; onOpenGrant: (uid: string) => void }) {
   const ar = lang === 'ar';
   const [data, setData] = useState<UserSummary | null>(null);
   const [error, setError] = useState('');
@@ -294,18 +295,22 @@ export function AdminAppUsersView({ lang }: { lang: Language }) {
                     </div>
                     <p className="mt-0.5 break-all text-xs text-slate-600" dir="ltr">{record.email || '—'}</p>
                     {record.online && <p className="mt-1 text-[11px] font-medium text-emerald-700">{ar ? 'الأجهزة المتصلة: ' : 'Connected devices: '}{(record.onlineDevices || []).map(device => deviceLabel(device, ar)).join(ar ? ' و' : ' and ')}</p>}
-                    <p className="mt-1 text-xs font-semibold text-slate-700">{accountPlan(record, ar)}</p>
+                    {(!record.grant || record.tier === 'paid') && <p className="mt-1 text-xs font-semibold text-slate-700">{accountPlan(record, ar)}</p>}
+                    {record.grant && <p className="mt-1 text-xs font-bold text-emerald-800">{ar ? 'منحة مجانية' : 'Free grant'} · {record.grant.plan === 'pro' ? 'Pro' : 'Basic'} · {ar ? 'حتى' : 'through'} {new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { timeZone: 'Africa/Cairo', dateStyle: 'medium' }).format(new Date(Date.parse(record.grant.endsAt) - 1))}</p>}
                     <p className="mt-1 text-[11px] text-slate-500">{ar ? 'إنشاء:' : 'Created:'} {niceDate(record.createdAt, ar)}</p>
                     <p className="mt-1 text-[11px] text-slate-500">{ar ? 'آخر ظهور:' : 'Last seen:'} {niceCairoDateTime(record.lastSeenAt, ar)} {record.online === false && record.lastSeenAt && <> · {deviceLabel(record.lastSeenDevice, ar)}</>} {ar ? '(توقيت القاهرة)' : '(Cairo time)'}</p>
                     {record.installed && <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5"/>{ar ? 'تم رصد نسخة مثبتة' : 'Installed-app usage reported'}</p>}
                   </div>
-                  {!isOwner && <div className="flex shrink-0 flex-wrap gap-1">
+                  <div className="flex shrink-0 flex-wrap gap-1">
+                    <button type="button" disabled={!!workingUid} onClick={() => onOpenGrant(record.uid)} className="rounded-lg bg-emerald-50 px-2.5 py-2 text-xs font-bold text-emerald-800 disabled:opacity-50">{ar ? 'المنحة' : 'Grant'}</button>
+                    {!isOwner && <>
                     <button type="button" disabled={!!workingUid} onClick={() => { setDeleteUid(null); setConfirmUid(activeConfirmation ? null : record.uid); }} className={'flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-bold disabled:opacity-50 ' + (record.disabled ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800')}>
                       {record.disabled ? <UserRoundCheck className="h-3.5 w-3.5"/> : <ShieldBan className="h-3.5 w-3.5"/>}
                       {record.disabled ? (ar ? 'تفعيل' : 'Enable') : (ar ? 'إيقاف' : 'Suspend')}
                     </button>
                     {record.disabled && <button type="button" disabled={!!workingUid} onClick={() => { setConfirmUid(null); setDeleteUid(activeDelete ? null : record.uid); setTypedEmail(''); }} className="flex items-center gap-1 rounded-lg bg-rose-50 px-2.5 py-2 text-xs font-bold text-rose-700 disabled:opacity-50"><Trash2 className="h-3.5 w-3.5"/>{ar ? 'حذف الهوية' : 'Delete identity'}</button>}
-                  </div>}
+                    </>}
+                  </div>
                 </div>
                 {activeConfirmation && <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
                   <p>{record.disabled ? (ar ? 'إعادة التفعيل تسمح للمستخدم بتسجيل الدخول من جديد.' : 'Enabling lets the user sign in again.') : (ar ? 'سيتم إيقاف الحساب ومنع تسجيل الدخول الجديد. قد تستمر جلسة مفتوحة مؤقتًا حتى انتهاء صلاحية رمز الدخول.' : 'New sign-ins will be blocked. Existing client sessions may remain briefly until their current ID token expires.')}</p>

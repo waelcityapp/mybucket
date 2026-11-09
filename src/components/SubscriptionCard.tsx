@@ -3,6 +3,8 @@ import { Tag, Sparkles, CheckCircle2, AlertCircle, Clock, Zap, Trash2 } from 'lu
 import { UserSubscription } from '../types/prototypeSubscription';
 import { calculateRemainingTrialDays, applyAffiliateCodeToExistingSubscription, removeAffiliateCodeFromSubscription } from '../utils/subscriptionUtils';
 import { Language } from '../types';
+import { activeGrant } from '../config/grantPolicy';
+import { stageFor } from '../config/subscriptionPolicy';
 
 interface SubscriptionCardProps {
   subscription: UserSubscription | null;
@@ -22,6 +24,8 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   if (!subscription) return null;
 
   const remainingDays = calculateRemainingTrialDays(subscription);
+  const grant = stageFor(subscription) !== 'paid' ? activeGrant(subscription.grant) : null;
+  const grantDays = grant ? Math.max(0, Math.ceil((Date.parse(grant.endsAt) - Date.now()) / 86400000)) : null;
 
   const handleApplyPromo = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,14 +55,16 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
         </div>
         <span
           className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
-            subscription.isPaid
+            grant || subscription.isPaid
               ? 'bg-emerald-100 text-emerald-800'
               : remainingDays > 0
               ? 'bg-amber-100 text-amber-900'
               : 'bg-rose-100 text-rose-800'
           }`}
         >
-          {subscription.isPaid
+          {grant
+            ? (isAr ? `منحة ${grant.plan === 'pro' ? 'Pro' : 'Basic'} مجانية (${grantDays} يوم)` : `Free ${grant.plan} grant (${grantDays} days)`)
+            : subscription.isPaid
             ? (isAr ? 'مشترك مُميز (Pro)' : 'Pro Member')
             : remainingDays > 0
             ? (isAr ? `تجربة مجانية (${remainingDays} يوم متبقي)` : `Trial (${remainingDays} days left)`)
@@ -86,18 +92,18 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
         <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60 text-[11px]">
           <div className="bg-white p-2 rounded-lg border border-slate-200">
             <span className="block text-slate-500 text-[10px]">{isAr ? 'تسجيلات AI اليومية' : 'Daily AI Entries'}</span>
-            <span className="font-black text-slate-800">15 {isAr ? 'عملية / يوم' : 'ops / day'}</span>
+            <span className="font-black text-slate-800">{isAr ? 'حسب حدود الخطة' : 'According to plan limits'}</span>
           </div>
           <div className="bg-white p-2 rounded-lg border border-slate-200">
             <span className="block text-slate-500 text-[10px]">{isAr ? 'استعلامات AI وسقف البحث' : 'AI Queries & History'}</span>
-            <span className="font-black text-slate-800">5 {isAr ? 'استعلامات (35 يوم)' : 'queries (35 days)'}</span>
+            <span className="font-black text-slate-800">{isAr ? 'حسب حدود الخطة' : 'According to plan limits'}</span>
           </div>
         </div>
 
         <p className="text-[10px] text-slate-500 font-medium leading-relaxed pt-0.5">
           {isAr
-            ? '💡 الإدخال والاستعلام اليدوي غير محدود ومتاح دائماً حتى بعد انتهاء حصة الذكاء الاصطناعي اليومية.'
-            : '💡 Manual entry & searches remain 100% unlimited even after daily AI quotas.'}
+              ? 'الإدخال اليدوي متاح خلال صلاحية الاستخدام حتى بعد انتهاء حصة الذكاء الاصطناعي اليومية.'
+              : 'Manual entry remains available while access is active after the daily AI quota.'}
         </p>
       </div>
 
@@ -141,7 +147,7 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
             <span>{isAr ? 'إلغاء الكود' : 'Remove'}</span>
           </button>
         </div>
-      ) : remainingDays === 0 && !subscription.isPaid ? (
+      ) : remainingDays === 0 && !subscription.isPaid && !grant ? (
         <p className="rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-900">{isAr ? 'انتهت التجربة المجانية. لا يمنح كود المسوّق تجربة جديدة؛ خصم الاشتراك قيد التجهيز.' : 'The free trial has ended. A marketer code cannot start another trial; subscription discounts are being prepared.'}</p>
       ) : (
         <form onSubmit={handleApplyPromo} className="space-y-2 pt-1">

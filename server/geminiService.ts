@@ -112,11 +112,8 @@ Relevant user vocabulary: ${JSON.stringify(relevantMemory)}`;
   }
 
   if (!parsed) {
-    // If all models are temporarily unavailable, initialize a safe default object to be populated by deterministic guardrails
-    parsed = {
-      intent: isFinancialQueryText(req.text) ? 'FINANCIAL_QUERY' : 'CREATE_TRANSACTION',
-      confidence: 0.85,
-    };
+    // The client must reserve its separate local allowance before fallback.
+    throw new Error('gemini_unavailable');
   }
 
   // Deterministic Guardrails: Semantic Intent and Number Role Verification

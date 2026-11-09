@@ -1,3 +1,5 @@
+import { activeGrant, type FreeGrant } from './grantPolicy.js';
+
 export const PRO_TRIAL_DAYS = 15;
 export const BASIC_FREE_DAYS = 75; // Default only; Firebase setting takes priority.
 export type TrialDurations = { proDays: number; basicDays: number };
@@ -14,8 +16,10 @@ export const PRO_MARKETER_PRICE_EGP = 120;
 export const BASIC_PRICE_EGP: number | null = null; // Pending approval.
 export type TrialStage = 'pro-trial' | 'basic-free' | 'paid' | 'expired';
 export function addDays(start: string, days: number) { const time = Date.parse(start); if (!Number.isFinite(time)) throw new Error('Invalid trial start'); return new Date(time + days * 86400000).toISOString(); }
-export function stageFor(sub: { trialStartedAt: string; isPaid: boolean; paidExpiresAt?: string | null }, now=Date.now(), durations: TrialDurations = currentDurations): TrialStage {
+export function stageFor(sub: { trialStartedAt: string; isPaid: boolean; paidExpiresAt?: string | null; grant?: FreeGrant | null }, now=Date.now(), durations: TrialDurations = currentDurations): TrialStage {
   if (sub.isPaid && sub.paidExpiresAt && Date.parse(sub.paidExpiresAt)>now) return 'paid';
+  const grant = activeGrant(sub.grant, now);
+  if (grant) return grant.plan === 'pro' ? 'pro-trial' : 'basic-free';
   const start = Date.parse(sub.trialStartedAt);
   if (!Number.isFinite(start)) return 'expired';
   if (now < start + durations.proDays*86400000) return 'pro-trial';

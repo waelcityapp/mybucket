@@ -3,7 +3,8 @@ import { Mic, MicOff, Send, Sparkles, Loader2, HelpCircle } from 'lucide-react';
 import { Language, FinancialAccount, Category, Transaction, CurrencyCode } from '../types';
 import { UserSubscription, UserDailyUsage } from '../types/prototypeSubscription';
 import { translations } from '../data/translations';
-import { aiClient } from '../services/ai/aiClient';
+import { geminiClient, quotaLocalClient } from '../services/ai/aiClient';
+import { stageFor } from '../config/subscriptionPolicy';
 import { AIFinancialQuery, AIInterpretationResult, AICorrection } from '../services/ai/types';
 import type { AnalyzerFeedbackContext } from '../services/ai/analyzerFeedbackClient';
 import { APP_REVISION } from '../config/appRevision';
@@ -52,14 +53,10 @@ export function VoiceNaturalInput({
   lang,
   accounts,
   categories,
-  userDailyUsage,
   userSubscription,
   onTransactionDraft,
   onFinancialQuery,
   onAICorrection,
-  onAiEntryUsed,
-  onAiQueryUsed,
-  onOpenManualAdd,
   subscriptionExpired = false,
   onExpiredAttempt,
 }: VoiceNaturalInputProps) {
@@ -72,16 +69,6 @@ export function VoiceNaturalInput({
   const [isListening, setIsListening] = useState(false);
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [showSoftLandingModal, setShowSoftLandingModal] = useState<'entry' | 'inquiry' | null>(null);
-
-  const isPaid = userSubscription?.isPaid || userSubscription?.tier === 'trial'; // Full Pro trial
-  const maxEntries = userSubscription?.dailyExpenseAiLimit || 15;
-  const maxQueries = userSubscription?.dailyInquiryAiLimit || 5;
-  const usedEntries = userDailyUsage?.expenseAiCount || 0;
-  const usedQueries = userDailyUsage?.inquiryAiCount || 0;
-
-  const entriesRemaining = isPaid ? 999 : Math.max(0, maxEntries - usedEntries);
-  const queriesRemaining = isPaid ? 999 : Math.max(0, maxQueries - usedQueries);
   const [speechError, setSpeechError] = useState<string | null>(null);
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -146,13 +133,16 @@ export function VoiceNaturalInput({
     setIsProcessingAI(true);
     setStatusMessage(isAr ? 'جاري فهم كلامك وتجهيز البيانات...' : 'Understanding your request and preparing details...');
 
+    let analyzed = false;
     try {
       const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Cairo';
       const now = new Date();
       // Format local ISO
       const localISO = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();
 
-      const result: AIInterpretationResult = await aiClient.interpret({
+      const phase = userSubscription ? stageFor(userSubscription) : 'expired';
+      const analyzer = phase === 'paid' || phase === 'pro-trial' ? geminiClient : quotaLocalClient;
+      const result: AIInterpretationResult = await analyzer.interpret({
         text,
         accounts: accounts.map((a) => ({
           id: a.id,
@@ -171,46 +161,20 @@ export function VoiceNaturalInput({
         userTimezone,
         lang,
       });
+      analyzed = true;
+      const engineNotice = result.engineUsed === 'local-fallback'
+        ? (isAr ? 'تم استخدام المحلل المحلي لأن Gemini غير متاح أو انتهى حده اليومي.' : 'The local analyzer was used because Gemini was unavailable or its daily limit was reached.')
+        : null;
 
       // Handle Result based on classified INTENT
       if (result.intent === 'FINANCIAL_QUERY') {
-        // Check Daily Inquiry Limit (5/day for trial)
-        if (!isPaid && queriesRemaining <= 0) {
-          setShowSoftLandingModal('inquiry');
-          setStatusMessage(
-            isAr
-              ? 'لقد استهلكت حد الأسئلة الذكية لليوم (5 استفسارات). يمكنك البحث اليدوي في شاشة التقارير أو الترقية للنسخة الاحترافية.'
-              : 'You have reached your daily AI query limit (5 queries). You can review records manually in Reports.'
-          );
-          setTimeout(() => setStatusMessage(null), 6000);
-          return;
-        }
-
-        setStatusMessage(null);
-        if (onAiQueryUsed) {
-          onAiQueryUsed();
-        }
+        setStatusMessage(engineNotice);
         onFinancialQuery(
           result.query || { metric: 'total_spent', period: 'all_time', transactionType: 'expense' },
           text
         );
       } else if (result.intent === 'CREATE_TRANSACTION' && result.transaction) {
-        // Check Daily Entry Limit (15/day for trial)
-        if (!isPaid && entriesRemaining <= 0) {
-          setShowSoftLandingModal('entry');
-          setStatusMessage(
-            isAr
-              ? 'لقد استهلكت حد الإدخال الذكي لليوم (15 عملية). جاري نقلك للإدخال اليدوي المباشر بدون قيود!'
-              : 'Daily AI entry limit reached (15 entries). You can continue entering transactions manually!'
-          );
-          setTimeout(() => setStatusMessage(null), 6000);
-          return;
-        }
-
-        setStatusMessage(null);
-        if (onAiEntryUsed) {
-          onAiEntryUsed();
-        }
+        setStatusMessage(engineNotice);
         const tx = result.transaction;
 
         // Build transaction draft
@@ -250,13 +214,13 @@ export function VoiceNaturalInput({
       console.error('AI processing error:', err);
       setStatusMessage(
         isAr
-          ? 'تعذر تحليل النص، يرجى مراجعة البيانات والمحاولة مرة أخرى'
+          ? (err instanceof Error && err.message ? err.message : 'تعذر تحليل النص، يرجى مراجعة البيانات والمحاولة مرة أخرى')
           : 'Could not analyze text; review your input and try again'
       );
       setTimeout(() => setStatusMessage(null), 4000);
     } finally {
       setIsProcessingAI(false);
-      setInputText('');
+      if (analyzed) setInputText('');
     }
   };
 
@@ -560,60 +524,7 @@ export function VoiceNaturalInput({
         </div>
       )}
 
-      {/* Soft Landing Quota Limit Modal */}
-      {showSoftLandingModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-sm w-full border border-slate-100 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-600 mx-auto">
-              <Sparkles className="w-6 h-6" />
-            </div>
 
-            <div className="text-center space-y-1">
-              <h3 className="font-bold text-base text-slate-800">
-                {showSoftLandingModal === 'entry'
-                  ? isAr
-                    ? 'وصلت للحد اليومي للإدخال الذكي (15 عملية)'
-                    : 'Daily AI Entry Limit Reached (15)'
-                  : isAr
-                  ? 'وصلت للحد اليومي للاستفسارات الذكية (5 أسئلة)'
-                  : 'Daily AI Query Limit Reached (5)'}
-              </h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                {showSoftLandingModal === 'entry'
-                  ? isAr
-                    ? 'فترة التجربة توفر 15 إدخال بالذكاء الاصطناعي يومياً. يمكنك الآن إتمام عمليتك بالإدخال اليدوي المباشر بدون أي انقطاع وبدون حدود!'
-                    : 'Trial includes 15 AI entries per day. You can continue effortlessly with manual entry with no limits!'
-                  : isAr
-                  ? 'فترة التجربة توفر 5 استفسارات بالذكاء الاصطناعي يومياً. يمكنك مراجعة تقاريرك وحساباتك مباشرة في تبويب التقارير.'
-                  : 'Trial includes 5 AI queries per day. You can review all records directly in the Reports tab.'}
-              </p>
-            </div>
-
-            <div className="space-y-2 pt-2">
-              {showSoftLandingModal === 'entry' && onOpenManualAdd && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowSoftLandingModal(null);
-                    onOpenManualAdd();
-                  }}
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <span>{isAr ? 'المتابعة بالإدخال اليدوي المباشر ✍️' : 'Continue with Manual Entry ✍️'}</span>
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setShowSoftLandingModal(null)}
-                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold text-xs transition-colors cursor-pointer"
-              >
-                {isAr ? 'حسناً، فهمت' : 'Got it'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

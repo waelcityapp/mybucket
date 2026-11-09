@@ -1,6 +1,8 @@
+import type { FreeGrant } from '../config/grantPolicy';
 export type SubscriptionStatus = 'trial' | 'paid' | 'expired';
 
 export interface UserSubscription {
+  grant?: FreeGrant | null;
   status: SubscriptionStatus;
   trialStartedAt: string;
   trialExpiresAt: string;

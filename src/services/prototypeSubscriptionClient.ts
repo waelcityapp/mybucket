@@ -4,17 +4,20 @@ import { requestSubscription, resolveSubscriptionRecords } from './subscriptionC
 import type { UserSubscription as StoredSubscription } from '../types/subscription';
 import type { UserSubscription } from '../types/prototypeSubscription';
 import { stageFor } from '../config/subscriptionPolicy';
+import { grantFromAccess } from '../config/grantPolicy';
 
 function toPrototype(sub: StoredSubscription): UserSubscription {
+  const phase = stageFor(sub);
   return {
-    tier: stageFor(sub) === 'basic-free' ? 'basic' : stageFor(sub) === 'pro-trial' ? 'trial' : stageFor(sub) === 'paid' ? 'pro' : 'expired',
+    grant: sub.grant || null,
+    tier: phase === 'basic-free' ? 'basic' : phase === 'pro-trial' ? 'trial' : phase === 'paid' ? 'pro' : 'expired',
     trialDatesStored: sub.trialDatesStored === true,
     affiliateCode: sub.affiliateCode,
     hasAppliedAffiliateCode: sub.hasAppliedAffiliateCode,
     totalTrialDays: sub.totalTrialDays,
     trialStartedAt: sub.trialStartedAt,
     trialExpiresAt: sub.trialExpiresAt,
-    isPaid: sub.isPaid,
+    isPaid: phase === 'paid',
     paidExpiresAt: sub.paidExpiresAt,
     dailyExpenseAiLimit: sub.dailyAiEntryLimit,
     dailyInquiryAiLimit: sub.dailyAiInquiryLimit,
@@ -24,7 +27,7 @@ function toPrototype(sub: StoredSubscription): UserSubscription {
 }
 
 export interface SubscriptionReadIssue {
-  source: 'billing' | 'profile' | 'dates' | 'auth';
+  source: 'billing' | 'profile' | 'access' | 'dates' | 'auth';
   code: string;
   messageAr: string;
   messageEn: string;
@@ -41,6 +44,7 @@ export function subscribeUserSubscription(
   let active = true;
   let billing: Record<string, unknown> | null | undefined;
   let profile: Record<string, unknown> | null | undefined;
+  let access: Record<string, unknown> | null | undefined;
   let delivered = false;
   const readErrors = new Map<SubscriptionReadIssue['source'], string>();
 
@@ -61,8 +65,8 @@ export function subscribeUserSubscription(
       ? error.code : 'subscription-read-failed');
     const denied = code === 'permission-denied';
     const timeout = code === 'subscription-read-timeout';
-    const labelAr = source === 'profile' ? 'كود المسوق المحفوظ في الحساب' : 'سجل الاشتراك';
-    const labelEn = source === 'profile' ? 'the saved marketer code' : 'the subscription record';
+    const labelAr = source === 'profile' ? 'كود المسوق المحفوظ في الحساب' : source === 'access' ? 'صلاحية الاستخدام' : 'سجل الاشتراك';
+    const labelEn = source === 'profile' ? 'the saved marketer code' : source === 'access' ? 'the access record' : 'the subscription record';
     console.warn(`Subscription ${source} read failed (${code}):`, error);
     readErrors.set(source, `${source}: ${code}`);
     onError({
@@ -93,12 +97,12 @@ export function subscribeUserSubscription(
 
   const timeout = setTimeout(() => {
     if (active && !delivered) {
-      report(billing === undefined ? 'billing' : 'profile', new Error('No confirmed snapshot within 12 seconds.'), 'subscription-read-timeout');
+      report(billing === undefined ? 'billing' : access === undefined ? 'access' : 'profile', new Error('No confirmed snapshot within 12 seconds.'), 'subscription-read-timeout');
     }
   }, 12000);
 
   const refresh = () => {
-    if (!active || billing === undefined) return;
+    if (!active || billing === undefined || access === undefined) return;
     const user = auth.currentUser;
     if (!user || user.uid !== uid) {
       report('auth', new Error('The signed-in account changed.'), 'auth-account-changed');
@@ -106,6 +110,7 @@ export function subscribeUserSubscription(
     }
     try {
       const sub = resolveSubscriptionRecords(user, billing, profile || null);
+      sub.grant = grantFromAccess(access);
       // A recorded code or paid status is complete in billing; profile is only needed for a prototype code.
       if (profile === undefined && !hasSelfContainedBilling()) return;
       clearTimeout(timeout);
@@ -136,11 +141,17 @@ export function subscribeUserSubscription(
     clearTimeout(timeout);
     report('billing', error);
   });
+  const unsubscribeAccess = onSnapshot(doc(db, 'users', uid, 'billing', 'access'), { includeMetadataChanges: true }, (snapshot) => {
+    if (snapshot.metadata.fromCache) return;
+    access = snapshot.exists() ? snapshot.data() : null;
+    refresh();
+  }, error => { clearTimeout(timeout); report('access', error); });
   return () => {
     active = false;
     clearTimeout(timeout);
     unsubscribeProfile();
     unsubscribeBilling();
+    unsubscribeAccess();
   };
 }
 

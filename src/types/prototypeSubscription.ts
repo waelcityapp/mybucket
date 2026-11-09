@@ -1,6 +1,8 @@
+import type { FreeGrant } from '../config/grantPolicy';
 export type SubscriptionTier = 'trial' | 'basic' | 'pro' | 'expired';
 
 export interface UserSubscription {
+  grant?: FreeGrant | null;
   tier: SubscriptionTier;
   trialDatesStored?: boolean;
   affiliateCode?: string | null;

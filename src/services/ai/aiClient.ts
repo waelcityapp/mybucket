@@ -19,6 +19,18 @@ import {
   matchTransferAccountsFromText,
 } from '../../utils/entityMatcher';
 
+async function reserveLocalQuota(text: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('يرجى تسجيل الدخول للتحقق من الحد اليومي.');
+  const response = await fetch('/api/gateway', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
+    body: JSON.stringify({ action: 'ai.quota.reserveLocal', payload: { text } }),
+  });
+  const body = await response.json();
+  if (!response.ok || !body?.ok) throw new Error(body?.message || 'تعذر التحقق من الحد اليومي للمحلل المحلي.');
+}
+
 export class GeminiAIClient implements AIInterpretationProvider {
   async interpret(request: AIInterpretationRequest): Promise<AIInterpretationResult> {
     try {
@@ -50,10 +62,11 @@ export class GeminiAIClient implements AIInterpretationProvider {
       if (!gatewayResponse?.ok || !gatewayResponse?.data) {
         throw new Error(gatewayResponse?.message || 'Gateway returned an invalid response');
       }
-      return this.validateAndSanitize(gatewayResponse.data as AIInterpretationResult, request);
+      return { ...this.validateAndSanitize(gatewayResponse.data as AIInterpretationResult, request), engineUsed: 'gemini' };
     } catch (err) {
-      console.warn('AI Server call failed or offline, using safe fallback parser:', err);
-      return this.fallbackInterpretation(request);
+      console.warn('Gemini unavailable; checking local allowance before fallback:', err);
+      await reserveLocalQuota(request.text);
+      return { ...this.fallbackInterpretation(request), engineUsed: 'local-fallback' };
     }
   }
 
@@ -273,14 +286,18 @@ export class GeminiAIClient implements AIInterpretationProvider {
    * Safe offline fallback parser using rule-based heuristics if backend is unreachable.
    */
   public fallbackInterpretation(request: AIInterpretationRequest): AIInterpretationResult {
-    return interpretLocalFinancialRequest(request);
+    return { ...interpretLocalFinancialRequest(request), engineUsed: 'local' };
   }
 }
 
-// Keep the Gemini client available for a future, explicitly approved feature.
-// Everyday entries and financial inquiries use the local parser ONLY and make
-// no AI gateway request, including when local interpretation is incomplete.
+// Main input chooses a quota-checked engine; form corrections retain the local parser.
 export const geminiClient: AIInterpretationProvider = new GeminiAIClient();
+export const quotaLocalClient: AIInterpretationProvider = {
+  async interpret(request: AIInterpretationRequest): Promise<AIInterpretationResult> {
+    await reserveLocalQuota(request.text);
+    return { ...interpretLocalFinancialRequest(request), engineUsed: 'local' };
+  },
+};
 export const aiClient: AIInterpretationProvider = {
   async interpret(request: AIInterpretationRequest): Promise<AIInterpretationResult> {
     return interpretLocalFinancialRequest(request);

@@ -3,6 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin.js';
 import type { AffiliateCodeRecord, UserSubscription } from '../src/types/subscription';
 import { BASIC_FREE_DAYS, PRO_PRICE_EGP, addDays, stageFor, type TrialDurations } from '../src/config/subscriptionPolicy.js';
+import { grantFromAccess } from '../src/config/grantPolicy.js';
 
 const BASE_TRIAL_DAYS = BASIC_FREE_DAYS;
 const DEFAULT_MONTHLY_PRICE_EGP = PRO_PRICE_EGP;
@@ -97,16 +98,19 @@ function withComputedStatus(subscription: UserSubscription, durations: TrialDura
   return { ...subscription, status: phase === 'paid' ? 'paid' : phase === 'expired' ? 'expired' : 'trial' };
 }
 
-export async function getOrCreateSubscription(uid: string): Promise<UserSubscription> {
+export async function getOrCreateSubscription(uid: string, knownDurations?: TrialDurations, requireAccess = false): Promise<UserSubscription> {
   const { readTrialSettings } = await import('./trialSettings.js');
-  const durations = await readTrialSettings();
+  const durations = knownDurations || await readTrialSettings();
   const db = getAdminFirestore();
   const subscriptionRef = db.doc(`users/${uid}/billing/subscription`);
-  const snapshot = await subscriptionRef.get();
+  const [snapshot, access] = await Promise.all([subscriptionRef.get(), db.doc(`users/${uid}/billing/access`).get()]);
+  if (requireAccess && !access.exists) throw new SubscriptionError(503, 'access_record_missing', 'تعذر التحقق من صلاحية الحساب.');
+  const grant = grantFromAccess(access.exists ? access.data() || null : null);
   if (snapshot.exists) {
     const stored = snapshot.data() as UserSubscription;
     return withComputedStatus({
       ...stored,
+      grant,
       totalTrialDays: durations.basicDays,
       trialExpiresAt: addDays(stored.trialStartedAt, durations.basicDays),
     }, durations);
@@ -127,6 +131,7 @@ export async function getOrCreateSubscription(uid: string): Promise<UserSubscrip
   const stored = latest.exists ? latest.data() as UserSubscription : created;
   return withComputedStatus({
     ...stored,
+    grant,
     totalTrialDays: durations.basicDays,
     trialExpiresAt: addDays(stored.trialStartedAt, durations.basicDays),
   }, durations);

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { auth } from '../lib/firebase';
 import { ChevronLeft, X, Plus, Trash2, Pencil, CheckCircle2 } from 'lucide-react';
 import type { Language } from '../types';
+import { playReminderTone } from '../utils/reminderSounds';
+import { BellRing, Volume2 } from 'lucide-react';
 
 export type ReminderKind = 'obligation' | 'receivable';
 type Reminder = { id: string; kind: ReminderKind; title: string; amount: number; currency: string; dueDate: string; note: string; done: boolean; leadDays?: number; tone?: number };
@@ -30,6 +32,7 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
   const [error, setError] = useState('');
   const [notice, setNotice] = useState<Reminder[]>([]);
   const sounded = useRef(new Set<string>());
+  const [currentDay, setCurrentDay] = useState(() => new Date().toLocaleDateString('en-CA'));
   const refresh = useCallback(async () => {
     setLoading(true);
     try { const data = await request('list'); if (auth.currentUser?.uid === userId) { setItems(Array.isArray(data.reminders) ? data.reminders : []); setError(''); } }
@@ -65,10 +68,34 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
     catch { setError(ar ? 'تعذر حذف البند' : 'Failed to delete item'); }
     finally { setBusy(false); }
   }
-  const today = new Date().toLocaleDateString('en-CA');
+  const today = currentDay;
   const dateLead = (item: Reminder) => { const date = new Date(item.dueDate + 'T12:00:00'); date.setDate(date.getDate() - (item.leadDays ?? 7)); return date.toLocaleDateString('en-CA'); };
   const dueNow = items.filter(item => !item.done && dateLead(item) <= today);
+  useEffect(() => {
+    const updateDay = () => setCurrentDay(new Date().toLocaleDateString('en-CA'));
+    const timer = window.setInterval(updateDay, 60_000);
+    window.addEventListener('focus', updateDay);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', updateDay); };
+  }, []);
+  useEffect(() => {
+    const alertedToday = dueNow.filter(item => !sounded.current.has(item.id + ':' + today));
+    if (!alertedToday.length) return;
+    alertedToday.forEach(item => sounded.current.add(item.id + ':' + today));
+    setNotice(dueNow);
+    // Browser audio may be blocked until a user gesture. Keep the visible notice regardless.
+    void playReminderTone(alertedToday[0].tone ?? 1).catch(() => {});
+  }, [items, today]);
+
   return <div className="space-y-2.5">
+    {dueNow.length > 0 && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 flex items-start gap-3" role="status">
+      <BellRing className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-extrabold text-amber-950">{ar ? `لديك ${dueNow.length} تذكير مالي يحتاج انتباهك` : `${dueNow.length} financial reminders need attention`}</p>
+        <p className="text-xs text-amber-800">{ar ? 'افتح القائمة لمراجعة البنود ومواعيدها.' : 'Open a list to review amounts and dates.'}</p>
+        {dueNow.slice(0,3).map(item => <button key={item.id} type="button" onClick={() => open(item.kind)} className="block text-start text-xs text-amber-900 underline mt-1">{item.title} — {item.amount.toLocaleString(ar ? 'ar-EG' : 'en-US')} {item.currency} — {item.dueDate}</button>)}
+        <button type="button" onClick={() => void playReminderTone(dueNow[0].tone ?? 1).catch(() => {})} className="flex items-center gap-1 text-xs font-bold text-emerald-800 mt-2"><Volume2 className="w-4 h-4" />{ar ? 'تشغيل جرس التذكير' : 'Play reminder sound'}</button>
+      </div>
+    </div>}
     {(['obligation', 'receivable'] as const).map(kind => {
       const count = items.filter(item => item.kind === kind && !item.done).length;
       const overdue = items.filter(item => item.kind === kind && !item.done && item.dueDate < today).length;
@@ -98,13 +125,28 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
             <label className="block text-xs font-semibold">{ar ? 'العملة' : 'Currency'}<select value={fields.currency} onChange={e => setFields(s => ({ ...s, currency: e.target.value }))} className="w-full mt-1 p-2.5 rounded-lg border bg-white">{currencies.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
           </div>
           <label className="block text-xs font-semibold">{ar ? 'تاريخ الاستحقاق' : 'Due date'}<input required type="date" value={fields.dueDate} onChange={e => setFields(s => ({ ...s, dueDate: e.target.value }))} className="w-full mt-1 p-2.5 rounded-lg border bg-white" /></label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="block text-xs font-semibold">{ar ? 'ذكرني قبل الاستحقاق' : 'Remind me before due date'}
+              <select value={fields.leadDays} onChange={e => setFields(s => ({ ...s, leadDays: Number(e.target.value) }))} className="w-full mt-1 p-2.5 rounded-lg border bg-white">
+                {[0,1,2,3,5,7,10,14,21,30,60,90].map(days => <option key={days} value={days}>{days === 0 ? (ar ? 'يوم الاستحقاق' : 'On the due date') : `${days} ${ar ? 'يوم' : 'days'}`}</option>)}
+              </select>
+            </label>
+            <label className="block text-xs font-semibold">{ar ? 'نغمة التنبيه' : 'Alert sound'}
+              <div className="flex items-center gap-2 mt-1">
+                <select value={fields.tone} onChange={e => setFields(s => ({ ...s, tone: Number(e.target.value) }))} className="flex-1 min-w-0 p-2.5 rounded-lg border bg-white">
+                  {[1,2,3,4].map(tone => <option key={tone} value={tone}>{ar ? 'النغمة' : 'Tone'} {tone}</option>)}
+                </select>
+                <button type="button" aria-label={ar ? 'استمع للنغمة' : 'Play tone'} onClick={() => void playReminderTone(fields.tone).catch(() => setError(ar ? 'تعذر تشغيل الصوت في المتصفح' : 'Audio unavailable'))} className="border rounded-lg px-3 py-2.5 text-emerald-700"><Volume2 className="w-4 h-4" /></button>
+              </div>
+            </label>
+          </div>
           <label className="block text-xs font-semibold">{ar ? 'ملاحظات (اختياري)' : 'Notes (optional)'}<textarea maxLength={500} rows={2} value={fields.note} onChange={e => setFields(s => ({ ...s, note: e.target.value }))} className="w-full mt-1 p-2.5 rounded-lg border bg-white" /></label>
           <div className="flex gap-2"><button type="submit" disabled={busy} className="bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50">{ar ? 'حفظ البند' : 'Save item'}</button><button type="button" onClick={() => setShowEditor(false)} disabled={busy} className="border rounded-lg px-4 py-2 text-sm">{ar ? 'إلغاء' : 'Cancel'}</button></div>
         </form>}
         {error && <p role="alert" className="text-xs text-red-600">{error}</p>}
         {loading ? <p className="text-sm text-slate-500">{ar ? 'جاري تحميل البنود...' : 'Loading items...'}</p> : items.filter(item => item.kind === selected).length === 0 ? <p className="text-sm text-slate-500">{ar ? 'لا توجد بنود مسجلة حتى الآن.' : 'No items yet.'}</p> : <div className="space-y-2">{items.filter(item => item.kind === selected).map(item => <div key={item.id} className="border border-slate-200 rounded-xl p-3 flex items-start gap-3">
           <button type="button" aria-label={ar ? 'تغيير الحالة' : 'Toggle complete'} disabled={busy} onClick={() => void toggle(item)} className={item.done ? 'text-emerald-600' : 'text-slate-400'}><CheckCircle2 className="w-5 h-5"/></button>
-          <div className="flex-1 min-w-0"><p className={`font-semibold text-sm break-words ${item.done ? 'line-through text-slate-400' : 'text-slate-900'}`}>{item.title}</p><p className="text-xs text-slate-600">{item.amount.toLocaleString(ar ? 'ar-EG' : 'en-US')} {item.currency} · {item.dueDate}</p>{item.note && <p className="text-xs text-slate-400 break-words">{item.note}</p>}{!item.done && item.dueDate < today && <p className="text-xs font-bold text-red-600">{ar ? 'متأخر عن موعده' : 'Overdue'}</p>}</div>
+          <div className="flex-1 min-w-0"><p className={`font-semibold text-sm break-words ${item.done ? 'line-through text-slate-400' : 'text-slate-900'}`}>{item.title}</p><p className="text-xs text-slate-600">{item.amount.toLocaleString(ar ? 'ar-EG' : 'en-US')} {item.currency} · {item.dueDate} · {ar ? 'التذكير قبل' : 'Remind'} {item.leadDays ?? 7} {ar ? 'يوم' : 'days ahead'}</p>{item.note && <p className="text-xs text-slate-400 break-words">{item.note}</p>}{!item.done && item.dueDate < today && <p className="text-xs font-bold text-red-600">{ar ? 'متأخر عن موعده' : 'Overdue'}</p>}</div>
           <button type="button" aria-label={ar ? 'تعديل' : 'Edit'} disabled={busy} onClick={() => edit(item)} className="text-slate-500"><Pencil className="w-4 h-4"/></button>
           <button type="button" aria-label={ar ? 'حذف' : 'Delete'} disabled={busy} onClick={() => void remove(item)} className="text-red-500"><Trash2 className="w-4 h-4"/></button>
         </div>)}</div>}

@@ -1,4 +1,4 @@
-export type DirectoryRow = { uid: string; disabled: boolean; installed: boolean; tier: string; trialPlan?: 'pro' | 'basic' };
+export type DirectoryRow = { uid: string; disabled: boolean; installed: boolean; tier: string; trialPlan?: 'pro' | 'basic'; grant?: unknown };
 export type UserFilter = 'all' | 'paid' | 'trial' | 'trial_pro' | 'trial_basic' | 'free' | 'disabled' | 'installed';
 
 /** Continue scanning bounded pages, retaining a cursor even for sparse filters. */
@@ -14,7 +14,8 @@ export async function collectDirectoryRows<Row extends DirectoryRow>(
     const page = await read(cursor);
     let filled = false;
     for (const row of page.rows) {
-      const matches = filter === 'all' || (filter === 'disabled' ? row.disabled : filter === 'installed' ? row.installed : filter === 'trial_pro' ? row.tier === 'trial' && row.trialPlan === 'pro' : filter === 'trial_basic' ? row.tier === 'trial' && row.trialPlan === 'basic' : row.tier === filter);
+      const trialOrExpired = ['trial', 'trial_pro', 'trial_basic', 'free'].includes(filter);
+      const matches = !(trialOrExpired && row.grant) && (filter === 'all' || (filter === 'disabled' ? row.disabled : filter === 'installed' ? row.installed : filter === 'trial_pro' ? row.tier === 'trial' && row.trialPlan === 'pro' : filter === 'trial_basic' ? row.tier === 'trial' && row.trialPlan === 'basic' : row.tier === filter));
       if (matches) selected.push(row);
       if (selected.length === 25) { nextCursor = row.uid; filled = true; break; }
     }

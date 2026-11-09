@@ -1,0 +1,159 @@
+// GRANTS REVIEW DRAFT. Do not deploy without comparing against the current
+// Firebase Console rules and testing with the Firestore emulator.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    function settingsPath() {
+      return /databases/$(database)/documents/appSettings/subscriptionTrials;
+    }
+    function accessPath(uid) {
+      return /databases/$(database)/documents/users/$(uid)/billing/access;
+    }
+    // Draft: validate a transfer record against the four referenced accounts.
+    // This does not by itself protect separate direct account-balance writes.
+    function accountPath(uid, id) {
+      return /databases/$(database)/documents/users/$(uid)/accounts/$(id);
+    }
+    function balanceMatchesMethod(uid, methodId, balanceId) {
+      let method = getAfter(accountPath(uid, methodId)).data;
+      return ('linkedBankId' in method && method.linkedBankId != null && method.linkedBankId != '')
+        ? method.linkedBankId == balanceId && method.type in ['card', 'wallet']
+          && getAfter(accountPath(uid, balanceId)).data.type == 'bank'
+        : methodId == balanceId;
+    }
+    function validTransferCurrency(uid, tx) {
+      return tx.type != 'transfer' || (
+        tx.accountId is string && tx.toAccountId is string
+        && tx.balanceAccountId is string && tx.toBalanceAccountId is string
+        && tx.currency is string
+        && tx.balanceAccountId != tx.toBalanceAccountId
+        && get(accountPath(uid, tx.balanceAccountId)).data.currency == tx.currency
+        && get(accountPath(uid, tx.toBalanceAccountId)).data.currency == tx.currency
+        && getAfter(accountPath(uid, tx.accountId)).data.currency == tx.currency
+        && getAfter(accountPath(uid, tx.toAccountId)).data.currency == tx.currency
+        && getAfter(accountPath(uid, tx.balanceAccountId)).data.currency == tx.currency
+        && getAfter(accountPath(uid, tx.toBalanceAccountId)).data.currency == tx.currency
+        && balanceMatchesMethod(uid, tx.accountId, tx.balanceAccountId)
+        && balanceMatchesMethod(uid, tx.toAccountId, tx.toBalanceAccountId)
+      );
+    }
+    function allowedFinancialWrite(uid) {
+      let settingsExist = exists(settingsPath());
+      let accessExist = exists(accessPath(uid));
+      return isOwner(uid)
+        && settingsExist
+        && accessExist
+        && get(settingsPath()).data.basicDays is int
+        && get(settingsPath()).data.basicDays >= 1
+        && get(settingsPath()).data.basicDays <= 365
+        && get(accessPath(uid)).data.registeredAt is timestamp
+        && (
+          request.time < get(accessPath(uid)).data.registeredAt
+            + duration.value(get(settingsPath()).data.basicDays, 'd')
+          ||
+          (
+            get(accessPath(uid)).data.paidUntil is timestamp
+            && request.time < get(accessPath(uid)).data.paidUntil
+          )
+          ||
+          (
+            'grantPlan' in get(accessPath(uid)).data
+            && get(accessPath(uid)).data.grantPlan in ['basic', 'pro']
+            && 'grantStartsAt' in get(accessPath(uid)).data
+            && get(accessPath(uid)).data.grantStartsAt is timestamp
+            && 'grantUntil' in get(accessPath(uid)).data
+            && get(accessPath(uid)).data.grantUntil is timestamp
+            && request.time >= get(accessPath(uid)).data.grantStartsAt
+            && request.time < get(accessPath(uid)).data.grantUntil
+          )
+        );
+    }
+    function validProfileCreate(userId) {
+      return isOwner(userId)
+        && request.resource.data.keys().hasOnly([
+          'userId', 'email', 'displayName', 'photoURL', 'lastLoginAt',
+          'updatedAt', 'prototypeAffiliateCode', 'prototypeAffiliateAppliedAt'
+        ])
+        && request.resource.data.userId == userId
+        && request.resource.data.email is string
+        && request.resource.data.displayName is string
+        && request.resource.data.photoURL is string
+        && request.resource.data.lastLoginAt is string
+        && (
+          !('prototypeAffiliateCode' in request.resource.data)
+          || request.resource.data.prototypeAffiliateCode in [
+            'WAEL2026', 'VIP2025', 'VIP35', 'MARKET50',
+            'OCTOBER2025', 'SAVE35', 'MYBUCKET35'
+          ]
+        );
+    }
+    function validProfileUpdate(userId) {
+      return isOwner(userId)
+        && (!('userId' in resource.data) || request.resource.data.userId == resource.data.userId)
+        && request.resource.data.userId == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'userId', 'email', 'displayName', 'photoURL', 'lastLoginAt', 'updatedAt',
+          'prototypeAffiliateCode', 'prototypeAffiliateAppliedAt'
+        ])
+        && (
+          !('prototypeAffiliateCode' in resource.data)
+          || request.resource.data.prototypeAffiliateCode == resource.data.prototypeAffiliateCode
+        )
+        && (
+          !('prototypeAffiliateAppliedAt' in resource.data)
+          || request.resource.data.prototypeAffiliateAppliedAt == resource.data.prototypeAffiliateAppliedAt
+        )
+        && (
+          !('prototypeAffiliateCode' in request.resource.data)
+          || ('prototypeAffiliateCode' in resource.data && request.resource.data.prototypeAffiliateCode == resource.data.prototypeAffiliateCode)
+          || request.resource.data.prototypeAffiliateCode in [
+            'WAEL2026', 'VIP2025', 'VIP35', 'MARKET50',
+            'OCTOBER2025', 'SAVE35', 'MYBUCKET35'
+          ]
+        )
+        && (!('email' in request.resource.data) || request.resource.data.email is string)
+        && (!('displayName' in request.resource.data) || request.resource.data.displayName is string)
+        && (!('photoURL' in request.resource.data) || request.resource.data.photoURL is string)
+        && (!('lastLoginAt' in request.resource.data) || request.resource.data.lastLoginAt is string)
+        && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is string)
+        && (!('accessDisabled' in resource.data) || request.resource.data.accessDisabled == resource.data.accessDisabled)
+        && (!('accessUpdatedAt' in resource.data) || request.resource.data.accessUpdatedAt == resource.data.accessUpdatedAt);
+    }
+
+    match /users/{userId} {
+      // Profile fields are allow-listed. Billing, role, and entitlement fields
+      // cannot be introduced or changed by a client.
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if validProfileCreate(userId);
+      allow update: if validProfileUpdate(userId);
+      allow delete: if false;
+      match /accounts/{accountId} {
+        allow read: if isOwner(userId);
+        allow create, update, delete: if allowedFinancialWrite(userId);
+      }
+      match /transactions/{transactionId} {
+        allow read: if isOwner(userId);
+        allow create, update: if allowedFinancialWrite(userId)
+          && (!('type' in request.resource.data) || validTransferCurrency(userId, request.resource.data));
+        allow delete: if allowedFinancialWrite(userId);
+      }
+      match /categories/{categoryId} {
+        allow read: if isOwner(userId);
+        allow create, update, delete: if allowedFinancialWrite(userId);
+      }
+      match /preferences/{preferenceId} {
+        allow read: if isOwner(userId);
+        allow create, update, delete: if allowedFinancialWrite(userId);
+      }
+      match /billing/{documentId} {
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
+    }
+    // No client read/write access to global policy, audit, codes or other users.
+  }
+}

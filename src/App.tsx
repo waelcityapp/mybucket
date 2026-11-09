@@ -23,6 +23,7 @@ import { Header } from './components/Header';
 import { VoiceNaturalInput } from './components/VoiceNaturalInput';
 import type { AnalyzerFeedbackContext } from './services/ai/analyzerFeedbackClient';
 import { APP_REVISION } from './config/appRevision';
+import { activeGrant } from './config/grantPolicy';
 import { closePresenceBeforeSignOut, startPresence } from './services/presenceClient';
 import { QuickActions } from './components/QuickActions';
 import { MoneySources } from './components/MoneySources';
@@ -52,6 +53,7 @@ import {
 import { FinancialQueryResultCard } from './components/FinancialQueryResultCard';
 import { HomeFinancialOverview } from './components/HomeFinancialOverview';
 import { AdminView, type SectionId } from './components/views/AdminView';
+import { AdminUserGrantView } from './components/views/AdminUserGrantView';
 import { AdminPinView } from './components/views/AdminPinView';
 import { AnalyzerFeedbackAdmin } from './components/views/AnalyzerFeedbackAdmin';
 import { AuthPage } from './components/views/AuthPage';
@@ -312,7 +314,7 @@ export default function App() {
     if (!isAdmin || pin !== '2233') return false;
     setAdminPinVerified(true);
     const currentPath = window.location.pathname;
-    const safeTarget = /^\/admin\/(users|subscriptions|marketers|ads|ai|system)$/.test(currentPath) ? currentPath : '/admin';
+    const safeTarget = /^\/admin\/(users|subscriptions|marketers|ads|ai|system)$/.test(currentPath) || /^\/admin\/users\/[A-Za-z0-9_-]{1,128}\/grant$/.test(currentPath) ? currentPath : '/admin';
     window.history.replaceState({ myBucketTab: 'admin' }, '', safeTarget);
     setAdminRoute(safeTarget);
     setActiveTab('admin');
@@ -344,6 +346,12 @@ export default function App() {
     window.history.pushState({ myBucketTab: 'admin' }, '', '/admin');
     setAdminRoute('/admin');
     setActiveTab('admin');
+  };
+  const openUserGrant = (uid: string) => {
+    if (!isAdmin || !adminPinVerified || !/^[A-Za-z0-9_-]{1,128}$/.test(uid)) return;
+    const path = `/admin/users/${uid}/grant`;
+    window.history.pushState({ myBucketTab: 'admin' }, '', path);
+    setAdminRoute(path); setActiveTab('admin');
   };
 
   const closeFeedbackAdmin = () => {
@@ -646,6 +654,15 @@ export default function App() {
     setFinancialWriteBlocked(currentTrialExpired);
     return () => setFinancialWriteBlocked(false);
   }, [currentTrialExpired, authUser?.uid]);
+
+  useEffect(() => {
+    const grant = userSubscription?.grant;
+    if (!grant) return;
+    const remaining = Date.parse(grant.endsAt) - Date.now();
+    if (!Number.isFinite(remaining) || remaining <= 0) return;
+    const timer = window.setTimeout(() => setSubscriptionRetry(n => n + 1), Math.min(remaining + 50, 2147483647));
+    return () => window.clearTimeout(timer);
+  }, [userSubscription?.grant?.endsAt]);
 
   // Google Login Handler
   const handleGoogleLogin = async () => {
@@ -1459,6 +1476,7 @@ export default function App() {
                 <h1 className="min-w-0 text-base sm:text-lg font-black text-slate-800 leading-relaxed">{greetingText}</h1>
                 {authUser && (userSubscription || subscriptionError) && (() => {
                   const phase = userSubscription ? stageFor(userSubscription) : null;
+                  const grant = phase !== 'paid' ? activeGrant(userSubscription?.grant) : null;
                   const trialStart = userSubscription ? Date.parse(userSubscription.trialStartedAt) : NaN;
                   const proRemaining = Number.isFinite(trialStart)
                     ? Math.max(0, Math.ceil((trialStart + getTrialDurations().proDays * 86400000 - Date.now()) / 86400000))
@@ -1468,7 +1486,7 @@ export default function App() {
                   const registeredAt = Number.isFinite(trialStart)
                     ? new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'numeric', year: 'numeric' }).format(new Date(trialStart))
                     : null;
-                  const remaining = phase === 'pro-trial' ? proRemaining : phase === 'basic-free' ? basicRemaining : null;
+                  const remaining = grant ? Math.max(0, Math.ceil((Date.parse(grant.endsAt) - Date.now()) / 86400000)) : phase === 'pro-trial' ? proRemaining : phase === 'basic-free' ? basicRemaining : null;
                   const paidExpiresAt = userSubscription?.paidExpiresAt ? Date.parse(userSubscription.paidExpiresAt) : NaN;
                   const renewalRemaining = phase === 'paid' && Number.isFinite(paidExpiresAt)
                     ? Math.max(0, Math.ceil((paidExpiresAt - Date.now()) / 86400000))
@@ -1486,6 +1504,8 @@ export default function App() {
                     ? (lang === 'ar' ? 'اضغط لإعادة المحاولة' : 'Tap to retry')
                     : !registeredAt
                     ? (lang === 'ar' ? 'راجع تفاصيل اشتراكك' : 'Review subscription details')
+                    : grant
+                    ? (lang === 'ar' ? `منحة مجانية · المتبقي ${remaining} يوم` : `Free grant · ${remaining} days remaining`)
                     : phase === 'paid'
                     ? renewalRemaining === null
                       ? (lang === 'ar' ? 'اشتراك مدفوع نشط' : 'Active paid subscription')
@@ -1699,7 +1719,9 @@ export default function App() {
         {activeTab === 'admin' && isAdmin && adminPinVerified && authUser && (
           adminRoute === '/admin/analyzer-feedback'
             ? <AnalyzerFeedbackAdmin lang={lang} onBack={closeFeedbackAdmin} />
-            : <AdminView lang={lang} user={authUser} onBack={() => navigateTab('home')} onResetDemoData={handleResetDemoData} onZeroAllBalances={handleZeroAllBalances} onOpenFeedbackAdmin={openFeedbackAdmin} sectionId={adminSectionFromPath()} onOpenSection={openAdminSection} onBackToSections={backToAdminSections} />
+            : /^\/admin\/users\/[A-Za-z0-9_-]{1,128}\/grant$/.test(adminRoute)
+            ? <AdminUserGrantView uid={adminRoute.split('/')[3]} lang={lang} onBack={() => openAdminSection('users')} />
+            : <AdminView lang={lang} user={authUser} onBack={() => navigateTab('home')} onResetDemoData={handleResetDemoData} onZeroAllBalances={handleZeroAllBalances} onOpenFeedbackAdmin={openFeedbackAdmin} sectionId={adminSectionFromPath()} onOpenSection={openAdminSection} onBackToSections={backToAdminSections} onOpenGrant={openUserGrant} />
         )}
       </main>
 

@@ -59,6 +59,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { listAppUsers } = await import('../server/adminUsers.js');
         return res.status(200).json({ ok: true, data: await listAppUsers(user, payload) });
       }
+      case 'admin.grant.get': {
+        const { getFreeGrant } = await import('../server/grantService.js');
+        return res.status(200).json({ ok: true, data: await getFreeGrant(user, payload) });
+      }
+      case 'admin.grant.set': {
+        const { setFreeGrant } = await import('../server/grantService.js');
+        return res.status(200).json({ ok: true, data: await setFreeGrant(user, payload) });
+      }
+      case 'admin.grant.end': {
+        const { endFreeGrant } = await import('../server/grantService.js');
+        return res.status(200).json({ ok: true, data: await endFreeGrant(user, payload) });
+      }
+      case 'admin.aiQuota.get': {
+        if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+        const { readAiDailyLimits } = await import('../server/aiQuota.js');
+        return res.status(200).json({ ok: true, data: await readAiDailyLimits() });
+      }
+      case 'admin.aiQuota.save': {
+        if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+        const { saveAiDailyLimits } = await import('../server/aiQuota.js');
+        return res.status(200).json({ ok: true, data: await saveAiDailyLimits(payload, user.uid) });
+      }
+      case 'ai.quota.reserveLocal': {
+        const { reserveAiQuota } = await import('../server/aiQuota.js');
+        return res.status(200).json({ ok: true, data: await reserveAiQuota(user.uid, payload.text, true) });
+      }
       case 'admin.users.countFiltered': {
         const { countFilteredUsers } = await import('../server/adminUsers.js');
         return res.status(200).json({ ok: true, data: await countFilteredUsers(user, payload) });
@@ -171,12 +197,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ ok: true, data: { subscription } });
       }
       case 'ai.interpret': {
-        const subscription = await getOrCreateSubscription(user.uid);
-        if (subscription.status === 'expired') return res.status(403).json({ ok: false, error: 'subscription_expired', message: 'Choose a subscription to continue AI operations.' });
         const { text, accounts, categories, currentDateTime, userTimezone, lang, currentProposal, learnedMemory } = payload;
         if (!text || typeof text !== 'string') {
           return res.status(400).json({ ok: false, error: 'invalid_ai_input', message: 'Missing or invalid text.' });
         }
+
+        const { reserveAiQuota } = await import('../server/aiQuota.js');
+        await reserveAiQuota(user.uid, text, false);
 
         const { interpretNaturalLanguageWithGemini } = await import('../server/geminiService.js');
         const result = await interpretNaturalLanguageWithGemini({

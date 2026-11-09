@@ -71,6 +71,32 @@ async function startServer() {
           const { listAppUsers } = await import('./server/adminUsers');
           return res.json({ ok: true, data: await listAppUsers(user, payload) });
         }
+        case 'admin.grant.get': {
+          const { getFreeGrant } = await import('./server/grantService');
+          return res.json({ ok: true, data: await getFreeGrant(user, payload) });
+        }
+        case 'admin.grant.set': {
+          const { setFreeGrant } = await import('./server/grantService');
+          return res.json({ ok: true, data: await setFreeGrant(user, payload) });
+        }
+        case 'admin.grant.end': {
+          const { endFreeGrant } = await import('./server/grantService');
+          return res.json({ ok: true, data: await endFreeGrant(user, payload) });
+        }
+        case 'admin.aiQuota.get': {
+          if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+          const { readAiDailyLimits } = await import('./server/aiQuota');
+          return res.json({ ok: true, data: await readAiDailyLimits() });
+        }
+        case 'admin.aiQuota.save': {
+          if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+          const { saveAiDailyLimits } = await import('./server/aiQuota');
+          return res.json({ ok: true, data: await saveAiDailyLimits(payload, user.uid) });
+        }
+        case 'ai.quota.reserveLocal': {
+          const { reserveAiQuota } = await import('./server/aiQuota');
+          return res.json({ ok: true, data: await reserveAiQuota(user.uid, payload.text, true) });
+        }
         case 'admin.users.countFiltered': {
           const { countFilteredUsers } = await import('./server/adminUsers');
           return res.json({ ok: true, data: await countFilteredUsers(user, payload) });
@@ -151,6 +177,8 @@ async function startServer() {
           if (!text || typeof text !== 'string') {
             return res.status(400).json({ ok: false, error: 'invalid_ai_input', message: 'Missing or invalid text.' });
           }
+          const { reserveAiQuota } = await import('./server/aiQuota');
+          await reserveAiQuota(user.uid, text, false);
           const result = await interpretNaturalLanguageWithGemini({
             text,
             accounts: Array.isArray(accounts) ? accounts : [],

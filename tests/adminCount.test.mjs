@@ -54,3 +54,14 @@ test('unfiltered custom-period count uses Cairo bounds in an aggregation', async
   assert.deepEqual(conditions,[['createdAtSort','>=','2026-10-31T22:00:00.000Z'],['createdAtSort','<','2026-11-10T22:00:00.000Z']]);
   assert.equal(x.reads(),0);
 });
+
+test('an active grant is not miscounted as an expired trial', async () => {
+  const x=setup();
+  const now=Date.now();
+  x.deps.db.getAll=async (...refs)=>refs.map(ref=>ref.path.endsWith('/billing/access')
+    ? {exists:true,data:()=>({grantPlan:'basic',grantStartsAt:{seconds:Math.floor((now-1000)/1000),nanoseconds:0},grantUntil:{seconds:Math.floor((now+86400000)/1000),nanoseconds:0}})}
+    : {exists:true,data:()=>({isPaid:false,trialStartedAt:'2020-01-01T00:00:00Z'})});
+  let cursor=null,total=0;
+  do {const page=await countFilteredUsers(actor,{filter:'free',cursor},x.deps);total+=page.count;cursor=page.nextCursor;} while(cursor);
+  assert.equal(total,0);
+});

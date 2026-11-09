@@ -3,6 +3,7 @@ import { getAdminApp, getAdminAuth, getAdminFirestore } from './firebaseAdmin.js
 import { getDatabaseWithUrl } from 'firebase-admin/database';
 import { SubscriptionError } from './subscriptionService.js';
 import { stageFor, type TrialDurations } from '../src/config/subscriptionPolicy.js';
+import { activeGrant, grantFromAccess } from '../src/config/grantPolicy.js';
 import { readTrialSettings } from './trialSettings.js';
 import { readDirectoryPage, parseDirectoryFilter } from './directoryPage.js';
 import { collectDirectoryRows, type UserFilter } from './directoryCollect.js';
@@ -43,10 +44,11 @@ async function enrichDirectoryUsers(visible: DirectoryUser[]) {
   const realtime = getDatabaseWithUrl('https://mybucket-8b6f0-default-rtdb.europe-west1.firebasedatabase.app', getAdminApp());
   for (let i = 0; i < visible.length; i += 40) {
     const batch = visible.slice(i, i + 40);
-    const [subscriptions, installations, presence, realtimePresence] = await Promise.all([
+    const [subscriptions, installations, presence, accesses, realtimePresence] = await Promise.all([
       db.getAll(...batch.map(u => db.doc('users/' + u.uid + '/billing/subscription'))),
       db.getAll(...batch.map(u => db.doc('users/' + u.uid + '/telemetry/pwaInstall'))),
       db.getAll(...batch.map(u => db.doc('users/' + u.uid + '/telemetry/presence'))),
+      db.getAll(...batch.map(u => db.doc('users/' + u.uid + '/billing/access'))),
       Promise.all(batch.map(async u => {
         let timer: ReturnType<typeof setTimeout> | undefined;
         try {
@@ -72,6 +74,7 @@ async function enrichDirectoryUsers(visible: DirectoryUser[]) {
       rows.push({
         ...batch[j],
         ...subscriptionLabel(sub, durations, batch[j].createdAt),
+        grant: activeGrant(grantFromAccess(accesses[j].exists ? accesses[j].data() || null : null)),
         installed: installations[j].exists,
         lastSeenAt: sessions.length ? new Date().toISOString() : currentLastSeen ? new Date(currentLastSeen).toISOString() : lastSeenMs === null ? null : new Date(lastSeenMs).toISOString(),
         lastSeenDevice: recentConnection >= recentTime && recentConnection ? sessions.find(s => s.since === recentConnection)?.device || 'unknown' : live.lastSeen?.device || 'unknown',
@@ -104,16 +107,20 @@ export async function countFilteredUsers(actor: AdminActor, payload: Record<stri
   }
   let cursor = parsed.cursor, nextCursor: string | null = null, count = 0;
   const durations = ['paid', 'trial', 'trial_pro', 'trial_basic', 'free'].includes(filter) ? await (deps?.readSettings || readTrialSettings)() : null;
+  const excludeGranted = ['trial', 'trial_pro', 'trial_basic', 'free'].includes(filter);
   for (let step = 0; step < 4; step++) {
     const page = await (deps?.readPage || readDirectoryPage)(actor, { search: parsed.search, period: parsed.period, from: parsed.from, to: parsed.to, cursor });
     const records = page.users;
-    const snapshots = records.length && (durations || filter === 'installed')
-      ? await db.getAll(...records.map((u: Record<string, unknown>) => db.doc(`users/${u.uid}/${filter === 'installed' ? 'telemetry/pwaInstall' : 'billing/subscription'}`)))
-      : [];
+    const [snapshots, accesses] = await Promise.all([
+      records.length && (durations || filter === 'installed')
+        ? db.getAll(...records.map((u: Record<string, unknown>) => db.doc(`users/${u.uid}/${filter === 'installed' ? 'telemetry/pwaInstall' : 'billing/subscription'}`))) : [],
+      records.length && excludeGranted ? db.getAll(...records.map((u: Record<string, unknown>) => db.doc(`users/${u.uid}/billing/access`))) : [],
+    ]);
     records.forEach((user: Record<string, unknown>, index: number) => {
       if (filter === 'all' || (filter === 'disabled' && user.disabled === true) || (filter === 'installed' && snapshots[index]?.exists)) count++;
       else if (durations) {
         const label = subscriptionLabel(snapshots[index]?.exists ? snapshots[index].data() as SubscriptionInfo : undefined, durations, typeof user.createdAt === 'string' ? user.createdAt : null);
+        if (excludeGranted && activeGrant(grantFromAccess(accesses[index]?.exists ? accesses[index].data() || null : null))) return;
         if (filter === 'trial_pro' ? label.tier === 'trial' && label.trialPlan === 'pro' : filter === 'trial_basic' ? label.tier === 'trial' && label.trialPlan === 'basic' : label.tier === filter) count++;
       }
     });

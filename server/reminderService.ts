@@ -3,7 +3,7 @@ import { getAdminFirestore } from './firebaseAdmin.js';
 import { SubscriptionError } from './subscriptionService.js';
 
 export type ReminderKind = 'obligation' | 'receivable';
-type Reminder = { id: string; kind: ReminderKind; title: string; amount: number; currency: string; dueDate: string; note: string; done: boolean; createdAt: number; updatedAt: number };
+type Reminder = { id: string; kind: ReminderKind; title: string; amount: number; currency: string; dueDate: string; note: string; done: boolean; leadDays: number; tone: number; createdAt: number; updatedAt: number };
 
 function fail(code: string, statusCode = 400): never { throw new SubscriptionError(statusCode, code, code); }
 function safeKind(value: unknown): ReminderKind { if (value === 'obligation' || value === 'receivable') return value; return fail('invalid_reminder_kind'); }
@@ -21,7 +21,12 @@ function normalized(payload: Record<string, unknown>) {
   if (!title) fail('reminder_title_required');
   if (!Number.isFinite(amount) || amount < 0 || amount > 1_000_000_000_000) fail('invalid_reminder_amount');
   if (!currencies.has(currency)) fail('invalid_reminder_currency');
-  return { title, amount, currency, note, dueDate: validateDate(payload.dueDate) };
+  // Optional for existing records created before reminder alarms were introduced.
+  const leadDays = payload.leadDays === undefined ? 7 : Number(payload.leadDays);
+  const tone = payload.tone === undefined ? 1 : Number(payload.tone);
+  if (!Number.isInteger(leadDays) || leadDays < 0 || leadDays > 365) fail('invalid_reminder_days');
+  if (!Number.isInteger(tone) || tone < 1 || tone > 4) fail('invalid_reminder_tone');
+  return { title, amount, currency, note, dueDate: validateDate(payload.dueDate), leadDays, tone };
 }
 export async function reminderAction(uid: string, action: string, payload: Record<string, unknown>) {
   const ref = getAdminFirestore().collection('users').doc(uid).collection('reminders');

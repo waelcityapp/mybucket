@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { auth } from '../lib/firebase';
 import { ChevronLeft, X, Plus, Trash2, Pencil, CheckCircle2 } from 'lucide-react';
 import type { Language } from '../types';
 
 export type ReminderKind = 'obligation' | 'receivable';
-type Reminder = { id: string; kind: ReminderKind; title: string; amount: number; currency: string; dueDate: string; note: string; done: boolean };
-type Fields = { title: string; amount: string; currency: string; dueDate: string; note: string };
-const blank = (): Fields => ({ title: '', amount: '', currency: 'EGP', dueDate: new Date().toLocaleDateString('en-CA'), note: '' });
+type Reminder = { id: string; kind: ReminderKind; title: string; amount: number; currency: string; dueDate: string; note: string; done: boolean; leadDays?: number; tone?: number };
+type Fields = { title: string; amount: string; currency: string; dueDate: string; note: string; leadDays: number; tone: number };
+const blank = (): Fields => ({ title: '', amount: '', currency: 'EGP', dueDate: new Date().toLocaleDateString('en-CA'), note: '', leadDays: 7, tone: 1 });
 const currencies = ['EGP', 'USD', 'EUR', 'SAR', 'AED', 'GBP', 'KWD', 'QAR'];
 
 async function request(action: string, payload: Record<string, unknown> = {}) {
@@ -28,6 +28,8 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState<Reminder[]>([]);
+  const sounded = useRef(new Set<string>());
   const refresh = useCallback(async () => {
     setLoading(true);
     try { const data = await request('list'); if (auth.currentUser?.uid === userId) { setItems(Array.isArray(data.reminders) ? data.reminders : []); setError(''); } }
@@ -38,14 +40,14 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
 
   const heading = (kind: ReminderKind) => kind === 'obligation' ? (ar ? 'تذكير بالالتزامات' : 'Obligation Reminders') : (ar ? 'تذكير بمستحقات لي' : 'Money Owed to Me');
   function open(kind: ReminderKind) { setSelected(kind); setEditingId(null); setFields(blank()); setShowEditor(false); setError(''); }
-  function edit(item: Reminder) { setEditingId(item.id); setFields({ title: item.title, amount: String(item.amount), currency: item.currency, dueDate: item.dueDate, note: item.note }); setShowEditor(true); setError(''); }
+  function edit(item: Reminder) { setEditingId(item.id); setFields({ title: item.title, amount: String(item.amount), currency: item.currency, dueDate: item.dueDate, note: item.note, leadDays: item.leadDays ?? 7, tone: item.tone ?? 1 }); setShowEditor(true); setError(''); }
   async function save() {
     if (!selected || !fields.title.trim() || !fields.dueDate || fields.amount === '' || !Number.isFinite(Number(fields.amount)) || Number(fields.amount) < 0) {
       setError(ar ? 'أدخل اسم البند والمبلغ والتاريخ بشكل صحيح' : 'Enter a valid item, amount and date'); return;
     }
     setBusy(true); setError('');
     try {
-      await request(editingId ? 'update' : 'create', { ...(editingId ? { id: editingId } : {}), kind: selected, title: fields.title, amount: Number(fields.amount), currency: fields.currency, dueDate: fields.dueDate, note: fields.note });
+      await request(editingId ? 'update' : 'create', { ...(editingId ? { id: editingId } : {}), kind: selected, title: fields.title, amount: Number(fields.amount), currency: fields.currency, dueDate: fields.dueDate, note: fields.note, leadDays: fields.leadDays, tone: fields.tone });
       await refresh(); setShowEditor(false); setEditingId(null); setFields(blank());
     } catch (e) { setError((ar ? 'تعذر الحفظ: ' : 'Save failed: ') + (e instanceof Error ? e.message : 'error')); }
     finally { setBusy(false); }
@@ -64,6 +66,8 @@ export function ReminderCards({ lang, userId }: { lang: Language; userId: string
     finally { setBusy(false); }
   }
   const today = new Date().toLocaleDateString('en-CA');
+  const dateLead = (item: Reminder) => { const date = new Date(item.dueDate + 'T12:00:00'); date.setDate(date.getDate() - (item.leadDays ?? 7)); return date.toLocaleDateString('en-CA'); };
+  const dueNow = items.filter(item => !item.done && dateLead(item) <= today);
   return <div className="space-y-2.5">
     {(['obligation', 'receivable'] as const).map(kind => {
       const count = items.filter(item => item.kind === kind && !item.done).length;

@@ -1430,7 +1430,7 @@ export default function App() {
   // Reminder management uses real pages and browser history, never modal dialogs.
   if (activeTab === 'reminders' && window.location.pathname.startsWith('/reminders/')) {
     const reminderKind = window.location.pathname.split('/')[2] === 'receivable' ? 'receivable' : 'obligation';
-    return <ReminderWorkspace key={reminderKind} lang={lang} kind={reminderKind} userId={authUser.uid} onHome={() => { window.history.pushState({ myBucketTab: 'home' }, '', '/'); setActiveTab('home'); }} />;
+    return <ReminderWorkspace lang={lang} kind={reminderKind} userId={authUser.uid} onHome={() => { window.history.pushState({ myBucketTab: 'home' }, '', '/'); setActiveTab('home'); }} />;
   }
 
   const showBottomNavigation = (

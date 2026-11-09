@@ -203,6 +203,9 @@ export function AdminAppUsersView({ lang, onOpenGrant }: { lang: Language; onOpe
 
   return (
     <div className="space-y-4" dir={ar ? 'rtl' : 'ltr'}>
+      <button type="button" onClick={() => { if (auth.currentUser?.uid) onOpenGrant(auth.currentUser.uid); }} className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white">
+        {ar ? 'إدارة منحة حسابي' : 'Manage my grant'}
+      </button>
       <div className="grid grid-cols-2 gap-2.5">
         <div className="rounded-2xl border border-slate-200 bg-white p-3.5">
           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600"><Users className="h-4 w-4 text-emerald-700" />{ar ? 'حسابات مسجلة' : 'Registered accounts'}</div>

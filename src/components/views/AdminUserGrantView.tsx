@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { auth } from '../../lib/firebase';
 import type { Language } from '../../types';
-import { cairoGrantDate, grantLastDayAfterMonths } from '../../utils/grantDates';
+import { cairoGrantDate, grantLastDayAfterDays } from '../../utils/grantDates';
 
 type GrantDetails = { uid:string; name:string; email:string; paidAccessUntil:string|null; grant:null | { plan:'basic'|'pro'; startsAt:string|null; endsAt:string|null; active:boolean; reason:string; note:string } };
 async function request(action:string, payload:Record<string,unknown>) {
@@ -17,6 +17,7 @@ export function AdminUserGrantView({uid,lang,onBack}:{uid:string;lang:Language;o
   const [data,setData]=useState<GrantDetails|null>(null);
   const [plan,setPlan]=useState<'basic'|'pro'>('basic');
   const [endDate,setEndDate]=useState('');
+  const [days,setDays]=useState('');
   const [reason,setReason]=useState('');
   const [note,setNote]=useState('');
   const [busy,setBusy]=useState(false);
@@ -53,8 +54,8 @@ export function AdminUserGrantView({uid,lang,onBack}:{uid:string;lang:Language;o
       <p className="rounded-xl bg-emerald-50 p-3 text-xs leading-6 text-emerald-900">{active?(ar?'لديه منحة سارية؛ يمكنك تعديلها أو إنهاؤها.':'An active grant can be changed or ended.'):(ar?'المنحة مجانية ولا تُسجّل كعملية دفع.':'This grant is free and is not recorded as a payment.')}</p>
       {data.paidAccessUntil && Date.parse(data.paidAccessUntil)>Date.now() && <p className="rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-900">{ar?'للمستخدم صلاحية مدفوعة سارية. المنحة تبدأ الآن، ولا يتوقف عدادها أثناء الصلاحية المدفوعة.':'This user has paid access. The grant starts now and continues to count down during paid access.'}</p>}
       <label className="block text-xs font-bold">{ar?'الخطة':'Plan'}<select value={plan} onChange={e=>setPlan(e.target.value as typeof plan)} className="mt-2 w-full rounded-xl border border-slate-200 p-3"><option value="basic">Basic</option><option value="pro">Pro</option></select></label>
-      <div><p className="text-xs font-bold">{ar?'مدة تبدأ من الآن':'Duration from now'}</p><div className="mt-2 flex flex-wrap gap-2">{[1,3,6,12].map(months=><button key={months} type="button" onClick={()=>setEndDate(grantLastDayAfterMonths(months))} className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-bold text-emerald-800">{ar?(months===12?'سنة':`${months} ${months===1?'شهر':'شهور'}`):`${months} mo`}</button>)}</div></div>
-      <label className="block text-xs font-bold">{ar?'تاريخ آخر يوم للمنحة (توقيت القاهرة)':'Last grant day (Cairo time)'}<input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="mt-2 block w-full rounded-xl border border-slate-200 p-3" /></label>
+      <label className="block text-xs font-bold">{ar?'عدد أيام المنحة':'Grant duration in days'}<input type="number" inputMode="numeric" min="1" max="3650" step="1" value={days} onChange={e=>{const value=e.target.value;setDays(value);const n=Number(value);setEndDate(value && Number.isInteger(n) && n>=1 && n<=3650 ? grantLastDayAfterDays(n) : '');}} placeholder={ar?'مثال: 90':'e.g. 90'} className="mt-2 block w-full rounded-xl border border-slate-200 p-3" /><span className="mt-1 block font-normal text-slate-500">{ar?'يُحسب اليوم الحالي أول يوم، وتنتهي المنحة بنهاية آخر يوم بتوقيت القاهرة.':'Today counts as the first day; the grant ends after its last day in Cairo.'}</span></label>
+      <label className="block text-xs font-bold">{ar?'تاريخ آخر يوم للمنحة (توقيت القاهرة)':'Last grant day (Cairo time)'}<input type="date" value={endDate} onChange={e=>{setDays('');setEndDate(e.target.value);}} className="mt-2 block w-full rounded-xl border border-slate-200 p-3" /></label>
       <label className="block text-xs font-bold">{ar?'سبب المنحة للإدارة فقط':'Internal reason'}<input maxLength={160} value={reason} onChange={e=>setReason(e.target.value)} placeholder={ar?'مثال: فريق المبيعات':'e.g. sales team'} className="mt-2 block w-full rounded-xl border border-slate-200 p-3" /></label>
       <label className="block text-xs font-bold">{ar?'ملاحظة داخلية اختيارية':'Optional internal note'}<textarea maxLength={500} value={note} onChange={e=>setNote(e.target.value)} className="mt-2 block w-full rounded-xl border border-slate-200 p-3" /></label>
       <div className="flex flex-wrap gap-2"><button type="button" disabled={busy||!endDate} onClick={()=>void save()} className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40">{ar?'حفظ المنحة':'Save grant'}</button>{active && <button type="button" disabled={busy} onClick={()=>setEnding(true)} className="rounded-xl border border-rose-200 bg-white px-4 py-2.5 text-sm font-bold text-rose-700">{ar?'إنهاء المنحة':'End grant'}</button>}</div>

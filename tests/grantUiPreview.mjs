@@ -18,7 +18,7 @@ try {
     await page.getByText('سارة محمد').waitFor();
     await page.screenshot({path:`grant-preview-${viewport.width}.png`,fullPage:true});
     await page.locator('select').first().selectOption('pro');
-    await page.getByRole('button',{name:'3 شهور'}).click();
+    await page.getByLabel('عدد أيام المنحة').fill('90');
     assert.ok(await page.locator('input[type=date]').inputValue());
     await page.getByPlaceholder('مثال: فريق المبيعات').fill('فريق المبيعات');
     await page.getByRole('button',{name:'حفظ المنحة'}).click();

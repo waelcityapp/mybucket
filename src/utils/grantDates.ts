@@ -12,3 +12,10 @@ export function grantLastDayAfterMonths(months: number, now = Date.now()): strin
   target.setUTCDate(Math.min(day, lastDay));
   return target.toISOString().slice(0, 10);
 }
+
+/** The current Cairo calendar day is day one, and the final day is inclusive. */
+export function grantLastDayAfterDays(days: number, now = Date.now()): string {
+  if (!Number.isInteger(days) || days < 1 || days > 3650) throw new Error('Invalid grant duration');
+  const [year, month, day] = cairoGrantDate(now).split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days - 1)).toISOString().slice(0, 10);
+}

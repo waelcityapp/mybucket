@@ -76,3 +76,11 @@ test('grant end date includes the entire last Cairo day', async () => {
   const result=await setFreeGrant(owner,{uid:'user1',plan:'pro',endDate:'2027-02-09'},deps,()=>now);
   assert.equal(result.endsAt,'2027-02-09T22:00:00.000Z');
 });
+
+test('owner can grant and end access for their own account', async () => {
+  const {deps,docs}=fakeDeps({'users/owner/billing/access':{registeredAt:Timestamp.fromMillis(now-1000),paidUntil:null,schemaVersion:1}});
+  await setFreeGrant(owner,{uid:'owner',plan:'basic',endDate:'2026-11-10'},deps,()=>now);
+  assert.equal(docs.get('users/owner/billing/access').grantPlan,'basic');
+  await endFreeGrant(owner,{uid:'owner'},deps,()=>now+1000);
+  assert.equal(docs.get('users/owner/billing/access').grantPlan,undefined);
+});

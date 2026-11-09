@@ -3,19 +3,44 @@
 import { execFileSync } from 'node:child_process';
 import { initializeApp, deleteApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
 
 const projectId = 'mybucket-8b6f0';
+let cachedToken = '';
+let refreshAt = 0;
 const credential = {
   async getAccessToken() {
-    const token = execFileSync('gcloud', ['auth', 'print-access-token'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-    if (!token) throw new Error('missing_access_token');
-    return { access_token: token, expires_in: 300 };
+    if (!cachedToken || Date.now() >= refreshAt) {
+      cachedToken = execFileSync('gcloud', ['auth', 'print-access-token'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+      if (!cachedToken) throw new Error('missing_access_token');
+      refreshAt = Date.now() + 240_000;
+    }
+    return { access_token: cachedToken, expires_in: 300 };
   },
 };
 const app = initializeApp({ projectId, credential });
-const db = getFirestore(app);
 const auth = getAuth(app);
+// The Admin Firestore SDK does not accept a custom gcloud token credential.
+// Use authenticated, read-only Firestore REST GET requests instead.
+async function readDocument(path) {
+  const { access_token } = await credential.getAccessToken();
+  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${path}`, {
+    headers: { Authorization: `Bearer ${access_token}` },
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw Object.assign(new Error('firestore_read_failed'), { code: `firestore_http_${response.status}` });
+  const result = await response.json();
+  return result.fields || {};
+}
+function field(fields, key) {
+  const value = fields?.[key];
+  if (!value) return undefined;
+  if ('stringValue' in value) return value.stringValue;
+  if ('integerValue' in value) return Number(value.integerValue);
+  if ('booleanValue' in value) return value.booleanValue;
+  if ('timestampValue' in value) return { timestampMs: Date.parse(value.timestampValue) };
+  if ('nullValue' in value) return null;
+  return { otherType: true };
+}
 const totals = {
   authAccounts: 0, creationDateValid: 0, creationDateInvalid: 0,
   billingPresent: 0, billingMissing: 0, billingTrialDateNotValidString: 0,
@@ -25,42 +50,41 @@ const totals = {
 };
 
 try {
-  const setting = await db.doc('appSettings/subscriptionTrials').get();
-  const s = setting.data();
-  const settings = setting.exists ? { proDays: s.proDays ?? null, basicDays: s.basicDays ?? null } : null;
+  const setting = await readDocument('appSettings/subscriptionTrials');
+  const settings = setting ? { proDays: field(setting, 'proDays') ?? null, basicDays: field(setting, 'basicDays') ?? null } : null;
   let pageToken;
   do {
     const page = await auth.listUsers(1000, pageToken);
     for (let offset = 0; offset < page.users.length; offset += 100) {
       const users = page.users.slice(offset, offset + 100);
-      const refs = users.flatMap(u => [db.doc(`users/${u.uid}/billing/subscription`), db.doc(`users/${u.uid}/billing/access`)]);
-      if (!refs.length) continue;
-      const docs = await db.getAll(...refs);
+      const docs = await Promise.all(users.flatMap(u => [readDocument(`users/${encodeURIComponent(u.uid)}/billing/subscription`), readDocument(`users/${encodeURIComponent(u.uid)}/billing/access`)]));
       users.forEach((user, i) => {
         totals.authAccounts++;
         const registration = Date.parse(user.metadata.creationTime || '');
         const validRegistration = Number.isFinite(registration) && registration <= Date.now();
         if (validRegistration) totals.creationDateValid++; else totals.creationDateInvalid++;
-        const billingDoc = docs[2 * i];
-        const accessDoc = docs[2 * i + 1];
-        const billing = billingDoc.data();
-        if (billingDoc.exists) {
+        const billing = docs[2 * i];
+        const access = docs[2 * i + 1];
+        if (billing) {
           totals.billingPresent++;
-          const start = typeof billing.trialStartedAt === 'string' ? Date.parse(billing.trialStartedAt) : NaN;
+          const trial = field(billing, 'trialStartedAt');
+          const start = typeof trial === 'string' ? Date.parse(trial) : NaN;
           if (!Number.isFinite(start)) totals.billingTrialDateNotValidString++;
           else if (validRegistration && start !== registration) totals.billingTrialDateDiffersFromAuth++;
         } else totals.billingMissing++;
         let paidExpiry = null;
-        if (billing?.isPaid === true) {
+        if (field(billing, 'isPaid') === true) {
           totals.paidFlagTrue++;
-          const parsed = typeof billing.paidExpiresAt === 'string' ? Date.parse(billing.paidExpiresAt) : NaN;
+          const paid = field(billing, 'paidExpiresAt');
+          const parsed = typeof paid === 'string' ? Date.parse(paid) : NaN;
           if (!Number.isFinite(parsed)) totals.paidExpiryNotValidString++; else paidExpiry = parsed;
         }
-        if (accessDoc.exists) {
+        if (access) {
           totals.accessPresent++;
-          const access = accessDoc.data();
-          if (!validRegistration || access.registeredAt?.toMillis?.() !== registration) totals.accessRegistrationMismatch++;
-          const until = access.paidUntil == null ? null : access.paidUntil?.toMillis?.() ?? 'invalid';
+          const registeredAt = field(access, 'registeredAt');
+          if (!validRegistration || registeredAt?.timestampMs !== registration) totals.accessRegistrationMismatch++;
+          const paidUntil = field(access, 'paidUntil');
+          const until = paidUntil == null ? null : paidUntil?.timestampMs ?? 'invalid';
           if (until !== paidExpiry) totals.accessPaidUntilMismatch++;
         } else totals.accessMissing++;
       });

@@ -6,7 +6,7 @@ import { occurrenceDate, occurrenceId, parseOccurrenceId, isoDate, type Frequenc
 type Kind = 'obligation' | 'receivable';
 type Status = { done?: boolean; alertDisabled?: boolean; snoozedUntil?: string | null; cancelled?: boolean };
 type Reminder = {
-  id: string; kind: Kind; title: string; amount: number; currency: string; dueDate: string; note: string;
+  id: string; kind: Kind; category?: string; title: string; amount: number; currency: string; dueDate: string; note: string;
   done: boolean; leadDays: number; tone: number; remindTime: string; repeat: 'daily' | 'once';
   alertDisabled: boolean; snoozedUntil: string | null; createdAt: number; updatedAt: number;
   frequency?: Frequency; installmentCount?: number | null; changes?: OccurrenceChange[];
@@ -44,7 +44,9 @@ function fieldsOf(payload: Record<string, unknown>) {
   if (!Number.isInteger(tone) || tone < 1 || tone > 4) fail('invalid_reminder_tone');
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(remindTime)) fail('invalid_reminder_time');
   if (payload.repeat !== undefined && payload.repeat !== 'daily' && payload.repeat !== 'once') fail('invalid_reminder_repeat');
-  return { title, amount, currency, note, dueDate: date(payload.dueDate), leadDays, tone, remindTime, repeat };
+  const category = String(payload.category ?? 'other').trim().slice(0,50);
+  if (!/^[a-z-]{2,50}$/.test(category)) fail('invalid_reminder_category');
+  return { title, category, amount, currency, note, dueDate: date(payload.dueDate), leadDays, tone, remindTime, repeat };
 }
 function scheduleOf(payload: Record<string, unknown>) {
   const frequency = frequencyOf(payload.frequency ?? 'none');
@@ -87,6 +89,7 @@ function expand(master: Reminder, today: string) {
     const past = item.dueDate < today;
     const showHistory = past && item.dueDate >= shiftBack(today,90);
     if (past && completed && !showHistory) continue;
+    if (!past && result.filter(r => r.dueDate >= today).length >= 18) break;
     result.push({ ...item, id: occurrenceId(master.id,index), seriesId: master.id,
       occurrenceIndex:index, done:completed, alertDisabled:!!state.alertDisabled,
       snoozedUntil:state.snoozedUntil ?? null });
@@ -103,7 +106,7 @@ export async function reminderAction(uid: string, action: string, payload: Recor
     const now = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
     const snapshot = await col.limit(250).get();
     const reminders = snapshot.docs.flatMap(doc => expand({ ...doc.data(), id:doc.id } as Reminder, now));
-    return { reminders: reminders.sort((a,b) => a.dueDate.localeCompare(b.dueDate) || a.createdAt-b.createdAt).slice(0,500) };
+    return { reminders: reminders.sort((a,b) => a.dueDate.localeCompare(b.dueDate) || a.createdAt-b.createdAt).slice(0,1000) };
   }
   if (action === 'reminders.create') {
     const doc = col.doc(randomUUID());
@@ -136,7 +139,7 @@ export async function reminderAction(uid: string, action: string, payload: Recor
           const changes = (master.changes || []).filter(x => x.fromIndex !== index);
           changes.push({ fromIndex:index, title:fields.title, amount:fields.amount, currency:fields.currency, note:fields.note, anchorDate:fields.dueDate, leadDays:fields.leadDays, tone:fields.tone, remindTime:fields.remindTime, repeat:fields.repeat });
           changes.sort((a,b)=>a.fromIndex-b.fromIndex);
-          transaction.update(ref,{changes,updatedAt:Date.now()});
+          transaction.update(ref,{changes,category:fields.category,updatedAt:Date.now()});
         } else {
           const overrides = {...master.overrides,[String(index)]:{title:fields.title,amount:fields.amount,currency:fields.currency,note:fields.note,dueDate:fields.dueDate, leadDays:fields.leadDays, tone:fields.tone, remindTime:fields.remindTime, repeat:fields.repeat}};
           transaction.update(ref,{overrides,updatedAt:Date.now()});

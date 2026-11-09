@@ -56,6 +56,12 @@ test('realistic setup, linked transfer, legacy profile, expiry and owner isolati
       t.update(bank2,{ balance:to.data().balance+5 });
       t.set(doc(db,'users/alice/transactions/two-linked'), { userId:'alice', type:'transfer', amount:5, currency:'EGP', accountId:'card', toAccountId:'wallet2', balanceAccountId:'bank', toBalanceAccountId:'bank2' });
     }));
+    await assertFails(setDoc(doc(db,'users/alice/transactions/wrong-link'), { userId:'alice', type:'transfer', amount:5, currency:'EGP', accountId:'card', toAccountId:'wallet2', balanceAccountId:'cash', toBalanceAccountId:'bank2' }));
+    await assertFails(setDoc(doc(db,'users/alice/transactions/wrong-currency'), { userId:'alice', type:'transfer', amount:5, currency:'USD', accountId:'card', toAccountId:'wallet2', balanceAccountId:'bank', toBalanceAccountId:'bank2' }));
+    const currencyChange = writeBatch(db);
+    currencyChange.update(bank2,{ currency:'USD' });
+    currencyChange.set(doc(db,'users/alice/transactions/currency-change'), { userId:'alice', type:'transfer', amount:5, currency:'EGP', accountId:'card', toAccountId:'wallet2', balanceAccountId:'bank', toBalanceAccountId:'bank2' });
+    await assertFails(currencyChange.commit());
     await assertSucceeds(runTransaction(db, async t => {
       const [from,to] = await Promise.all([t.get(bank2),t.get(cash)]);
       t.update(bank2,{ balance:from.data().balance-5 });

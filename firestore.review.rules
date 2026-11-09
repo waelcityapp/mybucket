@@ -20,10 +20,10 @@ service cloud.firestore {
       return /databases/$(database)/documents/users/$(uid)/accounts/$(id);
     }
     function balanceMatchesMethod(uid, methodId, balanceId) {
-      let method = get(accountPath(uid, methodId)).data;
+      let method = getAfter(accountPath(uid, methodId)).data;
       return ('linkedBankId' in method && method.linkedBankId != null && method.linkedBankId != '')
         ? method.linkedBankId == balanceId && method.type in ['card', 'wallet']
-          && get(accountPath(uid, balanceId)).data.type == 'bank'
+          && getAfter(accountPath(uid, balanceId)).data.type == 'bank'
         : methodId == balanceId;
     }
     function validTransferCurrency(uid, tx) {
@@ -32,12 +32,6 @@ service cloud.firestore {
         && tx.balanceAccountId is string && tx.toBalanceAccountId is string
         && tx.currency is string
         && tx.balanceAccountId != tx.toBalanceAccountId
-        && exists(accountPath(uid, tx.accountId))
-        && exists(accountPath(uid, tx.toAccountId))
-        && exists(accountPath(uid, tx.balanceAccountId))
-        && exists(accountPath(uid, tx.toBalanceAccountId))
-        && get(accountPath(uid, tx.accountId)).data.currency == tx.currency
-        && get(accountPath(uid, tx.toAccountId)).data.currency == tx.currency
         && get(accountPath(uid, tx.balanceAccountId)).data.currency == tx.currency
         && get(accountPath(uid, tx.toBalanceAccountId)).data.currency == tx.currency
         && getAfter(accountPath(uid, tx.accountId)).data.currency == tx.currency

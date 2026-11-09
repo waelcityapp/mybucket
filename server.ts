@@ -44,7 +44,7 @@ async function startServer() {
         const { appLockAction } = await import('./server/appLock');
         return res.json({ ok: true, data: await appLockAction(user.uid, action, payload) });
       }
-      if (action === 'reminders.list' || action === 'reminders.create' || action === 'reminders.update' || action === 'reminders.toggle' || action === 'reminders.delete') {
+      if (action === 'reminders.list' || action === 'reminders.create' || action === 'reminders.update' || action === 'reminders.toggle' || action === 'reminders.delete' || action === 'reminders.alert') {
         const { reminderAction } = await import('./server/reminderService');
         const result = await reminderAction(user.uid, action, payload);
         return res.json({ ok: true, data: result });

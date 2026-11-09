@@ -47,7 +47,7 @@ const totals = {
   billingPresent: 0, billingMissing: 0, billingTrialDateNotValidString: 0,
   billingTrialDateDiffersFromAuth: 0, paidFlagTrue: 0, paidExpiryNotValidString: 0,
   accessPresent: 0, accessMissing: 0, accessRegistrationMismatch: 0,
-  accessPaidUntilMismatch: 0,
+  accessPaidUntilMismatch: 0, accessInvalidSchema: 0, accessPaidUntilInvalidType: 0,
   profilesPresent: 0, profilesMissing: 0, profileUserIdMismatch: 0, profileUnexpectedFieldTypes: 0,
 };
 const planInputs = [];
@@ -95,6 +95,8 @@ try {
           const registeredAt = field(access, 'registeredAt');
           if (!validRegistration || registeredAt?.timestampMs !== registration) totals.accessRegistrationMismatch++;
           const paidUntil = field(access, 'paidUntil');
+          if (field(access, 'schemaVersion') !== 1) totals.accessInvalidSchema++;
+          if (paidUntil === undefined || (paidUntil !== null && !Number.isFinite(paidUntil?.timestampMs))) totals.accessPaidUntilInvalidType++;
           const until = paidUntil == null ? null : paidUntil?.timestampMs ?? 'invalid';
           if (until !== paidExpiry) totals.accessPaidUntilMismatch++;
         } else totals.accessMissing++;

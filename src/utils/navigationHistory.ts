@@ -5,6 +5,7 @@ const historyTabs: ActiveTab[] = ['home', 'transactions', 'search', 'accounts', 
 export function tabFromHistory(location: Location, state: unknown): ActiveTab {
   const path = location.pathname;
   if (path === '/admin' || path.startsWith('/admin/')) return path === '/admin/unlock' ? 'admin-pin' : 'admin';
+  if (path.startsWith('/reminders/')) return 'reminders';
   if (path === '/trial') return 'trial-details';
   if (path === '/subscription') return 'subscription';
   if (path === '/accounts' || path === '/accounts/new') return 'accounts';

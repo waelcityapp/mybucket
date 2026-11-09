@@ -1,0 +1,27 @@
+name: Grant security review
+on:
+  push:
+    branches:
+      - free-grants-review-20261109
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm install --no-audit --no-fund
+      - run: node --import tsx --test tests/grantPolicy.test.mjs tests/grantService.test.mjs tests/grantDates.test.mjs tests/aiGrantQuota.test.mjs
+      - name: Test Firestore rules in a disposable emulator
+        run: |
+          printf '%s\n' '{"firestore":{"rules":"firestore.grants-draft.rules"},"emulators":{"firestore":{"port":8080},"ui":{"enabled":false},"singleProjectMode":false}}' > firebase.grants-ci.json
+          npx --yes firebase-tools@15.35.0 emulators:exec --project demo-mybucket-grants --config firebase.grants-ci.json --only firestore "node --import tsx --test tests/firestoreGrantRules.test.mjs tests/trialAccessBootstrap.test.mjs"

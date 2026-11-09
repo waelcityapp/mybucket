@@ -21,6 +21,10 @@ jobs:
           java-version: '21'
       - run: npm install --no-audit --no-fund
       - run: node --import tsx --test tests/grantPolicy.test.mjs tests/grantService.test.mjs tests/grantDates.test.mjs tests/aiGrantQuota.test.mjs
+      - run: npm install --no-save --no-audit --no-fund playwright@1.62.1
+      - run: npx playwright install --with-deps chromium
+      - name: Test grant controls on desktop and mobile
+        run: node tests/grantUiPreview.mjs
       - name: Test Firestore rules in a disposable emulator
         run: |
           printf '%s\n' '{"firestore":{"rules":"firestore.grants-draft.rules"},"emulators":{"firestore":{"port":8080},"ui":{"enabled":false},"singleProjectMode":false}}' > firebase.grants-ci.json

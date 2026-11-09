@@ -1,5 +1,12 @@
 # MyBucket — Master Implementation Plan
 
+## Trial access bootstrap (November 2026)
+
+- The five existing authenticated accounts received server-owned `billing/access` documents using their original Firebase Authentication registration times; a read-only audit confirmed five matching records.
+- The authenticated `subscription.trialSettings` action ensures a missing access record exists before returning settings. Existing records are validated and never overwritten; an existing billing record without access requires review rather than an assumption about payment. Concurrent creation uses a Firestore transaction.
+- Initial setup account saves and default category initialization wait for this bootstrap. Financial reads remain available while it runs.
+- This does not deploy Firestore Rules or enable paid plans. Expiry enforcement on Firestore remains pending rule review, tests, and an approved rollout.
+
 ## Presence (November 2026)
 
 - Signed-in foreground clients register an independent Realtime Database session for each browser tab or device. Firebase on-disconnect operations remove the session and record the last-seen time and approximate device type.

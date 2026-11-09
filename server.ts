@@ -41,6 +41,13 @@ async function startServer() {
       }
 
       switch (action) {
+        case 'subscription.trialSettings': {
+          const { ensureTrialAccess } = await import('./server/trialAccessBootstrap');
+          const { readTrialSettings } = await import('./server/trialSettings');
+          await ensureTrialAccess(user.uid);
+          const { proDays, basicDays } = await readTrialSettings();
+          return res.json({ ok: true, data: { proDays, basicDays } });
+        }
         case 'app.presence': {
           const { recordPresence } = await import('./server/presence');
           await recordPresence(user.uid);

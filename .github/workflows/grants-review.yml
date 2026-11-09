@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - free-grants-review-20261109
+  pull_request:
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,7 +21,7 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: npm install --no-audit --no-fund
-      - run: node --import tsx --test tests/grantPolicy.test.mjs tests/grantService.test.mjs tests/grantDates.test.mjs tests/aiGrantQuota.test.mjs
+      - run: node --import tsx --test tests/grantPolicy.test.mjs tests/grantService.test.mjs tests/grantDates.test.mjs tests/aiGrantQuota.test.mjs tests/aiUsageStatus.test.mjs
       - run: npm install --no-save --no-audit --no-fund playwright@1.62.1
       - run: npx playwright install --with-deps chromium
       - name: Test grant controls on desktop and mobile

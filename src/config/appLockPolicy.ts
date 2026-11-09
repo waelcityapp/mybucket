@@ -8,7 +8,7 @@
  * App Lock is a privacy screen, not a substitute for Firebase Authentication
  * or Firestore security rules.
  */
-export const APP_LOCK_ENABLED = false as const;
+export const APP_LOCK_ENABLED = true as const;
 
 export const APP_LOCK_PIN_LENGTH = 6;
 export const APP_LOCK_INACTIVITY_MINUTES = [1, 2, 3] as const;

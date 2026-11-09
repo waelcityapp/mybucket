@@ -516,6 +516,10 @@ export function TransactionModal({
         setError(isAr ? 'لا يمكن التحويل لنفس الحساب' : 'Cannot transfer to the same account');
         return;
       }
+      if (selectedAccount && selectedToAccount && selectedAccount.currency !== selectedToAccount.currency) {
+        setError(isAr ? 'لا يمكن التحويل بين حسابين بعملتين مختلفتين. اختر حسابين بنفس العملة.' : 'Cannot transfer between accounts with different currencies. Choose accounts with the same currency.');
+        return;
+      }
     }
 
     // A missing category must never silently become the first available one.

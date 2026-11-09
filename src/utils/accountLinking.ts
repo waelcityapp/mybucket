@@ -36,7 +36,8 @@ export function bindMovement(accounts: LinkedAccount[], movement: Movement): Mov
   const from = resolveAccount(accounts, movement.accountId);
   const to = movement.type === 'transfer' && movement.toAccountId ? resolveAccount(accounts, movement.toAccountId) : null;
   if (movement.type === 'transfer' && !to) throw new Error('missing-destination');
-  if (to && (from.account.id === to.account.id || from.account.currency !== to.account.currency)) throw new Error('invalid-transfer');
+  if (to && from.account.id === to.account.id) throw new Error('invalid-transfer');
+  if (to && from.account.currency !== to.account.currency) throw new Error('currency-mismatch');
   return { ...movement, balanceAccountId: from.account.id, ...(to ? { toBalanceAccountId: to.account.id } : {}) };
 }
 

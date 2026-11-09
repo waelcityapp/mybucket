@@ -838,6 +838,8 @@ export default function App() {
         ? (lang === 'ar'
           ? `لا يمكن ${newTx.type === 'transfer' ? 'التحويل' : 'تسجيل المصروف'}: رصيد ${error.accountNameAr} هو ${new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency} فقط.`
           : `Cannot ${newTx.type === 'transfer' ? 'transfer' : 'record the expense'}: ${error.accountName} has only ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency}.`)
+        : error instanceof Error && error.message === 'currency-mismatch'
+        ? (lang === 'ar' ? 'لا يمكن التحويل بين حسابين بعملتين مختلفتين.' : 'Cannot transfer between accounts with different currencies.')
         : error instanceof Error && error.message === 'invalid-transfer'
         ? (lang === 'ar' ? 'لا يمكن التحويل بين وسيلتين مرتبطتين بنفس الحساب.' : 'Cannot transfer between methods linked to the same account.')
         : error instanceof Error && error.message === 'credit-overpayment'

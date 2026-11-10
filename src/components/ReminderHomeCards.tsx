@@ -43,23 +43,23 @@ export function ReminderHomeCards({ lang, onOpen }: { lang: Language; onOpen: (k
   const total = totals.obligations + totals.receivables;
   const pct = total > 0 ? totals.obligations / total * 100 : 0;
   const number = (value: number) => new Intl.NumberFormat(ar ? 'ar-EG' : 'en-US', { maximumFractionDigits: 2 }).format(value);
-  return <div className="space-y-2.5 rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-2xs" dir={ar ? 'rtl' : 'ltr'}>
-    <div className="rounded-xl bg-emerald-50/50 border border-emerald-100 p-3 space-y-2.5">
+  return <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs" dir={ar ? 'rtl' : 'ltr'}>
+    <div className="rounded-xl bg-emerald-50/50 border border-emerald-100 px-3 py-2 space-y-1.5">
       <div className="flex items-center justify-between gap-2"><h2 className="text-xs sm:text-sm font-black text-slate-800">{ar ? 'الالتزامات والمستحقات هذا الشهر' : 'Commitments and receivables this month'}</h2><select aria-label={ar ? 'عملة المؤشر' : 'Indicator currency'} value={selected} onChange={e => setCurrency(e.target.value)} className="max-w-24 rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs font-bold text-emerald-800">{(currencies.length ? currencies : ['EGP']).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
       {failed ? <p role="alert" className="text-xs text-rose-700">{ar ? 'تعذر حساب إجمالي هذا الشهر.' : 'Could not calculate this month’s totals.'} <button type="button" onClick={() => setRetry(n => n + 1)} className="font-bold underline">{ar ? 'إعادة المحاولة' : 'Retry'}</button></p> : !summary ? <p role="status" className="text-xs text-slate-500">{ar ? 'جارٍ حساب إجمالي الشهر...' : 'Calculating this month’s totals...'}</p> : <>
         <div role="img" aria-label={hidden ? (ar ? 'المبالغ مخفية' : 'Amounts hidden') : (ar ? `الالتزامات ${number(totals.obligations)}، المستحقات ${number(totals.receivables)} ${selected}` : `Commitments ${number(totals.obligations)}, receivables ${number(totals.receivables)} ${selected}`)} className="flex h-5 w-full overflow-hidden rounded-full bg-slate-200" dir="rtl">
-          {!hidden && total > 0 && <><span style={{ width: pct + '%' }} className="flex items-center justify-center overflow-hidden bg-emerald-600 text-[10px] font-bold text-white">{pct >= 18 ? Math.round(pct) + '%' : ''}</span><span style={{ width: (100-pct) + '%' }} className="flex items-center justify-center overflow-hidden bg-sky-300 text-[10px] font-bold text-sky-950">{100-pct >= 18 ? Math.round(100-pct) + '%' : ''}</span></>}
+          {!hidden && total > 0 && <><span style={{ width: pct + '%' }} className="flex items-center justify-center overflow-hidden bg-gradient-to-l from-rose-400 to-rose-500 text-[10px] font-bold text-white">{pct >= 18 ? Math.round(pct) + '%' : ''}</span><span style={{ width: (100-pct) + '%' }} className="flex items-center justify-center overflow-hidden bg-gradient-to-l from-emerald-500 to-emerald-300 text-[10px] font-bold text-white">{100-pct >= 18 ? Math.round(100-pct) + '%' : ''}</span></>}
         </div>
-        <div className="grid grid-cols-2 gap-2 text-xs"><div className="min-w-0"><p className="font-bold text-emerald-800">{ar ? 'الالتزامات' : 'Commitments'}</p><p className="mt-1 break-words font-black text-slate-900" dir="auto">{hidden ? '••••' : number(totals.obligations)} <span className="text-[10px] font-semibold text-slate-500">{selected}</span></p></div><div className="min-w-0 border-s border-slate-200 ps-2"><p className="font-bold text-sky-700">{ar ? 'مستحقاتي' : 'Receivables'}</p><p className="mt-1 break-words font-black text-slate-900" dir="auto">{hidden ? '••••' : number(totals.receivables)} <span className="text-[10px] font-semibold text-slate-500">{selected}</span></p></div></div>
+        <div className="grid grid-cols-2 gap-2 text-xs"><div className="min-w-0"><p className="font-bold text-rose-600">{ar ? 'الالتزامات' : 'Commitments'}</p><p className="break-words font-black text-slate-900" dir="auto">{hidden ? '••••' : number(totals.obligations)} <span className="text-[10px] font-semibold text-slate-500">{selected}</span></p></div><div className="min-w-0 border-s border-slate-200 ps-2"><p className="font-bold text-emerald-700">{ar ? 'مستحقاتي' : 'Receivables'}</p><p className="break-words font-black text-slate-900" dir="auto">{hidden ? '••••' : number(totals.receivables)} <span className="text-[10px] font-semibold text-slate-500">{selected}</span></p></div></div>
         <p className="text-[10px] text-slate-500">{ar ? 'إجمالي مواعيد هذا الشهر، بما فيها المسدد والمحصّل.' : 'All amounts due this month, including paid and collected.'}</p>
       </>}
     </div>
     {(['obligation','receivable'] as const).map(kind => <button
       key={kind} type="button" onClick={() => onOpen(kind)}
-      className="w-full rounded-2xl bg-white border border-slate-200/90 hover:bg-slate-50 p-2.5 sm:p-3 shadow-2xs flex items-center justify-between gap-2 text-start transition-colors"
+      className="w-full rounded-2xl bg-white border border-slate-200/90 hover:bg-slate-50 px-2.5 py-2 shadow-2xs flex items-center justify-between gap-2 text-start transition-colors"
     >
       <div className="flex items-center gap-2.5 min-w-0">
-        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${kind === 'obligation' ? 'bg-amber-50 text-amber-700' : 'bg-sky-50 text-sky-700'}`}>
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${kind === 'obligation' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'}`}>
           {kind === 'obligation' ? <CalendarClock className="w-4 h-4"/> : <HandCoins className="w-4 h-4"/>}
         </div>
         <div className="min-w-0 text-start">

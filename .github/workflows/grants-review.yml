@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - free-grants-review-20261109
+  pull_request:
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,6 +26,10 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Test grant controls on desktop and mobile
         run: node tests/grantUiPreview.mjs
+      - name: Test reminder editing and deletion on desktop and mobile
+        run: node tests/reminderWorkspaceUi.mjs
+      - name: Test reminder alerts on desktop and mobile
+        run: node tests/reminderAlertUi.mjs
       - name: Save sample screenshots
         uses: actions/upload-artifact@v4
         with:
@@ -33,4 +38,4 @@ jobs:
       - name: Test Firestore rules in a disposable emulator
         run: |
           printf '%s\n' '{"firestore":{"rules":"firestore.grants-draft.rules"},"emulators":{"firestore":{"port":8080},"ui":{"enabled":false},"singleProjectMode":false}}' > firebase.grants-ci.json
-          npx --yes firebase-tools@15.35.0 emulators:exec --project demo-mybucket-grants --config firebase.grants-ci.json --only firestore "node --import tsx --test tests/firestoreGrantRules.test.mjs tests/firestoreGrantIntegration.test.mjs tests/trialAccessBootstrap.test.mjs"
+          npx --yes firebase-tools@15.35.0 emulators:exec --project demo-mybucket-grants --config firebase.grants-ci.json --only firestore "node --import tsx --test tests/firestoreGrantRules.test.mjs tests/firestoreGrantIntegration.test.mjs tests/trialAccessBootstrap.test.mjs tests/reminderServiceIntegration.test.mjs"

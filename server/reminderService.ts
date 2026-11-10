@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { FieldPath } from 'firebase-admin/firestore';
 import { getAdminFirestore } from './firebaseAdmin.js';
 import { SubscriptionError } from './subscriptionService.js';
 import { occurrenceDate, occurrenceId, parseOccurrenceId, isoDate, type Frequency, type OccurrenceChange, type OccurrenceOverride } from './recurrence.js';
@@ -99,6 +100,65 @@ function expand(master: Reminder, today: string) {
 function shiftBack(today: string, days: number) {
   const d = new Date(today + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate()-days);
   return d.toISOString().slice(0,10);
+}
+
+/** Include every due date in the requested month, regardless of paid status or list pagination. */
+export function monthlyReminderTotals(masters: Reminder[], month: string) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) fail('invalid_summary_month');
+  const totals: Record<string, { obligations: number; receivables: number }> = {};
+  const monthStart = month + '-01';
+  for (const master of masters) {
+    if (!isoDate(master.dueDate) || (master.kind !== 'obligation' && master.kind !== 'receivable')) fail('invalid_reminder_data', 503);
+    const frequency = master.frequency || 'none';
+    if (!frequencies.has(frequency)) fail('invalid_reminder_data', 503);
+    const candidates = new Set<number>();
+    if (frequency === 'none') candidates.add(0);
+    else {
+      const segments = [{ fromIndex: 0, anchorDate: master.dueDate }, ...(master.changes || [])];
+      for (const segment of segments) {
+        if (!Number.isSafeInteger(segment.fromIndex) || segment.fromIndex < 0 || !isoDate(segment.anchorDate)) fail('invalid_reminder_data', 503);
+        const [y, m] = month.split('-').map(Number), [ay, am] = segment.anchorDate.split('-').map(Number);
+        const estimate = frequency === 'weekly'
+          ? Math.floor((Date.parse(monthStart + 'T12:00:00Z') - Date.parse(segment.anchorDate + 'T12:00:00Z')) / (7 * 86400000))
+          : frequency === 'yearly' ? y - ay : (y - ay) * 12 + m - am;
+        for (let offset = -2; offset <= 7; offset++) {
+          const index = segment.fromIndex + estimate + offset;
+          if (Number.isSafeInteger(index) && index >= segment.fromIndex && (frequency !== 'installments' || index < (master.installmentCount ?? 0))) candidates.add(index);
+        }
+      }
+      for (const key of Object.keys(master.overrides || {})) {
+        if (/^\d+$/.test(key)) { const index = Number(key); if (Number.isSafeInteger(index) && (frequency !== 'installments' || index < (master.installmentCount ?? 0))) candidates.add(index); }
+      }
+    }
+    for (const index of candidates) {
+      if (master.states?.[String(index)]?.cancelled) continue;
+      const item = frequency === 'none' ? master : effective(master, index);
+      if (!isoDate(item.dueDate)) fail('invalid_reminder_data', 503);
+      if (!item.dueDate.startsWith(month + '-')) continue;
+      if (!validCurrencies.has(item.currency) || typeof item.amount !== 'number' || !Number.isFinite(item.amount) || item.amount < 0) fail('invalid_reminder_data', 503);
+      const entry = totals[item.currency] ||= { obligations: 0, receivables: 0 };
+      if (master.kind === 'obligation') entry.obligations += item.amount;
+      else entry.receivables += item.amount;
+    }
+  }
+  for (const entry of Object.values(totals)) { entry.obligations = Math.round(entry.obligations * 100) / 100; entry.receivables = Math.round(entry.receivables * 100) / 100; }
+  return totals;
+}
+
+export async function monthlyReminderSummary(uid: string) {
+  const col = getAdminFirestore().collection('users').doc(uid).collection('reminders');
+  const month = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit' }).format(new Date());
+  const masters: Reminder[] = [];
+  let cursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
+  while (true) {
+    let query: FirebaseFirestore.Query = col.orderBy(FieldPath.documentId()).limit(200);
+    if (cursor) query = query.startAfter(cursor);
+    const page = await query.get();
+    masters.push(...page.docs.map(doc => ({ ...doc.data(), id: doc.id } as Reminder)));
+    if (page.size < 200) break;
+    cursor = page.docs[page.docs.length - 1];
+  }
+  return { month, totals: monthlyReminderTotals(masters, month) };
 }
 export async function reminderAction(uid: string, action: string, payload: Record<string, unknown>) {
   const col = getAdminFirestore().collection('users').doc(uid).collection('reminders');

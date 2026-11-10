@@ -26,11 +26,10 @@ export function HomeFinancialOverview({
   });
 
   const toggleHideBalance = () => {
-    setIsBalanceHidden((prev) => {
-      const next = !prev;
-      localStorage.setItem('hide_financial_balance', String(next));
-      return next;
-    });
+    const next = !isBalanceHidden;
+    localStorage.setItem('hide_financial_balance', String(next));
+    setIsBalanceHidden(next);
+    window.dispatchEvent(new Event('mybucket-balance-visibility'));
   };
 
   // Group balances by currency

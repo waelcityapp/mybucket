@@ -455,3 +455,6 @@ Show one red in-app banner for actionable reminder occurrences and a full-page l
 
 ## Revision #154 — Reminder editing and deletion
 Fix edit-route parsing and restore selected values on direct entry. Clearly distinguish unpaid/paid status from the action to mark payment. Provide full-page deletion confirmation for either one due date or an entire item. A future-wide edit replaces later conflicting schedule changes and overrides while preserving earlier history and completion states. Firebase emulator and mock browser tests do not replace a real-account check.
+
+## Revision #156 — Monthly commitments and receivables indicator
+The home reminder box displays the current Cairo month's total due commitments and receivables, including completed due dates, separately per currency. A server-side authenticated summary reads all of the user's reminder documents in bounded pages instead of relying on the truncated reminders list; the read cost scales with that user's reminder-document count each time the summary is loaded. Recurring dates, overrides, schedule changes, cancellations and installments are included; financial accounts and transactions are not changed. The indicator follows the existing balance visibility setting. The real-account production flow still requires verification.

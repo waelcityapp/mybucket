@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { auth } from '../../lib/firebase';
 import type { Language } from '../../types';
-import { ArrowRight, ArrowLeft, Plus, Pencil, Trash2, CheckCircle2, CalendarClock, Bell, Volume2 } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Plus, Pencil, Trash2, Check, CalendarClock, Bell, Volume2 } from 'lucide-react';
 import { playReminderTone } from '../../utils/reminderSounds';
 
 type Kind = 'obligation' | 'receivable';
@@ -124,7 +124,11 @@ export function ReminderWorkspace({ lang, kind, onHome, userId }:{lang:Language;
        {occurrences.map(item=><article key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col sm:flex-row sm:items-center gap-3">
          <div className="flex-1 space-y-1"><p className="text-sm font-bold">{item.dueDate} · {currencyValue(item,ar)}</p><p className={`text-xs font-semibold ${item.done?'text-emerald-700':item.dueDate<today?'text-red-600':'text-slate-500'}`}>{item.done?(kind==='obligation'?(ar?'مسدد':'Paid'):(ar?'تم التحصيل':'Collected')):item.dueDate<today?(ar?(kind==='obligation'?'غير مسدد · متأخر':'لم يُحصّل · متأخر'):'Not completed · overdue'):(ar?(kind==='obligation'?'غير مسدد · قادم':'لم يُحصّل · قادم'):'Not completed · upcoming')}</p>{item.frequency==='installments'&&<p className="text-xs text-slate-500">{ar?'القسط':'Installment'} {(item.occurrenceIndex??0)+1} / {item.installmentCount}</p>}</div>
          <div className="flex flex-wrap gap-2">
-           <button type="button" disabled={busy} onClick={()=>void update('toggle',{id:item.id,done:!item.done})} className="inline-flex gap-1 items-center rounded-lg bg-emerald-50 text-emerald-800 px-3 py-2 text-xs font-bold"><CheckCircle2 className="w-4 h-4"/>{item.done?(ar?'إلغاء التسجيل':'Undo'):(kind==='obligation'?(ar?'تسجيل السداد':'Mark paid'):(ar?'تسجيل التحصيل':'Mark collected'))}</button>
+           <label className="inline-flex min-w-14 cursor-pointer flex-col items-center gap-1 text-[11px] font-bold text-slate-600">
+             <input type="checkbox" checked={item.done} disabled={busy} onChange={e=>void update('toggle',{id:item.id,done:e.target.checked})} aria-label={kind==='obligation'?(ar?'السداد':'Payment'):(ar?'التحصيل':'Collection')} className="peer sr-only" />
+             <span aria-hidden="true" className={'flex h-8 w-8 items-center justify-center rounded-md border-2 peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-500 peer-disabled:opacity-50 '+(item.done?'border-emerald-600 bg-emerald-600 text-white':'border-slate-300 bg-white text-transparent')}><Check className="h-5 w-5" strokeWidth={3}/></span>
+             <span>{kind==='obligation'?(ar?'السداد':'Payment'):(ar?'التحصيل':'Collection')}</span>
+           </label>
            <button type="button" onClick={()=>startEdit(item)} className="rounded-lg border border-slate-200 p-2" aria-label={ar?'تعديل الاستحقاق':'Edit occurrence'}><Pencil className="w-4 h-4"/></button>
            <button type="button" onClick={()=>startDelete(item,false)} className="rounded-lg border border-red-100 p-2 text-red-600" aria-label={ar?'حذف الاستحقاق':'Delete due date'}><Trash2 className="w-4 h-4"/></button>
          </div>

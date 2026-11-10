@@ -15,7 +15,7 @@ try {
   await page.getByRole('button',{name:'تعديل الاستحقاق'}).nth(1).click();
   await page.getByLabel('المبلغ',{exact:true}).fill('4000');await page.getByText('الاستحقاق المختار وكل المواعيد القادمة').click();await page.getByRole('button',{name:'حفظ البند'}).click();
   await page.getByText(/٤٬٠٠٠/).first().waitFor();
-  await page.getByRole('button',{name:'تسجيل السداد'}).first().click();await page.getByText('مسدد',{exact:true}).first().waitFor();
+  const paid=page.getByRole('checkbox',{name:'السداد'}).first();const paidLabel=page.locator('label').filter({has:paid});assert.equal(await paid.isChecked(),false);await paidLabel.click();await page.getByText('مسدد',{exact:true}).first().waitFor();assert.equal(await paid.isChecked(),true);await paidLabel.click();await page.getByText('غير مسدد · قادم').first().waitFor();assert.equal(await paid.isChecked(),false);
   await page.getByRole('button',{name:'حذف الاستحقاق'}).nth(1).click();await page.getByText('حذف هذا الاستحقاق فقط؟').waitFor();
   await page.evaluate(()=>window.failDelete=true);await page.getByRole('button',{name:'تأكيد الحذف'}).click();await page.getByText(/تعذر تنفيذ العملية/).waitFor();
   await page.evaluate(()=>window.failDelete=false);await page.getByRole('button',{name:'تأكيد الحذف'}).click();await page.getByRole('heading',{name:'مواعيد الاستحقاق'}).waitFor();

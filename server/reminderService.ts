@@ -136,10 +136,12 @@ export async function reminderAction(uid: string, action: string, payload: Recor
       if (recurring) {
         const scope = payload.scope === 'future' ? 'future' : 'once';
         if (scope === 'future') {
-          const changes = (master.changes || []).filter(x => x.fromIndex !== index);
+          // A future-wide edit replaces later edits too, while retaining past history and completion states.
+          const changes = (master.changes || []).filter(x => x.fromIndex < index);
+          const overrides = Object.fromEntries(Object.entries(master.overrides || {}).filter(([key]) => Number(key) < index));
           changes.push({ fromIndex:index, title:fields.title, amount:fields.amount, currency:fields.currency, note:fields.note, anchorDate:fields.dueDate, leadDays:fields.leadDays, tone:fields.tone, remindTime:fields.remindTime, repeat:fields.repeat });
           changes.sort((a,b)=>a.fromIndex-b.fromIndex);
-          transaction.update(ref,{changes,category:fields.category,updatedAt:Date.now()});
+          transaction.update(ref,{changes,overrides,category:fields.category,updatedAt:Date.now()});
         } else {
           const overrides = {...master.overrides,[String(index)]:{title:fields.title,amount:fields.amount,currency:fields.currency,note:fields.note,dueDate:fields.dueDate, leadDays:fields.leadDays, tone:fields.tone, remindTime:fields.remindTime, repeat:fields.repeat}};
           transaction.update(ref,{overrides,updatedAt:Date.now()});

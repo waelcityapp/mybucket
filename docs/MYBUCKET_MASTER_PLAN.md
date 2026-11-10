@@ -452,3 +452,6 @@ The settings card reloads the usage snapshot when opened and when the app become
 
 ## Revision #153 — In-app reminder alert banner
 Show one red in-app banner for actionable reminder occurrences and a full-page list with paid/collected, tomorrow and stop controls. Closing stores the current alert IDs for the current Cairo day on that device; a newly due ID reopens the banner and outstanding alerts return the next day. The in-app alert remains eligible until acted on, including when a once-only reminder day was missed. No background/mobile push or automatic sound is implemented. Existing reminder-list limits still apply and should be addressed separately.
+
+## Revision #154 — Reminder editing and deletion
+Fix edit-route parsing and restore selected values on direct entry. Clearly distinguish unpaid/paid status from the action to mark payment. Provide full-page deletion confirmation for either one due date or an entire item. A future-wide edit replaces later conflicting schedule changes and overrides while preserving earlier history and completion states. Firebase emulator and mock browser tests do not replace a real-account check.

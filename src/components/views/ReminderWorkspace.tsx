@@ -39,15 +39,14 @@ export function ReminderWorkspace({ lang, kind, onHome, userId }:{lang:Language;
  const [error,setError]=useState('');
  const [fields,setFields]=useState<Fields>(defaultFields('other'));
  const [scope,setScope]=useState<'once'|'future'>('once');
- const [pendingDelete,setPendingDelete]=useState<Item|null>(null);
- const [deleteAll,setDeleteAll]=useState(false);
  const prefix='/reminders/'+kind;
  const current=path.startsWith(prefix)?path.slice(prefix.length).split('/').filter(Boolean):[];
  const category=current[0]&&categories.some(c=>c.id===current[0])?current[0]:null;
  const seriesId=current[1]&&/^[0-9a-f-]{36}$/.test(current[1])?current[1]:null;
  const isNew=current[1]==='new';
  const isEdit=current[2]==='edit';
- const view= !category?'categories':isNew||isEdit?'form':seriesId?'detail':'list';
+ const isDelete=current[2]==='delete';
+ const view= !category?'categories':isNew||isEdit?'form':isDelete?'delete':seriesId?'detail':'list';
  const refresh=useCallback(async()=>{
   setLoading(true);
   try {const r=await api('list');if(auth.currentUser?.uid===userId){setItems(Array.isArray(r.reminders)?r.reminders:[]);setError('');}}
@@ -56,18 +55,23 @@ export function ReminderWorkspace({ lang, kind, onHome, userId }:{lang:Language;
  },[userId,ar]);
  useEffect(()=>{void refresh();},[refresh]);
  useEffect(()=>{const callback=()=>setPath(window.location.pathname);window.addEventListener('popstate',callback);return()=>window.removeEventListener('popstate',callback);},[]);
- const navigate=(next:string)=>{window.history.pushState({myBucketTab:'reminders'},'',next);setPath(next);setError('');setPendingDelete(null);window.scrollTo(0,0);};
- const back=()=>{if(view==='categories'){onHome();return;}if(view==='list'){navigate(prefix);return;}if(view==='detail'){navigate(prefix+'/'+category);return;}if(isEdit){navigate(prefix+'/'+category+'/'+seriesId);return;}navigate(prefix+'/'+category);};
+ const navigate=(next:string)=>{window.history.pushState({myBucketTab:'reminders'},'',next);setPath(window.location.pathname);setError('');window.scrollTo(0,0);};
+ const back=()=>{if(view==='categories'){onHome();return;}if(view==='list'){navigate(prefix);return;}if(view==='detail'){navigate(prefix+'/'+category);return;}if(isEdit||isDelete){navigate(prefix+'/'+category+'/'+seriesId);return;}navigate(prefix+'/'+category);};
  const group=useMemo(()=>{const grouped=new Map<string,Item[]>();for(const item of items.filter(i=>i.kind===kind)){const id=masterId(item);const list=grouped.get(id)||[];list.push(item);grouped.set(id,list);}return [...grouped.entries()].map(([id,entries])=>({id,entries,category:entries[0]?.category||'other',first:entries.find(i=>!i.done&&i.dueDate>=new Date().toLocaleDateString('en-CA'))||entries.find(i=>!i.done)||entries[0]}));},[items,kind]);
  const selectedGroup=group.find(g=>g.id===seriesId);
  const occurrences=selectedGroup?.entries||[];
  const first=selectedGroup?.first;
- const selectedEdit=items.find(i=>i.id===new URLSearchParams(window.location.search).get('occ'))||first;
+ const params=new URLSearchParams(window.location.search);
+ const selectedEdit=occurrences.find(i=>i.id===params.get('occ'));
+ const deleteAll=params.get('all')==='1';
  const today=new Date().toLocaleDateString('en-CA');
  const startNew=()=>{setFields(defaultFields(category||'other'));setScope('once');navigate(prefix+'/'+category+'/new');};
  const startEdit=(item:Item)=>{setFields({category:item.category||category||'other',title:item.title,amount:String(item.amount),currency:item.currency,dueDate:item.dueDate,note:item.note||'',frequency:item.frequency||'none',installmentCount:item.installmentCount||12,leadDays:item.leadDays??7,tone:item.tone??1,remindTime:item.remindTime||'09:00',repeat:item.repeat||'daily'});setScope('once');navigate(prefix+'/'+category+'/'+masterId(item)+'/edit?occ='+encodeURIComponent(item.id));};
+ useEffect(()=>{if(!isEdit||!selectedEdit)return;const item=selectedEdit;setFields({category:item.category||category||'other',title:item.title,amount:String(item.amount),currency:item.currency,dueDate:item.dueDate,note:item.note||'',frequency:item.frequency||'none',installmentCount:item.installmentCount||12,leadDays:item.leadDays??7,tone:item.tone??1,remindTime:item.remindTime||'09:00',repeat:item.repeat||'daily'});setScope('once');},[isEdit,selectedEdit?.id]);
+ const startDelete=(item:Item,all:boolean)=>navigate(prefix+'/'+category+'/'+masterId(item)+'/delete?occ='+encodeURIComponent(item.id)+(all?'&all=1':''));
  async function save(){
   if(!fields.title.trim()||fields.amount===''||!Number.isFinite(Number(fields.amount))||Number(fields.amount)<0||!fields.dueDate){setError(ar?'أدخل اسم البند والمبلغ والتاريخ بشكل صحيح':'Enter valid name, amount and date');return;}
+  if(isEdit&&!selectedEdit){setError(ar?'تعذر تحديد الاستحقاق المطلوب تعديله. ارجع واختره مرة أخرى.':'Could not identify the selected due date.');return;}
   setBusy(true);setError('');
   try {await api(isEdit?'update':'create',{...(isEdit?{id:selectedEdit?.id,scope}:{}),kind,category:fields.category,title:fields.title,amount:Number(fields.amount),currency:fields.currency,dueDate:fields.dueDate,note:fields.note,frequency:fields.frequency,installmentCount:fields.frequency==='installments'?fields.installmentCount:null,leadDays:fields.leadDays,tone:fields.tone,remindTime:fields.remindTime,repeat:fields.repeat});
     await refresh();navigate(prefix+'/'+category+(isEdit?'/'+seriesId:''));}
@@ -76,8 +80,8 @@ export function ReminderWorkspace({ lang, kind, onHome, userId }:{lang:Language;
  }
  async function update(action:string,payload:Record<string,unknown>){
   setBusy(true);setError('');
-  try {await api(action,payload);await refresh();setPendingDelete(null);}
-  catch(e){setError((ar?'تعذر تنفيذ العملية: ':'Action failed: ')+(e instanceof Error?e.message:'error'));}
+  try {await api(action,payload);await refresh();return true;}
+  catch(e){setError((ar?'تعذر تنفيذ العملية: ':'Action failed: ')+(e instanceof Error?e.message:'error'));return false;}
   finally{setBusy(false);}
  }
  const title=kind==='obligation'?(ar?'التزاماتي':'My Commitments'):(ar?'مستحقات لي':'Receivables');
@@ -86,7 +90,7 @@ export function ReminderWorkspace({ lang, kind, onHome, userId }:{lang:Language;
    <div className="max-w-3xl mx-auto px-4 py-5 sm:py-8 space-y-4">
      <header className="flex gap-3 items-center">
        <button onClick={back} type="button" aria-label={ar?'رجوع':'Back'} className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm"><BackIcon className="w-5 h-5"/></button>
-       <div className="min-w-0"><p className="text-xs text-emerald-700 font-bold">{title}</p><h1 className="text-xl sm:text-2xl font-black break-words">{view==='categories'?(ar?'الأقسام الرئيسية':'Categories'):view==='list'?labelFor(category||'other',ar):view==='form'?(isEdit?(ar?'تعديل البند':'Edit item'):(ar?'إنشاء بند جديد':'New item')):first?.title||(ar?'تفاصيل البند':'Item details')}</h1></div>
+       <div className="min-w-0"><p className="text-xs text-emerald-700 font-bold">{title}</p><h1 className="text-xl sm:text-2xl font-black break-words">{view==='categories'?(ar?'الأقسام الرئيسية':'Categories'):view==='list'?labelFor(category||'other',ar):view==='delete'?(ar?'تأكيد الحذف':'Confirm deletion'):view==='form'?(isEdit?(ar?'تعديل البند':'Edit item'):(ar?'إنشاء بند جديد':'New item')):first?.title||(ar?'تفاصيل البند':'Item details')}</h1></div>
      </header>
      {error&&<p role="alert" className="rounded-xl border border-red-200 bg-red-50 text-red-700 p-3 text-sm">{error}</p>}
      {loading&&<p className="text-sm text-slate-500">{ar?'جاري تحميل البيانات...':'Loading...'}</p>}
@@ -114,20 +118,22 @@ export function ReminderWorkspace({ lang, kind, onHome, userId }:{lang:Language;
          {first.note&&<p className="text-sm text-slate-600">{first.note}</p>}
          <p className="text-xs text-slate-500">{first.frequency==='installments'?`${ar?'عدد الأقساط':'Installments'}: ${first.installmentCount||'-'}`:first.frequency==='monthly'?(ar?'يتكرر شهريًا':'Monthly'):first.frequency==='weekly'?(ar?'يتكرر أسبوعيًا':'Weekly'):first.frequency==='yearly'?(ar?'يتكرر سنويًا':'Yearly'):(ar?'بند غير متكرر':'One-time')}</p>
          <button type="button" onClick={()=>startEdit(first)} className="inline-flex gap-2 items-center border border-emerald-200 text-emerald-700 rounded-xl px-3 py-2 text-sm font-semibold"><Pencil className="w-4 h-4"/>{ar?'تعديل البند':'Edit item'}</button>
+         <button type="button" onClick={()=>startDelete(first,true)} className="mx-2 inline-flex gap-2 items-center border border-red-200 text-red-700 rounded-xl px-3 py-2 text-sm font-semibold"><Trash2 className="w-4 h-4"/>{ar?'حذف البند بالكامل':'Delete entire item'}</button>
        </div>}
        <h2 className="text-lg font-bold">{ar?'مواعيد الاستحقاق':'Due dates'}</h2>
        {occurrences.map(item=><article key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-         <div className="flex-1 space-y-1"><p className="text-sm font-bold">{item.dueDate} · {currencyValue(item,ar)}</p><p className={`text-xs font-semibold ${item.done?'text-emerald-700':item.dueDate<today?'text-red-600':'text-slate-500'}`}>{item.done?(kind==='obligation'?(ar?'تم السداد':'Paid'):(ar?'تم التحصيل':'Collected')):item.dueDate<today?(ar?'متأخر':'Overdue'):(ar?'قادم':'Upcoming')}</p>{item.frequency==='installments'&&<p className="text-xs text-slate-500">{ar?'القسط':'Installment'} {(item.occurrenceIndex??0)+1} / {item.installmentCount}</p>}</div>
+         <div className="flex-1 space-y-1"><p className="text-sm font-bold">{item.dueDate} · {currencyValue(item,ar)}</p><p className={`text-xs font-semibold ${item.done?'text-emerald-700':item.dueDate<today?'text-red-600':'text-slate-500'}`}>{item.done?(kind==='obligation'?(ar?'مسدد':'Paid'):(ar?'تم التحصيل':'Collected')):item.dueDate<today?(ar?(kind==='obligation'?'غير مسدد · متأخر':'لم يُحصّل · متأخر'):'Not completed · overdue'):(ar?(kind==='obligation'?'غير مسدد · قادم':'لم يُحصّل · قادم'):'Not completed · upcoming')}</p>{item.frequency==='installments'&&<p className="text-xs text-slate-500">{ar?'القسط':'Installment'} {(item.occurrenceIndex??0)+1} / {item.installmentCount}</p>}</div>
          <div className="flex flex-wrap gap-2">
-           <button type="button" disabled={busy} onClick={()=>void update('toggle',{id:item.id,done:!item.done})} className="inline-flex gap-1 items-center rounded-lg bg-emerald-50 text-emerald-800 px-3 py-2 text-xs font-bold"><CheckCircle2 className="w-4 h-4"/>{item.done?(ar?'تراجع':'Undo'):(kind==='obligation'?(ar?'تم السداد':'Paid'):(ar?'تم التحصيل':'Collected'))}</button>
+           <button type="button" disabled={busy} onClick={()=>void update('toggle',{id:item.id,done:!item.done})} className="inline-flex gap-1 items-center rounded-lg bg-emerald-50 text-emerald-800 px-3 py-2 text-xs font-bold"><CheckCircle2 className="w-4 h-4"/>{item.done?(ar?'إلغاء التسجيل':'Undo'):(kind==='obligation'?(ar?'تسجيل السداد':'Mark paid'):(ar?'تسجيل التحصيل':'Mark collected'))}</button>
            <button type="button" onClick={()=>startEdit(item)} className="rounded-lg border border-slate-200 p-2" aria-label={ar?'تعديل الاستحقاق':'Edit occurrence'}><Pencil className="w-4 h-4"/></button>
-           <button type="button" onClick={()=>{setPendingDelete(item);setDeleteAll(false);}} className="rounded-lg border border-red-100 p-2 text-red-600" aria-label={ar?'حذف':'Delete'}><Trash2 className="w-4 h-4"/></button>
+           <button type="button" onClick={()=>startDelete(item,false)} className="rounded-lg border border-red-100 p-2 text-red-600" aria-label={ar?'حذف الاستحقاق':'Delete due date'}><Trash2 className="w-4 h-4"/></button>
          </div>
        </article>)}
        {occurrences.length===0&&!loading&&<p className="text-sm text-slate-500">{ar?'لا توجد استحقاقات متاحة.':'No due dates found.'}</p>}
      </section>}
 
-     {view==='form'&&<form onSubmit={e=>{e.preventDefault();void save();}} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 space-y-4">
+     {view==='form'&&isEdit&&!selectedEdit&&!loading&&<p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{ar?'تعذر العثور على الاستحقاق المطلوب. ارجع واختره مرة أخرى.':'Due date not found. Go back and select it again.'}</p>}
+     {view==='form'&&(!isEdit||selectedEdit)&&<form onSubmit={e=>{e.preventDefault();void save();}} className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 space-y-4">
        <label className="block text-sm font-semibold">{ar?'اسم البند الفرعي':'Item name'}<input required maxLength={120} value={fields.title} onChange={e=>setFields(f=>({...f,title:e.target.value}))} placeholder={ar?'مثال: قسط السيارة أو الغسالة':'e.g. Car or washing machine installment'} className="mt-1 w-full rounded-xl border p-3"/></label>
        <div className="grid grid-cols-2 gap-3">
          <label className="block text-xs font-semibold">{ar?'المبلغ':'Amount'}<input required type="number" min="0" step="0.01" value={fields.amount} onChange={e=>setFields(f=>({...f,amount:e.target.value}))} className="mt-1 w-full rounded-xl border p-3"/></label>
@@ -153,11 +159,8 @@ export function ReminderWorkspace({ lang, kind, onHome, userId }:{lang:Language;
        <label className="block text-xs font-semibold">{ar?'ملاحظات اختيارية':'Notes'}<textarea maxLength={500} rows={2} value={fields.note} onChange={e=>setFields(f=>({...f,note:e.target.value}))} className="mt-1 w-full rounded-xl border p-3"/></label>
        <div className="flex gap-2"><button disabled={busy} type="submit" className="bg-emerald-600 text-white rounded-xl px-5 py-3 text-sm font-bold disabled:opacity-50">{ar?'حفظ البند':'Save item'}</button><button type="button" disabled={busy} onClick={back} className="border rounded-xl px-5 py-3 text-sm">{ar?'إلغاء':'Cancel'}</button></div>
      </form>}
-     {pendingDelete&&<section className="rounded-2xl border border-red-200 bg-red-50 p-4 space-y-3" role="alert">
-       <h2 className="font-black text-red-700">{ar?'تأكيد الحذف':'Confirm deletion'}</h2>
-       <p className="text-sm">{ar?'حذف الاستحقاق أم البند المتكرر بالكامل؟ لا تتأثر العمليات المالية المسجلة.':'Delete only this due date or the entire recurring series? Financial transactions are unchanged.'}</p>
-       <label className="flex gap-2 text-sm"><input type="checkbox" checked={deleteAll} onChange={e=>setDeleteAll(e.target.checked)}/>{ar?'حذف البند المتكرر وجميع استحقاقاته':'Delete series and all due dates'}</label>
-       <div className="flex gap-2"><button type="button" disabled={busy} onClick={()=>void update('delete',{id:deleteAll?masterId(pendingDelete):pendingDelete.id}).then(()=>{if(deleteAll)navigate(prefix+'/'+category);})} className="bg-red-600 text-white rounded-xl px-4 py-2 text-sm font-bold">{ar?'تأكيد الحذف':'Delete'}</button><button type="button" onClick={()=>setPendingDelete(null)} className="border rounded-xl px-4 py-2 text-sm">{ar?'تراجع':'Cancel'}</button></div>
+     {view==='delete'&&<section className="rounded-2xl border border-red-200 bg-white p-4 space-y-3">
+       {selectedEdit?<><p className="font-bold">{deleteAll?(ar?'حذف البند بالكامل وجميع مواعيده؟':'Delete the entire item and all due dates?'):(ar?'حذف هذا الاستحقاق فقط؟':'Delete this due date only?')}</p><p className="text-sm">{selectedEdit.title} · {selectedEdit.dueDate}</p><p className="text-sm text-slate-600">{ar?'لا تتأثر العمليات المالية المسجلة.':'Recorded financial transactions are unchanged.'}</p><div className="flex gap-2"><button type="button" disabled={busy} onClick={()=>void update('delete',{id:deleteAll?masterId(selectedEdit):selectedEdit.id}).then(ok=>{if(ok)navigate(deleteAll?prefix+'/'+category:prefix+'/'+category+'/'+seriesId);})} className="bg-red-600 text-white rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-50">{ar?'تأكيد الحذف':'Confirm deletion'}</button><button type="button" onClick={back} className="border rounded-xl px-4 py-2 text-sm">{ar?'تراجع':'Cancel'}</button></div></>:!loading&&<p role="alert" className="text-sm text-red-700">{ar?'تعذر العثور على البند المطلوب.':'Item not found.'}</p>}
      </section>}
      <p className="text-xs text-slate-500">{ar?'التذكيرات للمتابعة فقط، ولا تخصم أو تضيف أموالًا إلى حساباتك تلقائيًا.':'Reminders do not modify account balances.'}</p>
    </div>

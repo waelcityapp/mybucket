@@ -1,0 +1,10 @@
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import '../../src/index.css';
+import { ReminderWorkspace } from '../../src/components/views/ReminderWorkspace';
+const id='12345678-1234-1234-1234-123456789abc';
+let items=Array.from({length:3},(_,i)=>({id:id+'__'+i,seriesId:id,occurrenceIndex:i,category:'rent',kind:'obligation',title:'إيجار البيت',amount:3000,currency:'EGP',dueDate:`2026-${String(11+i).padStart(2,'0')}-15`,note:'',done:false,frequency:'monthly',leadDays:7,remindTime:'09:00',repeat:'daily'}));
+items[2].dueDate='2027-01-15';
+window.history.replaceState({},'',`/reminders/obligation/rent/${id}`);
+window.fetch=async(_url,init)=>{const {action,payload}=JSON.parse(String(init?.body||'{}'));if(action==='reminders.update'){const index=Number(payload.id.split('__')[1]);items=items.map(x=>x.occurrenceIndex===index||payload.scope==='future'&&x.occurrenceIndex>=index?{...x,amount:payload.amount,title:payload.title}:x);}if(action==='reminders.toggle')items=items.map(x=>x.id===payload.id?{...x,done:payload.done}:x);if(action==='reminders.delete'){if((window as any).failDelete) return new Response(JSON.stringify({ok:false,error:'test_failure'}),{status:500});items=items.filter(x=>payload.id===id?false:x.id!==payload.id);}return new Response(JSON.stringify({ok:true,data:{reminders:items}}),{status:200,headers:{'content-type':'application/json'}});};
+createRoot(document.getElementById('root')!).render(<ReminderWorkspace lang="ar" kind="obligation" userId="mock" onHome={()=>{}}/>);

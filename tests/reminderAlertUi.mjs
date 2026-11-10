@@ -21,7 +21,7 @@ try {
     await page.getByText('لديك 2 تذكير يحتاج انتباهك').waitFor();
     await page.getByRole('button',{name:'عرض التذكيرات'}).click();
     await page.getByText('قسط السيارة').waitFor();await page.getByText('مستحق آخر').waitFor();
-    await page.getByRole('button',{name:'تم السداد'}).click();
+    await page.getByRole('button',{name:'تسجيل السداد'}).click();
     await page.getByText('قسط السيارة').waitFor({state:'detached'});
     await page.getByRole('button',{name:'إيقاف التنبيه'}).click();
     await page.getByText('لا توجد تذكيرات تحتاج انتباهك الآن.').waitFor();

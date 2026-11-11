@@ -204,6 +204,7 @@ function requireFinancialWriteAccess(): void {
 // Save single account to Firestore
 export async function saveAccountToFirestore(userId: string, account: FinancialAccount) {
   requireFinancialWriteAccess();
+  if ((account.name || '').length > 40 || (account.nameAr || '').length > 40) throw new Error('account-name-too-long');
   if (account.type === 'credit') validateBalance(account, account.balance);
   else if (!isNonNegativeBalance(account.balance)) throw new Error('invalid-balance');
   const accountRef = doc(db, 'users', userId, 'accounts', account.id);
@@ -214,6 +215,7 @@ export async function saveAccountToFirestore(userId: string, account: FinancialA
 export async function saveAllAccountsToFirestore(userId: string, accounts: FinancialAccount[]) {
   requireFinancialWriteAccess();
   for (const account of accounts) {
+    if ((account.name || '').length > 40 || (account.nameAr || '').length > 40) throw new Error('account-name-too-long');
     if (account.type === 'credit') validateBalance(account, account.balance);
     else if (!isNonNegativeBalance(account.balance)) throw new Error('invalid-balance');
   }
@@ -368,6 +370,7 @@ async function applyFinancialChange(userId: string, expected: Transaction | null
 }
 
 export async function createFinancialTransaction(userId: string, tx: Transaction): Promise<void> {
+  if (typeof tx.description === 'string' && tx.description.length > 150) throw new Error('transaction-note-too-long');
   await applyFinancialChange(userId, null, tx);
   if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
   const confirmed = await getDocFromServer(doc(db, 'users', userId, 'transactions', tx.id));
@@ -375,6 +378,7 @@ export async function createFinancialTransaction(userId: string, tx: Transaction
   if (!confirmed.exists() || saved?.userId !== userId || !Object.entries(tx).every(([key, value]) => saved[key] === value)) throw new Error('transaction-verification-failed');
 }
 export async function updateFinancialTransaction(userId: string, expected: Transaction, updated: Transaction): Promise<void> {
+  if (typeof updated.description === 'string' && updated.description.length > 150) throw new Error('transaction-note-too-long');
   await applyFinancialChange(userId, expected, updated);
 }
 export async function deleteTransactionFromFirestore(userId: string, transactionId: string): Promise<'deleted' | 'already-deleted'> {

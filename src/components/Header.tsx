@@ -74,21 +74,21 @@ export function Header({
   }, []);
 
   return (
-    <header className="bg-white/95 backdrop-blur-md sticky top-0 z-20 px-3 sm:px-6 py-3 border-b border-slate-100">
-      <div className="max-w-md sm:max-w-xl mx-auto flex items-center justify-between gap-2">
+    <header className="bg-white/95 backdrop-blur-md sticky top-0 z-20 px-2 min-[360px]:px-3 sm:px-6 py-2.5 sm:py-3 border-b border-slate-100">
+      <div className="w-full max-w-md sm:max-w-xl mx-auto grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1.5 min-[360px]:gap-2 sm:gap-3">
         {/* Savings page shortcut */}
         <button
           id="btn-header-savings"
           type="button"
           onClick={onOpenOffers}
           title={isAr ? 'وفّر مع My Bucket' : 'Save with My Bucket'}
-          className="shrink-0 min-h-10 sm:min-h-11 inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 sm:px-4 py-2.5 text-xs sm:text-sm font-extrabold shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+          className="min-w-0 min-h-9 sm:min-h-11 inline-flex items-center justify-center rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-1.5 min-[360px]:px-2.5 sm:px-4 py-2 text-[10px] min-[360px]:text-xs sm:text-sm leading-tight text-center font-extrabold shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
         >
           {isAr ? 'وفّر مع My Bucket' : 'Save with My Bucket'}
         </button>
 
         {/* Center: Bucket Logo + Brand Title + Subtitle */}
-        <div className="flex flex-col items-center justify-center text-center">
+        <div className="hidden min-[380px]:flex min-w-0 flex-col items-center justify-center text-center">
           <div className="flex items-center gap-1.5">
             {/* Minimalist Green Bucket Icon */}
             <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-xs">
@@ -115,13 +115,13 @@ export function Header({
         </div>
 
         {/* Right: Language Pill + Google Account Auth */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1 min-[360px]:gap-1.5">
           {/* Language Toggle */}
           <button
             id="btn-lang-toggle"
             type="button"
             onClick={onToggleLanguage}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs"
+            className="flex shrink-0 min-h-9 items-center justify-center gap-1 px-2 min-[360px]:px-2.5 py-1.5 rounded-full border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs"
             title={lang === 'en' ? 'التحويل إلى اللغة العربية' : 'Switch to English'}
           >
             <Globe className="w-3 h-3 text-blue-500" />
@@ -290,7 +290,7 @@ export function Header({
               id="btn-google-login"
               type="button"
               onClick={onLogin}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+              className="flex shrink-0 min-h-9 items-center gap-1 px-2 min-[360px]:px-2.5 py-1.5 rounded-full border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all cursor-pointer shadow-2xs"
               title={t.signInWithGoogle}
             >
               {/* Google G SVG */}

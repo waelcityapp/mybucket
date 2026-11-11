@@ -532,6 +532,10 @@ export function TransactionModal({
 
     // Notes are optional. Do not persist an invented description or category.
     const finalDesc = description.trim();
+    if (finalDesc.length > 150) {
+      setError(isAr ? 'الحد الأقصى للملاحظات 150 حرفًا.' : 'Notes must be 150 characters or less.');
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -1103,7 +1107,8 @@ export function TransactionModal({
               <input
                 type="text"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                maxLength={150}
+                onChange={(e) => setDescription(e.target.value.slice(0, 150))}
                 placeholder={
                   selectedCategory
                     ? getCategoryDisplayName(selectedCategory)
@@ -1113,6 +1118,7 @@ export function TransactionModal({
                   fieldUpdated === 'description' ? 'border-indigo-500 ring-2 ring-indigo-300 bg-indigo-50/30' : 'border-slate-200'
                 }`}
               />
+              <p className="text-[11px] text-slate-500 text-end" dir="ltr">{description.length} / 150</p>
             </div>
 
             {/* 6. Date and Time with Derived Weekday & Interactive Editor */}

@@ -34,8 +34,9 @@ function fieldsOf(payload: Record<string, unknown>) {
   const amount = Number(payload.amount);
   const currency = String(payload.currency ?? 'EGP');
   const rawNote = payload.note ?? '';
-  if (typeof rawNote !== 'string' || rawNote.trim().length > 200) fail('reminder_note_too_long');
-  const note = rawNote.trim();
+  if (typeof rawNote !== 'string') fail('reminder_note_too_long');
+  const note = String(rawNote).trim();
+  if (note.length > 200) fail('reminder_note_too_long');
   const leadDays = payload.leadDays === undefined ? 7 : Number(payload.leadDays);
   const tone = payload.tone === undefined ? 1 : Number(payload.tone);
   const remindTime = payload.remindTime === undefined ? '09:00' : String(payload.remindTime);

@@ -1104,8 +1104,8 @@ export function TransactionModal({
               <label className="text-xs font-bold text-slate-700 block">
                 {t.labelDescription}
               </label>
-              <input
-                type="text"
+              <textarea
+                rows={3}
                 value={description}
                 maxLength={150}
                 onChange={(e) => setDescription(e.target.value.slice(0, 150))}
@@ -1114,11 +1114,15 @@ export function TransactionModal({
                     ? getCategoryDisplayName(selectedCategory)
                     : t.descPlaceholder
                 }
-                className={`w-full p-2.5 sm:p-3 rounded-2xl border bg-white text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:border-emerald-500 shadow-2xs transition-all duration-300 ${
+                className={`block w-full min-h-[88px] p-2.5 sm:p-3 rounded-2xl border bg-white text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:border-emerald-500 shadow-2xs transition-all duration-300 resize-y whitespace-pre-wrap break-words ${
                   fieldUpdated === 'description' ? 'border-indigo-500 ring-2 ring-indigo-300 bg-indigo-50/30' : 'border-slate-200'
                 }`}
               />
-              <p className="text-[11px] text-slate-500 text-end" dir="ltr">{description.length} / 150</p>
+              <p aria-live="polite" className={`text-[11px] text-end font-semibold ${
+                150 - description.length <= 15 ? 'text-red-600' : 'text-slate-500'
+              }`}>
+                {isAr ? `المتبقي: ${150 - description.length} حرف` : `Remaining: ${150 - description.length} characters`}
+              </p>
             </div>
 
             {/* 6. Date and Time with Derived Weekday & Interactive Editor */}

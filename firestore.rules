@@ -20,6 +20,24 @@ service cloud.firestore {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
+    // Validate stored text even when writes bypass the browser interface.
+    function shortText(data, key, maxLength) {
+      let value = data.get(key, '');
+      return value == null || (value is string && value.size() <= maxLength);
+    }
+
+    function validAccountText(data) {
+      return shortText(data, 'name', 40) && shortText(data, 'nameAr', 40);
+    }
+
+    function validCategoryText(data) {
+      return shortText(data, 'name', 40) && shortText(data, 'nameAr', 40);
+    }
+
+    function validTransactionText(data) {
+      return shortText(data, 'description', 150);
+    }
+
     // User Profile Document
     match /users/{userId} {
       allow get: if isOwner(userId);
@@ -30,21 +48,21 @@ service cloud.firestore {
       // Financial Accounts Subcollection
       match /accounts/{accountId} {
         allow get, list: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidId(accountId);
+        allow create, update: if isOwner(userId) && isValidId(accountId) && validAccountText(request.resource.data);
         allow delete: if isOwner(userId);
       }
 
       // Transactions Subcollection
       match /transactions/{transactionId} {
         allow get, list: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidId(transactionId);
+        allow create, update: if isOwner(userId) && isValidId(transactionId) && validTransactionText(request.resource.data);
         allow delete: if isOwner(userId);
       }
 
       // Categories Subcollection
       match /categories/{categoryId} {
         allow get, list: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidId(categoryId);
+        allow create, update: if isOwner(userId) && isValidId(categoryId) && validCategoryText(request.resource.data);
         allow delete: if isOwner(userId);
       }
 

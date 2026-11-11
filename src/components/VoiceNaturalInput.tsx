@@ -129,6 +129,10 @@ export function VoiceNaturalInput({
     const text = rawText.trim();
     if (subscriptionExpired) { onExpiredAttempt?.(); return; }
     if (!text) return;
+    if (text.length > 300) {
+      setStatusMessage(isAr ? 'الحد الأقصى لنص العملية أو السؤال 300 حرف.' : 'Maximum transaction or query length is 300 characters.');
+      return;
+    }
 
     setIsProcessingAI(true);
     setStatusMessage(isAr ? 'جاري فهم كلامك وتجهيز البيانات...' : 'Understanding your request and preparing details...');
@@ -273,7 +277,7 @@ export function VoiceNaturalInput({
       const segment = (segmentFinal + segmentInterim).trim();
       latestSegmentRef.current = segment;
       if (segment) {
-        setInputText([segmentBaseRef.current, segment].filter(Boolean).join(' '));
+        setInputText([segmentBaseRef.current, segment].filter(Boolean).join(' ').slice(0,300));
       }
     };
 
@@ -295,7 +299,7 @@ export function VoiceNaturalInput({
       const segment = (segmentFinal || latestSegmentRef.current).trim();
       if (segment) {
         // Append this completed session once, then reset for the next one.
-        segmentBaseRef.current = [segmentBaseRef.current, segment].filter(Boolean).join(' ');
+        segmentBaseRef.current = [segmentBaseRef.current, segment].filter(Boolean).join(' ').slice(0,300);
         setInputText(segmentBaseRef.current);
       }
       latestSegmentRef.current = '';
@@ -389,7 +393,8 @@ export function VoiceNaturalInput({
             onClick={() => { if (subscriptionExpired) onExpiredAttempt?.(); }}
             dir={isAr ? 'rtl' : 'ltr'}
             value={inputText}
-            onChange={(e) => { if (subscriptionExpired) { onExpiredAttempt?.(); return; } setInputText(e.target.value); }}
+            maxLength={300}
+            onChange={(e) => { if (subscriptionExpired) { onExpiredAttempt?.(); return; } setInputText(e.target.value.slice(0,300)); }}
             placeholder={
               isRecording
                 ? t.listening
@@ -404,6 +409,7 @@ export function VoiceNaturalInput({
             className={`block w-full min-h-[92px] max-h-[240px] resize-none overflow-y-auto whitespace-pre-wrap break-words leading-relaxed font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none bg-transparent disabled:opacity-60 ${transcriptSizeClass}`}
             aria-label={isAr ? 'نص العملية أو السؤال المالي' : 'Transaction or financial question'}
           />
+          <p className="text-end text-[11px] text-slate-500" dir="ltr">{inputText.length} / 300</p>
           <p className="text-[11px] sm:text-xs text-slate-400 font-medium mt-1">
             {isRecording ? (
               <span className="text-emerald-600 font-bold flex items-center gap-1">

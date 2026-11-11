@@ -270,9 +270,11 @@ export function AccountsView({ accounts, lang, onAddAccount, onDeleteAccount, on
                   required
                   placeholder={lang === 'ar' ? 'مثال: محفظة شخصية، بنك مصر...' : 'e.g. Personal Wallet'}
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  maxLength={40}
+                  onChange={(e) => setName(e.target.value.slice(0,40))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-medium focus:bg-white focus:border-emerald-500 focus:outline-hidden"
                 />
+                <p className="text-end text-[11px] text-slate-500" dir="ltr">{name.length} / 40</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

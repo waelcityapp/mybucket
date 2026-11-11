@@ -4,7 +4,7 @@ import { ReminderWorkspace } from './components/views/ReminderWorkspace';
 import { LockScreen, lockRequest, type LockStatus } from './components/AppLock';
 import { TrialSubscriptionPages } from './components/views/TrialSubscriptionPages';
 import { currencyName, SUPPORTED_CURRENCIES } from './types';
-import { ArrowLeftRight, RefreshCw } from 'lucide-react';
+import { ArrowLeftRight, ArrowUpDown, BadgePercent, RefreshCw } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import {
   FinancialAccount,
@@ -166,39 +166,60 @@ function ExchangeRatesMini({ lang }: { lang: Language }) {
     }).finally(() => { if (alive) setBusy(false); });
     return () => { alive = false; };
   }, [retry, ar]);
-  const update = async (side: 'from' | 'to', code: string) => {
-    if (!info || busy || info.remaining <= 0 || info[side] === code) return;
+  // Keep the same server-backed currency selection and daily quota in the compact card.
+  const changePair = async (from: string, to: string) => {
+    if (!info || busy || info.remaining <= 0 || (info.from === from && info.to === to)) return;
     setBusy(true);
     try {
-      const updated = await callCurrencyRates('fx.select', { from: side === 'from' ? code : info.from, to: side === 'to' ? code : info.to });
-      setInfo(updated); setError('');
+      const updated = await callCurrencyRates('fx.select', { from, to });
+      setInfo(updated);
+      setError('');
     } catch (e) {
       const limited = e instanceof Error && e.message === 'exchange_daily_limit';
-      setError(limited ? (ar ? 'انتهى حد اليوم' : 'Daily limit reached') : (ar ? 'تعذر التغيير' : 'Change failed'));
+      setError(limited ? (ar ? 'انتهى حد تغييرات اليوم' : 'Daily changes used up') : (ar ? 'تعذر تغيير العملة' : 'Could not change currency'));
     } finally { setBusy(false); }
   };
   const effectiveRate = info?.rate ?? reference?.rate;
   const rate = effectiveRate == null ? '—' : new Intl.NumberFormat('en-US', { maximumSignificantDigits: 6, useGrouping: false }).format(effectiveRate);
+  const selectedFrom = info?.from || 'EGP';
+  const selectedTo = info?.to || 'USD';
+  const canChange = !!info && !busy && info.remaining > 0;
   return (
-    <div className="flex min-w-0 flex-col items-stretch justify-center gap-2 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white p-3 text-center shadow-sm" aria-label={ar ? 'أسعار العملات التقريبية' : 'Approximate currency rates'}>
-      <span className="flex items-center justify-center gap-1.5 text-sm font-black text-emerald-900"><ArrowLeftRight className="h-4 w-4" />{ar ? 'أسعار العملات' : 'Exchange rates'}</span>
-      <div className="grid w-full grid-cols-2 gap-2">
-        {(['from','to'] as const).map(side => (
-          <select key={side} value={info?.[side] || (side === 'from' ? 'EGP' : 'USD')}
-            onChange={event => void update(side, event.target.value)}
-            aria-label={side === 'from' ? (ar ? 'العملة الأولى' : 'First currency') : (ar ? 'العملة الثانية' : 'Second currency')}
-            disabled={!info || busy || info.remaining === 0}
-            className="h-10 w-full min-w-0 rounded-xl border border-emerald-200 bg-white px-1 text-[11px] font-extrabold text-slate-800 shadow-sm disabled:opacity-70">
-            {SUPPORTED_CURRENCIES.filter(code => !info?.availableCurrencies || info.availableCurrencies.includes(code) || info[side] === code).map(code => <option key={code} value={code}>{currencyName(code, lang)} ({code})</option>)}
+    <section className="flex min-w-0 flex-col rounded-2xl border border-emerald-700/40 bg-gradient-to-br from-emerald-950 via-emerald-900 to-teal-800 px-2.5 py-3 text-white shadow-sm sm:px-4" aria-label={ar ? 'أسعار العملات التقريبية' : 'Approximate currency rates'}>
+      <div className="mb-2 flex items-center justify-center gap-1 text-[12px] font-black text-emerald-50 sm:text-sm">
+        <ArrowLeftRight className="h-3.5 w-3.5 shrink-0" />
+        <span>{ar ? 'أسعار العملات' : 'Exchange rates'}</span>
+      </div>
+      <div className="flex flex-col gap-1">
+        {(['from', 'to'] as const).map(side => (
+          <select key={side} value={side === 'from' ? selectedFrom : selectedTo}
+            onChange={event => void changePair(side === 'from' ? event.target.value : selectedFrom, side === 'to' ? event.target.value : selectedTo)}
+            aria-label={side === 'from' ? (ar ? 'اختر العملة الأولى' : 'Choose first currency') : (ar ? 'اختر العملة الثانية' : 'Choose second currency')}
+            disabled={!canChange}
+            className="h-8 min-w-0 w-full rounded-lg border border-emerald-400/50 bg-emerald-950 px-1.5 text-[11px] font-bold text-white outline-none focus:border-emerald-200 focus:ring-1 focus:ring-emerald-200 disabled:opacity-70">
+            {SUPPORTED_CURRENCIES.filter(code => !info?.availableCurrencies || info.availableCurrencies.includes(code) || info[side] === code)
+              .map(code => <option key={code} value={code}>{code} · {currencyName(code, lang)}</option>)}
           </select>
         ))}
       </div>
-      <strong dir="ltr" className="block rounded-xl bg-emerald-50 px-1 py-3 text-center text-[clamp(1.1rem,4.2vw,1.8rem)] font-black leading-tight tracking-tight text-emerald-800 tabular-nums">{info ? '1 ' + info.from + ' = ' + rate + ' ' + info.to : reference ? '1 EGP = ' + rate + ' USD' : busy ? '...' : '—'}</strong>
-      <span className="text-[9px] leading-tight text-slate-600">{ar ? 'سعر تقريبي غير ملزم · تحديث يومي' : 'Approximate, non-binding · daily update'}{(info?.rateDate || reference?.date) ? ' · ' + (info?.rateDate || reference?.date) : ''}</span>
-      {info && <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold text-emerald-900">{ar ? 'تغييرات متبقية' : 'Changes left'}: {info.remaining}/{info.limit}</span>}
-      {info?.stale && <span className="text-[9px] text-amber-700">{ar ? 'آخر سعر محفوظ' : 'Cached rate'}</span>}
-      {error && <button type="button" onClick={() => setRetry(value => value + 1)} className="flex items-center gap-1 text-[9px] leading-tight text-rose-700"><RefreshCw className="h-3 w-3 shrink-0"/>{error}</button>}
-    </div>
+      <button type="button" disabled={!canChange || selectedFrom === selectedTo}
+        onClick={() => void changePair(selectedTo, selectedFrom)}
+        title={ar ? 'تبديل العملتين (يُحتسب من تغييرات اليوم)' : 'Swap currencies (counts as one daily change)'}
+        aria-label={ar ? 'تبديل العملة الأولى والثانية' : 'Swap first and second currencies'}
+        className="mx-auto -my-1.5 z-10 flex h-7 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-400 bg-emerald-700 text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50">
+        <ArrowUpDown className="h-4 w-4" />
+      </button>
+      <strong dir="ltr" className="mt-2 block min-w-0 break-words rounded-xl bg-emerald-700/65 px-1.5 py-2 text-center text-[12px] font-black leading-snug tracking-tight text-white tabular-nums sm:text-base">
+        {info ? '1 ' + selectedFrom + ' = ' + rate + ' ' + selectedTo : reference ? '1 EGP = ' + rate + ' USD' : busy ? '...' : '—'}
+      </strong>
+      <span className="mt-1.5 text-center text-[9px] leading-snug text-emerald-100">
+        {ar ? 'سعر تقريبي غير ملزم' : 'Approximate rate'}
+        {(info?.rateDate || reference?.date) ? ' · ' + (info?.rateDate || reference?.date) : ''}
+      </span>
+      {info && <span className="mt-1 text-center text-[9px] font-semibold text-emerald-100">{ar ? 'تغييرات متبقية' : 'Changes left'}: {info.remaining}/{info.limit}</span>}
+      {info?.stale && <span className="text-center text-[9px] text-amber-200">{ar ? 'آخر سعر محفوظ' : 'Cached rate'}</span>}
+      {error && <button type="button" onClick={() => setRetry(value => value + 1)} className="mt-1 flex items-center justify-center gap-1 break-words text-center text-[9px] leading-tight text-rose-100"><RefreshCw className="h-3 w-3 shrink-0"/>{error}</button>}
+    </section>
   );
 }
 
@@ -1483,7 +1504,6 @@ export default function App() {
         onLogin={handleGoogleLogin}
         onLogout={handleGoogleLogout}
         onOpenMobileLink={() => setIsMobileModalOpen(true)}
-        onOpenOffers={openOffers}
         onOpenAdmin={isAdmin ? openAdminPin : undefined}
         onUpdateUserName={handleUpdateUserName}
       />
@@ -1604,16 +1624,27 @@ export default function App() {
                 </div>
               )}
             </section>
-            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_88px] gap-2 sm:grid-cols-[minmax(0,1fr)_112px]">
+            {/* Four independent home shortcuts: plans/guide above, savings/rates below. */}
+            <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-2.5">
+              <button type="button" onClick={() => openSubscriptionPage('subscription')}
+                className="flex min-w-0 min-h-[54px] items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-2 py-2.5 text-center text-[11px] font-extrabold text-emerald-900 shadow-sm transition-colors hover:bg-emerald-50 sm:text-sm">
+                <Tag className="h-4 w-4 shrink-0 text-emerald-700 sm:h-5 sm:w-5" />
+                <span>{lang === 'ar' ? 'الاشتراكات' : 'Plans'}</span>
+              </button>
+              <button type="button" onClick={openGuide}
+                className="flex min-w-0 min-h-[54px] items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-2 py-2.5 text-center text-[11px] font-extrabold text-emerald-900 shadow-sm transition-colors hover:bg-emerald-50 sm:text-sm">
+                <BookOpen className="h-4 w-4 shrink-0 text-emerald-700 sm:h-5 sm:w-5" />
+                <span>{lang === 'ar' ? 'دليل الاستخدام' : 'User guide'}</span>
+              </button>
+              <button type="button" onClick={openOffers}
+                className="flex min-w-0 flex-col items-center justify-center gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white px-2 py-4 text-center font-extrabold text-emerald-950 shadow-sm transition-colors hover:from-emerald-100 hover:to-emerald-50">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 sm:h-14 sm:w-14">
+                  <BadgePercent className="h-7 w-7 sm:h-8 sm:w-8" />
+                </span>
+                <span className="text-sm leading-snug sm:text-base">{lang === 'ar' ? 'وفّر مع My Bucket' : 'Save with My Bucket'}</span>
+                <span className="text-[10px] font-semibold text-emerald-700 sm:text-xs">{lang === 'ar' ? 'العروض والخصومات' : 'Offers & discounts'}</span>
+              </button>
               <ExchangeRatesMini lang={lang} />
-              <div className="grid grid-rows-2 gap-2">
-                <button type="button" onClick={openGuide} className="flex min-w-0 flex-col items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-1 py-3 text-center text-[11px] font-bold text-slate-700 shadow-sm hover:border-emerald-200 hover:bg-emerald-50">
-                  <BookOpen className="h-5 w-5 text-emerald-700" /><span>{lang === 'ar' ? 'دليل الاستخدام' : 'User guide'}</span>
-                </button>
-                <button type="button" onClick={() => openSubscriptionPage('subscription')} className="flex min-w-0 flex-col items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-1 py-3 text-center text-[11px] font-bold text-slate-700 shadow-sm hover:border-emerald-200 hover:bg-emerald-50">
-                  <Tag className="h-5 w-5 text-emerald-700" /><span>{lang === 'ar' ? 'الاشتراكات' : 'Plans'}</span>
-                </button>
-              </div>
             </div>
 
             {/* 2. Top Clear Financial Summary: Net Balance + Today/Month expenses */}

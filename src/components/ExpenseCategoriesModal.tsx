@@ -429,7 +429,7 @@ export function ExpenseCategoriesModal({
                   className="w-full bg-white border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm font-bold text-slate-900 outline-hidden transition-all"
                   dir="auto"
                 />
-                <p className="text-end text-[11px] text-slate-500" dir="ltr">{formNameAr.length} / 40</p>
+                <p aria-live="polite" className={`text-end text-[11px] font-semibold ${40 - formNameAr.length <= 15 ? 'text-red-600' : 'text-slate-500'}`}>{lang === 'ar' ? `المتبقي: ${40 - formNameAr.length} حرف` : `Remaining: ${40 - formNameAr.length} characters`}</p>
               </div>
 
               {/* Emoji Selector */}

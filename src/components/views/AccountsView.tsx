@@ -274,7 +274,7 @@ export function AccountsView({ accounts, lang, onAddAccount, onDeleteAccount, on
                   onChange={(e) => setName(e.target.value.slice(0,40))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-medium focus:bg-white focus:border-emerald-500 focus:outline-hidden"
                 />
-                <p className="text-end text-[11px] text-slate-500" dir="ltr">{name.length} / 40</p>
+                <p aria-live="polite" className={`text-end text-[11px] font-semibold ${40 - name.length <= 15 ? 'text-red-600' : 'text-slate-500'}`}>{lang === 'ar' ? `المتبقي: ${40 - name.length} حرف` : `Remaining: ${40 - name.length} characters`}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

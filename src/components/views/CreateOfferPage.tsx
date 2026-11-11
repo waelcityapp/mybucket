@@ -96,7 +96,7 @@ export function CreateOfferPage({ lang, onBack }: Props) {
                 <input id="offer-title" required maxLength={120} value={title} onChange={event => setTitle(event.target.value)} className={field} placeholder={ar ? 'اكتب عنوانًا واضحًا للإعلان' : 'A clear advertisement title'} />
               </div>
               <div><label htmlFor="offer-desc" className={label}>{ar ? 'التفاصيل' : 'Description'}</label>
-                <textarea id="offer-desc" rows={5} required maxLength={1000} value={description} onChange={event => setDescription(event.target.value.slice(0,1000))} className={field} placeholder={ar ? 'اكتب تفاصيل الإعلان وشروط العرض إن وجدت' : 'Describe the advertisement and any conditions'} /><p className="text-end text-[11px] text-slate-500" dir="ltr">{description.length} / 1000</p>
+                <textarea id="offer-desc" rows={5} required maxLength={1000} value={description} onChange={event => setDescription(event.target.value.slice(0,1000))} className={field} placeholder={ar ? 'اكتب تفاصيل الإعلان وشروط العرض إن وجدت' : 'Describe the advertisement and any conditions'} /><p aria-live="polite" className={`text-end text-[11px] font-semibold ${1000 - description.length <= 15 ? 'text-red-600' : 'text-slate-500'}`}>{ar ? `المتبقي: ${1000 - description.length} حرف` : `Remaining: ${1000 - description.length} characters`}</p>
               </div>
               <div><label htmlFor="offer-merchant" className={label}>{ar ? 'اسم المعلن أو النشاط' : 'Advertiser or business name'}</label>
                 <input id="offer-merchant" required maxLength={100} value={merchant} onChange={event => setMerchant(event.target.value)} className={field} />

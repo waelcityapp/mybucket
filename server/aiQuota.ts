@@ -125,7 +125,7 @@ export async function readOwnAiQuota(uid: string, deps?: { db: ReturnType<typeof
   return { day, plan, ...(plan === 'basic' ? { local: { entries: bucket('basicLocalEntries'), inquiries: bucket('basicLocalInquiries') } } : plan === 'pro' ? { gemini: { entries: bucket('proGeminiEntries'), inquiries: bucket('proGeminiInquiries') }, local: { entries: bucket('proLocalEntries'), inquiries: bucket('proLocalInquiries') } } : {}) };
 }
 export async function reserveAiQuota(uid: string, rawText: unknown, forceLocal = false, deps?: QuotaDeps): Promise<AiQuotaDecision> {
-  if (typeof rawText !== 'string' || !rawText.trim() || rawText.length > 12000) {
+  if (typeof rawText !== 'string' || !rawText.trim() || rawText.length > 300) {
     throw new SubscriptionError(400, 'invalid_ai_input', 'Missing or invalid AI input.');
   }
 

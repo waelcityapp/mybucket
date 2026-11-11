@@ -10,7 +10,6 @@ interface HeaderProps {
   onLogin: () => void;
   onLogout: () => void;
   onOpenMobileLink: () => void;
-  onOpenOffers: () => void;
   onOpenAdmin?: () => void;
   onUpdateUserName?: (newName: string) => Promise<void>;
 }
@@ -22,7 +21,6 @@ export function Header({
   onLogin,
   onLogout,
   onOpenMobileLink,
-  onOpenOffers,
   onOpenAdmin,
   onUpdateUserName,
 }: HeaderProps) {
@@ -75,20 +73,9 @@ export function Header({
 
   return (
     <header className="bg-white/95 backdrop-blur-md sticky top-0 z-20 px-2 min-[360px]:px-3 sm:px-6 py-2.5 sm:py-3 border-b border-slate-100">
-      <div className="w-full max-w-md sm:max-w-xl mx-auto grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1.5 min-[360px]:gap-2 sm:gap-3">
-        {/* Savings page shortcut */}
-        <button
-          id="btn-header-savings"
-          type="button"
-          onClick={onOpenOffers}
-          title={isAr ? 'وفّر مع My Bucket' : 'Save with My Bucket'}
-          className="min-w-0 min-h-9 sm:min-h-11 inline-flex items-center justify-center rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-1.5 min-[360px]:px-2.5 sm:px-4 py-2 text-[10px] min-[360px]:text-xs sm:text-sm leading-tight text-center font-extrabold shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
-        >
-          {isAr ? 'وفّر مع My Bucket' : 'Save with My Bucket'}
-        </button>
-
+      <div className="w-full max-w-md sm:max-w-xl mx-auto flex items-center justify-between gap-2 sm:gap-3">
         {/* Center: Bucket Logo + Brand Title + Subtitle */}
-        <div className="hidden min-[380px]:flex min-w-0 flex-col items-center justify-center text-center">
+        <div className="flex min-w-0 flex-col items-start justify-center text-start">
           <div className="flex items-center gap-1.5">
             {/* Minimalist Green Bucket Icon */}
             <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-xs">
@@ -105,11 +92,11 @@ export function Header({
                 <path d="M8 9V6a4 4 0 0 1 8 0v3" />
               </svg>
             </div>
-            <span className="font-extrabold text-slate-900  text-base sm:text-lg leading-none">
+            <span className="min-w-0 truncate font-extrabold text-slate-900 text-sm sm:text-lg leading-none">
               {t.appName}
             </span>
           </div>
-          <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium  mt-0.5">
+          <span className="hidden min-[360px]:block text-[9px] sm:text-[10px] text-slate-400 font-medium mt-0.5">
             {t.headerSubtitle}
           </span>
         </div>

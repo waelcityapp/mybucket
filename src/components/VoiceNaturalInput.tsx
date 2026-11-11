@@ -409,7 +409,7 @@ export function VoiceNaturalInput({
             className={`block w-full min-h-[92px] max-h-[240px] resize-none overflow-y-auto whitespace-pre-wrap break-words leading-relaxed font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none bg-transparent disabled:opacity-60 ${transcriptSizeClass}`}
             aria-label={isAr ? 'نص العملية أو السؤال المالي' : 'Transaction or financial question'}
           />
-          <p className="text-end text-[11px] text-slate-500" dir="ltr">{inputText.length} / 300</p>
+          <p aria-live="polite" className={`text-end text-[11px] font-semibold ${300 - inputText.length <= 15 ? 'text-red-600' : 'text-slate-500'}`}>{isAr ? `المتبقي: ${300 - inputText.length} حرف` : `Remaining: ${300 - inputText.length} characters`}</p>
           <p className="text-[11px] sm:text-xs text-slate-400 font-medium mt-1">
             {isRecording ? (
               <span className="text-emerald-600 font-bold flex items-center gap-1">

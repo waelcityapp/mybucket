@@ -107,7 +107,7 @@ export function WalletAccountModal({
                   className="w-full bg-white border border-cyan-200 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-900 focus:outline-hidden focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100 transition-all placeholder:text-slate-400 font-sans"
                   required
                 />
-                <p className="text-end text-[11px] text-slate-500" dir="ltr">{nameAr.length} / 40</p>
+                <p aria-live="polite" className={`text-end text-[11px] font-semibold ${40 - nameAr.length <= 15 ? 'text-red-600' : 'text-slate-500'}`}>{lang === 'ar' ? `المتبقي: ${40 - nameAr.length} حرف` : `Remaining: ${40 - nameAr.length} characters`}</p>
               </div>
 
               {/* اقتراحات سريعة لأسماء المحافظ */}

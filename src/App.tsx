@@ -4,7 +4,7 @@ import { ReminderWorkspace } from './components/views/ReminderWorkspace';
 import { LockScreen, lockRequest, type LockStatus } from './components/AppLock';
 import { TrialSubscriptionPages } from './components/views/TrialSubscriptionPages';
 import { currencyName, SUPPORTED_CURRENCIES } from './types';
-import { ArrowLeftRight, ArrowUpDown, BadgePercent, RefreshCw } from 'lucide-react';
+import { ArrowLeftRight, ArrowUpDown, ShoppingBag, RefreshCw } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import {
   FinancialAccount,
@@ -1643,7 +1643,7 @@ export default function App() {
               <button type="button" onClick={openOffers}
                 className="flex min-w-0 flex-col items-center justify-center gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white px-2 py-4 text-center font-extrabold text-emerald-950 shadow-sm transition-colors hover:from-emerald-100 hover:to-emerald-50">
                 <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 sm:h-14 sm:w-14">
-                  <BadgePercent className="h-7 w-7 sm:h-8 sm:w-8" />
+                  <ShoppingBag className="h-7 w-7 sm:h-8 sm:w-8" />
                 </span>
                 <span className="text-sm leading-snug sm:text-base">{lang === 'ar' ? 'وفّر مع My Bucket' : 'Save with My Bucket'}</span>
                 <span className="text-[10px] font-semibold text-emerald-700 sm:text-xs">{lang === 'ar' ? 'العروض والخصومات' : 'Offers & discounts'}</span>

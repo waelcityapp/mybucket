@@ -62,8 +62,8 @@ export function VoiceNaturalInput({
 }: VoiceNaturalInputProps) {
   const t = translations[lang];
   const isAr = lang === 'ar';
-  // Speech language is independent from the application UI language.
-  const [speechLanguage, setSpeechLanguage] = useState<'ar-EG' | 'en-US'>(lang === 'ar' ? 'ar-EG' : 'en-US');
+  // Keep voice recognition tied to the single app-wide language choice.
+  const speechLanguage = lang === 'ar' ? 'ar-EG' : 'en-US';
 
   const [inputText, setInputText] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -477,24 +477,6 @@ export function VoiceNaturalInput({
           </div>
         </div>
       </form>
-
-      <div className="flex items-center gap-2 justify-between px-1">
-        <span className="text-xs font-semibold text-slate-600">
-          {isAr ? 'لغة التحدث' : 'Speech language'}
-        </span>
-        <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 gap-1" role="group" aria-label={isAr ? 'اختيار لغة التحدث' : 'Choose speech language'}>
-          <button type="button" disabled={isRecording || isProcessingAI} onClick={() => setSpeechLanguage('ar-EG')}
-            aria-pressed={speechLanguage === 'ar-EG'}
-            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-50 ${speechLanguage === 'ar-EG' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
-            عربي
-          </button>
-          <button type="button" disabled={isRecording || isProcessingAI} onClick={() => setSpeechLanguage('en-US')}
-            aria-pressed={speechLanguage === 'en-US'}
-            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-50 ${speechLanguage === 'en-US' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
-            English
-          </button>
-        </div>
-      </div>
 
       {pendingVoiceReview && !isRecording && !isProcessingAI && (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 sm:p-4 space-y-3">

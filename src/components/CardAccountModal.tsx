@@ -120,11 +120,13 @@ export function CardAccountModal({
                 <input
                   type="text"
                   value={nameAr}
-                  onChange={(e) => setNameAr(e.target.value)}
+                  maxLength={40}
+                  onChange={(e) => setNameAr(e.target.value.slice(0,40))}
                   placeholder={lang === 'ar' ? 'مثال: فيزا مشتريات البنك الأهلي' : 'e.g. NBE Visa Card'}
                   className="w-full bg-white border border-purple-200 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-900 focus:outline-hidden focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-all placeholder:text-slate-400 font-sans"
                   required
                 />
+                <p className="text-end text-[11px] text-slate-500" dir="ltr">{nameAr.length} / 40</p>
               </div>
 
               {/* اقتراحات سريعة لأسماء البطاقات */}

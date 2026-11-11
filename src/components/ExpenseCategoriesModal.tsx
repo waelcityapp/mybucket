@@ -159,6 +159,10 @@ export function ExpenseCategoriesModal({
     }
 
     const cleanEn = formNameEn.trim() || cleanAr;
+    if (cleanAr.length > 40 || cleanEn.length > 40) {
+      setErrorMessage(lang === 'ar' ? 'اسم البند لا يزيد عن 40 حرفًا.' : 'Category name must be 40 characters or less.');
+      return;
+    }
 
     if (editingCategory) {
       // Update existing category
@@ -419,11 +423,13 @@ export function ExpenseCategoriesModal({
                   type="text"
                   required
                   value={formNameAr}
-                  onChange={(e) => setFormNameAr(e.target.value)}
+                  maxLength={40}
+                  onChange={(e) => setFormNameAr(e.target.value.slice(0,40))}
                   placeholder={lang === 'ar' ? 'مثال: دروس خصوصية، ترفيه، صيانة...' : 'e.g., Courses, Outings...'}
                   className="w-full bg-white border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm font-bold text-slate-900 outline-hidden transition-all"
                   dir="auto"
                 />
+                <p className="text-end text-[11px] text-slate-500" dir="ltr">{formNameAr.length} / 40</p>
               </div>
 
               {/* Emoji Selector */}

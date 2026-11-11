@@ -190,25 +190,29 @@ function ExchangeRatesMini({ lang }: { lang: Language }) {
         <ArrowLeftRight className="h-3.5 w-3.5 shrink-0" />
         <span>{ar ? 'أسعار العملات' : 'Exchange rates'}</span>
       </div>
-      <div className="flex flex-col gap-1">
+      <div className="flex min-w-0 flex-col items-center gap-1">
         {(['from', 'to'] as const).map(side => (
-          <select key={side} value={side === 'from' ? selectedFrom : selectedTo}
-            onChange={event => void changePair(side === 'from' ? event.target.value : selectedFrom, side === 'to' ? event.target.value : selectedTo)}
-            aria-label={side === 'from' ? (ar ? 'اختر العملة الأولى' : 'Choose first currency') : (ar ? 'اختر العملة الثانية' : 'Choose second currency')}
-            disabled={!canChange}
-            className="h-8 min-w-0 w-full rounded-lg border border-emerald-400/50 bg-emerald-950 px-1.5 text-[11px] font-bold text-white outline-none focus:border-emerald-200 focus:ring-1 focus:ring-emerald-200 disabled:opacity-70">
-            {SUPPORTED_CURRENCIES.filter(code => !info?.availableCurrencies || info.availableCurrencies.includes(code) || info[side] === code)
-              .map(code => <option key={code} value={code}>{code} · {currencyName(code, lang)}</option>)}
-          </select>
+          <div key={side} className="flex w-full min-w-0 flex-col items-center gap-1">
+            {side === 'to' && (
+              <button type="button" disabled={!canChange || selectedFrom === selectedTo}
+                onClick={() => void changePair(selectedTo, selectedFrom)}
+                title={ar ? 'تبديل العملتين (يُحتسب من تغييرات اليوم)' : 'Swap currencies (counts as one daily change)'}
+                aria-label={ar ? 'تبديل العملة الأولى والثانية' : 'Swap first and second currencies'}
+                className="flex h-6 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-400 bg-emerald-700 text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50">
+                <ArrowUpDown className="h-3.5 w-3.5" />
+              </button>
+            )}
+            <select value={side === 'from' ? selectedFrom : selectedTo}
+              onChange={event => void changePair(side === 'from' ? event.target.value : selectedFrom, side === 'to' ? event.target.value : selectedTo)}
+              aria-label={side === 'from' ? (ar ? 'اختر العملة الأولى' : 'Choose first currency') : (ar ? 'اختر العملة الثانية' : 'Choose second currency')}
+              disabled={!canChange}
+              className="h-8 min-w-0 w-full rounded-lg border border-emerald-400/50 bg-emerald-950 px-1.5 text-[11px] font-bold text-white outline-none focus:border-emerald-200 focus:ring-1 focus:ring-emerald-200 disabled:opacity-70">
+              {SUPPORTED_CURRENCIES.filter(code => !info?.availableCurrencies || info.availableCurrencies.includes(code) || info[side] === code)
+                .map(code => <option key={code} value={code}>{code} · {currencyName(code, lang)}</option>)}
+            </select>
+          </div>
         ))}
       </div>
-      <button type="button" disabled={!canChange || selectedFrom === selectedTo}
-        onClick={() => void changePair(selectedTo, selectedFrom)}
-        title={ar ? 'تبديل العملتين (يُحتسب من تغييرات اليوم)' : 'Swap currencies (counts as one daily change)'}
-        aria-label={ar ? 'تبديل العملة الأولى والثانية' : 'Swap first and second currencies'}
-        className="mx-auto -my-1.5 z-10 flex h-7 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-400 bg-emerald-700 text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50">
-        <ArrowUpDown className="h-4 w-4" />
-      </button>
       <strong dir="ltr" className="mt-2 block min-w-0 break-words rounded-xl bg-emerald-700/65 px-1.5 py-2 text-center text-[12px] font-black leading-snug tracking-tight text-white tabular-nums sm:text-base">
         {info ? '1 ' + selectedFrom + ' = ' + rate + ' ' + selectedTo : reference ? '1 EGP = ' + rate + ' USD' : busy ? '...' : '—'}
       </strong>

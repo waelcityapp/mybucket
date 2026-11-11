@@ -67,7 +67,7 @@ export function AccountsView({ accounts, lang, onAddAccount, onDeleteAccount, on
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
-    if (saving || !name.trim()) return;
+    if (saving || !name.trim() || name.trim().length > 40) return;
     const linked = (type === 'card' || type === 'wallet') && linkMode === 'linked';
     const bank = linked ? accounts.find(account => account.id === linkedBankId && account.type === 'bank') : null;
     const amount = Number(initialBalance || 0);

@@ -10,9 +10,10 @@ interface Props {
   onClosePreview?: () => void;
   onBack?: () => void | Promise<void>;
   onCancel?: () => void | Promise<void>;
+  backLabel?: string;
 }
 
-export function InitialSetupView({ lang, onSave, preview = false, onClosePreview, onBack, onCancel }: Props) {
+export function InitialSetupView({ lang, onSave, preview = false, onClosePreview, onBack, onCancel, backLabel }: Props) {
   const isAr = lang === 'ar';
   const [banks, setBanks] = useState<BankDraft[]>([]);
   const [cash, setCash] = useState('0');
@@ -65,7 +66,7 @@ export function InitialSetupView({ lang, onSave, preview = false, onClosePreview
               <button type="button" disabled={saving || leaving} onClick={() => void leave(onBack)}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50">
                 {isAr ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
-                {isAr ? 'العودة لتسجيل الدخول' : 'Back to sign-in'}
+                {backLabel || (isAr ? 'العودة لتسجيل الدخول' : 'Back to sign-in')}
               </button>
             ) : <span />}
             {onCancel && (

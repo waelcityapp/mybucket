@@ -6,6 +6,9 @@ import { AuthPage } from './AuthPage';
 import { InitialSetupView } from './InitialSetupView';
 import { HomeFinancialOverview } from '../HomeFinancialOverview';
 import { RecentTransactions } from '../RecentTransactions';
+import { QuickActions } from '../QuickActions';
+import { MoneySources } from '../MoneySources';
+import { TransactionsView } from './TransactionsView';
 
 type Stage = 'login' | 'setup' | 'dashboard' | 'offers';
 type DashboardPage = 'overview' | 'accounts' | 'transactions';
@@ -34,11 +37,17 @@ const exampleTransactions = (): Transaction[] => {
   }));
 };
 
-interface Props { lang: Language; onExit: () => void; }
+interface Props {
+  lang: Language;
+  onExit: () => void;
+  realOnboarding?: boolean;
+  onStartReal?: () => void;
+  trialDaysRemaining?: number | null;
+}
 
-export function AdminNewUserSimulation({ lang, onExit }: Props) {
+export function AdminNewUserSimulation({ lang, onExit, realOnboarding = false, onStartReal, trialDaysRemaining }: Props) {
   const ar = lang === 'ar';
-  const [stage, setStage] = useState<Stage>('login');
+  const [stage, setStage] = useState<Stage>(() => realOnboarding ? 'dashboard' : 'login');
   const [page, setPage] = useState<DashboardPage>('overview');
   const [accounts, setAccounts] = useState<FinancialAccount[]>(exampleAccounts);
   const [transactions, setTransactions] = useState<Transaction[]>(exampleTransactions);
@@ -101,7 +110,7 @@ export function AdminNewUserSimulation({ lang, onExit }: Props) {
   const buttonClass = 'rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50';
   return (
     <div dir={ar ? 'rtl' : 'ltr'} className="min-h-screen bg-[#F8FAFC] text-slate-900">
-      <div className="sticky top-0 z-50 bg-amber-50 border-b border-amber-200 px-3 py-2 shadow-sm">
+      {!realOnboarding && <div className="sticky top-0 z-50 bg-amber-50 border-b border-amber-200 px-3 py-2 shadow-sm">
         <div className="max-w-xl mx-auto flex flex-wrap items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-amber-800 shrink-0" />
           <span className="text-xs font-extrabold text-amber-950 flex-1">{ar ? 'وضع محاكاة المستخدم الجديد — بلا حفظ أو تسجيل حقيقي' : 'New user simulation — no real sign-in or saved data'}</span>
@@ -111,10 +120,10 @@ export function AdminNewUserSimulation({ lang, onExit }: Props) {
             {ar ? 'إنهاء المحاكاة' : 'Exit'}
           </button>
         </div>
-      </div>
+      </div>}
 
       {stage === 'login' && (
-        <AuthPage lang={lang} simulation onSimulatedSignIn={() => setStage('setup')}
+        <AuthPage lang={lang} simulation onSimulatedSignIn={() => setStage('dashboard')}
           onSuccess={async () => {}} onOpenOffers={() => setStage('offers')} />
       )}
 
@@ -137,13 +146,13 @@ export function AdminNewUserSimulation({ lang, onExit }: Props) {
               {ar ? 'نجحت محاكاة تسجيل Google دون استخدام حساب جديد' : 'Simulated Google sign-in — no new account created'}
             </div>
             <p className="text-xs text-emerald-950 leading-relaxed">
-              {ar ? 'هذه شاشة إعداد الحسابات الموجودة حاليًا. جرّبها، أو افتح التصور المقترح الذي يبدأ ببيانات نموذجية جاهزة.' : 'This is the current account setup screen. Try it, or jump to the proposed ready-made sample dashboard.'}
+              {ar ? 'يمكنك تجربة إدخال حسابات خاصة بك بعد مشاهدة البيانات النموذجية. هذه محاكاة فقط ولا تحفظ على Firebase.' : 'Try entering your own accounts after viewing sample data. This simulation does not save to Firebase.'}
             </p>
             <button type="button" onClick={resetSamples} className="w-full rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white py-2.5 px-3 text-sm font-extrabold">
-              {ar ? 'عرض التطبيق ببيانات تجريبية جاهزة' : 'View the app with ready-made sample data'}
+              {ar ? 'الرجوع للبيانات التجريبية' : 'Return to sample data'}
             </button>
           </div>
-          <InitialSetupView lang={lang} onBack={() => setStage('login')} onCancel={onExit} onSave={async draft => {
+          <InitialSetupView lang={lang} onBack={() => setStage('dashboard')} backLabel={ar ? 'العودة للتجربة' : 'Back to sample data'} onCancel={onExit} onSave={async draft => {
             setAccounts(draft.map((account, index) => ({ ...account, id: index === 0 ? 'sim_cash' : 'sim_account_' + index })));
             setTransactions([]); setSampleMode(false); setPage('overview'); setStage('dashboard');
           }} />
@@ -158,16 +167,33 @@ export function AdminNewUserSimulation({ lang, onExit }: Props) {
               <h1 className="text-xl font-black">{ar ? 'مرحبًا بك في التطبيق 👋' : 'Welcome to My Bucket 👋'}</h1>
             </div>
             <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-900">
-              {ar ? 'تجربة Pro افتراضية' : 'Simulated Pro trial'}
+              {realOnboarding
+                ? trialDaysRemaining === null || trialDaysRemaining === undefined
+                  ? (ar ? 'جاري قراءة مدة التجربة' : 'Loading trial status')
+                  : (ar ? `الأيام المجانية المتبقية: ${trialDaysRemaining}` : `Free days remaining: ${trialDaysRemaining}`)
+                : (ar ? 'تجربة افتراضية' : 'Simulated trial')}
             </div>
           </div>
 
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-2">
             <p className="font-extrabold text-sm text-amber-950">{ar ? (sampleMode ? 'هذه مجرد بيانات تجريبية يمكنك تعديلها' : 'أنت تجرب حسابًا افتراضيًا فارغًا') : (sampleMode ? 'These are editable sample records' : 'You are testing an empty sample account')}</p>
-            <p className="text-xs text-amber-900 leading-relaxed">{ar ? 'كل التعديلات هنا مؤقتة في ذاكرة الصفحة فقط، ولا تؤثر على حساب الإدارة أو Firebase أو فترة اشتراكك.' : 'All changes stay in this page memory only; nothing affects your admin account, Firebase, or subscription.'}</p>
+            <p className="text-xs text-amber-900 leading-relaxed">
+              {realOnboarding
+                ? (ar ? 'جرّب تعديل الأرصدة وتسجيل دخل ومصروف. هذه بيانات للشرح فقط، ولن تُحفظ في حسابك، وتعود لأصلها عند تحديث الصفحة. تبدأ مدة تجربتك من تسجيل Google.' : 'Try balances, income and expenses. These are sample records, not saved to your account; a page refresh resets them. Your trial starts when you register with Google.')
+                : (ar ? 'كل التعديلات هنا مؤقتة في ذاكرة الصفحة فقط، ولا تؤثر على حساب الإدارة أو Firebase أو فترة اشتراكك.' : 'All changes stay in this page memory only; nothing affects your admin account, Firebase, or subscription.')}
+            </p>
+            {sampleMode && (
+              <button type="button" onClick={realOnboarding ? onStartReal : () => setStage('setup')}
+                className="w-full rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white py-3 px-3 text-sm font-extrabold">
+                {ar ? 'ابدأ ببياناتي الحقيقية' : 'Start with my own data'}
+              </button>
+            )}
+            {realOnboarding && <p className="text-[11px] text-amber-800">
+              {ar ? 'عند البدء ببياناتك الحقيقية، لن تنتقل الأرقام الوهمية إلى حسابك.' : 'Sample figures will not be copied into your real account.'}
+            </p>}
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={resetSamples} className={buttonClass}><RotateCcw className="w-3.5 h-3.5 inline me-1" />{ar ? 'استعادة البيانات النموذجية' : 'Reset sample data'}</button>
-              <button type="button" onClick={clearSamples} className={buttonClass}><Trash2 className="w-3.5 h-3.5 inline me-1" />{ar ? 'البدء بحساب فارغ' : 'Start with empty account'}</button>
+              <button type="button" onClick={clearSamples} className={buttonClass}><Trash2 className="w-3.5 h-3.5 inline me-1" />{ar ? 'تصفير بيانات العرض' : 'Clear sample records'}</button>
             </div>
           </div>
 
@@ -187,6 +213,10 @@ export function AdminNewUserSimulation({ lang, onExit }: Props) {
             <>
               <HomeFinancialOverview accounts={accounts} transactions={transactions} lang={lang} simulation userId="simulator"
                 onViewAccounts={() => setPage('accounts')} onViewTransactions={() => setPage('transactions')} />
+              <QuickActions lang={lang} onOpenAddModal={kind => {
+                setType(kind === 'income' ? 'income' : 'expense'); setPage('transactions');
+              }} onOpenSearchModal={() => setPage('transactions')} />
+              <MoneySources lang={lang} accounts={accounts} onViewAll={() => setPage('accounts')} />
               <RecentTransactions accounts={accounts} transactions={transactions} categories={INITIAL_CATEGORIES} lang={lang}
                 onViewAll={() => setPage('transactions')} onDeleteTransaction={removeEntry} />
             </>
@@ -209,7 +239,8 @@ export function AdminNewUserSimulation({ lang, onExit }: Props) {
           )}
 
           {page === 'transactions' && (
-            <RecentTransactions accounts={accounts} transactions={transactions} categories={INITIAL_CATEGORIES} lang={lang} onDeleteTransaction={removeEntry} />
+            <TransactionsView accounts={accounts} transactions={transactions} categories={INITIAL_CATEGORIES} lang={lang}
+              loadState="ready" onDeleteTransaction={removeEntry} onOpenAddModal={() => setPage('transactions')} />
           )}
 
           <form onSubmit={addEntry} className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
@@ -231,7 +262,10 @@ export function AdminNewUserSimulation({ lang, onExit }: Props) {
             {error && <p role="alert" className="text-xs font-bold text-rose-700">{error}</p>}
             <button type="submit" className="w-full rounded-xl bg-emerald-700 py-3 text-sm font-extrabold text-white hover:bg-emerald-800">{ar ? 'أضف العملية التجريبية' : 'Add sample transaction'}</button>
           </form>
-          <p className="text-center text-xs text-slate-500">{ar ? 'المحاكاة لا تنشئ مستخدمًا ولا تستهلك Gemini أو Firestore.' : 'The simulator creates no user and uses no Gemini or Firestore writes.'}</p>
+          <p className="text-center text-xs text-slate-500">
+            {realOnboarding ? (ar ? 'أنت مسجّل بـ Google بالفعل. العمليات التجريبية لا تستهلك Gemini ولا تُحفظ في Firebase.' : 'You are signed in with Google. Sample entries use no Gemini and are not saved to Firebase.')
+              : (ar ? 'المحاكاة لا تنشئ مستخدمًا ولا تستهلك Gemini أو Firestore.' : 'The simulator creates no user and uses no Gemini or Firestore writes.')}
+          </p>
         </main>
       )}
     </div>

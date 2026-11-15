@@ -309,6 +309,7 @@ export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [financialLoaded, setFinancialLoaded] = useState({ accounts: false, transactions: false });
   const [needsInitialSetup, setNeedsInitialSetup] = useState(false);
+  const [onboardingSetupUid, setOnboardingSetupUid] = useState<string | null>(null);
   const initialSetupAttempt = useRef<{ signature: string; accounts: FinancialAccount[] } | null>(null);
   const [transactionReadError, setTransactionReadError] = useState(false);
   const lastUserId = useRef<string | null>(null);
@@ -527,6 +528,7 @@ export default function App() {
         setTransactions([]);
         setFinancialLoaded({ accounts: false, transactions: false });
         setNeedsInitialSetup(false);
+        setOnboardingSetupUid(null);
         initialSetupAttempt.current = null;
         setTransactionReadError(false);
         setUserSubscription(null);
@@ -1449,8 +1451,30 @@ export default function App() {
     return <InitialSetupView lang={lang} preview onClosePreview={() => { window.location.href = '/'; }} onSave={async () => {}} />;
   }
 
+  // Do not mistake an incomplete Firestore snapshot for a newly empty account.
+  if (!financialLoaded.accounts || (needsInitialSetup && !financialLoaded.transactions && !transactionReadError)) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center p-5 text-sm font-bold text-emerald-800">
+      {lang === 'ar' ? 'جاري تحميل بيانات حسابك...' : 'Loading your account data...'}
+    </div>;
+  }
+  if (needsInitialSetup && transactionReadError) {
+    return <div dir={lang === 'ar' ? 'rtl' : 'ltr'} className="min-h-screen bg-slate-50 flex items-center justify-center p-5">
+      <section className="max-w-sm w-full rounded-2xl border border-amber-200 bg-white p-5 text-center space-y-3">
+        <p className="text-sm font-bold text-amber-900">{lang === 'ar' ? 'تعذر التأكد من بيانات عملياتك. لن نبدأ ببيانات تجريبية قبل التأكد من سلامة بياناتك.' : 'We could not verify your transactions. Sample onboarding is paused to protect your data.'}</p>
+        <button type="button" onClick={() => window.location.reload()} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white">{lang === 'ar' ? 'إعادة المحاولة' : 'Retry'}</button>
+      </section>
+    </div>;
+  }
+  if (needsInitialSetup && financialLoaded.accounts && financialLoaded.transactions && transactions.length === 0 && onboardingSetupUid !== authUser.uid) {
+    const trialDaysRemaining = userSubscription ? stageFor(userSubscription) === 'pro-trial'
+      ? Math.max(0, Math.ceil((Date.parse(userSubscription.trialStartedAt) + getTrialDurations().proDays * 86400000 - Date.now()) / 86400000))
+      : calculateRemainingTrialDays(userSubscription) : null;
+    return <AdminNewUserSimulation key={authUser.uid} lang={lang} realOnboarding
+      trialDaysRemaining={trialDaysRemaining} onStartReal={() => setOnboardingSetupUid(authUser.uid)}
+      onExit={() => { void handleGoogleLogout(); }} />;
+  }
   if (needsInitialSetup && financialLoaded.accounts) {
-    // A new user must be able to leave account setup without creating any accounts.
+    // Account setup is now an explicit choice after exploring sample data.
     // Signing out returns to the existing Google sign-in page without resetting the trial.
     const leaveInitialSetup = async () => {
       await closePresenceBeforeSignOut().catch(error => console.warn('Presence sign-out notice:', error));
@@ -1459,7 +1483,9 @@ export default function App() {
       window.history.replaceState({ myBucketTab: 'home' }, '', '/');
       setActiveTab('home');
     };
-    return <InitialSetupView lang={lang} onBack={leaveInitialSetup} onCancel={leaveInitialSetup} onSave={async draft => {
+    return <InitialSetupView lang={lang}
+      onBack={() => setOnboardingSetupUid(null)} backLabel={lang === 'ar' ? 'العودة للبيانات التجريبية' : 'Back to sample data'}
+      onCancel={leaveInitialSetup} onSave={async draft => {
       if (!auth.currentUser || auth.currentUser.uid !== authUser.uid) throw new Error('auth-changed');
       if (!trialSettingsReady) throw new Error('trial-access-not-ready');
       const signature = JSON.stringify(draft);

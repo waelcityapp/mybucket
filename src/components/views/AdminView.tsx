@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   ArrowLeft, ArrowRight, CheckCircle2, Database, RotateCcw, ShieldCheck,
   MessageSquareText, Users, CreditCard, Megaphone, BrainCircuit, Settings2,
-  ChevronUp, Clock3, PanelsTopLeft,
+  ChevronUp, Clock3, PanelsTopLeft, PlayCircle,
 } from 'lucide-react';
 import type { AuthUser, Language } from '../../types';
 import { translations } from '../../data/translations';
@@ -22,13 +22,14 @@ interface AdminViewProps {
   onOpenSection: (section: SectionId) => void;
   onBackToSections: () => void;
   onOpenGrant: (uid: string) => void;
+  onOpenNewUserSimulation: () => void;
 }
 
 export type SectionId = 'users' | 'subscriptions' | 'marketers' | 'reports' | 'ai' | 'system' | 'ads';
 
 export function AdminView({
   lang, user, onBack, onResetDemoData, onZeroAllBalances, onOpenFeedbackAdmin,
-  sectionId = null, onOpenSection, onBackToSections, onOpenGrant,
+  sectionId = null, onOpenSection, onBackToSections, onOpenGrant, onOpenNewUserSimulation,
 }: AdminViewProps) {
   const t = translations[lang];
   const ar = lang === 'ar';
@@ -99,6 +100,17 @@ export function AdminView({
           );
         })}
       </div>}
+
+      {!selected && (
+        <button type="button" onClick={onOpenNewUserSimulation}
+          className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 p-4 flex items-center gap-3 text-start hover:bg-emerald-100 transition-colors">
+          <span className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0"><PlayCircle className="w-5 h-5" /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-extrabold text-emerald-950">{ar ? 'محاكاة مستخدم جديد' : 'Simulate a new user'}</span>
+            <span className="block text-xs text-emerald-800/80 mt-1 leading-relaxed">{ar ? 'جرّب التسجيل وإعداد الحسابات وبيانات نموذجية دون تغيير بياناتك الفعلية.' : 'Try the sign-in screen, account setup and sample finances without touching real data.'}</span>
+          </span>
+        </button>
+      )}
 
       {activeSection && (
         <section className="space-y-3 scroll-mt-24" aria-label={activeSection.title}>

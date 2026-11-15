@@ -10,6 +10,7 @@ interface HomeFinancialOverviewProps {
   onViewTransactions?: (period: 'today' | 'month', currency: string) => void;
   onViewAccounts?: () => void;
   userId?: string;
+  simulation?: boolean;
 }
 
 export function HomeFinancialOverview({
@@ -19,17 +20,20 @@ export function HomeFinancialOverview({
   onViewTransactions,
   onViewAccounts,
   userId,
+  simulation = false,
 }: HomeFinancialOverviewProps) {
   const isAr = lang === 'ar';
   const [isBalanceHidden, setIsBalanceHidden] = useState<boolean>(() => {
-    return localStorage.getItem('hide_financial_balance') === 'true';
+    return simulation ? false : localStorage.getItem('hide_financial_balance') === 'true';
   });
 
   const toggleHideBalance = () => {
     const next = !isBalanceHidden;
-    localStorage.setItem('hide_financial_balance', String(next));
+    if (!simulation) {
+      localStorage.setItem('hide_financial_balance', String(next));
+      window.dispatchEvent(new Event('mybucket-balance-visibility'));
+    }
     setIsBalanceHidden(next);
-    window.dispatchEvent(new Event('mybucket-balance-visibility'));
   };
 
   // Group balances by currency
@@ -46,9 +50,9 @@ export function HomeFinancialOverview({
   // Selected currency is a view preference and never changes stored balances.
   const accountCurrencies = useMemo(() => Array.from(new Set(accounts.map(account => account.currency || 'EGP'))), [accounts]);
   const key = 'mybucket_currency_' + (userId || 'guest');
-  const [currency, setCurrency] = useState(() => localStorage.getItem(key) || 'EGP');
+  const [currency, setCurrency] = useState(() => simulation ? 'EGP' : localStorage.getItem(key) || 'EGP');
   const primaryCurrency = accountCurrencies.includes(currency) ? currency : (accountCurrencies[0] || 'EGP');
-  const selectCurrency = (value: string) => { setCurrency(value); localStorage.setItem(key, value); };
+  const selectCurrency = (value: string) => { setCurrency(value); if (!simulation) localStorage.setItem(key, value); };
   const primaryTotal = balancesByCurrency[primaryCurrency] ?? 0;
   const otherCurrencies = Object.entries(balancesByCurrency).filter(([curr]) => curr !== primaryCurrency);
 

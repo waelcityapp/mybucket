@@ -57,6 +57,7 @@ import {
 import { FinancialQueryResultCard } from './components/FinancialQueryResultCard';
 import { HomeFinancialOverview } from './components/HomeFinancialOverview';
 import { AdminView, type SectionId } from './components/views/AdminView';
+import { AdminNewUserSimulation } from './components/views/AdminNewUserSimulation';
 import { AdminUserGrantView } from './components/views/AdminUserGrantView';
 import { AdminPinView } from './components/views/AdminPinView';
 import { AnalyzerFeedbackAdmin } from './components/views/AnalyzerFeedbackAdmin';
@@ -385,7 +386,7 @@ export default function App() {
     if (!isAdmin || pin !== '2233') return false;
     setAdminPinVerified(true);
     const currentPath = window.location.pathname;
-    const safeTarget = /^\/admin\/(users|subscriptions|marketers|ads|ai|system)$/.test(currentPath) || /^\/admin\/users\/[A-Za-z0-9_-]{1,128}\/grant$/.test(currentPath) ? currentPath : '/admin';
+    const safeTarget = /^\/admin\/(users|subscriptions|marketers|ads|ai|system|simulate-new-user)$/.test(currentPath) || /^\/admin\/users\/[A-Za-z0-9_-]{1,128}\/grant$/.test(currentPath) ? currentPath : '/admin';
     window.history.replaceState({ myBucketTab: 'admin' }, '', safeTarget);
     setAdminRoute(safeTarget);
     setActiveTab('admin');
@@ -411,6 +412,12 @@ export default function App() {
     if (section === 'reports') { openFeedbackAdmin(); return; }
     window.history.pushState({ myBucketTab: 'admin' }, '', `/admin/${section}`);
     setAdminRoute(`/admin/${section}`);
+    setActiveTab('admin');
+  };
+  const openNewUserSimulation = () => {
+    if (!isAdmin || !adminPinVerified) return;
+    window.history.pushState({ myBucketTab: 'admin' }, '', '/admin/simulate-new-user');
+    setAdminRoute('/admin/simulate-new-user');
     setActiveTab('admin');
   };
   const backToAdminSections = () => {
@@ -1430,6 +1437,10 @@ export default function App() {
     );
   }
 
+  if (isAdmin && adminPinVerified && activeTab === 'admin' && adminRoute === '/admin/simulate-new-user') {
+    return <AdminNewUserSimulation lang={lang} onExit={backToAdminSections} />;
+  }
+
   if (activeTab === 'guide') {
     return <UsageGuideView lang={lang} onBack={() => { if (window.history.state?.guide) window.history.back(); else { window.history.replaceState({}, '', '/'); setActiveTab('home'); } }} />;
   }
@@ -1825,7 +1836,7 @@ export default function App() {
             ? <AnalyzerFeedbackAdmin lang={lang} onBack={closeFeedbackAdmin} />
             : /^\/admin\/users\/[A-Za-z0-9_-]{1,128}\/grant$/.test(adminRoute)
             ? <AdminUserGrantView uid={adminRoute.split('/')[3]} lang={lang} onBack={() => openAdminSection('users')} />
-            : <AdminView lang={lang} user={authUser} onBack={() => navigateTab('home')} onResetDemoData={handleResetDemoData} onZeroAllBalances={handleZeroAllBalances} onOpenFeedbackAdmin={openFeedbackAdmin} sectionId={adminSectionFromPath()} onOpenSection={openAdminSection} onBackToSections={backToAdminSections} onOpenGrant={openUserGrant} />
+            : <AdminView lang={lang} user={authUser} onBack={() => navigateTab('home')} onResetDemoData={handleResetDemoData} onZeroAllBalances={handleZeroAllBalances} onOpenFeedbackAdmin={openFeedbackAdmin} sectionId={adminSectionFromPath()} onOpenSection={openAdminSection} onBackToSections={backToAdminSections} onOpenGrant={openUserGrant} onOpenNewUserSimulation={openNewUserSimulation} />
         )}
       </main>
 

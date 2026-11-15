@@ -12,7 +12,7 @@ import { TransactionsView } from './TransactionsView';
 
 type Stage = 'login' | 'setup' | 'dashboard' | 'offers';
 type DashboardPage = 'overview' | 'accounts' | 'transactions';
-type EntryType = 'income' | 'expense';
+type EntryType = 'income' | 'expense' | 'transfer';
 
 const exampleAccounts = (): FinancialAccount[] => [
   { id: 'sim_cash', name: 'Cash', nameAr: 'كاش', type: 'cash', balance: 5000, currency: 'EGP', color: '#10b981' },
@@ -53,6 +53,8 @@ export function AdminNewUserSimulation({ lang, onExit, realOnboarding = false, o
   const [transactions, setTransactions] = useState<Transaction[]>(exampleTransactions);
   const [sampleMode, setSampleMode] = useState(true);
   const [type, setType] = useState<EntryType>('expense');
+  const [accountId, setAccountId] = useState('sim_cash');
+  const [toAccountId, setToAccountId] = useState('sim_bank');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
@@ -75,36 +77,57 @@ export function AdminNewUserSimulation({ lang, onExit, realOnboarding = false, o
   const addEntry = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const value = Number(amount);
-    const account = accounts.find(item => item.type === 'cash' && item.currency === 'EGP')
-      || accounts.find(item => item.currency === 'EGP' && !item.linkedBankId && item.type !== 'credit');
-    if (!account) {
-      setError(ar ? 'أضف حسابًا بالجنيه المصري أولًا.' : 'Add an EGP account first.'); return;
+    const account = accounts.find(item => item.id === accountId);
+    const recipient = accounts.find(item => item.id === toAccountId);
+    const isTransfer = type === 'transfer';
+    if (!account || account.currency !== 'EGP') {
+      setError(ar ? 'اختر حسابًا بالجنيه المصري أولًا.' : 'Choose an EGP account first.'); return;
+    }
+    if (isTransfer && (!recipient || recipient.currency !== account.currency || recipient.id === account.id)) {
+      setError(ar ? 'اختر حساب تحويل مختلفًا بنفس العملة.' : 'Choose a different destination account in the same currency.'); return;
     }
     if (!Number.isFinite(value) || value <= 0 || value > 1_000_000_000) {
       setError(ar ? 'أدخل مبلغًا صحيحًا أكبر من صفر.' : 'Enter a valid amount above zero.'); return;
     }
-    if (type === 'expense' && account.balance < value) {
+    if ((type === 'expense' || type === 'transfer') && account.balance < value) {
       setError(ar ? 'الرصيد التجريبي لا يكفي لهذا المصروف.' : 'Not enough sample balance for this expense.'); return;
     }
     const now = new Date();
     const date = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
     const newTransaction: Transaction = {
       id: 'sim_' + crypto.randomUUID(), type, amount: value, currency: 'EGP',
-      accountId: account.id, description: description.trim() || (type === 'income' ? 'دخل تجريبي' : 'مصروف تجريبي'),
-      categoryId: type === 'income' ? 'cat_salary' : 'cat_other', date, createdAt: now.toISOString(),
+      accountId: account.id, ...(isTransfer ? { toAccountId: recipient!.id } : {}),
+      description: description.trim() || (type === 'income' ? 'دخل تجريبي' : isTransfer ? 'تحويل تجريبي' : 'مصروف تجريبي'),
+      ...(isTransfer ? {} : { categoryId: type === 'income' ? 'cat_salary' : 'cat_other' }),
+      date, createdAt: now.toISOString(),
       dateTime: now.toISOString(), time: now.toTimeString().slice(0, 5),
     };
     setAccounts(previous => previous.map(item => item.id === account.id
-      ? { ...item, balance: item.balance + (type === 'income' ? value : -value) } : item));
+      ? { ...item, balance: item.balance + (type === 'income' ? value : -value) }
+      : isTransfer && item.id === recipient!.id ? { ...item, balance: item.balance + value }
+      : item));
     setTransactions(previous => [newTransaction, ...previous]);
     setAmount(''); setDescription(''); setError('');
   };
   const removeEntry = (id: string) => {
     const transaction = transactions.find(item => item.id === id);
     if (!transaction) return;
+    const fromAccount = accounts.find(item => item.id === transaction.accountId);
+    const toAccount = accounts.find(item => item.id === transaction.toAccountId);
+    const reverseFrom = transaction.type === 'expense' || transaction.type === 'transfer'
+      ? transaction.amount : -transaction.amount;
+    if ((fromAccount && fromAccount.balance + reverseFrom < 0)
+      || (transaction.type === 'transfer' && (!toAccount || toAccount.balance < transaction.amount))) {
+      setError(ar ? 'لا يمكن حذف العملية لأن ذلك يجعل أحد الأرصدة سالبًا.' : 'Cannot delete this sample entry because an account would go negative.');
+      setPage('transactions'); return;
+    }
     setTransactions(previous => previous.filter(item => item.id !== id));
     setAccounts(previous => previous.map(item => item.id === transaction.accountId
-      ? { ...item, balance: item.balance + (transaction.type === 'expense' ? transaction.amount : -transaction.amount) } : item));
+      ? { ...item, balance: item.balance + reverseFrom }
+      : transaction.type === 'transfer' && item.id === transaction.toAccountId
+        ? { ...item, balance: item.balance - transaction.amount }
+        : item));
+    setError('');
   };
 
   const buttonClass = 'rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50';
@@ -214,7 +237,7 @@ export function AdminNewUserSimulation({ lang, onExit, realOnboarding = false, o
               <HomeFinancialOverview accounts={accounts} transactions={transactions} lang={lang} simulation userId="simulator"
                 onViewAccounts={() => setPage('accounts')} onViewTransactions={() => setPage('transactions')} />
               <QuickActions lang={lang} onOpenAddModal={kind => {
-                setType(kind === 'income' ? 'income' : 'expense'); setPage('transactions');
+                setType(kind === 'income' ? 'income' : kind === 'transfer' ? 'transfer' : 'expense'); setPage('transactions');
               }} onOpenSearchModal={() => setPage('transactions')} />
               <MoneySources lang={lang} accounts={accounts} onViewAll={() => setPage('accounts')} />
               <RecentTransactions accounts={accounts} transactions={transactions} categories={INITIAL_CATEGORIES} lang={lang}
@@ -250,12 +273,29 @@ export function AdminNewUserSimulation({ lang, onExit, realOnboarding = false, o
                 <select className="mt-1 w-full rounded-xl border border-slate-300 p-2" value={type} onChange={event => setType(event.target.value as EntryType)}>
                   <option value="expense">{ar ? 'مصروف' : 'Expense'}</option>
                   <option value="income">{ar ? 'دخل' : 'Income'}</option>
+                  <option value="transfer">{ar ? 'تحويل' : 'Transfer'}</option>
                 </select>
               </label>
               <label className="text-xs font-bold text-slate-700">{ar ? 'المبلغ بالجنيه' : 'Amount (EGP)'}
                 <input required type="number" min="0.01" max="1000000000" step="any" value={amount} onChange={event => setAmount(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 p-2" />
               </label>
             </div>
+            <label className="block text-xs font-bold text-slate-700">{type === 'transfer' ? (ar ? 'من حساب' : 'From account') : (ar ? 'الحساب' : 'Account')}
+              <select value={accountId} onChange={event => setAccountId(event.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-300 p-2">
+                {accounts.filter(item => item.currency === 'EGP').map(account => (
+                  <option key={account.id} value={account.id}>{ar ? account.nameAr : account.name}</option>
+                ))}
+              </select>
+            </label>
+            {type === 'transfer' && <label className="block text-xs font-bold text-slate-700">{ar ? 'إلى حساب' : 'To account'}
+              <select value={toAccountId} onChange={event => setToAccountId(event.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-300 p-2">
+                {accounts.filter(item => item.currency === 'EGP' && item.id !== accountId).map(account => (
+                  <option key={account.id} value={account.id}>{ar ? account.nameAr : account.name}</option>
+                ))}
+              </select>
+            </label>}
             <label className="block text-xs font-bold text-slate-700">{ar ? 'الوصف' : 'Description'}
               <input value={description} onChange={event => setDescription(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 p-2" placeholder={ar ? 'مثال: وجبة غداء' : 'e.g. Lunch'} />
             </label>

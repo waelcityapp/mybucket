@@ -1450,7 +1450,16 @@ export default function App() {
   }
 
   if (needsInitialSetup && financialLoaded.accounts) {
-    return <InitialSetupView lang={lang} onSave={async draft => {
+    // A new user must be able to leave account setup without creating any accounts.
+    // Signing out returns to the existing Google sign-in page without resetting the trial.
+    const leaveInitialSetup = async () => {
+      await closePresenceBeforeSignOut().catch(error => console.warn('Presence sign-out notice:', error));
+      await logoutUser();
+      setAdminPinVerified(false);
+      window.history.replaceState({ myBucketTab: 'home' }, '', '/');
+      setActiveTab('home');
+    };
+    return <InitialSetupView lang={lang} onBack={leaveInitialSetup} onCancel={leaveInitialSetup} onSave={async draft => {
       if (!auth.currentUser || auth.currentUser.uid !== authUser.uid) throw new Error('auth-changed');
       if (!trialSettingsReady) throw new Error('trial-access-not-ready');
       const signature = JSON.stringify(draft);

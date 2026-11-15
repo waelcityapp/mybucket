@@ -143,7 +143,7 @@ export function AdminNewUserSimulation({ lang, onExit }: Props) {
               {ar ? 'عرض التطبيق ببيانات تجريبية جاهزة' : 'View the app with ready-made sample data'}
             </button>
           </div>
-          <InitialSetupView lang={lang} onSave={async draft => {
+          <InitialSetupView lang={lang} onBack={() => setStage('login')} onCancel={onExit} onSave={async draft => {
             setAccounts(draft.map((account, index) => ({ ...account, id: index === 0 ? 'sim_cash' : 'sim_account_' + index })));
             setTransactions([]); setSampleMode(false); setPage('overview'); setStage('dashboard');
           }} />

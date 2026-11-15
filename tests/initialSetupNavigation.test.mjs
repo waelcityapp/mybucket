@@ -17,11 +17,13 @@ test('leaving after edits confirms unsaved changes', () => {
   assert.match(setup, /hasUnsavedChanges/);
   assert.match(setup, /window\.confirm/);
 });
-test('real setup signs out before returning to Google login', () => {
+test('real setup returns to samples, while cancel signs out safely', () => {
   assert.match(app, /const leaveInitialSetup = async \(\) => \{/);
   assert.match(app, /await logoutUser\(\)/);
-  assert.match(app, /onBack=\{leaveInitialSetup\} onCancel=\{leaveInitialSetup\}/);
+  assert.match(app, /onBack=\{\(\) => setOnboardingSetupUid\(null\)\}/);
+  assert.match(app, /onCancel=\{leaveInitialSetup\}/);
 });
-test('simulated setup returns without signing into Google or changing Firebase', () => {
-  assert.match(simulation, /onBack=\{\(\) => setStage\('login'\)\} onCancel=\{onExit\}/);
+test('simulated setup returns to samples without Firebase writes', () => {
+  assert.match(simulation, /onBack=\{\(\) => setStage\('dashboard'\)\}/);
+  assert.match(simulation, /onCancel=\{onExit\}/);
 });

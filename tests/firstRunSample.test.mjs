@@ -7,7 +7,7 @@ const sample = readFileSync('src/components/views/AdminNewUserSimulation.tsx','u
 
 test('new Google accounts see sample home before real account setup', () => {
   assert.match(app, /needsInitialSetup && financialLoaded\.accounts && financialLoaded\.transactions && transactions\.length === 0/);
-  assert.ok(app.indexOf('return <AdminNewUserSimulation key={authUser.uid}') < app.indexOf('if (needsInitialSetup && financialLoaded.accounts) {'));
+  assert.ok(app.indexOf('return <AdminNewUserSimulation') < app.indexOf('if (needsInitialSetup && financialLoaded.accounts) {'));
   assert.match(app, /onStartReal=\{\(\) => setOnboardingSetupUid\(authUser\.uid\)\}/);
   assert.match(app, /onBack=\{\(\) => setOnboardingSetupUid\(null\)\}/);
 });

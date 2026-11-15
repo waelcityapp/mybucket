@@ -182,7 +182,7 @@ export function AdminNewUserSimulation({ lang, onExit, realOnboarding = false, o
                 ? (ar ? 'جرّب تعديل الأرصدة وتسجيل دخل ومصروف. هذه بيانات للشرح فقط، ولن تُحفظ في حسابك، وتعود لأصلها عند تحديث الصفحة. تبدأ مدة تجربتك من تسجيل Google.' : 'Try balances, income and expenses. These are sample records, not saved to your account; a page refresh resets them. Your trial starts when you register with Google.')
                 : (ar ? 'كل التعديلات هنا مؤقتة في ذاكرة الصفحة فقط، ولا تؤثر على حساب الإدارة أو Firebase أو فترة اشتراكك.' : 'All changes stay in this page memory only; nothing affects your admin account, Firebase, or subscription.')}
             </p>
-            {sampleMode && (
+            {(sampleMode || realOnboarding) && (
               <button type="button" onClick={realOnboarding ? onStartReal : () => setStage('setup')}
                 className="w-full rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white py-3 px-3 text-sm font-extrabold">
                 {ar ? 'ابدأ ببياناتي الحقيقية' : 'Start with my own data'}

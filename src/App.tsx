@@ -1469,7 +1469,7 @@ export default function App() {
     const trialDaysRemaining = userSubscription ? stageFor(userSubscription) === 'pro-trial'
       ? Math.max(0, Math.ceil((Date.parse(userSubscription.trialStartedAt) + getTrialDurations().proDays * 86400000 - Date.now()) / 86400000))
       : calculateRemainingTrialDays(userSubscription) : null;
-    return <AdminNewUserSimulation key={authUser.uid} lang={lang} realOnboarding
+    return <AdminNewUserSimulation lang={lang} realOnboarding
       trialDaysRemaining={trialDaysRemaining} onStartReal={() => setOnboardingSetupUid(authUser.uid)}
       onExit={() => { void handleGoogleLogout(); }} />;
   }

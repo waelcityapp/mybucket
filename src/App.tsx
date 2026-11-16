@@ -1452,6 +1452,7 @@ export default function App() {
     return (
       <AuthPage
         lang={lang}
+        identity={appIdentity}
         onSuccess={handleAuthGateSuccess}
         onToggleLanguage={handleToggleLanguage}
         onOpenOffers={openOffers}

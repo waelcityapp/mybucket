@@ -22,6 +22,7 @@ import { PromoBanner } from './components/PromoBanner';
 import { DealsModal } from './components/DealsModal';
 import { OffersPage } from './components/views/OffersPage';
 import { CreateOfferPage } from './components/views/CreateOfferPage';
+import { AdSignInGate } from './components/views/AdSignInGate';
 import { translations } from './data/translations';
 import { Header } from './components/Header';
 import { VoiceNaturalInput } from './components/VoiceNaturalInput';
@@ -1405,8 +1406,9 @@ export default function App() {
     return <LockScreen lang={lang} onUnlock={() => { appLockLastActivity.current = Date.now(); setAppLockUnlocked(true); }} />;
   }
 
-  // Advertisement creation is a public draft/review experience; no publishing occurs client-side.
+  // Browsing is public, but creating or preparing an advertisement requires sign-in.
   if (window.location.pathname === '/offers/new') {
+    if (!authUser) return <AdSignInGate lang={lang} onBack={() => window.location.assign('/offers')} onSignIn={loginWithGoogle} />;
     return <CreateOfferPage lang={lang} onBack={() => window.location.assign('/offers')} />;
   }
 

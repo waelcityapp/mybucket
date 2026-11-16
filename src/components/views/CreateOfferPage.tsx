@@ -128,7 +128,11 @@ export function CreateOfferPage({ lang, onBack }: Props) {
             <p className="text-xs text-slate-600">{ar ? 'نهاية العرض:' : 'Ends:'} {new Date(endsAt).toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
             {reviewPreview && <div className="grid grid-cols-2 gap-2"><button type="button" disabled className="rounded-xl bg-emerald-100 text-emerald-800 opacity-60 py-2 text-xs font-bold">{ar ? 'موافقة' : 'Approve'}</button><button type="button" disabled className="rounded-xl bg-red-100 text-red-800 opacity-60 py-2 text-xs font-bold">{ar ? 'رفض' : 'Reject'}</button></div>}
             <button type="button" onClick={() => setPreview(false)} className="w-full rounded-xl border border-emerald-600 text-emerald-700 py-3 text-sm font-bold">{ar ? 'تعديل الإعلان' : 'Edit advertisement'}</button>
-            <p className="text-center text-xs text-slate-500">{ar ? 'إرسال الإعلان للنشر غير متاح حاليًا' : 'Submission is not yet available'}</p>
+            <div className="space-y-2 rounded-xl bg-slate-50 p-3 text-center">
+              <p className="text-xs font-bold text-slate-700">{tier === 'free' ? (ar ? 'الإعلان المجاني سيُرسل للإدارة للمراجعة والموافقة.' : 'Free ads will be sent to the administrator for review and approval.') : (ar ? 'الإعلان المميز سينتقل إلى صفحة الدفع قبل إرساله للمراجعة.' : 'Featured ads will proceed to payment before review.')}</p>
+              <button type="button" disabled className="w-full rounded-xl bg-slate-200 px-3 py-3 text-sm font-bold text-slate-500">{tier === 'free' ? (ar ? 'الإرسال للإدارة — قريبًا' : 'Send for review — coming soon') : (ar ? 'الانتقال للدفع — قريبًا' : 'Continue to payment — coming soon')}</button>
+              <p className="text-xs text-slate-500">{ar ? 'الخطوة دي لسه غير متاحة؛ إعلانك لم يُرسل ولن يُخصم أي مبلغ.' : 'This step is not yet available; your ad has not been submitted and no payment will be charged.'}</p>
+            </div>
           </section>
         ) : (
           <form onSubmit={handleReview} className="space-y-5">

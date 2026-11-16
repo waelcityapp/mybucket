@@ -518,3 +518,7 @@ The authenticated owner may test a signed image or video upload to the My Bucket
 ## Revision #177 — Clear upload completion
 
 The upload percentage and progress bar remain visible during transfer, verification and after success. After server confirmation, the page shows a success message instead of displaying the protected URL or public ID. The verification flow and stored Cloudinary test file are unchanged; advertisement persistence remains unavailable.
+
+## Revision #178 — Advertising sign-in and planned routes
+
+Browsing offers remains public. An unauthenticated visitor attempting `/offers/new` must sign in with Google before viewing the advertisement creation form, including on direct navigation; the gateway must independently authorize future advertiser operations. The owner decided that free ads go to administration for review and featured ads go to a payment page. Payment amounts, provider, refusal and refund rules remain undecided. The preview communicates both paths with disabled controls; no submission, payment, approval or publication is enabled by this UI. Do not activate a financial flow until the owner approves its rules and the backend is verified.

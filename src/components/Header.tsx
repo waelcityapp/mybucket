@@ -81,12 +81,12 @@ export function Header({
         <div className="flex min-w-0 flex-col items-start justify-center text-start">
           <div className="flex items-center gap-1.5">
             {/* Cloudinary identity icon when configured; preserve original bucket as default. */}
-            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-xs overflow-hidden shrink-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-xs overflow-hidden shrink-0">
               {identity.icon192Url ? (
                 <img src={identity.icon192Url} alt="" className="h-full w-full object-contain" />
               ) : (
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-                  strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 sm:w-4 sm:h-4">
+                  strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 sm:w-[22px] sm:h-[22px]">
                   <path d="M5 9h14l-1.5 11h-11L5 9z" />
                   <path d="M8 9V6a4 4 0 0 1 8 0v3" />
                 </svg>

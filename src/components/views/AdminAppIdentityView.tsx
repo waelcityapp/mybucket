@@ -3,11 +3,11 @@ import { ArrowLeft, ArrowRight, CheckCircle2, ImagePlus, Save, ShieldCheck, Rota
 import type { Language } from '../../types';
 import { identityRequest, uploadBrandIcon, type AppIdentity } from '../../services/appIdentityClient';
 
-type Props = { lang: Language; identity: AppIdentity; onSaved: (updated: AppIdentity) => void; onBack: () => void };
+type Props = { lang: Language; identity: AppIdentity; identityReady: boolean; onSaved: (updated: AppIdentity) => void; onBack: () => void };
 const MAX_BYTES = 3 * 1024 * 1024;
 const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
 
-export function AdminAppIdentityView({ lang, identity, onSaved, onBack }: Props) {
+export function AdminAppIdentityView({ lang, identity, identityReady, onSaved, onBack }: Props) {
   const ar = lang === 'ar';
   const [nameAr, setNameAr] = useState(identity.appNameAr);
   const [nameEn, setNameEn] = useState(identity.appNameEn);
@@ -47,7 +47,7 @@ export function AdminAppIdentityView({ lang, identity, onSaved, onBack }: Props)
   };
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (saving) return;
+    if (saving || !identityReady) return;
     if (!nameAr.trim() || !nameEn.trim() || nameAr.trim().length > 48 || nameEn.trim().length > 48) {
       setError(ar ? 'اسم التطبيق مطلوب في اللغتين، بحد أقصى 48 حرفًا.' : 'Enter both names, with a maximum of 48 characters each.');
       return;
@@ -87,6 +87,7 @@ export function AdminAppIdentityView({ lang, identity, onSaved, onBack }: Props)
         <ShieldCheck className="h-4 w-4 shrink-0" />
         {ar ? 'للإدارة فقط · تُحفظ التغييرات على الخادم · صور الهوية في Cloudinary الخاص بـ My Bucket' : 'Admin only · Server-controlled changes · My Bucket Cloudinary'}
       </div>
+      {!identityReady && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">{ar ? 'تعذر تحميل بيانات الهوية من الخادم. حدّث الصفحة قبل إجراء تغييرات.' : 'Could not load the identity from the server. Refresh the page before editing.'}</p>}
       <form onSubmit={save} className="space-y-4">
         <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-sm font-extrabold text-slate-900">{ar ? 'اسم التطبيق' : 'App name'}</h2>
@@ -127,7 +128,7 @@ export function AdminAppIdentityView({ lang, identity, onSaved, onBack }: Props)
         </section>
         {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800">{error}</p>}
         {success && <p role="status" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-800"><CheckCircle2 className="h-4 w-4 shrink-0" />{success}</p>}
-        <button type="submit" disabled={saving || !nameAr.trim() || !nameEn.trim() || !dirty}
+        <button type="submit" disabled={saving || !identityReady || !nameAr.trim() || !nameEn.trim() || !dirty}
           className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3.5 text-sm font-black text-white shadow-sm transition-colors hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           {saving ? (ar ? 'جاري رفع الصورة وحفظ الهوية...' : 'Uploading and saving...') : (ar ? 'حفظ التغييرات' : 'Save changes')}

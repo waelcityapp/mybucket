@@ -26,6 +26,9 @@ export function CreateOfferPage({ lang, onBack }: Props) {
   const [description, setDescription] = useState('');
   const [merchant, setMerchant] = useState('');
   const [contact, setContact] = useState('');
+  const [startsAt, setStartsAt] = useState('');
+  const [endsAt, setEndsAt] = useState('');
+  const [dateError, setDateError] = useState(false);
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState(false);
   const imageUrl = useMemo(() => image ? URL.createObjectURL(image) : null, [image]);
@@ -33,6 +36,11 @@ export function CreateOfferPage({ lang, onBack }: Props) {
   const categoryName = categories.find(item => item.id === category);
   const handleReview = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const start = Date.parse(startsAt), end = Date.parse(endsAt);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || end <= Date.now()) {
+      setDateError(true); return;
+    }
+    setDateError(false);
     if (title.trim() && description.trim() && category && merchant.trim()) setPreview(true);
   };
   const label = 'block text-xs font-extrabold text-slate-700 mb-1.5';
@@ -66,6 +74,8 @@ export function CreateOfferPage({ lang, onBack }: Props) {
             <h2 className="text-lg font-extrabold break-words">{title}</h2>
             <p className="text-sm text-slate-700 whitespace-pre-wrap break-words">{description}</p>
             <p className="text-xs text-slate-600">{ar ? 'المعلن:' : 'Advertiser:'} {merchant}</p>
+            <p className="text-xs text-slate-600">{ar ? 'بداية العرض:' : 'Starts:'} {new Date(startsAt).toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
+            <p className="text-xs text-slate-600">{ar ? 'نهاية العرض:' : 'Ends:'} {new Date(endsAt).toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
             {contact && <p className="text-xs text-slate-600 break-all">{ar ? 'وسيلة التواصل:' : 'Contact:'} {contact}</p>}
             <button type="button" onClick={() => setPreview(false)} className="w-full rounded-xl border border-emerald-600 text-emerald-700 py-3 text-sm font-bold">{ar ? 'تعديل الإعلان' : 'Edit advertisement'}</button>
             <p className="text-center text-xs text-slate-500">{ar ? 'إرسال الإعلان للنشر غير متاح حاليًا' : 'Submission is not yet available'}</p>
@@ -106,7 +116,18 @@ export function CreateOfferPage({ lang, onBack }: Props) {
               </div>
             </section>
             <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-              <label htmlFor="offer-image" className="flex items-center gap-2 font-extrabold text-sm"><ImagePlus className="w-5 h-5 text-emerald-700" />{ar ? '3. صورة الإعلان (اختياري)' : '3. Advertisement image (optional)'}</label>
+              <h2 className="font-extrabold text-sm">{ar ? '3. مدة العرض' : '3. Advertisement schedule'}</h2>
+              <p className="text-xs text-slate-500">{ar ? 'المواعيد حسب توقيت جهازك. الإعلان لا يظهر إلا بعد موافقة الإدارة.' : 'Times use your device time zone. The advertisement appears only after admin approval.'}</p>
+              <div><label htmlFor="offer-start" className={label}>{ar ? 'بداية العرض' : 'Start'}</label>
+                <input id="offer-start" type="datetime-local" required value={startsAt} onChange={event => { setStartsAt(event.target.value); setDateError(false); }} className={field} />
+              </div>
+              <div><label htmlFor="offer-end" className={label}>{ar ? 'نهاية العرض' : 'End'}</label>
+                <input id="offer-end" type="datetime-local" required value={endsAt} onChange={event => { setEndsAt(event.target.value); setDateError(false); }} className={field} />
+              </div>
+              {dateError && <p role="alert" className="text-xs font-bold text-red-700">{ar ? 'اختار نهاية بعد البداية ولسه مجتش.' : 'Choose an end after the start and in the future.'}</p>}
+            </section>
+            <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+              <label htmlFor="offer-image" className="flex items-center gap-2 font-extrabold text-sm"><ImagePlus className="w-5 h-5 text-emerald-700" />{ar ? '4. صورة الإعلان (اختياري)' : '4. Advertisement image (optional)'}</label>
               <input id="offer-image" type="file" accept="image/png,image/jpeg,image/webp" onChange={event => {
                 const next = event.target.files?.[0] ?? null;
                 setImage(next && next.size <= 5 * 1024 * 1024 ? next : null);

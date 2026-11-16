@@ -1674,7 +1674,7 @@ export default function App() {
                 </div>
               )}
             </section>
-            {/* Four independent home shortcuts: plans/guide above, savings/rates below. */}
+            {/* Subscription and guide shortcuts — first row. */}
             <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-2.5">
               <button type="button" onClick={() => openSubscriptionPage('subscription')}
                 className="flex min-w-0 min-h-[54px] items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-2 py-2.5 text-center text-[11px] font-extrabold text-emerald-900 shadow-sm transition-colors hover:bg-emerald-50 sm:text-sm">
@@ -1686,43 +1686,34 @@ export default function App() {
                 <BookOpen className="h-4 w-4 shrink-0 text-emerald-700 sm:h-5 sm:w-5" />
                 <span>{lang === 'ar' ? 'دليل الاستخدام' : 'User guide'}</span>
               </button>
-              <button type="button" onClick={openOffers}
-                className="flex min-w-0 flex-col items-center justify-center gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white px-2 py-4 text-center font-extrabold text-emerald-950 shadow-sm transition-colors hover:from-emerald-100 hover:to-emerald-50">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 sm:h-14 sm:w-14">
-                  <ShoppingBag className="h-7 w-7 sm:h-8 sm:w-8" />
-                </span>
-                <span className="text-sm leading-snug sm:text-base">{lang === 'ar' ? 'وفّر مع My Bucket' : 'Save with My Bucket'}</span>
-                <span className="text-[10px] font-semibold text-emerald-700 sm:text-xs">{lang === 'ar' ? 'العروض والخصومات' : 'Offers & discounts'}</span>
-              </button>
-              <ExchangeRatesMini lang={lang} />
             </div>
 
-            {/* 2. Top Clear Financial Summary: Net Balance + Today/Month expenses */}
-            <HomeFinancialOverview
-              accounts={accounts}
-              transactions={transactions}
-              lang={lang}
-              onViewTransactions={(period, currency) => navigateTab('transactions', { period, currency })}
-              onViewAccounts={() => navigateTab('accounts')}
-              userId={authUser?.uid}
-            />
+            {/* Main financial input and its four actions stay together on all screen sizes. */}
+            <div className="space-y-2 sm:space-y-2.5">
+              {/* Primary voice and text input */}
+              <VoiceNaturalInput
+                lang={lang}
+                accounts={accounts}
+                categories={categories}
+                userDailyUsage={dailyUsage}
+                userSubscription={userSubscription}
+                subscriptionExpired={currentTrialExpired}
+                onExpiredAttempt={showExpiredNotice}
+                onTransactionDraft={handleTransactionDraft}
+                onFinancialQuery={handleFinancialQuery}
+                onAICorrection={handleAICorrection}
+                onAiEntryUsed={handleAiEntryUsed}
+                onAiQueryUsed={handleAiQueryUsed}
+                onOpenManualAdd={() => handleOpenAddModal('expense')}
+              />
 
-            {/* 3. THE PRIMARY INTERACTION: "اكتب أو قل لي أي عملية..." Large Card */}
-            <VoiceNaturalInput
-              lang={lang}
-              accounts={accounts}
-              categories={categories}
-              userDailyUsage={dailyUsage}
-              userSubscription={userSubscription}
-              subscriptionExpired={currentTrialExpired}
-              onExpiredAttempt={showExpiredNotice}
-              onTransactionDraft={handleTransactionDraft}
-              onFinancialQuery={handleFinancialQuery}
-              onAICorrection={handleAICorrection}
-              onAiEntryUsed={handleAiEntryUsed}
-              onAiQueryUsed={handleAiQueryUsed}
-              onOpenManualAdd={() => handleOpenAddModal('expense')}
-            />
+              {/* Quick expense, income, transfer, and inquiry actions */}
+              <QuickActions 
+                lang={lang} 
+                onOpenAddModal={handleOpenAddModal} 
+                onOpenSearchModal={() => navigateTab('search')}
+              />
+            </div>
 
             {/* AI Financial Query Result Card */}
             {activeFinancialQueryResult && (
@@ -1733,12 +1724,28 @@ export default function App() {
               />
             )}
 
-            {/* 3. 3 Quick Transaction Action Buttons: مصروف, دخل, تحويل */}
-            <QuickActions 
-              lang={lang} 
-              onOpenAddModal={handleOpenAddModal} 
-              onOpenSearchModal={() => navigateTab('search')}
+            {/* Financial overview after the main actions */}
+            <HomeFinancialOverview
+              accounts={accounts}
+              transactions={transactions}
+              lang={lang}
+              onViewTransactions={(period, currency) => navigateTab('transactions', { period, currency })}
+              onViewAccounts={() => navigateTab('accounts')}
+              userId={authUser?.uid}
             />
+
+            {/* Savings offers and exchange-rate widgets follow the financial overview. */}
+            <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-2.5">
+              <button type="button" onClick={openOffers}
+                className="flex min-w-0 flex-col items-center justify-center gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white px-2 py-4 text-center font-extrabold text-emerald-950 shadow-sm transition-colors hover:from-emerald-100 hover:to-emerald-50">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 sm:h-14 sm:w-14">
+                  <ShoppingBag className="h-7 w-7 sm:h-8 sm:w-8" />
+                </span>
+                <span className="text-sm leading-snug sm:text-base">{lang === 'ar' ? 'وفّر مع My Bucket' : 'Save with My Bucket'}</span>
+                <span className="text-[10px] font-semibold text-emerald-700 sm:text-xs">{lang === 'ar' ? 'العروض والخصومات' : 'Offers & discounts'}</span>
+              </button>
+              <ExchangeRatesMini lang={lang} />
+            </div>
 
             {/* 4. "حساباتك" - Money Sources / Accounts Grid */}
             <MoneySources

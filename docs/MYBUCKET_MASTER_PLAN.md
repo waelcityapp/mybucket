@@ -483,3 +483,10 @@ Revision #168 adds start and end date/time inputs to the create-ad preview in th
 - **Do not auto-submit to Gemini or the local analyzer on Finish recording.** Users can first correct recognition errors; the first and only requested interpretation occurs when they explicitly press the inline Send action. This preserves the intended AI-cost protection and avoids re-analysis for mere transcript edits.
 - On successful CREATE_TRANSACTION interpretation, the existing transaction review page opens with editable fields and an explicit save step. Never save transactions automatically; retain existing subscription restrictions and missing-field highlighting.
 - Prevent rapid duplicate Send taps from starting concurrent analyzer calls. A failed analysis may be retried by the user; text entry and financial questions still use the same interpretation pipeline.
+
+## Home page action priority (November 2026)
+
+- On the authenticated My Bucket home page, keep the subscription and user-guide shortcuts directly above the main voice/text financial input and the four quick-action buttons (expense, income, transfer, inquiry).
+- Keep input and its quick actions together with tighter vertical spacing (`space-y-2` on mobile) so the primary task is accessible without scrolling past summaries or promotions.
+- The existing financial query result appears immediately below these actions when present; financial overview follows, then Save with My Bucket and exchange rates, then accounts, reminders, recent transactions and the existing banner.
+- This is a layout-only reorder; preserve component props, callbacks, financial data, trial rules, colors, Arabic RTL/English LTR, and all existing functionality.

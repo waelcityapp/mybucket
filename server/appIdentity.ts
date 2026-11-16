@@ -118,7 +118,7 @@ export async function saveAppIdentity(payload: Record<string, unknown>, uid: str
   } else if (publicId === prior.iconPublicId && typeof prior.iconUrl === 'string') {
     iconFields = { iconUrl: prior.iconUrl, iconPublicId: prior.iconPublicId, iconCloudName: prior.iconCloudName, iconVersion: prior.iconVersion };
   } else {
-    iconFields = await verifiedIcon(publicId, config || cloudinarySettings(), getResource);
+    iconFields = await verifiedIcon(publicId as string, config || cloudinarySettings(), getResource);
   }
   const stored = { ...names, ...iconFields, updatedAt: Date.now(), updatedBy: uid, serverTimestamp: FieldValue.serverTimestamp() };
   await ref.set(stored);

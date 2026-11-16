@@ -4,6 +4,7 @@ import type { Language } from '../../types';
 import { compressAdImage } from '../../utils/adImageCompression';
 import { compressAdVideo } from '../../utils/adVideoCompression';
 import { AdVideoPlayer } from '../AdVideoPlayer';
+import { AdCreativeCard } from '../AdCreativeCard';
 
 const categories = [
   { id: 'banks-finance', ar: 'البنوك والمؤسسات المالية', en: 'Banks & Financial Services' },
@@ -38,6 +39,7 @@ export function CreateOfferPage({ lang, onBack }: Props) {
   const [compressionNotice, setCompressionNotice] = useState(false);
   const imageSelection = useRef(0);
   const [preview, setPreview] = useState(false);
+  const [reviewPreview, setReviewPreview] = useState(false);
   const imageUrl = useMemo(() => image ? URL.createObjectURL(image) : null, [image]);
   useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
   const categoryName = categories.find(item => item.id === category);
@@ -75,14 +77,17 @@ export function CreateOfferPage({ lang, onBack }: Props) {
         {preview ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-4">
             <div className="flex items-center gap-2"><CheckCircle2 className="w-5 h-5 text-emerald-600" /><h2 className="font-extrabold">{ar ? 'معاينة الإعلان قبل الإرسال' : 'Preview before submission'}</h2></div>
-            {imageUrl && (image?.type.startsWith('video/') ? <><p className="text-xs text-slate-500">{ar ? 'تجربة مشاهدة الزائر: 3 مرات يوميًا على هذا المتصفح.' : 'Visitor playback demo: 3 plays per day in this browser.'}</p><AdVideoPlayer src={imageUrl} adId="local-ad-preview-demo" lang={lang} label={ar ? 'معاينة فيديو الإعلان' : 'Advertisement video preview'} className="w-full max-h-56 object-contain bg-slate-50 rounded-xl" /></> : <img src={imageUrl} alt={ar ? 'صورة الإعلان المختارة' : 'Selected ad image'} className="w-full max-h-56 object-contain bg-slate-50 rounded-xl" />)}
-            <div className="flex justify-between text-xs gap-3"><strong>{tier === 'free' ? (ar ? 'إعلان مجاني' : 'Free') : (ar ? 'إعلان مميز' : 'Featured')}</strong><span className="text-slate-500">{ar ? categoryName?.ar : categoryName?.en}</span></div>
-            <h2 className="text-lg font-extrabold break-words">{title}</h2>
-            <p className="text-sm text-slate-700 whitespace-pre-wrap break-words">{description}</p>
-            <p className="text-xs text-slate-600">{ar ? 'المعلن:' : 'Advertiser:'} {merchant}</p>
+            <div className="grid grid-cols-2 gap-2" aria-label={ar ? 'طريقة المعاينة' : 'Preview mode'}>
+              <button type="button" aria-pressed={!reviewPreview} onClick={() => setReviewPreview(false)} className={`rounded-xl border px-3 py-2 text-xs font-bold ${!reviewPreview ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-600'}`}>{ar ? 'شكل الإعلان' : 'Advertisement'}</button>
+              <button type="button" aria-pressed={reviewPreview} onClick={() => setReviewPreview(true)} className={`rounded-xl border px-3 py-2 text-xs font-bold ${reviewPreview ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-600'}`}>{ar ? 'شكل مراجعة الإدارة' : 'Admin review'}</button>
+            </div>
+            {reviewPreview && <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">{ar ? 'تصميم تجريبي لشاشة المراجعة. الموافقة والرفض غير مفعّلين بعد.' : 'Review screen demonstration. Approval and rejection are not enabled yet.'}</p>}
+            {imageUrl && image?.type.startsWith('video/') && <p className="text-xs text-slate-500">{ar ? 'تجربة مشاهدة الزائر: 3 مرات يوميًا على هذا المتصفح.' : 'Visitor playback demo: 3 plays per day in this browser.'}</p>}
+            <AdCreativeCard lang={lang} title={title} description={description} merchant={merchant} contact={contact} category={ar ? categoryName?.ar : categoryName?.en} mediaUrl={imageUrl} mediaType={image?.type.startsWith('video/') ? 'video' : 'image'} videoQuotaId="local-ad-preview-demo" />
+            {reviewPreview && <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-xs font-bold text-emerald-900">{ar ? 'نوع الإعلان:' : 'Advertisement type:'} {tier === 'free' ? (ar ? 'مجاني' : 'Free') : (ar ? 'مميز' : 'Featured')}</div>}
             <p className="text-xs text-slate-600">{ar ? 'بداية العرض:' : 'Starts:'} {new Date(startsAt).toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
             <p className="text-xs text-slate-600">{ar ? 'نهاية العرض:' : 'Ends:'} {new Date(endsAt).toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
-            {contact && <p className="text-xs text-slate-600 break-all">{ar ? 'وسيلة التواصل:' : 'Contact:'} {contact}</p>}
+            {reviewPreview && <div className="grid grid-cols-2 gap-2"><button type="button" disabled className="rounded-xl bg-emerald-100 text-emerald-800 opacity-60 py-2 text-xs font-bold">{ar ? 'موافقة' : 'Approve'}</button><button type="button" disabled className="rounded-xl bg-red-100 text-red-800 opacity-60 py-2 text-xs font-bold">{ar ? 'رفض' : 'Reject'}</button></div>}
             <button type="button" onClick={() => setPreview(false)} className="w-full rounded-xl border border-emerald-600 text-emerald-700 py-3 text-sm font-bold">{ar ? 'تعديل الإعلان' : 'Edit advertisement'}</button>
             <p className="text-center text-xs text-slate-500">{ar ? 'إرسال الإعلان للنشر غير متاح حاليًا' : 'Submission is not yet available'}</p>
           </section>

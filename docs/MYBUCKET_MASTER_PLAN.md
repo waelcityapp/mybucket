@@ -506,3 +506,7 @@ The ad creation page allows selecting and locally preparing an image or a video,
 ## Revision #174 — Clear advertisement date messages
 
 The local advertisement preview now explains separately when the end date is not after the start date and when the end date has already passed. Date validation behavior is unchanged; no advertisement storage or publication is enabled.
+
+## Revision #175 — Advertising creative and review design preview
+
+The advertiser preview uses a reusable creative card intended for both future public rendering and administrator review. A labelled design demonstration switches between the creative and an administrator review layout using that same card, with the free/featured type and disabled approval/rejection controls outside it. This is groundwork only: administrator review, real public ads, secure upload and publishing are not yet connected. Do not claim visual parity is verified until the same card is actually wired into both public and reviewer views. Cloudinary image-upload server groundwork remains local and is not part of this revision.

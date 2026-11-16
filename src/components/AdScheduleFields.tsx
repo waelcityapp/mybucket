@@ -19,7 +19,6 @@ export function AdScheduleFields({ id, lang, value, onChange }: Props) {
   const selectedDate = adScheduleDate(value);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<AdScheduleValue>(value);
-  const [firstSelection, setFirstSelection] = useState(!selectedDate);
   const [pickerError, setPickerError] = useState(false);
 
   const field = 'w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500';
@@ -27,8 +26,22 @@ export function AdScheduleFields({ id, lang, value, onChange }: Props) {
 
   const openPicker = () => {
     if (open) { setOpen(false); return; }
-    setDraft(value);
-    setFirstSelection(!adScheduleDate(value));
+    // Capture the user's device-local date and time at the exact moment
+    // the calendar is opened. Previously confirmed dates are preserved.
+    if (adScheduleDate(value)) {
+      setDraft(value);
+    } else {
+      const now = new Date();
+      const hour = now.getHours();
+      setDraft({
+        day: String(now.getDate()),
+        month: String(now.getMonth() + 1),
+        year: String(now.getFullYear()),
+        hour: String(hour % 12 || 12),
+        minute: String(now.getMinutes()).padStart(2, '0'),
+        period: hour < 12 ? 'am' : 'pm',
+      });
+    }
     setPickerError(false);
     setOpen(true);
   };
@@ -43,13 +56,6 @@ export function AdScheduleFields({ id, lang, value, onChange }: Props) {
     const next = { ...draft, ...change };
     setDraft(next);
     setPickerError(false);
-    // New selections collapse as soon as all six parts form a real date/time.
-    // Editing a completed selection waits for confirmation so one edit cannot
-    // unexpectedly close the picker before the user finishes other changes.
-    if (firstSelection && adScheduleDate(next)) {
-      onChange(next);
-      setOpen(false);
-    }
   };
 
   const confirm = () => {

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
-import { validateIdentityNames, signBrandIconUpload, buildIdentityIconUrl } from '../server/appIdentity.ts';
+import { validateIdentityNames, signBrandIconUpload, buildIdentityIconUrl, saveAppIdentity } from '../server/appIdentity.ts';
 
 const config = { cloudName: 'mybucket-test', apiKey: 'public-key', apiSecret: 'server-only-secret' };
 const uuid = 'b38bb5fa-4395-4aac-8eaa-66693675f8d9';
@@ -36,4 +36,11 @@ test('icon resize links stay on the dedicated Cloudinary environment', () => {
   assert.equal(url, 'https://res.cloudinary.com/mybucket-test/image/upload/c_pad,b_transparent,w_512,h_512,f_png/v1731/mybucket/branding/icons/' + uuid + '.png');
   assert.throws(() => buildIdentityIconUrl('cityeve/other', 'mybucket/branding/icons/' + uuid, 1731, 512));
   assert.throws(() => buildIdentityIconUrl(config.cloudName, 'cityeve/branding/icons/' + uuid, 1731, 512));
+});
+
+test('gateway owner enforcement prevents an invalid admin UID before Firestore access', async () => {
+  await assert.rejects(() => saveAppIdentity({ appNameAr: 'My Bucket', appNameEn: 'My Bucket', iconPublicId: null }, ''), /admin_only/);
+});
+test('identity save rejects untrusted and cross-app image references before Firestore access', async () => {
+  await assert.rejects(() => saveAppIdentity({ appNameAr: 'My Bucket', appNameEn: 'My Bucket', iconPublicId: 'cityeve/icons/abc' }, 'valid-uid'), /invalid_identity_icon/);
 });

@@ -502,3 +502,7 @@ Revision #168 adds start and end date/time inputs to the create-ad preview in th
 ## Revision #173 — Local ad media preview
 
 The ad creation page allows selecting and locally preparing an image or a video, rejects video longer than one minute before compression, and supports local playback preview without autoplay. A clearly labelled visitor-playback demonstration on the preview uses a browser-local three-start daily counter in Cairo time; it pauses off-screen or when the page is hidden and does not resume automatically. This demo counter is shared by previews in the same browser and is not an account-based or tamper-proof limit. Browser limitations may prevent video compression; in that case the original file is used for local preview only. Image and video size limits in this prototype are 5 MiB and 25 MiB respectively, subject to future product review. No Cloudinary upload, progress, Firebase write, ad submission, approval, public ad feed, or payment is activated. The separate upload and account-counter foundations remain unshipped, pending security review and owner-approved rollout.
+
+## Revision #174 — Clear advertisement date messages
+
+The local advertisement preview now explains separately when the end date is not after the start date and when the end date has already passed. Date validation behavior is unchanged; no advertisement storage or publication is enabled.

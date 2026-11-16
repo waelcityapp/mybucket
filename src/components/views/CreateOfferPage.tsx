@@ -31,7 +31,7 @@ export function CreateOfferPage({ lang, onBack }: Props) {
   const [contact, setContact] = useState('');
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
-  const [dateError, setDateError] = useState(false);
+  const [dateError, setDateError] = useState<'order' | 'past' | null>(null);
   const [image, setImage] = useState<File | null>(null);
   const [imageStatus, setImageStatus] = useState<'idle' | 'compressing' | 'ready' | 'error'>('idle');
   const [mediaError, setMediaError] = useState<'generic' | 'video_too_long' | 'video_too_large'>('generic');
@@ -44,10 +44,9 @@ export function CreateOfferPage({ lang, onBack }: Props) {
   const handleReview = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const start = Date.parse(startsAt), end = Date.parse(endsAt);
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || end <= Date.now()) {
-      setDateError(true); return;
-    }
-    setDateError(false);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) { setDateError('order'); return; }
+    if (end <= Date.now()) { setDateError('past'); return; }
+    setDateError(null);
     if (title.trim() && description.trim() && category && merchant.trim()) setPreview(true);
   };
   const label = 'block text-xs font-extrabold text-slate-700 mb-1.5';
@@ -126,12 +125,12 @@ export function CreateOfferPage({ lang, onBack }: Props) {
               <h2 className="font-extrabold text-sm">{ar ? '3. مدة العرض' : '3. Advertisement schedule'}</h2>
               <p className="text-xs text-slate-500">{ar ? 'المواعيد حسب توقيت جهازك. الإعلان لا يظهر إلا بعد موافقة الإدارة.' : 'Times use your device time zone. The advertisement appears only after admin approval.'}</p>
               <div><label htmlFor="offer-start" className={label}>{ar ? 'بداية العرض' : 'Start'}</label>
-                <input id="offer-start" type="datetime-local" required value={startsAt} onChange={event => { setStartsAt(event.target.value); setDateError(false); }} className={field} />
+                <input id="offer-start" type="datetime-local" required value={startsAt} onChange={event => { setStartsAt(event.target.value); setDateError(null); }} className={field} />
               </div>
               <div><label htmlFor="offer-end" className={label}>{ar ? 'نهاية العرض' : 'End'}</label>
-                <input id="offer-end" type="datetime-local" required value={endsAt} onChange={event => { setEndsAt(event.target.value); setDateError(false); }} className={field} />
+                <input id="offer-end" type="datetime-local" required value={endsAt} onChange={event => { setEndsAt(event.target.value); setDateError(null); }} className={field} />
               </div>
-              {dateError && <p role="alert" className="text-xs font-bold text-red-700">{ar ? 'اختار نهاية بعد البداية ولسه مجتش.' : 'Choose an end after the start and in the future.'}</p>}
+              {dateError && <p role="alert" className="text-xs font-bold text-red-700">{dateError === 'order' ? (ar ? 'يجب أن يكون موعد نهاية الإعلان بعد موعد بدايته.' : 'The advertisement end must be after its start.') : (ar ? 'موعد نهاية الإعلان قد مضى. يرجى اختيار موعد في المستقبل.' : 'The advertisement end has passed. Please choose a future date and time.')}</p>}
             </section>
             <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
               <label htmlFor="offer-image" className="flex items-center gap-2 font-extrabold text-sm"><ImagePlus className="w-5 h-5 text-emerald-700" />{ar ? '4. صورة أو فيديو الإعلان (اختياري)' : '4. Advertisement image or video (optional)'}</label>

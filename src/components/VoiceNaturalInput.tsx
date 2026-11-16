@@ -72,6 +72,8 @@ export function VoiceNaturalInput({
   const [speechError, setSpeechError] = useState<string | null>(null);
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  // Synchronous guard: rapid taps must not start multiple analyzer requests.
+  const processingRequestRef = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const recordingActiveRef = useRef(false);
   const segmentBaseRef = useRef('');
@@ -134,6 +136,8 @@ export function VoiceNaturalInput({
       return;
     }
 
+    if (processingRequestRef.current) return;
+    processingRequestRef.current = true;
     setIsProcessingAI(true);
     setStatusMessage(isAr ? 'جاري فهم كلامك وتجهيز البيانات...' : 'Understanding your request and preparing details...');
 
@@ -223,8 +227,13 @@ export function VoiceNaturalInput({
       );
       setTimeout(() => setStatusMessage(null), 4000);
     } finally {
+      processingRequestRef.current = false;
       setIsProcessingAI(false);
-      if (analyzed) setInputText('');
+      if (analyzed) {
+        setInputText('');
+        segmentBaseRef.current = '';
+        latestSegmentRef.current = '';
+      }
     }
   };
 
@@ -364,7 +373,7 @@ export function VoiceNaturalInput({
       finishVoiceRecording();
       return;
     }
-    if (!inputText.trim() || isProcessingAI) return;
+    if (!inputText.trim() || isProcessingAI || processingRequestRef.current) return;
     setPendingVoiceReview(false);
     void processInputWithAI(inputText, pendingVoiceReview ? 'voice' : 'text', segmentBaseRef.current);
   };
@@ -421,6 +430,13 @@ export function VoiceNaturalInput({
                 <Sparkles className="w-3 h-3 animate-spin text-indigo-500 inline-block" />
                 {isAr ? 'جاري تجهيز طلبك...' : 'Preparing your request...'}
               </span>
+            ) : pendingVoiceReview ? (
+              <span className="flex items-center gap-1 text-emerald-700 font-semibold">
+                <Sparkles className="w-3 h-3 shrink-0" />
+                {isAr
+                  ? 'عدّل النص لو محتاج، ثم اضغط سهم الإرسال لتحليله مرة واحدة وفتح حقول العملية.'
+                  : 'Edit the transcript if needed, then tap Send to analyze once and review the fields.'}
+              </span>
             ) : (
               <span className="flex items-center gap-1 text-slate-400">
                 <Sparkles className="w-3 h-3 text-emerald-500" />
@@ -436,11 +452,12 @@ export function VoiceNaturalInput({
 
         {/* Right Side: Action Buttons */}
         <div className="flex items-start gap-2 shrink-0 self-start">
-          {inputText.trim().length > 0 && !isProcessingAI && !pendingVoiceReview && !isRecording && (
+          {inputText.trim().length > 0 && !isProcessingAI && !isRecording && (
             <button
               type="submit"
               className="w-10 h-10 rounded-full bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center transition-transform active:scale-95 cursor-pointer shadow-xs"
-              title={isAr ? 'إرسال' : 'Send'}
+              aria-label={pendingVoiceReview ? (isAr ? 'تحليل النص بعد مراجعته' : 'Analyze reviewed transcript') : (isAr ? 'إرسال' : 'Send')}
+              title={pendingVoiceReview ? (isAr ? 'تحليل النص بعد مراجعته' : 'Analyze reviewed transcript') : (isAr ? 'إرسال' : 'Send')}
             >
               <Send className="w-4 h-4" />
             </button>
@@ -477,24 +494,6 @@ export function VoiceNaturalInput({
           </div>
         </div>
       </form>
-
-      {pendingVoiceReview && !isRecording && !isProcessingAI && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 sm:p-4 space-y-3">
-          <p className="text-sm font-bold text-emerald-900">
-            {isAr ? 'راجع الكلام المكتوب بالأعلى، ويمكنك تعديله قبل الإرسال.' : 'Review the transcript above and edit it before sending.'}
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <button type="button" disabled={!inputText.trim()} onClick={() => { const text = inputText.trim(); if (!text) return; setPendingVoiceReview(false); void processInputWithAI(text, 'voice', segmentBaseRef.current); }}
-              className="rounded-xl bg-emerald-600 px-3 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
-              {isAr ? 'إرسال للمراجعة والتأكيد' : 'Send for review and confirmation'}
-            </button>
-            <button type="button" onClick={() => { setPendingVoiceReview(false); setInputText(''); segmentBaseRef.current = ''; latestSegmentRef.current = ''; setStatusMessage(null); }}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-              {isAr ? 'إلغاء' : 'Cancel'}
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Clarification or Status Banner */}
       {statusMessage && (

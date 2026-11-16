@@ -25,6 +25,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const authorization = Array.isArray(authorizationHeader)
       ? authorizationHeader[0] || ''
       : authorizationHeader || '';
+    // Public read-only branding is safe before Google sign-in and uses the existing gateway.
+    if (req.body?.action === 'app.identity.get') {
+      const { getAppIdentity } = await import('../server/appIdentity.js');
+      return res.status(200).json({ ok: true, data: await getAppIdentity() });
+    }
     const user = await verifyAuthenticatedUser({
       header: (name: string) => name.toLowerCase() === 'authorization' ? authorization : undefined,
     } as unknown as Request);
@@ -34,6 +39,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (typeof action !== 'string') {
       return res.status(400).json({ ok: false, error: 'invalid_gateway_action', message: 'A valid gateway action is required.' });
+    }
+
+    if (action === 'admin.identity.signUpload' || action === 'admin.identity.save') {
+      if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+      const { signBrandIconUpload, saveAppIdentity } = await import('../server/appIdentity.js');
+      const data = action === 'admin.identity.signUpload' ? signBrandIconUpload(payload) : await saveAppIdentity(payload, user.uid);
+      return res.status(200).json({ ok: true, data });
     }
 
     if (action === 'admin.ads.testUploadSign' || action === 'admin.ads.testUploadConfirm') {

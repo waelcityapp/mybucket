@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Globe, Smartphone, Cloud, LogOut, Check, ChevronDown, Edit2, X, ShieldCheck } from 'lucide-react';
 import { Language, AuthUser } from '../types';
 import { translations } from '../data/translations';
+import type { AppIdentity } from '../services/appIdentityClient';
 
 interface HeaderProps {
   lang: Language;
@@ -12,6 +13,7 @@ interface HeaderProps {
   onOpenMobileLink: () => void;
   onOpenAdmin?: () => void;
   onUpdateUserName?: (newName: string) => Promise<void>;
+  identity: AppIdentity;
 }
 
 export function Header({
@@ -23,6 +25,7 @@ export function Header({
   onOpenMobileLink,
   onOpenAdmin,
   onUpdateUserName,
+  identity,
 }: HeaderProps) {
   const t = translations[lang];
   const isAr = lang === 'ar';
@@ -77,23 +80,20 @@ export function Header({
         {/* Center: Bucket Logo + Brand Title + Subtitle */}
         <div className="flex min-w-0 flex-col items-start justify-center text-start">
           <div className="flex items-center gap-1.5">
-            {/* Minimalist Green Bucket Icon */}
-            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-xs">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="w-3.5 h-3.5 sm:w-4 sm:h-4"
-              >
-                <path d="M5 9h14l-1.5 11h-11L5 9z" />
-                <path d="M8 9V6a4 4 0 0 1 8 0v3" />
-              </svg>
+            {/* Cloudinary identity icon when configured; preserve original bucket as default. */}
+            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-xs overflow-hidden shrink-0">
+              {identity.icon192Url ? (
+                <img src={identity.icon192Url} alt="" className="h-full w-full object-contain" />
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                  strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 sm:w-4 sm:h-4">
+                  <path d="M5 9h14l-1.5 11h-11L5 9z" />
+                  <path d="M8 9V6a4 4 0 0 1 8 0v3" />
+                </svg>
+              )}
             </div>
             <span className="min-w-0 truncate font-extrabold text-slate-900 text-sm sm:text-lg leading-none">
-              {t.appName}
+              {lang === 'ar' ? identity.appNameAr : identity.appNameEn}
             </span>
           </div>
           <span className="hidden min-[360px]:block text-[9px] sm:text-[10px] text-slate-400 font-medium mt-0.5">

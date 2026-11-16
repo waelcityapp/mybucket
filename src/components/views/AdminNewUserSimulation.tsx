@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Banknote, CircleHelp, PlayCircle, RotateCcw, Shi
 import type { FinancialAccount, Language, Transaction } from '../../types';
 import { INITIAL_CATEGORIES } from '../../data/initialData';
 import { AuthPage } from './AuthPage';
+import type { AppIdentity } from '../../services/appIdentityClient';
 import { InitialSetupView } from './InitialSetupView';
 import { HomeFinancialOverview } from '../HomeFinancialOverview';
 import { RecentTransactions } from '../RecentTransactions';
@@ -43,9 +44,10 @@ interface Props {
   realOnboarding?: boolean;
   onStartReal?: () => void;
   trialDaysRemaining?: number | null;
+  identity?: AppIdentity;
 }
 
-export function AdminNewUserSimulation({ lang, onExit, realOnboarding = false, onStartReal, trialDaysRemaining }: Props) {
+export function AdminNewUserSimulation({ lang, onExit, realOnboarding = false, onStartReal, trialDaysRemaining, identity }: Props) {
   const ar = lang === 'ar';
   const [stage, setStage] = useState<Stage>(() => realOnboarding ? 'dashboard' : 'login');
   const [page, setPage] = useState<DashboardPage>('overview');
@@ -146,7 +148,7 @@ export function AdminNewUserSimulation({ lang, onExit, realOnboarding = false, o
       </div>}
 
       {stage === 'login' && (
-        <AuthPage lang={lang} simulation onSimulatedSignIn={() => setStage('dashboard')}
+        <AuthPage lang={lang} identity={identity} simulation onSimulatedSignIn={() => setStage('dashboard')}
           onSuccess={async () => {}} onOpenOffers={() => setStage('offers')} />
       )}
 

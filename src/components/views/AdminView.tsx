@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   ArrowLeft, ArrowRight, CheckCircle2, Database, RotateCcw, ShieldCheck,
   MessageSquareText, Users, CreditCard, Megaphone, BrainCircuit, Settings2,
-  ChevronUp, Clock3, PanelsTopLeft, PlayCircle,
+  ChevronUp, Clock3, PanelsTopLeft, PlayCircle, Palette,
 } from 'lucide-react';
 import type { AuthUser, Language } from '../../types';
 import { translations } from '../../data/translations';
@@ -25,7 +25,7 @@ interface AdminViewProps {
   onOpenNewUserSimulation: () => void;
 }
 
-export type SectionId = 'users' | 'subscriptions' | 'marketers' | 'reports' | 'ai' | 'system' | 'ads';
+export type SectionId = 'users' | 'subscriptions' | 'marketers' | 'reports' | 'ai' | 'system' | 'ads' | 'branding';
 
 export function AdminView({
   lang, user, onBack, onResetDemoData, onZeroAllBalances, onOpenFeedbackAdmin,
@@ -43,6 +43,7 @@ export function AdminView({
     { id: 'ads' as const, icon: PanelsTopLeft, title: ar ? 'إدارة الإعلانات' : 'Ads management', desc: ar ? 'الإعلانات والعروض المنشورة' : 'Published ads and offers', ready: false },
     { id: 'reports' as const, icon: MessageSquareText, title: ar ? 'البلاغات' : 'Reports', desc: ar ? 'تقييمات المحلل المحلي والتحكم فيها' : 'Local analyzer feedback and controls', ready: true },
     { id: 'ai' as const, icon: BrainCircuit, title: ar ? 'الذكاء الاصطناعي' : 'Artificial intelligence', desc: ar ? 'Gemini والاستهلاك واختيار النموذج' : 'Gemini, usage and model selection', ready: true },
+    { id: 'branding' as const, icon: Palette, title: ar ? 'التحكم في هوية التطبيق' : 'App identity', desc: ar ? 'تغيير الاسم والأيقونة عبر Cloudinary' : 'Edit the name and Cloudinary icon', ready: true },
     { id: 'system' as const, icon: Settings2, title: ar ? 'إعدادات النظام' : 'System settings', desc: ar ? 'التشخيص والأدوات الحالية' : 'Diagnostics and existing tools', ready: true },
   ];
 

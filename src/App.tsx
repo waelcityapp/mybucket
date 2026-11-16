@@ -25,6 +25,8 @@ import { CreateOfferPage } from './components/views/CreateOfferPage';
 import { AdSignInGate } from './components/views/AdSignInGate';
 import { translations } from './data/translations';
 import { Header } from './components/Header';
+import { AdminAppIdentityView } from './components/views/AdminAppIdentityView';
+import { DEFAULT_APP_IDENTITY, applyAppIdentity, identityRequest, type AppIdentity } from './services/appIdentityClient';
 import { VoiceNaturalInput } from './components/VoiceNaturalInput';
 import type { AnalyzerFeedbackContext } from './services/ai/analyzerFeedbackClient';
 import { APP_REVISION } from './config/appRevision';
@@ -242,6 +244,17 @@ export default function App() {
   });
 
   // 2. Active Tab State
+  const [appIdentity, setAppIdentity] = useState<AppIdentity>(DEFAULT_APP_IDENTITY);
+  const [identityReady, setIdentityReady] = useState(false);
+  useEffect(() => {
+    let active = true;
+    identityRequest<AppIdentity>('app.identity.get').then(identity => {
+      if (active) { setAppIdentity(identity); setIdentityReady(true); }
+    }).catch(() => { if (active) setIdentityReady(false); });
+    return () => { active = false; };
+  }, []);
+  useEffect(() => { applyAppIdentity(appIdentity, lang); }, [appIdentity, lang]);
+
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname.startsWith('/admin') ? 'admin-pin' : window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : window.location.pathname.startsWith('/reminders/') ? 'reminders' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : 'home');
   // Keep in-app tab changes in browser history so the device Back button can restore them.
   const [transactionQuickFilter, setTransactionQuickFilter] = useState<{ period: 'today' | 'month'; currency: string } | null>(null);
@@ -393,7 +406,7 @@ export default function App() {
     if (!isAdmin || pin !== '2233') return false;
     setAdminPinVerified(true);
     const currentPath = window.location.pathname;
-    const safeTarget = /^\/admin\/(users|subscriptions|marketers|ads|ai|system|simulate-new-user)$/.test(currentPath) || /^\/admin\/users\/[A-Za-z0-9_-]{1,128}\/grant$/.test(currentPath) ? currentPath : '/admin';
+    const safeTarget = /^\/admin\/(users|subscriptions|marketers|ads|ai|system|branding|simulate-new-user)$/.test(currentPath) || /^\/admin\/users\/[A-Za-z0-9_-]{1,128}\/grant$/.test(currentPath) ? currentPath : '/admin';
     window.history.replaceState({ myBucketTab: 'admin' }, '', safeTarget);
     setAdminRoute(safeTarget);
     setActiveTab('admin');
@@ -411,7 +424,7 @@ export default function App() {
   }, [adminPinVerified]);
 
   const adminSectionFromPath = (): SectionId | null => {
-    const section = adminRoute.match(/^\/admin\/(users|subscriptions|marketers|ads|ai|system)(?:\/new)?$/)?.[1];
+    const section = adminRoute.match(/^\/admin\/(users|subscriptions|marketers|ads|ai|system|branding)(?:\/new)?$/)?.[1];
     return section ? section as SectionId : null;
   };
   const openAdminSection = (section: SectionId) => {
@@ -1439,6 +1452,7 @@ export default function App() {
     return (
       <AuthPage
         lang={lang}
+        identity={appIdentity}
         onSuccess={handleAuthGateSuccess}
         onToggleLanguage={handleToggleLanguage}
         onOpenOffers={openOffers}
@@ -1447,7 +1461,7 @@ export default function App() {
   }
 
   if (isAdmin && adminPinVerified && activeTab === 'admin' && adminRoute === '/admin/simulate-new-user') {
-    return <AdminNewUserSimulation lang={lang} onExit={backToAdminSections} />;
+    return <AdminNewUserSimulation lang={lang} identity={appIdentity} onExit={backToAdminSections} />;
   }
 
   if (activeTab === 'guide') {
@@ -1557,6 +1571,7 @@ export default function App() {
       <Header
         lang={lang}
         onToggleLanguage={handleToggleLanguage}
+        identity={appIdentity}
         user={authUser}
         onLogin={handleGoogleLogin}
         onLogout={handleGoogleLogout}
@@ -1884,6 +1899,8 @@ export default function App() {
         {activeTab === 'admin' && isAdmin && adminPinVerified && authUser && (
           adminRoute === '/admin/analyzer-feedback'
             ? <AnalyzerFeedbackAdmin lang={lang} onBack={closeFeedbackAdmin} />
+            : adminRoute === '/admin/branding'
+            ? <AdminAppIdentityView lang={lang} identity={appIdentity} identityReady={identityReady} onSaved={(updated) => setAppIdentity(updated)} onBack={backToAdminSections} />
             : /^\/admin\/users\/[A-Za-z0-9_-]{1,128}\/grant$/.test(adminRoute)
             ? <AdminUserGrantView uid={adminRoute.split('/')[3]} lang={lang} onBack={() => openAdminSection('users')} />
             : <AdminView lang={lang} user={authUser} onBack={() => navigateTab('home')} onResetDemoData={handleResetDemoData} onZeroAllBalances={handleZeroAllBalances} onOpenFeedbackAdmin={openFeedbackAdmin} sectionId={adminSectionFromPath()} onOpenSection={openAdminSection} onBackToSections={backToAdminSections} onOpenGrant={openUserGrant} onOpenNewUserSimulation={openNewUserSimulation} />

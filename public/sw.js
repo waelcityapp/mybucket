@@ -18,6 +18,15 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin || !STATIC_ICONS.includes(url.pathname)) return;
+  if (url.origin !== self.location.origin) return;
+  // Keep a stable manifest URL so installed PWA identity remains the same.
+  // Public identity is written to this cache by the signed-in or guest app UI.
+  if (url.pathname === '/manifest.webmanifest') {
+    event.respondWith(caches.open('mybucket-pwa-branding-v1')
+      .then(cache => cache.match('/manifest.webmanifest'))
+      .then(cached => cached || fetch(event.request)));
+    return;
+  }
+  if (!STATIC_ICONS.includes(url.pathname)) return;
   event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request)));
 });

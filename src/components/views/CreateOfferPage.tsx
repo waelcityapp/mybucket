@@ -5,6 +5,8 @@ import { compressAdImage } from '../../utils/adImageCompression';
 import { compressAdVideo } from '../../utils/adVideoCompression';
 import { AdVideoPlayer } from '../AdVideoPlayer';
 import { AdCreativeCard } from '../AdCreativeCard';
+import { auth } from '../../lib/firebase';
+import { uploadAdMedia, type SignedAdUpload, type UploadedAdMedia } from '../../services/adMediaUpload';
 
 const categories = [
   { id: 'banks-finance', ar: 'البنوك والمؤسسات المالية', en: 'Banks & Financial Services' },
@@ -37,12 +39,49 @@ export function CreateOfferPage({ lang, onBack }: Props) {
   const [imageStatus, setImageStatus] = useState<'idle' | 'compressing' | 'ready' | 'error'>('idle');
   const [mediaError, setMediaError] = useState<'generic' | 'video_too_long' | 'video_too_large'>('generic');
   const [compressionNotice, setCompressionNotice] = useState(false);
+  const [uploadState, setUploadState] = useState<'idle' | 'uploading' | 'verifying' | 'success' | 'error'>('idle');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState('');
+  const [pendingUpload, setPendingUpload] = useState<UploadedAdMedia | null>(null);
+  const [verifiedUpload, setVerifiedUpload] = useState<{ secureUrl: string; publicId: string } | null>(null);
   const imageSelection = useRef(0);
   const [preview, setPreview] = useState(false);
   const [reviewPreview, setReviewPreview] = useState(false);
   const imageUrl = useMemo(() => image ? URL.createObjectURL(image) : null, [image]);
   useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
   const categoryName = categories.find(item => item.id === category);
+  const isAdmin = auth.currentUser?.email?.trim().toLowerCase() === 'waelvts@gmail.com';
+  const uploadTest = async () => {
+    const user = auth.currentUser;
+    if (!image || !user || user.email?.trim().toLowerCase() !== 'waelvts@gmail.com' || uploadState === 'uploading' || uploadState === 'verifying') return;
+    const gateway = async (action: string, payload: Record<string, unknown>) => {
+      const response = await fetch('/api/gateway', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + await user.getIdToken() }, body: JSON.stringify({ action, payload }) });
+      const result = await response.json();
+      if (!response.ok || !result?.ok) throw new Error(typeof result?.error === 'string' ? result.error : 'upload_failed');
+      return result.data;
+    };
+    setUploadState('uploading'); setUploadProgress(0); setUploadError('');
+    try {
+      let uploaded = pendingUpload;
+      if (!uploaded) {
+        const resourceType = image.type.startsWith('video/') ? 'video' : 'image';
+        const signed = await gateway('admin.ads.testUploadSign', { resourceType, bytes: image.size }) as SignedAdUpload;
+        uploaded = await uploadAdMedia(image, signed, setUploadProgress);
+        setPendingUpload(uploaded);
+      }
+      setUploadState('verifying');
+      const data = await gateway('admin.ads.testUploadConfirm', { publicId: uploaded.publicId, resourceType: uploaded.resourceType, version: uploaded.version, responseSignature: uploaded.responseSignature });
+      if (typeof data?.secureUrl !== 'string' || data?.publicId !== uploaded.publicId) throw new Error('upload_failed');
+      setVerifiedUpload({ secureUrl: data.secureUrl, publicId: data.publicId });
+      setUploadState('success');
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      setUploadError(code === 'ad_upload_not_configured'
+        ? (ar ? 'إعدادات Cloudinary غير مكتملة على الخادم.' : 'Cloudinary server configuration is incomplete.')
+        : (ar ? 'تعذر الرفع أو التأكد منه. حاول مرة أخرى.' : 'Upload or verification failed. Please try again.'));
+      setUploadState('error');
+    }
+  };
   const handleReview = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const start = Date.parse(startsAt), end = Date.parse(endsAt);
@@ -139,10 +178,10 @@ export function CreateOfferPage({ lang, onBack }: Props) {
             </section>
             <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
               <label htmlFor="offer-image" className="flex items-center gap-2 font-extrabold text-sm"><ImagePlus className="w-5 h-5 text-emerald-700" />{ar ? '4. صورة أو فيديو الإعلان (اختياري)' : '4. Advertisement image or video (optional)'}</label>
-              <input id="offer-image" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime" onChange={async event => {
+              <input id="offer-image" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime" disabled={uploadState === 'uploading' || uploadState === 'verifying'} onChange={async event => {
                 const next = event.target.files?.[0] ?? null;
                 const selection = ++imageSelection.current;
-                setImage(null); setMediaError('generic'); setCompressionNotice(false);
+                setImage(null); setMediaError('generic'); setCompressionNotice(false); setUploadState('idle'); setUploadError(''); setPendingUpload(null); setVerifiedUpload(null);
                 if (!next) { setImageStatus('idle'); return; }
                 const isVideo = next.type.startsWith('video/');
                 if ((!isVideo && next.size > 5 * 1024 * 1024) || !['image/png', 'image/jpeg', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime'].includes(next.type)) { setImageStatus('error'); return; }
@@ -165,6 +204,15 @@ export function CreateOfferPage({ lang, onBack }: Props) {
               {compressionNotice && <p className="text-xs text-amber-800">{ar ? 'المتصفح لا يدعم ضغط الفيديو؛ المعاينة تستخدم الملف الأصلي على جهازك.' : 'This browser cannot compress video; the local preview uses the original file.'}</p>}
               {imageStatus === 'error' && <p role="alert" className="text-xs text-red-700">{mediaError === 'video_too_long' ? (ar ? 'مدة الفيديو أكتر من دقيقة. اختار فيديو مدته دقيقة أو أقل.' : 'The video is longer than one minute. Choose a video of one minute or less.') : mediaError === 'video_too_large' ? (ar ? 'حجم الفيديو أكبر من 25 ميجابايت. اختار ملفًا أصغر.' : 'The video exceeds 25 MB. Choose a smaller file.') : (ar ? 'تعذر تجهيز الملف. تأكد من الحجم ونوع الملف ودعم المتصفح.' : 'Could not prepare the file. Check its size, type and browser support.')}</p>}
               {imageUrl && (image?.type.startsWith('video/') ? <AdVideoPlayer src={imageUrl} label={ar ? 'معاينة فيديو الإعلان' : 'Advertisement video preview'} className="w-full max-h-48 object-contain rounded-xl bg-slate-50" /> : <img src={imageUrl} alt={ar ? 'معاينة الصورة' : 'Image preview'} className="w-full max-h-48 object-contain rounded-xl bg-slate-50" />)}
+              {isAdmin && image && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 space-y-3">
+                <p className="text-xs font-bold text-emerald-900">{ar ? 'اختبار رفع للإدارة فقط' : 'Admin-only upload test'}</p>
+                <p className="text-xs leading-relaxed text-emerald-800">{ar ? 'يرفع الملف فعليًا إلى Cloudinary. لن يُحفظ الإعلان في Firebase أو يُرسل للمراجعة بعد، والملف التجريبي سيبقى في Cloudinary.' : 'Uploads the file to Cloudinary. The ad is not yet saved to Firebase or submitted for review; the test file remains in Cloudinary.'}</p>
+                {uploadState !== 'success' && <button type="button" onClick={() => void uploadTest()} disabled={uploadState === 'uploading' || uploadState === 'verifying'} className="w-full rounded-xl bg-emerald-700 px-3 py-2 text-sm font-bold text-white disabled:opacity-50">{pendingUpload ? (ar ? 'إعادة التأكد من الرفع' : 'Retry verification') : (ar ? 'رفع تجريبي إلى Cloudinary' : 'Test upload to Cloudinary')}</button>}
+                {uploadState === 'uploading' && <div role="status" className="text-xs text-emerald-900">{ar ? 'جاري رفع الملف' : 'Uploading file'}: {uploadProgress}%<progress max={100} value={uploadProgress} className="mt-2 block w-full" /></div>}
+                {uploadState === 'verifying' && <p role="status" className="text-xs text-emerald-900">{ar ? 'اكتمل إرسال الملف، جاري التأكد منه...' : 'File sent; verifying...'}</p>}
+                {uploadState === 'success' && verifiedUpload && <div role="status" className="space-y-2 text-xs text-emerald-900"><p className="font-bold">{ar ? 'تم الرفع والتأكد من الملف بنجاح.' : 'Upload and verification succeeded.'}</p><label className="block">{ar ? 'رابط الملف المحمي:' : 'Protected file URL:'}<input readOnly value={verifiedUpload.secureUrl} dir="ltr" className="mt-1 w-full rounded-lg border border-emerald-200 bg-white p-2 text-xs" /></label><p className="break-all" dir="ltr">{verifiedUpload.publicId}</p></div>}
+                {uploadError && <p role="alert" className="text-xs text-red-700">{uploadError}</p>}
+              </div>}
 
             </section>
             <button type="submit" disabled={imageStatus === 'compressing'} className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold py-3 flex justify-center items-center gap-2"><Megaphone className="w-5 h-5" />{ar ? 'مراجعة الإعلان' : 'Review advertisement'}</button>

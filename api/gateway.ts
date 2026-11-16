@@ -36,6 +36,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ ok: false, error: 'invalid_gateway_action', message: 'A valid gateway action is required.' });
     }
 
+    if (action === 'admin.ads.testUploadSign' || action === 'admin.ads.testUploadConfirm') {
+      if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+      const { signAdminAdTestUpload, confirmAdminAdTestUpload } = await import('../server/adminAdTestUpload.js');
+      const data = action === 'admin.ads.testUploadSign' ? signAdminAdTestUpload(user.uid, payload) : await confirmAdminAdTestUpload(user.uid, payload);
+      return res.status(200).json({ ok: true, data });
+    }
+
     // Vercel production uses this serverless gateway, not the Express server.ts route.
     if (action === 'appLock.status' || action === 'appLock.enable' || action === 'appLock.verify' || action === 'appLock.disable' || action === 'appLock.change' || action === 'appLock.timeout' || action === 'appLock.toggle') {
       const { appLockAction } = await import('../server/appLock.js');

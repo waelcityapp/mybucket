@@ -40,6 +40,13 @@ async function startServer() {
         return res.status(400).json({ ok: false, error: 'invalid_gateway_action', message: 'A valid gateway action is required.' });
       }
 
+      if (action === 'admin.ads.testUploadSign' || action === 'admin.ads.testUploadConfirm') {
+        if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+        const { signAdminAdTestUpload, confirmAdminAdTestUpload } = await import('./server/adminAdTestUpload.js');
+        const data = action === 'admin.ads.testUploadSign' ? signAdminAdTestUpload(user.uid, payload) : await confirmAdminAdTestUpload(user.uid, payload);
+        return res.json({ ok: true, data });
+      }
+
       if (action === 'appLock.status' || action === 'appLock.enable' || action === 'appLock.verify' || action === 'appLock.disable' || action === 'appLock.change' || action === 'appLock.timeout' || action === 'appLock.toggle') {
         const { appLockAction } = await import('./server/appLock');
         return res.json({ ok: true, data: await appLockAction(user.uid, action, payload) });

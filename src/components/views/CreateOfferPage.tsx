@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, ArrowLeft, ImagePlus, Megaphone, CheckCircle2, ShieldAlert } from 'lucide-react';
 import type { Language } from '../../types';
+import { compressAdImage } from '../../utils/adImageCompression';
+import { compressAdVideo } from '../../utils/adVideoCompression';
+import { AdVideoPlayer } from '../AdVideoPlayer';
 
 const categories = [
   { id: 'banks-finance', ar: 'البنوك والمؤسسات المالية', en: 'Banks & Financial Services' },
@@ -30,6 +33,10 @@ export function CreateOfferPage({ lang, onBack }: Props) {
   const [endsAt, setEndsAt] = useState('');
   const [dateError, setDateError] = useState(false);
   const [image, setImage] = useState<File | null>(null);
+  const [imageStatus, setImageStatus] = useState<'idle' | 'compressing' | 'ready' | 'error'>('idle');
+  const [mediaError, setMediaError] = useState<'generic' | 'video_too_long' | 'video_too_large'>('generic');
+  const [compressionNotice, setCompressionNotice] = useState(false);
+  const imageSelection = useRef(0);
   const [preview, setPreview] = useState(false);
   const imageUrl = useMemo(() => image ? URL.createObjectURL(image) : null, [image]);
   useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
@@ -69,7 +76,7 @@ export function CreateOfferPage({ lang, onBack }: Props) {
         {preview ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-4">
             <div className="flex items-center gap-2"><CheckCircle2 className="w-5 h-5 text-emerald-600" /><h2 className="font-extrabold">{ar ? 'معاينة الإعلان قبل الإرسال' : 'Preview before submission'}</h2></div>
-            {imageUrl && <img src={imageUrl} alt={ar ? 'صورة الإعلان المختارة' : 'Selected ad image'} className="w-full max-h-56 object-contain bg-slate-50 rounded-xl" />}
+            {imageUrl && (image?.type.startsWith('video/') ? <><p className="text-xs text-slate-500">{ar ? 'تجربة مشاهدة الزائر: 3 مرات يوميًا على هذا المتصفح.' : 'Visitor playback demo: 3 plays per day in this browser.'}</p><AdVideoPlayer src={imageUrl} adId="local-ad-preview-demo" lang={lang} label={ar ? 'معاينة فيديو الإعلان' : 'Advertisement video preview'} className="w-full max-h-56 object-contain bg-slate-50 rounded-xl" /></> : <img src={imageUrl} alt={ar ? 'صورة الإعلان المختارة' : 'Selected ad image'} className="w-full max-h-56 object-contain bg-slate-50 rounded-xl" />)}
             <div className="flex justify-between text-xs gap-3"><strong>{tier === 'free' ? (ar ? 'إعلان مجاني' : 'Free') : (ar ? 'إعلان مميز' : 'Featured')}</strong><span className="text-slate-500">{ar ? categoryName?.ar : categoryName?.en}</span></div>
             <h2 className="text-lg font-extrabold break-words">{title}</h2>
             <p className="text-sm text-slate-700 whitespace-pre-wrap break-words">{description}</p>
@@ -127,15 +134,36 @@ export function CreateOfferPage({ lang, onBack }: Props) {
               {dateError && <p role="alert" className="text-xs font-bold text-red-700">{ar ? 'اختار نهاية بعد البداية ولسه مجتش.' : 'Choose an end after the start and in the future.'}</p>}
             </section>
             <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-              <label htmlFor="offer-image" className="flex items-center gap-2 font-extrabold text-sm"><ImagePlus className="w-5 h-5 text-emerald-700" />{ar ? '4. صورة الإعلان (اختياري)' : '4. Advertisement image (optional)'}</label>
-              <input id="offer-image" type="file" accept="image/png,image/jpeg,image/webp" onChange={event => {
+              <label htmlFor="offer-image" className="flex items-center gap-2 font-extrabold text-sm"><ImagePlus className="w-5 h-5 text-emerald-700" />{ar ? '4. صورة أو فيديو الإعلان (اختياري)' : '4. Advertisement image or video (optional)'}</label>
+              <input id="offer-image" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime" onChange={async event => {
                 const next = event.target.files?.[0] ?? null;
-                setImage(next && next.size <= 5 * 1024 * 1024 ? next : null);
+                const selection = ++imageSelection.current;
+                setImage(null); setMediaError('generic'); setCompressionNotice(false);
+                if (!next) { setImageStatus('idle'); return; }
+                const isVideo = next.type.startsWith('video/');
+                if ((!isVideo && next.size > 5 * 1024 * 1024) || !['image/png', 'image/jpeg', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime'].includes(next.type)) { setImageStatus('error'); return; }
+                setImageStatus('compressing');
+                try {
+                  const result = isVideo ? await compressAdVideo(next) : await compressAdImage(next);
+                  if (selection === imageSelection.current) { setImage(result); setImageStatus('ready'); }
+                } catch (error) {
+                  if (selection === imageSelection.current) {
+                    const code = error instanceof Error ? error.message : '';
+                    if (code === 'video_compression_unavailable') { setImage(next); setCompressionNotice(true); setImageStatus('ready'); return; }
+                    setMediaError(code === 'video_too_long' || code === 'video_too_large' ? code : 'generic');
+                    setImageStatus('error');
+                  }
+                }
               }} className="block w-full text-xs text-slate-600 file:me-3 file:border-0 file:rounded-lg file:bg-emerald-50 file:text-emerald-800 file:font-bold file:px-3 file:py-2" />
-              <p className="text-xs text-slate-500">{ar ? 'معاينة محلية فقط — PNG أو JPG أو WebP حتى 5 ميجابايت. لن تُرفع الصورة.' : 'Local preview only — PNG, JPG or WebP up to 5 MB. No upload.'}</p>
-              {imageUrl && <img src={imageUrl} alt={ar ? 'معاينة الصورة' : 'Image preview'} className="w-full max-h-48 object-contain rounded-xl bg-slate-50" />}
+              <p className="text-xs text-slate-500">{ar ? 'للتجربة: الصور حتى 5 ميجابايت، والفيديو حتى 25 ميجابايت ودقيقة واحدة. تجهيز الفيديو قد يستغرق مدة تشغيله.' : 'For this preview: images up to 5 MB; videos up to 25 MB and one minute. Video preparation may take its full duration.'}</p>
+              {imageStatus === 'compressing' && <p role="status" className="text-xs text-slate-600">{ar ? 'جاري تجهيز الملف...' : 'Preparing file...'}</p>}
+              {imageStatus === 'ready' && <p role="status" className="text-xs text-emerald-700">{ar ? 'الملف جاهز للمعاينة.' : 'File is ready for preview.'}</p>}
+              {compressionNotice && <p className="text-xs text-amber-800">{ar ? 'المتصفح لا يدعم ضغط الفيديو؛ المعاينة تستخدم الملف الأصلي على جهازك.' : 'This browser cannot compress video; the local preview uses the original file.'}</p>}
+              {imageStatus === 'error' && <p role="alert" className="text-xs text-red-700">{mediaError === 'video_too_long' ? (ar ? 'مدة الفيديو أكتر من دقيقة. اختار فيديو مدته دقيقة أو أقل.' : 'The video is longer than one minute. Choose a video of one minute or less.') : mediaError === 'video_too_large' ? (ar ? 'حجم الفيديو أكبر من 25 ميجابايت. اختار ملفًا أصغر.' : 'The video exceeds 25 MB. Choose a smaller file.') : (ar ? 'تعذر تجهيز الملف. تأكد من الحجم ونوع الملف ودعم المتصفح.' : 'Could not prepare the file. Check its size, type and browser support.')}</p>}
+              {imageUrl && (image?.type.startsWith('video/') ? <AdVideoPlayer src={imageUrl} label={ar ? 'معاينة فيديو الإعلان' : 'Advertisement video preview'} className="w-full max-h-48 object-contain rounded-xl bg-slate-50" /> : <img src={imageUrl} alt={ar ? 'معاينة الصورة' : 'Image preview'} className="w-full max-h-48 object-contain rounded-xl bg-slate-50" />)}
+
             </section>
-            <button type="submit" className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3 flex justify-center items-center gap-2"><Megaphone className="w-5 h-5" />{ar ? 'مراجعة الإعلان' : 'Review advertisement'}</button>
+            <button type="submit" disabled={imageStatus === 'compressing'} className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold py-3 flex justify-center items-center gap-2"><Megaphone className="w-5 h-5" />{ar ? 'مراجعة الإعلان' : 'Review advertisement'}</button>
           </form>
         )}
       </main>

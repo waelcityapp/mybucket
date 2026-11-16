@@ -12,6 +12,8 @@ export function AdminAppIdentityView({ lang, identity, identityReady, onSaved, o
   const [nameAr, setNameAr] = useState(identity.appNameAr);
   const [nameEn, setNameEn] = useState(identity.appNameEn);
   const [file, setFile] = useState<File | null>(null);
+  // Keep a completed upload for a save retry instead of charging Cloudinary again.
+  const [pendingPublicId, setPendingPublicId] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [clearIcon, setClearIcon] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -40,10 +42,10 @@ export function AdminAppIdentityView({ lang, identity, identityReady, onSaved, o
       setError(ar ? 'اختر PNG أو JPG أو WebP بحجم لا يتجاوز 3 ميجابايت.' : 'Choose a PNG, JPG or WebP image under 3 MB.');
       return;
     }
-    setFile(selected); setClearIcon(false); setDirty(true);
+    setFile(selected); setPendingPublicId(null); setClearIcon(false); setDirty(true);
   };
   const resetIcon = () => {
-    setFile(null); setClearIcon(true); setDirty(true); setError(''); setSuccess('');
+    setFile(null); setPendingPublicId(null); setClearIcon(true); setDirty(true); setError(''); setSuccess('');
   };
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -55,12 +57,15 @@ export function AdminAppIdentityView({ lang, identity, identityReady, onSaved, o
     setSaving(true); setError(''); setSuccess('');
     try {
       let iconPublicId = clearIcon ? null : identity.iconPublicId;
-      if (file) iconPublicId = await uploadBrandIcon(file);
+      if (file) {
+        iconPublicId = pendingPublicId || await uploadBrandIcon(file);
+        setPendingPublicId(iconPublicId);
+      }
       const updated = await identityRequest<AppIdentity>('admin.identity.save', {
         appNameAr: nameAr.trim(), appNameEn: nameEn.trim(), iconPublicId,
       });
       onSaved(updated);
-      setFile(null); setClearIcon(false); setDirty(false);
+      setFile(null); setPendingPublicId(null); setClearIcon(false); setDirty(false);
       setSuccess(ar ? 'تم حفظ هوية التطبيق بنجاح. قد تحتاج أيقونة التطبيق المثبّت إلى إعادة تثبيت حسب الجهاز.' : 'App identity saved. Installed app icons may need reinstalling on some devices.');
     } catch (failure) {
       const code = failure instanceof Error ? failure.message : 'unknown_error';

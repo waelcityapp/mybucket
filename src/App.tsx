@@ -1461,7 +1461,7 @@ export default function App() {
   }
 
   if (isAdmin && adminPinVerified && activeTab === 'admin' && adminRoute === '/admin/simulate-new-user') {
-    return <AdminNewUserSimulation lang={lang} onExit={backToAdminSections} />;
+    return <AdminNewUserSimulation lang={lang} identity={appIdentity} onExit={backToAdminSections} />;
   }
 
   if (activeTab === 'guide') {

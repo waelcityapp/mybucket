@@ -39,8 +39,8 @@ test('icon resize links stay on the dedicated Cloudinary environment', () => {
 });
 
 test('gateway owner enforcement prevents an invalid admin UID before Firestore access', async () => {
-  await assert.rejects(() => saveAppIdentity({ appNameAr: 'My Bucket', appNameEn: 'My Bucket', iconPublicId: null }, ''), /admin_only/);
+  await assert.rejects(() => saveAppIdentity({ appNameAr: 'My Bucket', appNameEn: 'My Bucket', iconPublicId: null }, ''), error => error.code === 'admin_only');
 });
 test('identity save rejects untrusted and cross-app image references before Firestore access', async () => {
-  await assert.rejects(() => saveAppIdentity({ appNameAr: 'My Bucket', appNameEn: 'My Bucket', iconPublicId: 'cityeve/icons/abc' }, 'valid-uid'), /invalid_identity_icon/);
+  await assert.rejects(() => saveAppIdentity({ appNameAr: 'My Bucket', appNameEn: 'My Bucket', iconPublicId: 'cityeve/icons/abc' }, 'valid-uid'), error => error.code === 'invalid_identity_icon');
 });

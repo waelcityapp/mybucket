@@ -5,6 +5,8 @@ import { compressAdImage } from '../../utils/adImageCompression';
 import { compressAdVideo } from '../../utils/adVideoCompression';
 import { AdVideoPlayer } from '../AdVideoPlayer';
 import { AdCreativeCard } from '../AdCreativeCard';
+import { AdScheduleFields } from '../AdScheduleFields';
+import { adScheduleDate, emptyAdSchedule } from '../../utils/adSchedule';
 import { auth } from '../../lib/firebase';
 import { uploadAdMedia, type SignedAdUpload, type UploadedAdMedia } from '../../services/adMediaUpload';
 
@@ -32,9 +34,9 @@ export function CreateOfferPage({ lang, onBack }: Props) {
   const [description, setDescription] = useState('');
   const [merchant, setMerchant] = useState('');
   const [contact, setContact] = useState('');
-  const [startsAt, setStartsAt] = useState('');
-  const [endsAt, setEndsAt] = useState('');
-  const [dateError, setDateError] = useState<'order' | 'past' | null>(null);
+  const [startsAt, setStartsAt] = useState(emptyAdSchedule);
+  const [endsAt, setEndsAt] = useState(emptyAdSchedule);
+  const [dateError, setDateError] = useState<'invalid' | 'order' | 'past' | null>(null);
   const [image, setImage] = useState<File | null>(null);
   const [imageStatus, setImageStatus] = useState<'idle' | 'compressing' | 'ready' | 'error'>('idle');
   const [mediaError, setMediaError] = useState<'generic' | 'video_too_long' | 'video_too_large'>('generic');
@@ -84,9 +86,10 @@ export function CreateOfferPage({ lang, onBack }: Props) {
   };
   const handleReview = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const start = Date.parse(startsAt), end = Date.parse(endsAt);
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) { setDateError('order'); return; }
-    if (end <= Date.now()) { setDateError('past'); return; }
+    const start = adScheduleDate(startsAt), end = adScheduleDate(endsAt);
+    if (!start || !end) { setDateError('invalid'); return; }
+    if (end.getTime() <= start.getTime()) { setDateError('order'); return; }
+    if (end.getTime() <= Date.now()) { setDateError('past'); return; }
     setDateError(null);
     if (title.trim() && description.trim() && category && merchant.trim()) setPreview(true);
   };
@@ -124,8 +127,8 @@ export function CreateOfferPage({ lang, onBack }: Props) {
             {imageUrl && image?.type.startsWith('video/') && <p className="text-xs text-slate-500">{ar ? 'تجربة مشاهدة الزائر: 3 مرات يوميًا على هذا المتصفح.' : 'Visitor playback demo: 3 plays per day in this browser.'}</p>}
             <AdCreativeCard lang={lang} title={title} description={description} merchant={merchant} contact={contact} category={ar ? categoryName?.ar : categoryName?.en} mediaUrl={imageUrl} mediaType={image?.type.startsWith('video/') ? 'video' : 'image'} videoQuotaId="local-ad-preview-demo" />
             {reviewPreview && <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-xs font-bold text-emerald-900">{ar ? 'نوع الإعلان:' : 'Advertisement type:'} {tier === 'free' ? (ar ? 'مجاني' : 'Free') : (ar ? 'مميز' : 'Featured')}</div>}
-            <p className="text-xs text-slate-600">{ar ? 'بداية العرض:' : 'Starts:'} {new Date(startsAt).toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
-            <p className="text-xs text-slate-600">{ar ? 'نهاية العرض:' : 'Ends:'} {new Date(endsAt).toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
+            <p className="text-xs text-slate-600">{ar ? 'بداية النشر:' : 'Publication starts:'} {adScheduleDate(startsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
+            <p className="text-xs text-slate-600">{ar ? 'نهاية النشر:' : 'Publication ends:'} {adScheduleDate(endsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
             {reviewPreview && <div className="grid grid-cols-2 gap-2"><button type="button" disabled className="rounded-xl bg-emerald-100 text-emerald-800 opacity-60 py-2 text-xs font-bold">{ar ? 'موافقة' : 'Approve'}</button><button type="button" disabled className="rounded-xl bg-red-100 text-red-800 opacity-60 py-2 text-xs font-bold">{ar ? 'رفض' : 'Reject'}</button></div>}
             <button type="button" onClick={() => setPreview(false)} className="w-full rounded-xl border border-emerald-600 text-emerald-700 py-3 text-sm font-bold">{ar ? 'تعديل الإعلان' : 'Edit advertisement'}</button>
             <div className="space-y-2 rounded-xl bg-slate-50 p-3 text-center">
@@ -170,15 +173,11 @@ export function CreateOfferPage({ lang, onBack }: Props) {
               </div>
             </section>
             <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-              <h2 className="font-extrabold text-sm">{ar ? '3. مدة العرض' : '3. Advertisement schedule'}</h2>
+              <h2 className="font-extrabold text-sm">{ar ? '3. مدة النشر' : '3. Publication schedule'}</h2>
               <p className="text-xs text-slate-500">{ar ? 'المواعيد حسب توقيت جهازك. الإعلان لا يظهر إلا بعد موافقة الإدارة.' : 'Times use your device time zone. The advertisement appears only after admin approval.'}</p>
-              <div><label htmlFor="offer-start" className={label}>{ar ? 'بداية العرض' : 'Start'}</label>
-                <input id="offer-start" type="datetime-local" required value={startsAt} onChange={event => { setStartsAt(event.target.value); setDateError(null); }} className={field} />
-              </div>
-              <div><label htmlFor="offer-end" className={label}>{ar ? 'نهاية العرض' : 'End'}</label>
-                <input id="offer-end" type="datetime-local" required value={endsAt} onChange={event => { setEndsAt(event.target.value); setDateError(null); }} className={field} />
-              </div>
-              {dateError && <p role="alert" className="text-xs font-bold text-red-700">{dateError === 'order' ? (ar ? 'يجب أن يكون موعد نهاية الإعلان بعد موعد بدايته.' : 'The advertisement end must be after its start.') : (ar ? 'موعد نهاية الإعلان قد مضى. يرجى اختيار موعد في المستقبل.' : 'The advertisement end has passed. Please choose a future date and time.')}</p>}
+              <AdScheduleFields id="start" lang={lang} value={startsAt} onChange={value => { setStartsAt(value); setDateError(null); }} />
+              <AdScheduleFields id="end" lang={lang} value={endsAt} onChange={value => { setEndsAt(value); setDateError(null); }} />
+              {dateError && <p role="alert" className="text-xs font-bold text-red-700">{dateError === 'invalid' ? (ar ? 'يرجى اختيار تاريخ ووقت صحيحين لبداية النشر ونهايته.' : 'Please choose valid start and end dates and times.') : dateError === 'order' ? (ar ? 'يجب أن يكون موعد نهاية النشر بعد موعد بدايته.' : 'The publication end must be after its start.') : (ar ? 'موعد نهاية النشر قد مضى. يرجى اختيار موعد في المستقبل.' : 'The publication end has passed. Please choose a future date and time.')}</p>}
             </section>
             <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
               <label htmlFor="offer-image" className="flex items-center gap-2 font-extrabold text-sm"><ImagePlus className="w-5 h-5 text-emerald-700" />{ar ? '4. صورة أو فيديو الإعلان (اختياري)' : '4. Advertisement image or video (optional)'}</label>

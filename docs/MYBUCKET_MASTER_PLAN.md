@@ -522,3 +522,7 @@ The upload percentage and progress bar remain visible during transfer, verificat
 ## Revision #178 — Advertising sign-in and planned routes
 
 Browsing offers remains public. An unauthenticated visitor attempting `/offers/new` must sign in with Google before viewing the advertisement creation form, including on direct navigation; the gateway must independently authorize future advertiser operations. The owner decided that free ads go to administration for review and featured ads go to a payment page. Payment amounts, provider, refusal and refund rules remain undecided. The preview communicates both paths with disabled controls; no submission, payment, approval or publication is enabled by this UI. Do not activate a financial flow until the owner approves its rules and the backend is verified.
+
+## Revision #179 — Clear ad publication date and time
+
+The ad creation form presents separate day, named month, year, hour, minute and morning/afternoon choices for publication start and end. Selected values use the device's local time zone, are preserved when returning from preview, and are checked for invalid calendar or local clock times, ordering and an end in the future. The Arabic schedule labels use «النشر» rather than «العرض». This remains a local preview; no ad submission, payment, or Firebase write is added.

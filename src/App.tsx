@@ -186,44 +186,49 @@ function ExchangeRatesMini({ lang }: { lang: Language }) {
   const selectedTo = info?.to || 'USD';
   const canChange = !!info && !busy && info.remaining > 0;
   return (
-    <section className="flex min-w-0 flex-col rounded-2xl border border-emerald-700/40 bg-gradient-to-br from-emerald-950 via-emerald-900 to-teal-800 px-2.5 py-3 text-white shadow-sm sm:px-4" aria-label={ar ? 'أسعار العملات التقريبية' : 'Approximate currency rates'}>
-      <div className="mb-2 flex items-center justify-center gap-1 text-[12px] font-black text-emerald-50 sm:text-sm">
-        <ArrowLeftRight className="h-3.5 w-3.5 shrink-0" />
+    <section className="w-full min-w-0 overflow-hidden rounded-2xl border border-emerald-700/40 bg-gradient-to-r from-emerald-950 via-emerald-900 to-teal-800 px-3 py-3 text-white shadow-sm sm:px-4 sm:py-3.5" aria-label={ar ? 'أسعار العملات التقريبية' : 'Approximate currency rates'}>
+      <div className="mb-2.5 flex items-center gap-1.5 text-[13px] font-black text-emerald-50 sm:text-sm">
+        <ArrowLeftRight className="h-4 w-4 shrink-0" />
         <span>{ar ? 'أسعار العملات' : 'Exchange rates'}</span>
       </div>
-      <div className="flex min-w-0 flex-col items-center gap-1">
-        {(['from', 'to'] as const).map(side => (
-          <div key={side} className="flex w-full min-w-0 flex-col items-center gap-1">
-            {side === 'to' && (
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-1.5 sm:gap-3">
+        {(['from', 'to'] as const).map((side, index) => (
+          <React.Fragment key={side}>
+            {index === 1 && (
               <button type="button" disabled={!canChange || selectedFrom === selectedTo}
                 onClick={() => void changePair(selectedTo, selectedFrom)}
                 title={ar ? 'تبديل العملتين (يُحتسب من تغييرات اليوم)' : 'Swap currencies (counts as one daily change)'}
                 aria-label={ar ? 'تبديل العملة الأولى والثانية' : 'Swap first and second currencies'}
-                className="flex h-6 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-400 bg-emerald-700 text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50">
-                <ArrowUpDown className="h-3.5 w-3.5" />
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-emerald-400 bg-emerald-700 text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:w-10">
+                <ArrowLeftRight className="h-4 w-4" />
               </button>
             )}
-            <select value={side === 'from' ? selectedFrom : selectedTo}
-              onChange={event => void changePair(side === 'from' ? event.target.value : selectedFrom, side === 'to' ? event.target.value : selectedTo)}
-              aria-label={side === 'from' ? (ar ? 'اختر العملة الأولى' : 'Choose first currency') : (ar ? 'اختر العملة الثانية' : 'Choose second currency')}
-              disabled={!canChange}
-              className="h-8 min-w-0 w-full rounded-lg border border-emerald-400/50 bg-emerald-950 px-1.5 text-[11px] font-bold text-white outline-none focus:border-emerald-200 focus:ring-1 focus:ring-emerald-200 disabled:opacity-70">
-              {SUPPORTED_CURRENCIES.filter(code => !info?.availableCurrencies || info.availableCurrencies.includes(code) || info[side] === code)
-                .map(code => <option key={code} value={code}>{code} · {currencyName(code, lang)}</option>)}
-            </select>
-          </div>
+            <label className="flex min-w-0 flex-col gap-1">
+              <span className="text-[10px] font-bold text-emerald-100 sm:text-xs">{side === 'from' ? (ar ? 'من' : 'From') : (ar ? 'إلى' : 'To')}</span>
+              <select value={side === 'from' ? selectedFrom : selectedTo}
+                onChange={event => void changePair(side === 'from' ? event.target.value : selectedFrom, side === 'to' ? event.target.value : selectedTo)}
+                aria-label={side === 'from' ? (ar ? 'اختر العملة الأولى' : 'Choose first currency') : (ar ? 'اختر العملة الثانية' : 'Choose second currency')}
+                disabled={!canChange}
+                className="h-9 w-full min-w-0 rounded-xl border border-emerald-400/50 bg-emerald-950 px-1.5 text-[11px] font-bold text-white outline-none focus:border-emerald-200 focus:ring-1 focus:ring-emerald-200 disabled:opacity-70 sm:h-10 sm:px-3 sm:text-sm">
+                {SUPPORTED_CURRENCIES.filter(code => !info?.availableCurrencies || info.availableCurrencies.includes(code) || info[side] === code)
+                  .map(code => <option key={code} value={code}>{code} · {currencyName(code, lang)}</option>)}
+              </select>
+            </label>
+          </React.Fragment>
         ))}
       </div>
-      <strong dir="ltr" className="mt-2 block min-w-0 break-words rounded-xl bg-emerald-700/65 px-1.5 py-2 text-center text-[12px] font-black leading-snug tracking-tight text-white tabular-nums sm:text-base">
+      <strong dir="ltr" className="mt-2.5 block min-w-0 break-words rounded-xl bg-emerald-700/65 px-2 py-2 text-center text-sm font-black leading-snug tracking-tight text-white tabular-nums sm:text-lg">
         {info ? '1 ' + selectedFrom + ' = ' + rate + ' ' + selectedTo : reference ? '1 EGP = ' + rate + ' USD' : busy ? '...' : '—'}
       </strong>
-      <span className="mt-1.5 text-center text-[9px] leading-snug text-emerald-100">
-        {ar ? 'سعر تقريبي غير ملزم' : 'Approximate rate'}
-        {(info?.rateDate || reference?.date) ? ' · ' + (info?.rateDate || reference?.date) : ''}
-      </span>
-      {info && <span className="mt-1 text-center text-[9px] font-semibold text-emerald-100">{ar ? 'تغييرات متبقية' : 'Changes left'}: {info.remaining}/{info.limit}</span>}
-      {info?.stale && <span className="text-center text-[9px] text-amber-200">{ar ? 'آخر سعر محفوظ' : 'Cached rate'}</span>}
-      {error && <button type="button" onClick={() => setRetry(value => value + 1)} className="mt-1 flex items-center justify-center gap-1 break-words text-center text-[9px] leading-tight text-rose-100"><RefreshCw className="h-3 w-3 shrink-0"/>{error}</button>}
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[10px] leading-snug text-emerald-100">
+        <span>
+          {ar ? 'سعر تقريبي غير ملزم' : 'Approximate rate'}
+          {(info?.rateDate || reference?.date) ? ' · ' + (info?.rateDate || reference?.date) : ''}
+        </span>
+        {info && <span className="font-semibold">{ar ? 'تغييرات متبقية' : 'Changes left'}: {info.remaining}/{info.limit}</span>}
+        {info?.stale && <span className="text-amber-200">{ar ? 'آخر سعر محفوظ' : 'Cached rate'}</span>}
+      </div>
+      {error && <button type="button" onClick={() => setRetry(value => value + 1)} className="mt-2 flex w-full items-center justify-center gap-1 break-words text-center text-[10px] leading-tight text-rose-100"><RefreshCw className="h-3 w-3 shrink-0"/>{error}</button>}
     </section>
   );
 }
@@ -1674,17 +1679,28 @@ export default function App() {
                 </div>
               )}
             </section>
-            {/* Subscription and guide shortcuts — first row. */}
-            <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-2.5">
+            {/* Compact access shortcuts: subscriptions, guide, and savings offers. */}
+            <div className="grid min-w-0 grid-cols-3 gap-1.5 sm:gap-2">
               <button type="button" onClick={() => openSubscriptionPage('subscription')}
-                className="flex min-w-0 min-h-[54px] items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-2 py-2.5 text-center text-[11px] font-extrabold text-emerald-900 shadow-sm transition-colors hover:bg-emerald-50 sm:text-sm">
-                <Tag className="h-4 w-4 shrink-0 text-emerald-700 sm:h-5 sm:w-5" />
-                <span>{lang === 'ar' ? 'الاشتراكات' : 'Plans'}</span>
+                className="flex min-w-0 min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-emerald-200 bg-white px-1.5 py-2 text-center text-[10px] font-extrabold leading-tight text-emerald-900 shadow-sm transition-colors hover:bg-emerald-50 sm:min-h-[80px] sm:px-2 sm:text-xs">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 sm:h-8 sm:w-8">
+                  <Tag className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 break-words">{lang === 'ar' ? 'الاشتراكات' : 'Plans'}</span>
               </button>
               <button type="button" onClick={openGuide}
-                className="flex min-w-0 min-h-[54px] items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-2 py-2.5 text-center text-[11px] font-extrabold text-emerald-900 shadow-sm transition-colors hover:bg-emerald-50 sm:text-sm">
-                <BookOpen className="h-4 w-4 shrink-0 text-emerald-700 sm:h-5 sm:w-5" />
-                <span>{lang === 'ar' ? 'دليل الاستخدام' : 'User guide'}</span>
+                className="flex min-w-0 min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-emerald-200 bg-white px-1.5 py-2 text-center text-[10px] font-extrabold leading-tight text-emerald-900 shadow-sm transition-colors hover:bg-emerald-50 sm:min-h-[80px] sm:px-2 sm:text-xs">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 sm:h-8 sm:w-8">
+                  <BookOpen className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 break-words">{lang === 'ar' ? 'دليل المستخدم' : 'User guide'}</span>
+              </button>
+              <button type="button" onClick={openOffers}
+                className="flex min-w-0 min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-emerald-200 bg-white px-1.5 py-2 text-center text-[10px] font-extrabold leading-tight text-emerald-900 shadow-sm transition-colors hover:bg-emerald-50 sm:min-h-[80px] sm:px-2 sm:text-xs">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 sm:h-8 sm:w-8">
+                  <ShoppingBag className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 break-words">{lang === 'ar' ? 'وفّر مع My Bucket' : 'Save with My Bucket'}</span>
               </button>
             </div>
 
@@ -1734,18 +1750,8 @@ export default function App() {
               userId={authUser?.uid}
             />
 
-            {/* Savings offers and exchange-rate widgets follow the financial overview. */}
-            <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-2.5">
-              <button type="button" onClick={openOffers}
-                className="flex min-w-0 flex-col items-center justify-center gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white px-2 py-4 text-center font-extrabold text-emerald-950 shadow-sm transition-colors hover:from-emerald-100 hover:to-emerald-50">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 sm:h-14 sm:w-14">
-                  <ShoppingBag className="h-7 w-7 sm:h-8 sm:w-8" />
-                </span>
-                <span className="text-sm leading-snug sm:text-base">{lang === 'ar' ? 'وفّر مع My Bucket' : 'Save with My Bucket'}</span>
-                <span className="text-[10px] font-semibold text-emerald-700 sm:text-xs">{lang === 'ar' ? 'العروض والخصومات' : 'Offers & discounts'}</span>
-              </button>
-              <ExchangeRatesMini lang={lang} />
-            </div>
+            {/* Full-width horizontal currency converter below the financial overview. */}
+            <ExchangeRatesMini lang={lang} />
 
             {/* 4. "حساباتك" - Money Sources / Accounts Grid */}
             <MoneySources

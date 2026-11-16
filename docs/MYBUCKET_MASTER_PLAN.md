@@ -490,3 +490,9 @@ Revision #168 adds start and end date/time inputs to the create-ad preview in th
 - Keep input and its quick actions together with tighter vertical spacing (`space-y-2` on mobile) so the primary task is accessible without scrolling past summaries or promotions.
 - The existing financial query result appears immediately below these actions when present; financial overview follows, then Save with My Bucket and exchange rates, then accounts, reminders, recent transactions and the existing banner.
 - This is a layout-only reorder; preserve component props, callbacks, financial data, trial rules, colors, Arabic RTL/English LTR, and all existing functionality.
+
+## Compact home shortcuts and horizontal currency converter (November 2026)
+
+- Show subscriptions, user guide, and "Save with My Bucket" as three equal-height compact shortcuts in the first row, above the voice/text input and the existing four primary financial actions. Keep each shortcut's original navigation action; use clear icons and responsive Arabic/English labels.
+- Replace the old side-by-side savings tile and tall narrow FX tile with a full-width horizontal currency converter below the financial overview. Show the two server-backed currency selectors side by side with the existing swap action centered between them, the live/reference result underneath, and a compact rate-date/daily-remaining footer.
+- Preserve all FX API behavior, available-currency filters, change quotas, server error/fallback handling, current colors, financial summaries and data, RTL/LTR, and all other home components. This is a UI/layout change only.

@@ -5,7 +5,7 @@ import { LockScreen, lockRequest, type LockStatus } from './components/AppLock';
 import { TrialSubscriptionPages } from './components/views/TrialSubscriptionPages';
 import { currencyName, SUPPORTED_CURRENCIES } from './types';
 import { ArrowLeftRight, ArrowUpDown, ShoppingBag, RefreshCw } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { Fragment, useState, useEffect, useRef } from 'react';
 import {
   FinancialAccount,
   Category,
@@ -193,7 +193,7 @@ function ExchangeRatesMini({ lang }: { lang: Language }) {
       </div>
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-1.5 sm:gap-3">
         {(['from', 'to'] as const).map((side, index) => (
-          <React.Fragment key={side}>
+          <Fragment key={side}>
             {index === 1 && (
               <button type="button" disabled={!canChange || selectedFrom === selectedTo}
                 onClick={() => void changePair(selectedTo, selectedFrom)}
@@ -214,7 +214,7 @@ function ExchangeRatesMini({ lang }: { lang: Language }) {
                   .map(code => <option key={code} value={code}>{code} · {currencyName(code, lang)}</option>)}
               </select>
             </label>
-          </React.Fragment>
+          </Fragment>
         ))}
       </div>
       <strong dir="ltr" className="mt-2.5 block min-w-0 break-words rounded-xl bg-emerald-700/65 px-2 py-2 text-center text-sm font-black leading-snug tracking-tight text-white tabular-nums sm:text-lg">

@@ -3,6 +3,7 @@ import { Sparkles, ArrowRight, ShieldCheck, CheckCircle2, AlertCircle, Mail, Loc
 import { VALID_AFFILIATE_CODES } from '../../utils/subscriptionUtils';
 import { loginWithGoogle } from '../../lib/firebase';
 import { Language } from '../../types';
+import type { AppIdentity } from '../../services/appIdentityClient';
 
 interface AuthPageProps {
   lang: Language;
@@ -11,9 +12,10 @@ interface AuthPageProps {
   onOpenOffers: () => void;
   simulation?: boolean;
   onSimulatedSignIn?: () => void;
+  identity?: AppIdentity;
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({ lang, onSuccess, onToggleLanguage, onOpenOffers, simulation = false, onSimulatedSignIn }) => {
+export const AuthPage: React.FC<AuthPageProps> = ({ lang, onSuccess, onToggleLanguage, onOpenOffers, simulation = false, onSimulatedSignIn, identity }) => {
   const [affiliateCode, setAffiliateCode] = useState('');
   const [codeValidStatus, setCodeValidStatus] = useState<'idle' | 'valid' | 'invalid'>('idle');
   const [isLoading, setIsLoading] = useState(false);
@@ -58,11 +60,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ lang, onSuccess, onToggleLan
       {/* Top Simple Brand Bar */}
       <header className="w-full max-w-lg mx-auto px-4 py-4 flex items-center justify-between border-b border-slate-200/60">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-sm font-black text-base">
-            M
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center overflow-hidden text-white shadow-sm font-black text-base">
+            {identity?.icon192Url ? <img src={identity.icon192Url} alt="" className="h-full w-full object-contain" /> : 'M'}
           </div>
           <div>
-            <span className="text-base font-black text-slate-900  block leading-tight">My Bucket</span>
+            <span className="text-base font-black text-slate-900 block leading-tight">{isAr ? identity?.appNameAr || 'My Bucket' : identity?.appNameEn || 'My Bucket'}</span>
             <span className="text-[10px] text-slate-500 font-bold block">{isAr ? 'إدارة المصاريف والمال الشخصي' : 'Smart Personal Budget'}</span>
           </div>
         </div>
@@ -88,7 +90,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ lang, onSuccess, onToggleLan
               <Sparkles className="w-6 h-6" />
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 ">
-              {isAr ? 'صفحة تسجيل الدخول والاشتراك' : 'Welcome to My Bucket'}
+              {isAr ? 'صفحة تسجيل الدخول والاشتراك' : 'Welcome to ' + (identity?.appNameEn || 'My Bucket')}
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 font-medium">
               {isAr
@@ -196,7 +198,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ lang, onSuccess, onToggleLan
 
       {/* Footer */}
       <footer className="w-full max-w-lg mx-auto px-4 py-4 text-center text-[11px] text-slate-400 font-medium">
-        <span>My Bucket © 2026 • {isAr ? 'الخصوصية والأمان أولاً' : 'Privacy & Security First'}</span>
+        <span>{isAr ? identity?.appNameAr || 'My Bucket' : identity?.appNameEn || 'My Bucket'} © 2026 • {isAr ? 'الخصوصية والأمان أولاً' : 'Privacy & Security First'}</span>
       </footer>
     </div>
   );

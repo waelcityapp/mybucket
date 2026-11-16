@@ -1,5 +1,10 @@
 # MyBucket — Master Implementation Plan
 
+## Header brand icon visibility (November 16, 2026 — revision #182)
+
+- Increase the header brand icon from 24px to 32px on mobile and from 28px to 36px on larger screens. Scale the built-in bucket fallback proportionally; the uploaded Cloudinary icon remains unchanged. Keep existing header layout, branding names, sign-in, and language controls intact.
+
+
 ## Trial access bootstrap (November 2026)
 
 - The five existing authenticated accounts received server-owned `billing/access` documents using their original Firebase Authentication registration times; a read-only audit confirmed five matching records.

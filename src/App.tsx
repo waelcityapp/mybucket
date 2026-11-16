@@ -1696,8 +1696,8 @@ export default function App() {
                 <span className="min-w-0 break-words">{lang === 'ar' ? 'دليل المستخدم' : 'User guide'}</span>
               </button>
               <button type="button" onClick={openOffers}
-                className="flex min-w-0 min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-emerald-200 bg-white px-1.5 py-2 text-center text-[10px] font-extrabold leading-tight text-emerald-900 shadow-sm transition-colors hover:bg-emerald-50 sm:min-h-[80px] sm:px-2 sm:text-xs">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 sm:h-8 sm:w-8">
+                className="flex min-w-0 min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-emerald-700 bg-emerald-600 px-1.5 py-2 text-center text-[10px] font-extrabold leading-tight text-white shadow-sm transition-colors hover:bg-emerald-700 sm:min-h-[80px] sm:px-2 sm:text-xs">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/20 text-white sm:h-8 sm:w-8">
                   <ShoppingBag className="h-4 w-4" />
                 </span>
                 <span className="min-w-0 break-words">{lang === 'ar' ? 'وفّر مع My Bucket' : 'Save with My Bucket'}</span>

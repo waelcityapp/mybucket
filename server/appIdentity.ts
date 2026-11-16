@@ -69,10 +69,16 @@ function toPublicIdentity(data: Record<string, unknown> | undefined): AppIdentit
     updatedAt: typeof data.updatedAt === 'number' ? data.updatedAt : null,
   };
 }
+// In-memory public read cache reduces Firestore reads during bursts of app launches.
+// Edits refresh the current instance immediately; other instances refresh within 30s.
+let cachedIdentity: { value: AppIdentity; until: number } | null = null;
 /** Public, read-only branding. It never returns Cloudinary credentials or other app settings. */
 export async function getAppIdentity(): Promise<AppIdentity> {
+  if (cachedIdentity && cachedIdentity.until > Date.now()) return cachedIdentity.value;
   const snapshot = await identityRef().get();
-  return toPublicIdentity(snapshot.exists ? snapshot.data() : undefined);
+  const value = toPublicIdentity(snapshot.exists ? snapshot.data() : undefined);
+  cachedIdentity = { value, until: Date.now() + 30_000 };
+  return value;
 }
 /** Called only from the admin-authorized gateway action. The API secret never leaves the server. */
 export function signBrandIconUpload(payload: Record<string, unknown>, config: CloudinarySettings = cloudinarySettings(), now = Date.now(), uuid = randomUUID()) {
@@ -122,5 +128,7 @@ export async function saveAppIdentity(payload: Record<string, unknown>, uid: str
   }
   const stored = { ...names, ...iconFields, updatedAt: Date.now(), updatedBy: uid, serverTimestamp: FieldValue.serverTimestamp() };
   await ref.set(stored);
-  return toPublicIdentity(stored);
+  const identity = toPublicIdentity(stored);
+  cachedIdentity = { value: identity, until: Date.now() + 30_000 };
+  return identity;
 }

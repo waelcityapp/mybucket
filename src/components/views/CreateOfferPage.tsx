@@ -60,7 +60,7 @@ export function CreateOfferPage({ lang, onBack }: Props) {
       if (!response.ok || !result?.ok) throw new Error(typeof result?.error === 'string' ? result.error : 'upload_failed');
       return result.data;
     };
-    setUploadState('uploading'); setUploadProgress(0); setUploadError('');
+    setUploadState('uploading'); setUploadProgress(pendingUpload ? 100 : 0); setUploadError('');
     try {
       let uploaded = pendingUpload;
       if (!uploaded) {
@@ -208,9 +208,12 @@ export function CreateOfferPage({ lang, onBack }: Props) {
                 <p className="text-xs font-bold text-emerald-900">{ar ? 'اختبار رفع للإدارة فقط' : 'Admin-only upload test'}</p>
                 <p className="text-xs leading-relaxed text-emerald-800">{ar ? 'يرفع الملف فعليًا إلى Cloudinary. لن يُحفظ الإعلان في Firebase أو يُرسل للمراجعة بعد، والملف التجريبي سيبقى في Cloudinary.' : 'Uploads the file to Cloudinary. The ad is not yet saved to Firebase or submitted for review; the test file remains in Cloudinary.'}</p>
                 {uploadState !== 'success' && <button type="button" onClick={() => void uploadTest()} disabled={uploadState === 'uploading' || uploadState === 'verifying'} className="w-full rounded-xl bg-emerald-700 px-3 py-2 text-sm font-bold text-white disabled:opacity-50">{pendingUpload ? (ar ? 'إعادة التأكد من الرفع' : 'Retry verification') : (ar ? 'رفع تجريبي إلى Cloudinary' : 'Test upload to Cloudinary')}</button>}
-                {uploadState === 'uploading' && <div role="status" className="text-xs text-emerald-900">{ar ? 'جاري رفع الملف' : 'Uploading file'}: {uploadProgress}%<progress max={100} value={uploadProgress} className="mt-2 block w-full" /></div>}
+                {(uploadState === 'uploading' || uploadState === 'verifying' || uploadState === 'success') && <div className="space-y-2 text-xs font-bold text-emerald-900">
+                  <div className="flex items-center justify-between gap-2"><span>{ar ? 'نسبة رفع الملف' : 'Upload progress'}</span><span dir="ltr">{uploadState === 'uploading' ? uploadProgress : 100}%</span></div>
+                  <progress aria-label={ar ? 'نسبة رفع الملف' : 'Upload progress'} max={100} value={uploadState === 'uploading' ? uploadProgress : 100} className="block h-3 w-full accent-emerald-700" />
+                </div>}
                 {uploadState === 'verifying' && <p role="status" className="text-xs text-emerald-900">{ar ? 'اكتمل إرسال الملف، جاري التأكد منه...' : 'File sent; verifying...'}</p>}
-                {uploadState === 'success' && verifiedUpload && <div role="status" className="space-y-2 text-xs text-emerald-900"><p className="font-bold">{ar ? 'تم الرفع والتأكد من الملف بنجاح.' : 'Upload and verification succeeded.'}</p><label className="block">{ar ? 'رابط الملف المحمي:' : 'Protected file URL:'}<input readOnly value={verifiedUpload.secureUrl} dir="ltr" className="mt-1 w-full rounded-lg border border-emerald-200 bg-white p-2 text-xs" /></label><p className="break-all" dir="ltr">{verifiedUpload.publicId}</p></div>}
+                {uploadState === 'success' && verifiedUpload && <p role="status" className="text-xs font-bold text-emerald-900">{ar ? 'تم التحميل بنجاح' : 'Upload completed successfully'}</p>}
                 {uploadError && <p role="alert" className="text-xs text-red-700">{uploadError}</p>}
               </div>}
 

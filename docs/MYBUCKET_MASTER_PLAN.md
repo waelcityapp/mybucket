@@ -526,3 +526,8 @@ Browsing offers remains public. An unauthenticated visitor attempting `/offers/n
 ## Revision #179 — Clear ad publication date and time
 
 The ad creation form presents separate day, named month, year, hour, minute and morning/afternoon choices for publication start and end. Selected values use the device's local time zone, are preserved when returning from preview, and are checked for invalid calendar or local clock times, ordering and an end in the future. The Arabic schedule labels use «النشر» rather than «العرض». This remains a local preview; no ad submission, payment, or Firebase write is added.
+
+
+## Revision #180 — Temporary public advertising demonstration
+
+Ten explicitly labelled fictional advertisements let visitors inspect the shared creative card: four restaurants, three fashion, two home and one food. One has no media and one plays a short CC0 sample video on demand with the existing browser-local daily limit. The mock entries are isolated in src/data/demoAds.ts, with local demo assets in public/demo-ads, so they can be removed without touching Firebase or Cloudinary. Counts refer to demo entries, not published merchant ads. No submission, real publication, payment, or admin approval is activated. Video limit is browser-local, not the future signed-in account enforcement.

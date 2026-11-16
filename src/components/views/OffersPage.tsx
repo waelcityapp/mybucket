@@ -5,6 +5,8 @@ import {
   Gift, Smartphone, type LucideIcon
 } from 'lucide-react';
 import { Language } from '../../types';
+import { AdCreativeCard } from '../AdCreativeCard';
+import { DEMO_ADS } from '../../data/demoAds';
 
 interface OffersPageProps {
   lang: Language;
@@ -35,10 +37,6 @@ const CATEGORIES: OfferCategory[] = [
   { slug: 'technology', ar: 'الإلكترونيات والتكنولوجيا', en: 'Electronics & Technology', Icon: Smartphone },
 ];
 
-// Public category directory only. Counts MUST be derived from actual published,
-// active, non-expired merchant offers once the real offers data source exists.
-// Do not use INITIAL_PERK_DEALS: its coupons are demonstration-only.
-const PUBLISHED_OFFERS: ReadonlyArray<{ id: string; categorySlug: string; titleAr: string; titleEn: string }> = [];
 
 export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySlug, onOpenCategory, onAddAd }) => {
   const isAr = lang === 'ar';
@@ -50,7 +48,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
     `${item.ar} ${item.en}`.toLowerCase().includes(search.trim().toLowerCase())
   ), [search]);
 
-  const categoryCount = (slug: string) => PUBLISHED_OFFERS.filter(offer => offer.categorySlug === slug).length;
+  const categoryCount = (slug: string) => DEMO_ADS.filter(offer => offer.categorySlug === slug).length;
   const title = category ? (isAr ? category.ar : category.en) : (isAr ? 'وفّر مع My Bucket' : 'Save with My Bucket');
 
   return (
@@ -82,16 +80,28 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
             {category ? (
               <>
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-slate-700">{isAr ? 'عروض القسم' : 'Category offers'}</p>
+                  <p className="text-sm font-semibold text-slate-700">{isAr ? 'إعلانات القسم التجريبية' : 'Demo ads in this category'}</p>
                   <span className="rounded-full bg-emerald-50 border border-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1.5">
                     {isAr ? `${categoryCount(category.slug)} إعلان` : `${categoryCount(category.slug)} offers`}
                   </span>
                 </div>
-                <div className="bg-white border border-slate-200 rounded-2xl p-9 text-center">
+                {categoryCount(category.slug) > 0 ? (
+                  <div className="space-y-4">
+                    <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-semibold text-amber-900">{isAr ? 'الإعلانات دي أمثلة تجريبية، والعروض وأسماء المعلنين غير حقيقية.' : 'These are demonstration ads; the offers and advertisers are fictional.'}</p>
+                    {DEMO_ADS.filter(ad => ad.categorySlug === category.slug).map(ad => {
+                      const [adTitle, description, merchant] = isAr ? ad.ar : ad.en;
+                      const media = 'video' in ad ? ad.video : 'image' in ad ? ad.image : undefined;
+                      return <div key={ad.id}>
+                        <p className="text-xs font-bold text-amber-800 mb-2">{isAr ? 'إعلان تجريبي' : 'Demo advertisement'}</p>
+                        <AdCreativeCard lang={lang} title={adTitle} description={description} merchant={merchant} category={isAr ? category.ar : category.en} mediaUrl={media ? `/demo-ads/${media}` : undefined} mediaType={'video' in ad ? 'video' : 'image'} videoQuotaId={'video' in ad ? ad.id : undefined} />
+                      </div>;
+                    })}
+                  </div>
+                ) : <div className="bg-white border border-slate-200 rounded-2xl p-9 text-center">
                   <Gift className="w-10 h-10 text-slate-300 mx-auto mb-3" />
                   <h2 className="text-base font-bold">{isAr ? 'لا توجد عروض منشورة في هذا القسم حاليًا' : 'No published offers in this category yet'}</h2>
                   <p className="text-sm text-slate-500 mt-2">{isAr ? 'عند إضافة عروض حقيقية، هتظهر هنا.' : 'Published offers will appear here once available.'}</p>
-                </div>
+                </div>}
               </>
             ) : (
               <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center">
@@ -137,7 +147,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-extrabold leading-snug">{isAr ? item.ar : item.en}</h4>
-                        <p className="text-xs text-slate-500 mt-1">{isAr ? `عدد الإعلانات: ${categoryCount(item.slug)}` : `Offers: ${categoryCount(item.slug)}`}</p>
+                        <p className="text-xs text-slate-500 mt-1">{isAr ? `إعلانات تجريبية: ${categoryCount(item.slug)}` : `Demo ads: ${categoryCount(item.slug)}`}</p>
                       </div>
                       <ForwardIcon className="w-4 h-4 text-slate-400 shrink-0" />
                     </a>

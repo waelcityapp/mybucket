@@ -1,0 +1,13 @@
+// Temporary, fictional examples. Remove this file and its use in OffersPage to retire the demo.
+export const DEMO_ADS = [
+  { id: 'demo-restaurant-1', categorySlug: 'restaurants-cafes-outings', ar: ['وجبة غداء لشخصين', 'استمتع بوجبة غداء لشخصين مع مشروبين بسعر تجريبي.', 'مطعم مذاق'], en: ['Lunch for two', 'Enjoy lunch for two with two drinks at a sample price.', 'Mazaq Restaurant'], image: 'food.jpg' },
+  { id: 'demo-restaurant-2', categorySlug: 'restaurants-cafes-outings', ar: ['قهوة وحلوى بعد الظهر', 'قهوة وحلوى مختارة في أجواء هادئة.', 'كافيه البن'], en: ['Coffee and an afternoon treat', 'Coffee and a selected dessert in a relaxed setting.', 'Al Bon Cafe'], image: 'coffee.jpg' },
+  { id: 'demo-restaurant-3', categorySlug: 'restaurants-cafes-outings', ar: ['فطار نهاية الأسبوع', 'فطار متنوع للعائلة خلال عطلة نهاية الأسبوع.', 'مطعم صباح'], en: ['Weekend breakfast', 'A varied family breakfast for the weekend.', 'Sabah Restaurant'], image: 'food.jpg' },
+  { id: 'demo-restaurant-4', categorySlug: 'restaurants-cafes-outings', ar: ['خصم على المشروبات الساخنة', 'مثال لإعلان نصي بدون صورة: خصم على المشروبات الساخنة.', 'ركن القهوة'], en: ['Hot drinks discount', 'A text-only example: a discount on hot drinks.', 'Coffee Corner'] },
+  { id: 'demo-fashion-1', categorySlug: 'fashion', ar: ['تشكيلة ملابس جديدة', 'اكتشف تشكيلة ملابس يومية تناسب مختلف الأذواق.', 'بيت الأناقة'], en: ['New clothing collection', 'Explore an everyday collection for different tastes.', 'Style House'], image: 'fashion.jpg' },
+  { id: 'demo-fashion-2', categorySlug: 'fashion', ar: ['عرض على الإكسسوارات', 'تشكيلة إكسسوارات لإكمال إطلالتك.', 'لمسة'], en: ['Accessories offer', 'A selection of accessories to complete your look.', 'Lamsa'], image: 'shop.jpg' },
+  { id: 'demo-fashion-3', categorySlug: 'fashion', ar: ['أساسيات كل يوم', 'قطع عملية مريحة للاستخدام اليومي.', 'خطوة'], en: ['Everyday essentials', 'Comfortable practical pieces for daily wear.', 'Khotwa'], image: 'fashion.jpg' },
+  { id: 'demo-home-1', categorySlug: 'home-shopping', ar: ['لمسة طبيعية لمنزلك', 'شاهد مثالًا لفيديو قصير عن النباتات والزهور.', 'ركن البيت'], en: ['A natural touch for your home', 'Watch a short sample video about plants and flowers.', 'Home Corner'], video: 'flower.mp4' },
+  { id: 'demo-home-2', categorySlug: 'home-shopping', ar: ['مستلزمات البيت', 'اكتشف تشكيلة عملية لاحتياجات البيت اليومية.', 'بيتنا'], en: ['Home essentials', 'Discover practical items for everyday home needs.', 'Beitna'], image: 'shop.jpg' },
+  { id: 'demo-food-1', categorySlug: 'food-beverages', ar: ['منتجات لمائدتك', 'أفكار لوجبات شهية تجمع الأسرة.', 'زاد'], en: ['For your table', 'Ideas for delicious meals to share with family.', 'Zad'], image: 'food.jpg' },
+] as const;

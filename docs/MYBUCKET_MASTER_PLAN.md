@@ -1,5 +1,10 @@
 # MyBucket — Master Implementation Plan
 
+## Ad cards: no repeated category label (November 17, 2026 — revision #188)
+
+- The category selected when creating an ad is placement metadata, not part of the customer-facing ad design. The ad creative card no longer renders the category label, in either demo offers or advertiser/reviewer previews.
+- The category picker, routing, filtering, demo counts, all advertiser fields, and review logic remain unchanged. No changes to ad data or database configuration.
+
 ## Cloudinary advertisement video duration verification (November 17, 2026 — revision #187)
 
 - Admin-only test uploads request Cloudinary Admin API video details with `media_metadata=true`, and validate `video_duration` (fallback to `duration`) as a positive finite number not exceeding 60 seconds.

@@ -526,7 +526,6 @@ export function CategoryDetailPage({
             <button
               type="button"
               onClick={() => {
-                onClose();
                 onOpenAddTransaction(category.id, category.type);
               }}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-transform active:scale-95 cursor-pointer shadow-xs"
@@ -772,7 +771,6 @@ export function CategoryDetailPage({
                 <button
                   type="button"
                   onClick={() => {
-                    onClose();
                     onOpenAddTransaction(category.id, category.type);
                   }}
                   className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-transform active:scale-95 cursor-pointer mt-2"

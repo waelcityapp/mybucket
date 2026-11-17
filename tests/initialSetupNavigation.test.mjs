@@ -15,7 +15,8 @@ test('initial setup has explicit localized back and cancel navigation', () => {
 });
 test('leaving after edits confirms unsaved changes', () => {
   assert.match(setup, /hasUnsavedChanges/);
-  assert.match(setup, /window\.confirm/);
+  assert.match(setup, /await confirmAction\(/);
+  assert.match(setup, /if \(!approved\) return/);
 });
 test('real setup returns to samples, while cancel signs out safely', () => {
   assert.match(app, /const leaveInitialSetup = async \(\) => \{/);

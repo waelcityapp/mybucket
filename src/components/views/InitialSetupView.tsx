@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { ArrowLeft, ArrowRight, X } from 'lucide-react';
 import { SUPPORTED_CURRENCIES, currencyName, type CurrencyCode, type FinancialAccount, type Language } from '../../types';
+import { useAppConfirm } from '../AppConfirmDialog';
 
 type BankDraft = { name: string; balance: string; currency: CurrencyCode };
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 
 export function InitialSetupView({ lang, onSave, preview = false, onClosePreview, onBack, onCancel, backLabel }: Props) {
   const isAr = lang === 'ar';
+  const confirmAction = useAppConfirm();
   const [banks, setBanks] = useState<BankDraft[]>([]);
   const [cash, setCash] = useState('0');
   const [cashCurrency, setCashCurrency] = useState<CurrencyCode>('EGP');
@@ -26,9 +28,19 @@ export function InitialSetupView({ lang, onSave, preview = false, onClosePreview
   const leave = async (action: (() => void | Promise<void>) | undefined) => {
     if (!action || saving || leaving) return;
     const hasUnsavedChanges = cash !== '0' || cashCurrency !== 'EGP' || banks.length > 0;
-    if (hasUnsavedChanges && !window.confirm(isAr
-      ? 'التغييرات التي أدخلتها في هذه الصفحة لم تُحفظ. هل تريد المغادرة؟'
-      : 'Your setup changes have not been saved. Leave this page?')) return;
+    if (hasUnsavedChanges) {
+      const approved = await confirmAction({
+        lang,
+        title: isAr ? 'مغادرة إعداد الحساب؟' : 'Leave account setup?',
+        description: isAr
+          ? 'لديك تغييرات غير محفوظة في هذه الصفحة. إذا غادرت الآن ستفقد هذه التغييرات.'
+          : 'You have unsaved changes on this page. Leaving now will discard those changes.',
+        confirmLabel: isAr ? 'مغادرة دون حفظ' : 'Leave without saving',
+        cancelLabel: isAr ? 'استكمال الإعداد' : 'Continue setup',
+        tone: 'warning',
+      });
+      if (!approved) return;
+    }
     setLeaving(true);
     setError('');
     try {

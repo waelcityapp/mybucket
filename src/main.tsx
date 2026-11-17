@@ -1,6 +1,7 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
+import { AppConfirmProvider } from './components/AppConfirmDialog';
 import './index.css';
 
 // Register only the install worker; never cache financial pages, auth tokens or API replies.
@@ -14,6 +15,8 @@ if ('serviceWorker' in navigator) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <AppConfirmProvider>
+      <App />
+    </AppConfirmProvider>
   </StrictMode>,
 );

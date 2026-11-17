@@ -43,7 +43,7 @@ import { WalletAccountModal } from './components/WalletAccountModal';
 import { OtherAccountModal } from './components/OtherAccountModal';
 import { ExtraAccountModal } from './components/ExtraAccountModal';
 import { ExpenseCategoriesModal } from './components/ExpenseCategoriesModal';
-import { CategoryDetailModal } from './components/CategoryDetailModal';
+import { CategoryDetailPage } from './components/CategoryDetailModal';
 import { MobileLinkModal } from './components/MobileLinkModal';
 import { BottomNav } from './components/BottomNav';
 import { TransactionsView } from './components/views/TransactionsView';
@@ -255,7 +255,7 @@ export default function App() {
   }, []);
   useEffect(() => { applyAppIdentity(appIdentity, lang); }, [appIdentity, lang]);
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname.startsWith('/admin') ? 'admin-pin' : window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : window.location.pathname.startsWith('/reminders/') ? 'reminders' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : 'home');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname.startsWith('/admin') ? 'admin-pin' : window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : window.location.pathname.startsWith('/reminders/') ? 'reminders' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : window.location.pathname.startsWith('/categories/') ? 'categories' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : 'home');
   // Keep in-app tab changes in browser history so the device Back button can restore them.
   const [transactionQuickFilter, setTransactionQuickFilter] = useState<{ period: 'today' | 'month'; currency: string } | null>(null);
   const navigateTab = (tab: ActiveTab, quickFilter: { period: 'today' | 'month'; currency: string } | null = null) => {
@@ -418,10 +418,19 @@ export default function App() {
       const next = tabFromHistory(window.location, window.history.state);
       setAdminRoute(window.location.pathname);
       setActiveTab(next === 'admin' && !adminPinVerified ? 'admin-pin' : next);
+      // Browser/Android Back and Forward must navigate report pages, not dismiss overlays.
+      const reportPath = window.location.pathname.match(/^\/categories\/([^/]+)$/);
+      setIsCategoryDetailPageOpen(Boolean(reportPath));
+      let reportId = '';
+      if (reportPath) {
+        try { reportId = decodeURIComponent(reportPath[1]); }
+        catch { reportId = ''; }
+      }
+      setSelectedCategoryForDetail(reportId ? categories.find(cat => cat.id === reportId) ?? null : null);
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, [adminPinVerified]);
+  }, [adminPinVerified, categories]);
 
   const adminSectionFromPath = (): SectionId | null => {
     const section = adminRoute.match(/^\/admin\/(users|subscriptions|marketers|ads|ai|system|branding)(?:\/new)?$/)?.[1];
@@ -508,7 +517,7 @@ export default function App() {
   const [isExtraAccountModalOpen, setIsExtraAccountModalOpen] = useState(false);
   const [selectedExtraAccountId, setSelectedExtraAccountId] = useState<string | null>(null);
   const [isExpenseCategoriesModalOpen, setIsExpenseCategoriesModalOpen] = useState(false);
-  const [isCategoryDetailModalOpen, setIsCategoryDetailModalOpen] = useState(false);
+  const [isCategoryDetailPageOpen, setIsCategoryDetailPageOpen] = useState(() => window.location.pathname.startsWith('/categories/'));
   const [selectedCategoryForDetail, setSelectedCategoryForDetail] = useState<Category | null>(null);
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
   const [isDealsModalOpen, setIsDealsModalOpen] = useState(false);
@@ -561,9 +570,9 @@ export default function App() {
         setIsOtherAccountModalOpen(false);
         setIsExtraAccountModalOpen(false);
         setIsExpenseCategoriesModalOpen(false);
-        setIsCategoryDetailModalOpen(false);
+        setIsCategoryDetailPageOpen(Boolean(firebaseUser) && window.location.pathname.startsWith('/categories/'));
         setSelectedCategoryForDetail(null);
-        setActiveTab((window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : firebaseUser && window.location.pathname.startsWith('/admin') ? 'admin-pin': firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && window.location.pathname.startsWith('/reminders/') ? 'reminders' : firebaseUser && (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : 'home');
+        setActiveTab((window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : firebaseUser && window.location.pathname.startsWith('/admin') ? 'admin-pin': firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && window.location.pathname.startsWith('/reminders/') ? 'reminders' : firebaseUser && (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : firebaseUser && window.location.pathname.startsWith('/categories/') ? 'categories' : 'home');
         setToastMessage(null);
         aiLearnedMemory.clear();
       }
@@ -1527,6 +1536,26 @@ export default function App() {
     return <><ReminderAlerts uid={authUser.uid} lang={lang} onOpen={() => { window.history.pushState({ myBucketTab: 'reminders' }, '', '/reminders/alerts'); setAdminRoute('/reminders/alerts'); }} /><ReminderWorkspace lang={lang} kind={reminderKind} userId={authUser.uid} onHome={() => { window.history.pushState({ myBucketTab: 'home' }, '', '/'); setActiveTab('home'); }} /></>;
   }
 
+  const detailCategoryPath = window.location.pathname.match(/^\/categories\/([^/]+)$/);
+  let detailCategoryId = '';
+  if (detailCategoryPath) {
+    try { detailCategoryId = decodeURIComponent(detailCategoryPath[1]); } catch { detailCategoryId = ''; }
+  }
+  const detailCategory = (detailCategoryId ? categories.find(cat => cat.id === detailCategoryId) : null) ?? selectedCategoryForDetail;
+
+  const closeCategoryDetailPage = () => {
+    if (window.location.pathname.startsWith('/categories/') && window.history.state?.categoryDetail) {
+      window.history.back();
+    } else {
+      if (window.location.pathname.startsWith('/categories/')) {
+        window.history.replaceState({ myBucketTab: 'categories' }, '', '/');
+      }
+      setIsCategoryDetailPageOpen(false);
+      setSelectedCategoryForDetail(null);
+      setActiveTab('categories');
+    }
+  };
+
   const showBottomNavigation = (
     ['home', 'transactions', 'search', 'categories', 'settings', 'accounts'].includes(activeTab)
     && window.location.pathname !== '/accounts/new'
@@ -1538,7 +1567,7 @@ export default function App() {
     && !isOtherAccountModalOpen
     && !isExtraAccountModalOpen
     && !isExpenseCategoriesModalOpen
-    && !isCategoryDetailModalOpen
+    && !isCategoryDetailPageOpen
     && !isMobileModalOpen
     && !isDealsModalOpen
   );
@@ -1581,7 +1610,7 @@ export default function App() {
       />
 
       {/* Main Content Area - Mobile First proportions matching reference */}
-      <main className={`flex-1 max-w-md sm:max-w-xl w-full mx-auto p-4 ${showBottomNavigation ? 'pb-32' : 'pb-8'}`}>
+      <main className={`flex-1 ${isCategoryDetailPageOpen && activeTab === 'categories' ? 'max-w-5xl' : 'max-w-md sm:max-w-xl'} w-full mx-auto p-4 ${showBottomNavigation ? 'pb-32' : 'pb-8'}`}>
         {activeTab === 'home' && (
           <div className="space-y-4">
             {/* Quick Mobile & Google Account Banner (if not logged in) */}
@@ -1853,18 +1882,43 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'categories' && (
+        {activeTab === 'categories' && (isCategoryDetailPageOpen && detailCategory ? (
+          <CategoryDetailPage
+            key={detailCategory.id}
+            category={detailCategory}
+            categories={categories}
+            accounts={accounts}
+            transactions={transactions}
+            lang={lang}
+            authUser={authUser}
+            onClose={closeCategoryDetailPage}
+            onEditTransaction={handleEditTransaction}
+            onDeleteTransaction={handleDeleteTransaction}
+            onOpenAddTransaction={(prefilledCatId, type) => {
+              if (window.location.pathname.startsWith('/categories/')) {
+                window.history.replaceState({ myBucketTab: 'categories' }, '', '/');
+              }
+              setIsCategoryDetailPageOpen(false);
+              setSelectedCategoryForDetail(null);
+              setAddModalInitialType(type);
+              setPrefilledDraft({ categoryId: prefilledCatId, type });
+              setIsAddModalOpen(true);
+            }}
+          />
+        ) : (
           <CategoriesView
             categories={categories}
             transactions={transactions}
             lang={lang}
             authUser={authUser}
             onSelectCategory={(cat) => {
+              window.history.pushState({ myBucketTab: 'categories', categoryDetail: cat.id }, '', '/categories/' + encodeURIComponent(cat.id));
               setSelectedCategoryForDetail(cat);
-              setIsCategoryDetailModalOpen(true);
+              setIsCategoryDetailPageOpen(true);
+              window.scrollTo(0, 0);
             }}
           />
-        )}
+        ))}
 
         {(activeTab === 'trial-details' || activeTab === 'subscription') && (
           <TrialSubscriptionPages lang={lang} subscription={userSubscription} error={subscriptionError ? (lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn) : null} page={activeTab} onBack={() => { window.history.pushState({}, '', activeTab === 'subscription' ? '/trial' : '/'); setActiveTab(activeTab === 'subscription' ? 'trial-details' : 'home'); }} onSubscription={() => openSubscriptionPage('subscription')} onUpdateSubscription={async updated => { const saved = await saveUserSubscriptionToFirestore(authUser.uid, updated); setUserSubscription(saved); }} />
@@ -1987,28 +2041,6 @@ export default function App() {
         lang={lang}
         onClose={() => setIsExpenseCategoriesModalOpen(false)}
         onUpdateCategories={handleUpdateCategories}
-      />
-
-      {/* Category Transactions & Period Statement Modal */}
-      <CategoryDetailModal
-        isOpen={isCategoryDetailModalOpen}
-        category={selectedCategoryForDetail}
-        categories={categories}
-        accounts={accounts}
-        transactions={transactions}
-        lang={lang}
-        authUser={authUser}
-        onClose={() => {
-          setIsCategoryDetailModalOpen(false);
-          setSelectedCategoryForDetail(null);
-        }}
-        onEditTransaction={handleEditTransaction}
-        onDeleteTransaction={handleDeleteTransaction}
-        onOpenAddTransaction={(prefilledCatId, type) => {
-          setAddModalInitialType(type);
-          setPrefilledDraft({ categoryId: prefilledCatId, type });
-          setIsAddModalOpen(true);
-        }}
       />
 
       {/* Mobile Link & QR Modal */}

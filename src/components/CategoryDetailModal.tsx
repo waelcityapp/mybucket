@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
-  X,
+  ArrowLeft,
+  ArrowRight,
   Calendar as CalendarIcon,
   Filter,
   Plus,
@@ -36,8 +37,7 @@ import { formatDateTimeDisplay, getCurrentLocalDate, toDateTimeISO } from '../ut
 import { getUserDateLimits, getAvailableMonthsForYear } from '../utils/userRegistration';
 import { ProExportModal, ExportFormat } from './ProExportModal';
 
-interface CategoryDetailModalProps {
-  isOpen: boolean;
+interface CategoryDetailPageProps {
   category: Category | null;
   categories: Category[];
   accounts: FinancialAccount[];
@@ -52,8 +52,7 @@ interface CategoryDetailModalProps {
 
 type PeriodType = 'this_month' | 'last_month' | 'specific_month' | 'specific_year' | 'custom_range';
 
-export function CategoryDetailModal({
-  isOpen,
+export function CategoryDetailPage({
   category,
   categories,
   accounts,
@@ -64,7 +63,7 @@ export function CategoryDetailModal({
   onEditTransaction,
   onDeleteTransaction,
   onOpenAddTransaction,
-}: CategoryDetailModalProps) {
+}: CategoryDetailPageProps) {
   const t = translations[lang];
   const isAr = lang === 'ar';
 
@@ -124,7 +123,7 @@ export function CategoryDetailModal({
 
   const yearsList = userDateLimits.yearsList;
 
-  if (!isOpen || !category) return null;
+  if (!category) return null;
 
   // Helper to render icon
   const renderCategoryIcon = (iconStr?: string) => {
@@ -253,12 +252,11 @@ export function CategoryDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/65 backdrop-blur-xs animate-in fade-in duration-200">
+    <section className="w-full rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
       <div
-        className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-100 overflow-hidden max-h-[92vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
+        className="w-full"
       >
-        {/* Modal Header */}
+        {/* Full-page report header */}
         <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white">
           <div className="flex items-center gap-3 min-w-0">
             <div
@@ -293,9 +291,9 @@ export function CategoryDetailModal({
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors cursor-pointer shrink-0"
-            aria-label="Close"
+            aria-label={isAr ? "العودة إلى البنود" : "Back to categories"}
           >
-            <X className="w-4 h-4 stroke-[2.5]" />
+            {isAr ? <ArrowRight className="w-4 h-4 stroke-[2.5]" /> : <ArrowLeft className="w-4 h-4 stroke-[2.5]" />}
           </button>
         </div>
 
@@ -539,8 +537,8 @@ export function CategoryDetailModal({
           </div>
         </div>
 
-        {/* Modal Body & Transactions List */}
-        <div className="p-4 sm:p-5 overflow-y-auto space-y-3 flex-1">
+        {/* Report content scrolls with the normal page; no nested modal scrollbar. */}
+        <div className="p-4 sm:p-5 space-y-3">
           {/* Search in filtered transactions */}
           {filteredTransactions.length > 3 && (
             <div className="relative">
@@ -787,7 +785,7 @@ export function CategoryDetailModal({
           </div>
         </div>
 
-        {/* Modal Footer */}
+        {/* Full-page report footer */}
         <div className="p-3.5 sm:p-4 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between">
           <span className="text-[11px] text-slate-500 font-medium">
             {isAr
@@ -813,7 +811,7 @@ export function CategoryDetailModal({
               onClick={onClose}
               className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-transform active:scale-95 cursor-pointer shadow-xs"
             >
-              {isAr ? 'إغلاق' : 'Close'}
+              {isAr ? 'العودة للبنود' : 'Back to categories'}
             </button>
           </div>
         </div>
@@ -841,6 +839,6 @@ export function CategoryDetailModal({
         }
         initialFormat={selectedExportFormat}
       />
-    </div>
+    </section>
   );
 }

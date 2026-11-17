@@ -1,5 +1,13 @@
 # MyBucket — Master Implementation Plan
 
+## Advertiser checkout page based on CityEve (November 17, 2026 — revision #189)
+
+- Review CityEve `EventPaymentCheckout` from both main and preview; reproduce the full-page payment review structure in My Bucket for featured advertisements: invoice summary, advertiser and schedule, media type, follow-up phone, InstaPay/Vodafone Cash instructions, receipt image picker/drop-zone/preview/remove, and review button. Use the My Bucket green/white identity and Arabic/English responsive layout.
+- Route from the featured advertisement preview to `/offers/new/payment` with browser/mobile Back support and in-memory form continuity. Refresh/direct access without a draft shows an explicit return-to-editor screen. Free ads keep their existing not-yet-enabled review workflow.
+- My Bucket does not yet have approved featured-ad prices, a server-owned invoice, a configured My Bucket payee or receipt-review submission backend. Checkout is therefore a **clearly labeled, non-collecting preview**: no real amount or account is shown, no receipt is uploaded/stored, and the final submission button is disabled. Do not copy CityEve's transfer number, localStorage submission, or auto-approval logic.
+- Receipt selection is local only, restricted to image/jpeg, image/png and image/webp of up to 5 MB. No Firestore, Cloudinary, subscription billing, merchant placement data, or publication rules change. Secure server-owned invoice/pricing and admin approval are separate future work.
+
+
 ## Ad cards: no repeated category label (November 17, 2026 — revision #188)
 
 - The category selected when creating an ad is placement metadata, not part of the customer-facing ad design. The ad creative card no longer renders the category label, in either demo offers or advertiser/reviewer previews.

@@ -4,6 +4,7 @@ import type { Language } from '../../types';
 import { compressAdImage } from '../../utils/adImageCompression';
 import { compressAdVideo } from '../../utils/adVideoCompression';
 import { AdVideoPlayer } from '../AdVideoPlayer';
+import { AdPaymentCheckout } from './AdPaymentCheckout';
 import { AdCreativeCard } from '../AdCreativeCard';
 import { AdScheduleFields } from '../AdScheduleFields';
 import { adScheduleDate, emptyAdSchedule } from '../../utils/adSchedule';
@@ -48,6 +49,12 @@ export function CreateOfferPage({ lang, onBack }: Props) {
   const [verifiedUpload, setVerifiedUpload] = useState<{ secureUrl: string; publicId: string } | null>(null);
   const imageSelection = useRef(0);
   const [preview, setPreview] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(() => window.location.pathname === '/offers/new/payment');
+  useEffect(() => {
+    const syncCheckoutRoute = () => setCheckoutOpen(window.location.pathname === '/offers/new/payment');
+    window.addEventListener('popstate', syncCheckoutRoute);
+    return () => window.removeEventListener('popstate', syncCheckoutRoute);
+  }, []);
   const [reviewPreview, setReviewPreview] = useState(false);
   const imageUrl = useMemo(() => image ? URL.createObjectURL(image) : null, [image]);
   useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
@@ -98,6 +105,44 @@ export function CreateOfferPage({ lang, onBack }: Props) {
     setDateError(null);
     if (title.trim() && description.trim() && category && merchant.trim()) setPreview(true);
   };
+  const goToPayment = () => {
+    if (!preview || tier !== 'featured') return;
+    if (window.location.pathname !== '/offers/new/payment') {
+      window.history.pushState({ myBucketTab: 'offers', offerPaymentPreview: true }, '', '/offers/new/payment');
+    }
+    setCheckoutOpen(true);
+    window.scrollTo(0, 0);
+  };
+  const returnFromPayment = () => {
+    if (window.location.pathname === '/offers/new/payment') {
+      if (window.history.state?.offerPaymentPreview) window.history.back();
+      else window.history.replaceState({ myBucketTab: 'offers' }, '', '/offers/new');
+    }
+    setCheckoutOpen(false);
+  };
+  if (checkoutOpen) {
+    const start = adScheduleDate(startsAt);
+    const end = adScheduleDate(endsAt);
+    if (!preview || tier !== 'featured' || !start || !end || !title.trim() || !merchant.trim() || !category) {
+      return (
+        <main dir={ar ? 'rtl' : 'ltr'} className="min-h-screen bg-slate-50 px-4 py-12 text-slate-900">
+          <section className="mx-auto max-w-xl space-y-4 rounded-2xl border border-emerald-100 bg-white p-6">
+            <h1 className="text-xl font-black">{ar ? 'صفحة الدفع — My Bucket' : 'My Bucket — Payment'}</h1>
+            <p className="text-sm leading-6 text-slate-600">
+              {ar ? 'بيانات الإعلان غير موجودة في هذه الجلسة. ارجع لإنشاء الإعلان واختار إعلان مميز، ثم افتح صفحة الدفع من المعاينة.' : 'The advertisement draft is not available in this session. Create a featured ad and open checkout from its preview.'}
+            </p>
+            <button type="button" onClick={() => { window.history.replaceState({ myBucketTab: 'offers' }, '', '/offers/new'); setCheckoutOpen(false); setPreview(false); }}
+              className="min-h-11 w-full rounded-xl bg-emerald-700 px-4 text-sm font-extrabold text-white">
+              {ar ? 'العودة إلى إنشاء الإعلان' : 'Back to create advertisement'}
+            </button>
+          </section>
+        </main>
+      );
+    }
+    return <AdPaymentCheckout lang={lang} advertiserName={merchant} adTitle={title} startsAt={start} endsAt={end}
+      mediaType={image ? (image.type.startsWith('video/') ? 'video' : 'image') : 'none'} onBack={returnFromPayment} />;
+  }
+
   const label = 'block text-xs font-extrabold text-slate-700 mb-1.5';
   const field = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500';
   const BackIcon = ar ? ArrowRight : ArrowLeft;
@@ -138,8 +183,15 @@ export function CreateOfferPage({ lang, onBack }: Props) {
             <button type="button" onClick={() => setPreview(false)} className="w-full rounded-xl border border-emerald-600 text-emerald-700 py-3 text-sm font-bold">{ar ? 'تعديل الإعلان' : 'Edit advertisement'}</button>
             <div className="space-y-2 rounded-xl bg-slate-50 p-3 text-center">
               <p className="text-xs font-bold text-slate-700">{tier === 'free' ? (ar ? 'الإعلان المجاني سيُرسل للإدارة للمراجعة والموافقة.' : 'Free ads will be sent to the administrator for review and approval.') : (ar ? 'الإعلان المميز سينتقل إلى صفحة الدفع قبل إرساله للمراجعة.' : 'Featured ads will proceed to payment before review.')}</p>
-              <button type="button" disabled className="w-full rounded-xl bg-slate-200 px-3 py-3 text-sm font-bold text-slate-500">{tier === 'free' ? (ar ? 'الإرسال للإدارة — قريبًا' : 'Send for review — coming soon') : (ar ? 'الانتقال للدفع — قريبًا' : 'Continue to payment — coming soon')}</button>
-              <p className="text-xs text-slate-500">{ar ? 'الخطوة دي لسه غير متاحة؛ إعلانك لم يُرسل ولن يُخصم أي مبلغ.' : 'This step is not yet available; your ad has not been submitted and no payment will be charged.'}</p>
+              <button type="button" onClick={goToPayment} disabled={tier === 'free'}
+                className={tier === 'featured'
+                  ? 'w-full rounded-xl bg-emerald-700 px-3 py-3 text-sm font-extrabold text-white hover:bg-emerald-800'
+                  : 'w-full rounded-xl bg-slate-200 px-3 py-3 text-sm font-bold text-slate-500'}>
+                {tier === 'free' ? (ar ? 'الإرسال للإدارة — قريبًا' : 'Send for review — coming soon') : (ar ? 'الانتقال إلى صفحة الدفع' : 'Continue to payment')}
+              </button>
+              <p className="text-xs text-slate-500">{tier === 'free'
+                ? (ar ? 'إرسال الإعلان المجاني للمراجعة لم يُفعّل بعد.' : 'Sending free ads for review is not enabled yet.')
+                : (ar ? 'صفحة الدفع متاحة للمعاينة. لا توجد رسوم أو تحويلات أو إرسال فعلي حتى تفعيل نظام الدفع.' : 'Checkout is available for preview only. No payments, transfers or actual submission are enabled yet.')}</p>
             </div>
           </section>
         ) : (

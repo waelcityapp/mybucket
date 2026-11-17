@@ -257,7 +257,7 @@ export default function App() {
   }, []);
   useEffect(() => { applyAppIdentity(appIdentity, lang); }, [appIdentity, lang]);
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname.startsWith('/admin') ? 'admin-pin' : window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : window.location.pathname.startsWith('/reminders/') ? 'reminders' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : window.location.pathname.startsWith('/categories/') ? 'categories' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : 'home');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname.startsWith('/admin') ? 'admin-pin' : window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : window.location.pathname.startsWith('/reminders/') ? 'reminders' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : window.location.pathname.startsWith('/categories/') ? 'categories' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/') || window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment') ? 'offers' : 'home');
   // Keep in-app tab changes in browser history so the device Back button can restore them.
   const [transactionQuickFilter, setTransactionQuickFilter] = useState<{ period: 'today' | 'month'; currency: string } | null>(null);
   const navigateTab = (tab: ActiveTab, quickFilter: { period: 'today' | 'month'; currency: string } | null = null) => {
@@ -574,7 +574,7 @@ export default function App() {
         setIsExpenseCategoriesModalOpen(false);
         setIsCategoryDetailPageOpen(Boolean(firebaseUser) && window.location.pathname.startsWith('/categories/'));
         setSelectedCategoryForDetail(null);
-        setActiveTab((window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) ? 'offers' : firebaseUser && window.location.pathname.startsWith('/admin') ? 'admin-pin': firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && window.location.pathname.startsWith('/reminders/') ? 'reminders' : firebaseUser && (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : firebaseUser && window.location.pathname.startsWith('/categories/') ? 'categories' : 'home');
+        setActiveTab((window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/') || window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment') ? 'offers' : firebaseUser && window.location.pathname.startsWith('/admin') ? 'admin-pin': firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && window.location.pathname.startsWith('/reminders/') ? 'reminders' : firebaseUser && (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : firebaseUser && window.location.pathname.startsWith('/categories/') ? 'categories' : 'home');
         setToastMessage(null);
         aiLearnedMemory.clear();
       }
@@ -1439,7 +1439,7 @@ export default function App() {
   }
 
   // Browsing is public, but creating or preparing an advertisement requires sign-in.
-  if (window.location.pathname === '/offers/new') {
+  if (window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment') {
     if (!authUser) return <AdSignInGate lang={lang} onBack={() => window.location.assign('/offers')} onSignIn={loginWithGoogle} />;
     return <CreateOfferPage lang={lang} onBack={() => window.location.assign('/offers')} />;
   }

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import ts from 'typescript';
 
 const srcDir = path.resolve('src');
 
@@ -13,14 +14,31 @@ function sourceFiles(directory) {
   });
 }
 
-test('first-party app code does not use browser-native alert/confirm/prompt dialogs', () => {
-  const nativeDialog = /(?:\b(?:window|globalThis|self)\s*\.\s*(?:alert|confirm|prompt)\s*\()|(?<![\w.$])(?:alert|confirm|prompt)\s*\(/g;
+test('first-party app code does not call browser-native dialogs', () => {
+  // Parse the TypeScript AST rather than matching text: AI-language regular
+  // expressions can legitimately contain phrases such as "confirm(...)".
   const offenders = sourceFiles(srcDir).flatMap((file) => {
     const content = fs.readFileSync(file, 'utf8');
-    return [...content.matchAll(nativeDialog)].map((match) => {
-      const line = content.slice(0, match.index).split('\n').length;
-      return path.relative(process.cwd(), file) + ':' + line + ' (' + match[0] + ')';
-    });
+    const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true,
+      file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+    const violations = [];
+    const visit = (node) => {
+      if (ts.isCallExpression(node)) {
+        const fn = node.expression;
+        const nativeNames = new Set(['alert', 'confirm', 'prompt']);
+        const isNative = (ts.isIdentifier(fn) && nativeNames.has(fn.text)) ||
+          (ts.isPropertyAccessExpression(fn) && ts.isIdentifier(fn.expression) &&
+            ['window', 'globalThis', 'self'].includes(fn.expression.text) &&
+            nativeNames.has(fn.name.text));
+        if (isNative) {
+          const position = source.getLineAndCharacterOfPosition(node.getStart(source));
+          violations.push(path.relative(process.cwd(), file) + ':' + (position.line + 1));
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+    return violations;
   });
   assert.deepEqual(offenders, [], 'Use the shared AppConfirmDialog, or inline validation messages: ' + offenders.join(', '));
 });

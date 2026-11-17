@@ -36,6 +36,7 @@ import { translations } from '../data/translations';
 import { formatDateTimeDisplay, getCurrentLocalDate, toDateTimeISO } from '../utils/dateTime';
 import { getUserDateLimits, getAvailableMonthsForYear } from '../utils/userRegistration';
 import { ProExportModal, ExportFormat } from './ProExportModal';
+import { useAppConfirm } from './AppConfirmDialog';
 
 interface CategoryDetailPageProps {
   category: Category | null;
@@ -66,6 +67,7 @@ export function CategoryDetailPage({
 }: CategoryDetailPageProps) {
   const t = translations[lang];
   const isAr = lang === 'ar';
+  const confirmAction = useAppConfirm();
 
   const userDateLimits = useMemo(
     () => getUserDateLimits(authUser, transactions),
@@ -228,7 +230,7 @@ export function CategoryDetailPage({
 
     const parsedAmount = parseFloat(editAmount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      alert(isAr ? 'يرجى إدخال مبلغ صحيح' : 'Please enter a valid amount');
+      setEditError(isAr ? 'يرجى إدخال مبلغ صحيح أكبر من صفر.' : 'Enter a valid amount greater than zero.');
       return;
     }
 
@@ -723,16 +725,18 @@ export function CategoryDetailPage({
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              isAr
-                                ? 'هل أنت متأكد من حذف هذه العملية؟ سيتم استرجاع الرصيد تلقائياً.'
-                                : 'Are you sure you want to delete this transaction?'
-                            )
-                          ) {
-                            onDeleteTransaction(tx.id);
-                          }
+                        onClick={async () => {
+                          const approved = await confirmAction({
+                            lang,
+                            title: isAr ? 'حذف العملية؟' : 'Delete transaction?',
+                            description: isAr
+                              ? `سيتم حذف عملية «${tx.description}» بمبلغ ${formatNumber(tx.amount)} ${tx.currency || 'EGP'}، وستُحدّث الأرصدة المرتبطة بها تلقائيًا. هل تريد المتابعة؟`
+                              : `Delete "${tx.description}" for ${formatNumber(tx.amount)} ${tx.currency || 'EGP'}? Related balances will be updated automatically.`,
+                            confirmLabel: isAr ? 'نعم، احذف العملية' : 'Delete transaction',
+                            cancelLabel: isAr ? 'إلغاء الحذف' : 'Keep transaction',
+                            tone: 'danger',
+                          });
+                          if (approved) onDeleteTransaction(tx.id);
                         }}
                         title={isAr ? 'حذف العملية' : 'Delete'}
                         className="w-7 h-7 rounded-xl bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center transition-colors cursor-pointer"

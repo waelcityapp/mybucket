@@ -44,6 +44,7 @@ import { OtherAccountModal } from './components/OtherAccountModal';
 import { ExtraAccountModal } from './components/ExtraAccountModal';
 import { ExpenseCategoriesModal } from './components/ExpenseCategoriesModal';
 import { CategoryDetailPage } from './components/CategoryDetailModal';
+import { useAppConfirm } from './components/AppConfirmDialog';
 import { MobileLinkModal } from './components/MobileLinkModal';
 import { BottomNav } from './components/BottomNav';
 import { TransactionsView } from './components/views/TransactionsView';
@@ -237,6 +238,7 @@ function ExchangeRatesMini({ lang }: { lang: Language }) {
 }
 
 export default function App() {
+  const confirmAction = useAppConfirm();
   // 1. Language State (Arabic is default)
   const [lang, setLang] = useState<Language>(() => {
     const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}lang`);
@@ -1356,7 +1358,15 @@ export default function App() {
     const message = lang === 'ar'
       ? 'سيتم تصفير أرصدة جميع الحسابات، بما فيها المبالغ المستحقة على بطاقات الائتمان داخل التطبيق. ستبقى الحسابات والعمليات المسجلة كما هي، وقد يؤثر تعديل أو حذف عملية قديمة على الرصيد بعد التصفير. هل تريد المتابعة؟'
       : 'All account balances, including recorded credit card debt, will be set to zero. Accounts and transaction history remain; editing or deleting an old transaction can change balances afterward. Continue?';
-    if (!window.confirm(message)) return false;
+    const approved = await confirmAction({
+      lang,
+      title: lang === 'ar' ? 'تأكيد تصفير جميع الأرصدة' : 'Confirm balance reset',
+      description: message,
+      confirmLabel: lang === 'ar' ? 'نعم، صفّر الأرصدة' : 'Reset balances',
+      cancelLabel: lang === 'ar' ? 'احتفظ بالأرصدة' : 'Keep balances',
+      tone: 'danger',
+    });
+    if (!approved) return false;
     try {
       await zeroAccountBalances(authUser.uid);
       setToastMessage(lang === 'ar' ? 'تم تصفير أرصدة الحسابات. العمليات المسجلة لم تُحذف.' : 'Account balances reset. Transaction history was retained.');

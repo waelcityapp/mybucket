@@ -15,6 +15,7 @@ import {
 import { Category, Language } from '../types';
 import { translations } from '../data/translations';
 import { aiLearnedMemory } from '../services/ai/aiLearnedMemory';
+import { useAppConfirm } from './AppConfirmDialog';
 
 interface ExpenseCategoriesModalProps {
   isOpen: boolean;
@@ -81,6 +82,7 @@ export function ExpenseCategoriesModal({
   onUpdateCategories,
 }: ExpenseCategoriesModalProps) {
   const t = translations[lang];
+  const confirmAction = useAppConfirm();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -226,29 +228,23 @@ export function ExpenseCategoriesModal({
     setErrorMessage(null);
   };
 
-  // Delete an additional custom category
-  const handleDeleteCategory = (catId: string) => {
-    if (DEFAULT_EXPENSE_CAT_IDS.has(catId)) {
-      if (
-        !window.confirm(
-          lang === 'ar'
-            ? 'هذا بند أساسي. هل تريد حذفه من قائمتك؟'
-            : 'This is a default category. Are you sure you want to remove it?'
-        )
-      ) {
-        return;
-      }
-    } else {
-      if (
-        !window.confirm(
-          lang === 'ar'
-            ? 'هل أنت متأكد من حذف هذا البند من بنود الصرف؟'
-            : 'Are you sure you want to delete this spending category?'
-        )
-      ) {
-        return;
-      }
-    }
+  // Remove a category only after a branded confirmation; cancellation leaves all data intact.
+  const handleDeleteCategory = async (catId: string) => {
+    const target = categories.find((item) => item.id === catId);
+    if (!target) return;
+    const isDefault = DEFAULT_EXPENSE_CAT_IDS.has(catId);
+    const name = lang === 'ar' ? target.nameAr : target.name;
+    const approved = await confirmAction({
+      lang,
+      title: lang === 'ar' ? 'إزالة بند الصرف؟' : 'Remove spending category?',
+      description: lang === 'ar'
+        ? `هل تريد إزالة بند «${name}» من قائمتك؟${isDefault ? ' هذا بند أساسي.' : ''}`
+        : `Remove "${name}" from your category list?${isDefault ? ' This is a default category.' : ''}`,
+      confirmLabel: lang === 'ar' ? 'نعم، أزل البند' : 'Remove category',
+      cancelLabel: lang === 'ar' ? 'الاحتفاظ بالبند' : 'Keep category',
+      tone: 'danger',
+    });
+    if (!approved) return;
 
     const updatedList = categories.filter((c) => c.id !== catId);
     onUpdateCategories(updatedList);

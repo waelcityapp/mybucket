@@ -1884,7 +1884,6 @@ export default function App() {
 
         {activeTab === 'categories' && (isCategoryDetailPageOpen && detailCategory ? (
           <CategoryDetailPage
-            key={detailCategory.id}
             category={detailCategory}
             categories={categories}
             accounts={accounts}

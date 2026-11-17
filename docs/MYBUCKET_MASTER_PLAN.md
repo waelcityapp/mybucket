@@ -1,5 +1,12 @@
 # MyBucket — Master Implementation Plan
 
+## Cloudinary advertisement video duration verification (November 17, 2026 — revision #187)
+
+- Admin-only test uploads request Cloudinary Admin API video details with `media_metadata=true`, and validate `video_duration` (fallback to `duration`) as a positive finite number not exceeding 60 seconds.
+- Retain owner-only authentication, Cloudinary response signature checks, secure metadata validation, the 25 MB video cap, and fail-closed behavior when duration is missing/invalid.
+- Separate the missing video-duration and over-one-minute errors in the admin UI. A failed confirmation retains the pending uploaded file and allows verification retry without uploading a duplicate.
+- Include video-upload server regression tests in the production build command; do not change Cloudinary credentials, Firebase rules, ad publishing, or existing media data.
+
 ## Header brand icon visibility (November 16, 2026 — revision #182)
 
 - Increase the header brand icon from 24px to 32px on mobile and from 28px to 36px on larger screens. Scale the built-in bucket fallback proportionally; the uploaded Cloudinary icon remains unchanged. Keep existing header layout, branding names, sign-in, and language controls intact.

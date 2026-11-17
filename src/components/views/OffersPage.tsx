@@ -93,7 +93,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                       const media = 'video' in ad ? ad.video : 'image' in ad ? ad.image : undefined;
                       return <div key={ad.id}>
                         <p className="text-xs font-bold text-amber-800 mb-2">{isAr ? 'إعلان تجريبي' : 'Demo advertisement'}</p>
-                        <AdCreativeCard lang={lang} title={adTitle} description={description} merchant={merchant} category={isAr ? category.ar : category.en} mediaUrl={media ? `/demo-ads/${media}` : undefined} mediaType={'video' in ad ? 'video' : 'image'} videoQuotaId={'video' in ad ? ad.id : undefined} />
+                        <AdCreativeCard lang={lang} title={adTitle} description={description} merchant={merchant} mediaUrl={media ? `/demo-ads/${media}` : undefined} mediaType={'video' in ad ? 'video' : 'image'} videoQuotaId={'video' in ad ? ad.id : undefined} />
                       </div>;
                     })}
                   </div>

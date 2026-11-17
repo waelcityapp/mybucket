@@ -51,7 +51,6 @@ export function CreateOfferPage({ lang, onBack }: Props) {
   const [reviewPreview, setReviewPreview] = useState(false);
   const imageUrl = useMemo(() => image ? URL.createObjectURL(image) : null, [image]);
   useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
-  const categoryName = categories.find(item => item.id === category);
   const isAdmin = auth.currentUser?.email?.trim().toLowerCase() === 'waelvts@gmail.com';
   const uploadTest = async () => {
     const user = auth.currentUser;
@@ -131,7 +130,7 @@ export function CreateOfferPage({ lang, onBack }: Props) {
             </div>
             {reviewPreview && <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">{ar ? 'تصميم تجريبي لشاشة المراجعة. الموافقة والرفض غير مفعّلين بعد.' : 'Review screen demonstration. Approval and rejection are not enabled yet.'}</p>}
             {imageUrl && image?.type.startsWith('video/') && <p className="text-xs text-slate-500">{ar ? 'تجربة مشاهدة الزائر: 3 مرات يوميًا على هذا المتصفح.' : 'Visitor playback demo: 3 plays per day in this browser.'}</p>}
-            <AdCreativeCard lang={lang} title={title} description={description} merchant={merchant} contact={contact} category={ar ? categoryName?.ar : categoryName?.en} mediaUrl={imageUrl} mediaType={image?.type.startsWith('video/') ? 'video' : 'image'} videoQuotaId="local-ad-preview-demo" />
+            <AdCreativeCard lang={lang} title={title} description={description} merchant={merchant} contact={contact} mediaUrl={imageUrl} mediaType={image?.type.startsWith('video/') ? 'video' : 'image'} videoQuotaId="local-ad-preview-demo" />
             {reviewPreview && <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-xs font-bold text-emerald-900">{ar ? 'نوع الإعلان:' : 'Advertisement type:'} {tier === 'free' ? (ar ? 'مجاني' : 'Free') : (ar ? 'مميز' : 'Featured')}</div>}
             <p className="text-xs text-slate-600">{ar ? 'بداية النشر:' : 'Publication starts:'} {adScheduleDate(startsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
             <p className="text-xs text-slate-600">{ar ? 'نهاية النشر:' : 'Publication ends:'} {adScheduleDate(endsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>

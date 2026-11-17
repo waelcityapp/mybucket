@@ -39,7 +39,9 @@ export async function confirmAdminAdTestUpload(uid: string, payload: Record<stri
   const expected = createHash('sha1').update(`public_id=${publicId}&version=${version}${cfg.apiSecret}`).digest();
   if (!timingSafeEqual(expected, Buffer.from(signature, 'hex'))) return fail('invalid_upload_response');
   const path = publicId.split('/').map(encodeURIComponent).join('/');
-  const response = await getResource(`https://api.cloudinary.com/v1_1/${cfg.cloudName}/resources/${resourceType}/authenticated/${path}`, {
+  // Cloudinary's Admin API omits video duration by default: request the media metadata explicitly.
+  const metadataQuery = resourceType === 'video' ? '?media_metadata=true' : '';
+  const response = await getResource(`https://api.cloudinary.com/v1_1/${cfg.cloudName}/resources/${resourceType}/authenticated/${path}${metadataQuery}`, {
     headers: { Authorization: `Basic ${Buffer.from(`${cfg.apiKey}:${cfg.apiSecret}`).toString('base64')}` }, signal: AbortSignal.timeout(12000),
   });
   if (!response.ok) return fail('ad_upload_verification_failed', 503);
@@ -52,6 +54,11 @@ export async function confirmAdminAdTestUpload(uid: string, payload: Record<stri
       !Number.isSafeInteger(data.bytes) || data.bytes <= 0 || data.bytes > maxBytes || !formats.includes(data.format) ||
       typeof data.asset_id !== 'string' || !data.asset_id || secureUrl.protocol !== 'https:' || secureUrl.hostname !== 'res.cloudinary.com' ||
       !secureUrl.pathname.startsWith(`/${cfg.cloudName}/${resourceType}/authenticated/`)) return fail('invalid_upload_response');
-  if (resourceType === 'video' && (typeof data.duration !== 'number' || !Number.isFinite(data.duration) || data.duration <= 0 || data.duration > 60)) return fail('invalid_video_duration');
+  if (resourceType === 'video') {
+    // Admin API can return video_duration with media_metadata=true; retain duration as a fallback.
+    const duration = data.video_duration ?? data.duration;
+    if (typeof duration !== 'number' || !Number.isFinite(duration) || duration <= 0) return fail('ad_video_duration_unavailable', 422);
+    if (duration > 60) return fail('invalid_video_duration');
+  }
   return { publicId, resourceType, assetId: data.asset_id, secureUrl: secureUrl.href, version, bytes: data.bytes, format: data.format };
 }

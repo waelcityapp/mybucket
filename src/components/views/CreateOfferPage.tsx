@@ -80,7 +80,13 @@ export function CreateOfferPage({ lang, onBack }: Props) {
       const code = error instanceof Error ? error.message : '';
       setUploadError(code === 'ad_upload_not_configured'
         ? (ar ? 'إعدادات Cloudinary غير مكتملة على الخادم.' : 'Cloudinary server configuration is incomplete.')
-        : (ar ? 'تعذر الرفع أو التأكد منه. حاول مرة أخرى.' : 'Upload or verification failed. Please try again.'));
+        : code === 'ad_video_duration_unavailable'
+          ? (ar ? 'الفيديو اترفع، لكن Cloudinary لم يرجع مدته بعد. اضغط إعادة التأكد من الرفع، من غير ما ترفع الملف تاني.' : 'Video uploaded, but Cloudinary did not return its duration yet. Retry verification without uploading again.')
+          : code === 'invalid_video_duration'
+            ? (ar ? 'مدة الفيديو المرفوع تجاوزت دقيقة واحدة. اختر فيديو أقصر.' : 'The uploaded video exceeds one minute. Choose a shorter video.')
+            : code === 'ad_upload_verification_failed'
+              ? (ar ? 'الفيديو اترفع، لكن تعذر الاتصال بـ Cloudinary للتأكد منه. حاول إعادة التأكد من الرفع.' : 'Video uploaded, but Cloudinary verification is unavailable. Retry verification.')
+              : (ar ? 'تعذر الرفع أو التأكد منه. حاول مرة أخرى.' : 'Upload or verification failed. Please try again.'));
       setUploadState('error');
     }
   };

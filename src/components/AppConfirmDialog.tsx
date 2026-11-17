@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode, type KeyboardEvent } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { AlertTriangle, ShieldAlert, X } from 'lucide-react';
 import type { Language } from '../types';
 
@@ -14,7 +14,7 @@ export type ConfirmationOptions = {
 type ConfirmFunction = (options: ConfirmationOptions) => Promise<boolean>;
 const ConfirmationContext = createContext<ConfirmFunction | null>(null);
 
-/** App-branded, accessible confirmation instead of blocking browser confirm(). */
+/** App-branded, accessible confirmation instead of browser-native blockers. */
 export function AppConfirmProvider({ children }: { children: ReactNode }) {
   const [request, setRequest] = useState<ConfirmationOptions | null>(null);
   const resolver = useRef<((result: boolean) => void) | null>(null);
@@ -44,7 +44,7 @@ export function AppConfirmProvider({ children }: { children: ReactNode }) {
     document.body.style.overflow = 'hidden';
     // Put initial focus on the safe choice (cancel), not the destructive action.
     cancelButton.current?.focus();
-    const onEscape = (event: globalThis.KeyboardEvent) => {
+    const onEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
         finish(false);
@@ -63,7 +63,7 @@ export function AppConfirmProvider({ children }: { children: ReactNode }) {
     resolver.current = null;
   }, []);
 
-  const keepFocusInside = (event: KeyboardEvent<HTMLDivElement>) => {
+  const keepFocusInside = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'Tab') return;
     const first = cancelButton.current;
     const last = confirmButton.current;

@@ -55,10 +55,10 @@ export function OfferDetailPage({ lang, offerId }: { lang: Language; offerId: st
         <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="space-y-3 p-4 sm:p-6">
             {demo && <p className="w-fit rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-900">{ar ? 'إعلان تجريبي' : 'Demo ad'}</p>}
-            <h1 className="break-words text-2xl font-extrabold sm:text-3xl">{title}</h1>
             {merchant && <p className="flex items-center gap-2 text-sm font-semibold">
               <Store className="size-5 shrink-0 text-emerald-700 dark:text-emerald-400" aria-hidden="true" />{merchant}
             </p>}
+            <h1 className="break-words text-2xl font-extrabold sm:text-3xl">{title}</h1>
           </div>
           {image && <img src={image} alt={title}
             className="max-h-[60vh] w-full bg-slate-100 object-contain dark:bg-slate-800" />}

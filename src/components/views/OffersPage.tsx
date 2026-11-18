@@ -127,12 +127,12 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                               {isAr ? 'إعلان تجريبي' : 'Demo ad'}
                             </span>}
                             <div className="flex flex-1 flex-col gap-2 p-3.5">
+                              <p className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
+                                <Store className="size-4 shrink-0 text-emerald-700 dark:text-emerald-400" aria-hidden="true" /><span className="min-w-0 break-words">{merchant}</span>
+                              </p>
                               <h2 className="break-words text-lg font-extrabold leading-snug">{adTitle}</h2>
                               <p className="line-clamp-2 break-words text-sm text-slate-600 dark:text-slate-300">{description}</p>
-                              <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pt-1">
-                                <span className="flex min-w-0 items-center gap-1.5 break-words text-sm font-semibold">
-                                  <Store className="size-4 shrink-0 text-emerald-700 dark:text-emerald-400" aria-hidden="true" />{merchant}
-                                </span>
+                              <div className="mt-auto flex justify-end pt-1">
                                 <a href={`/offers/ad/${ad.id}`} aria-label={`${isAr ? 'شوف العرض' : 'View offer'} · ${adTitle}`}
                                   className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-50 px-3 text-sm font-bold text-emerald-900 hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-emerald-600 dark:bg-emerald-950 dark:text-emerald-200 dark:hover:bg-emerald-900">
                                   {isAr ? 'شوف العرض' : 'View offer'} <ForwardIcon className="size-4" aria-hidden="true" />

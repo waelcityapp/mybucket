@@ -1,3 +1,4 @@
+import { followInternalLink } from '../../utils/navigationHistory';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, Store } from 'lucide-react';
 import type { Language } from '../../types';
@@ -7,7 +8,7 @@ import { DEMO_ADS } from '../../data/demoAds';
 import { adContactPhone } from '../../utils/adContactPhone';
 import { AdVideoPlayer } from '../AdVideoPlayer';
 
-export function OfferDetailPage({ lang, offerId }: { lang: Language; offerId: string }) {
+export function OfferDetailPage({ lang, offerId, onBack }: { lang: Language; offerId: string; onBack: (path: string) => void }) {
   const ar = lang === 'ar';
   const demo = DEMO_ADS.find(ad => ad.id === offerId);
   const [result, setResult] = useState<{ id: string; offer?: PublicOfferAd | null; expired?: boolean; failed?: boolean }>();
@@ -50,7 +51,7 @@ export function OfferDetailPage({ lang, offerId }: { lang: Language; offerId: st
   return (
     <main dir={ar ? 'rtl' : 'ltr'} className="min-h-screen bg-slate-50 px-4 py-5 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div className="mx-auto max-w-3xl">
-        <a href={categorySlug ? `/offers/category/${categorySlug}` : '/offers'}
+        <a href={categorySlug ? `/offers/category/${categorySlug}` : '/offers'} onClick={event => followInternalLink(event, onBack)}
           className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-bold text-emerald-800 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-emerald-600 dark:text-emerald-200 dark:hover:bg-emerald-950">
           <BackIcon className="size-5" aria-hidden="true" />
           {ar ? 'كل عروض القسم' : 'Back to offers'}

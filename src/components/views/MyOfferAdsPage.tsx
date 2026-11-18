@@ -1,10 +1,11 @@
+import { followInternalLink } from '../../utils/navigationHistory';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, Megaphone, RefreshCw } from 'lucide-react';
 import type { Language } from '../../types';
 import type { MyOfferAd } from '../../data/offerAds';
 import { offerAdsRequest } from '../../services/offerAdsClient';
 
-export function MyOfferAdsPage({ uid, lang, onBack }: { uid: string; lang: Language; onBack: () => void }) {
+export function MyOfferAdsPage({ uid, lang, onBack, onNavigate }: { uid: string; lang: Language; onBack: () => void; onNavigate: (path: string) => void }) {
   const ar = lang === 'ar';
   const Back = ar ? ArrowRight : ArrowLeft;
   const [result, setResult] = useState<{ uid: string; ads: MyOfferAd[] } | null>(null);
@@ -79,7 +80,7 @@ export function MyOfferAdsPage({ uid, lang, onBack }: { uid: string; lang: Langu
         : ads === null && <p role="status" className="text-sm">{ar ? 'جاري تحميل إعلاناتك...' : 'Loading your ads…'}</p>}
       {ads && visibleAds.length === 0 && <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
         <p className="font-bold">{ar ? 'لسه ما أرسلتش إعلانات' : 'You haven’t submitted any ads yet'}</p>
-        <a href="/offers/new" className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-emerald-800 underline dark:text-emerald-300">
+        <a href="/offers/new" onClick={event => followInternalLink(event, onNavigate)} className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-emerald-800 underline dark:text-emerald-300">
           <Megaphone className="size-4" aria-hidden="true" />{ar ? 'إنشاء إعلان' : 'Create an ad'}</a>
       </section>}
       {deleteError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{ar ? 'تعذّر إكمال الحذف. جرّب تاني.' : 'Could not complete deletion. Try again.'}</p>}
@@ -113,11 +114,11 @@ export function MyOfferAdsPage({ uid, lang, onBack }: { uid: string; lang: Langu
                 <button type="button" disabled={deleting} onClick={() => setConfirmDelete(null)} className="min-h-11 px-3 text-sm font-bold">{ar ? 'إلغاء' : 'Cancel'}</button>
               </div>
             </div> : <div className="flex flex-wrap gap-3">
-              <a href={`/offers/new?renew=${ad.id}`} className="inline-flex min-h-11 items-center rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white">{ar ? 'إعادة الإرسال للمراجعة' : 'Resubmit for review'}</a>
+              <a href={`/offers/new?renew=${ad.id}`} onClick={event => followInternalLink(event, onNavigate)} className="inline-flex min-h-11 items-center rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white">{ar ? 'إعادة الإرسال للمراجعة' : 'Resubmit for review'}</a>
               <button type="button" disabled={deleting} onClick={() => { setConfirmDelete(ad.id); setDeleteError(false); }} className="min-h-11 px-2 text-sm font-bold text-red-700 dark:text-red-300">{ar ? 'حذف الإعلان' : 'Delete ad'}</button>
             </div>}
           </div>}
-          {published && <a href={`/offers/ad/${ad.id}`} className="inline-flex min-h-11 items-center text-sm font-bold text-emerald-800 underline dark:text-emerald-300">{ar ? 'شوف الإعلان المنشور' : 'View published ad'}</a>}
+          {published && <a href={`/offers/ad/${ad.id}`} onClick={event => followInternalLink(event, onNavigate)} className="inline-flex min-h-11 items-center text-sm font-bold text-emerald-800 underline dark:text-emerald-300">{ar ? 'شوف الإعلان المنشور' : 'View published ad'}</a>}
           </article>
         </div>;
       })}

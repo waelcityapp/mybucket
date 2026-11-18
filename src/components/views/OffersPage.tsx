@@ -1,3 +1,4 @@
+import { followInternalLink } from '../../utils/navigationHistory';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft, ArrowRight, Search, Plus, Landmark, UtensilsCrossed, ShoppingBasket,
@@ -13,8 +14,7 @@ interface OffersPageProps {
   lang: Language;
   onBack: () => void;
   categorySlug?: string | null;
-  onOpenCategory: (slug: string) => void;
-  onAddAd: () => void;
+  onNavigate: (path: string) => void;
 }
 
 interface OfferCategory {
@@ -39,7 +39,7 @@ const CATEGORIES: OfferCategory[] = [
 ];
 
 
-export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySlug, onOpenCategory, onAddAd }) => {
+export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySlug, onNavigate }) => {
   const isAr = lang === 'ar';
   const BackIcon = isAr ? ArrowRight : ArrowLeft;
   const ForwardIcon = isAr ? ArrowLeft : ArrowRight;
@@ -84,7 +84,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
             <p className="text-xs text-slate-500">My Bucket</p>
           </div>
           {!categorySlug && (
-            <button type="button" onClick={onAddAd}
+            <button type="button" onClick={() => onNavigate('/offers/new')}
               aria-label={isAr ? 'إضافة إعلان جديد' : 'Add new advertisement'}
               title={isAr ? 'إضافة إعلان جديد' : 'Add new advertisement'}
               className="h-12 w-12 sm:h-14 sm:w-14 shrink-0 rounded-2xl bg-emerald-600 text-white shadow-md hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 flex items-center justify-center transition-colors">
@@ -113,7 +113,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                         return (
                           <article key={ad.id} className="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                             {media?.type === 'image' && <img src={media.url} alt="" loading="lazy" className="aspect-video w-full bg-slate-100 object-cover dark:bg-slate-800" />}
-                            {hasVideo && <a href={`/offers/ad/${ad.id}`}
+                            {hasVideo && <a href={`/offers/ad/${ad.id}`} onClick={event => followInternalLink(event, onNavigate)}
                               aria-label={`${isAr ? 'شوف الفيديو' : 'View video'} · ${adTitle}`}
                               className="relative block aspect-video bg-emerald-950 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white">
                               {media?.poster && <img src={media.poster} alt="" loading="lazy" className="h-full w-full object-cover" />}
@@ -133,7 +133,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                               <h2 className="break-words text-lg font-extrabold leading-snug">{adTitle}</h2>
                               <p className="line-clamp-2 break-words text-sm text-slate-600 dark:text-slate-300">{description}</p>
                               <div className="mt-auto flex justify-end pt-1">
-                                <a href={`/offers/ad/${ad.id}`} aria-label={`${isAr ? 'شوف العرض' : 'View offer'} · ${adTitle}`}
+                                <a href={`/offers/ad/${ad.id}`} onClick={event => followInternalLink(event, onNavigate)} aria-label={`${isAr ? 'شوف العرض' : 'View offer'} · ${adTitle}`}
                                   className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-50 px-3 text-sm font-bold text-emerald-900 hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-emerald-600 dark:bg-emerald-950 dark:text-emerald-200 dark:hover:bg-emerald-900">
                                   {isAr ? 'شوف العرض' : 'View offer'} <ForwardIcon className="size-4" aria-hidden="true" />
                                 </a>
@@ -186,7 +186,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                     <a
                       key={item.slug}
                       href={`/offers/category/${item.slug}`}
-                      onClick={event => { if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); onOpenCategory(item.slug); } }}
+                      onClick={event => followInternalLink(event, onNavigate)}
                       className="bg-white border border-slate-200 rounded-2xl px-4 py-4 min-h-[100px] flex items-center gap-3 hover:border-emerald-300 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-emerald-500 transition-all"
                     >
                       <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">

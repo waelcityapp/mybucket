@@ -1,3 +1,4 @@
+import { followInternalLink } from '../../utils/navigationHistory';
 import type { PublicOfferAd } from '../../data/offerAds';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, ArrowLeft, ImagePlus, Megaphone, CheckCircle2, X } from 'lucide-react';
@@ -28,9 +29,9 @@ const categories = [
   { id: 'technology', ar: 'الإلكترونيات والتكنولوجيا', en: 'Electronics & Technology' },
 ] as const;
 
-interface Props { lang: Language; onBack: () => void }
+interface Props { lang: Language; onBack: () => void; onNavigate: (path: string) => void }
 
-export function CreateOfferPage({ lang, onBack }: Props) {
+export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   const ar = lang === 'ar';
   const [tier, setTier] = useState<'free' | 'featured'>('free');
   const [category, setCategory] = useState('');
@@ -337,13 +338,13 @@ export function CreateOfferPage({ lang, onBack }: Props) {
             <p role={renewState === 'error' ? 'alert' : 'status'}>{renewState === 'loading'
               ? (ar ? 'جاري تحميل بيانات الإعلان المنتهي...' : 'Loading the expired ad…')
               : (ar ? 'تعذّر فتح الإعلان لإعادة الإرسال. راجع «إعلاناتي» وحاول تاني.' : 'Could not open this ad for renewal. Check My ads and try again.')}</p>
-            {renewState === 'error' && <a className="mt-3 inline-block font-bold text-emerald-800 underline" href="/settings/ads">{ar ? 'إعلاناتي' : 'My ads'}</a>}
+            {renewState === 'error' && <a className="mt-3 inline-block font-bold text-emerald-800 underline" href="/settings/ads" onClick={event => followInternalLink(event, onNavigate)}>{ar ? 'إعلاناتي' : 'My ads'}</a>}
           </section>
         ) : submitted ? (
           <section className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950">
             <h2 className="flex items-center gap-2 font-extrabold"><CheckCircle2 className="size-5" />{ar ? 'تم إرسال إعلانك للمراجعة' : 'Your ad was sent for review'}</h2>
             <p className="text-sm">{ar ? 'هيظهر في القسم خلال مدة النشر المحددة بعد موافقة الإدارة.' : 'It will appear in its category during the selected dates after approval.'}</p>
-            <a className="inline-flex min-h-11 items-center font-bold underline" href="/settings/ads">{ar ? 'تابع الإعلان في إعلاناتي' : 'Track the ad in My ads'}</a>
+            <a className="inline-flex min-h-11 items-center font-bold underline" href="/settings/ads" onClick={event => followInternalLink(event, onNavigate)}>{ar ? 'تابع الإعلان في إعلاناتي' : 'Track the ad in My ads'}</a>
           </section>
         ) : preview ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-4">

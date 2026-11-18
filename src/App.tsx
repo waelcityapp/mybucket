@@ -267,7 +267,22 @@ export default function App() {
     if (recordTabNavigation(window.history, window.location, activeTab, tab)) setActiveTab(tab);
   };
   const openGuide = () => { window.history.pushState({ guide: true }, '', '/guide'); setActiveTab('guide'); };
-  const openOffers = () => { if (window.location.pathname !== '/offers') window.history.pushState({ offers: true }, '', '/offers'); setActiveTab('offers'); };
+  const [, setOfferLocation] = useState(() => window.location.pathname + window.location.search);
+  const navigateOffer = (path: string, replace = false) => {
+    const current = window.location.pathname + window.location.search;
+    if (current === path) return;
+    const state = replace ? {} : { offerBack: current, offers: path === '/offers' };
+    if (replace) window.history.replaceState(state, '', path);
+    else window.history.pushState(state, '', path);
+    setOfferLocation(path);
+    setActiveTab(tabFromHistory(window.location, state));
+    window.scrollTo(0, 0);
+  };
+  const backFromOffer = (fallback: string) => {
+    if (window.history.state?.offerBack === fallback) window.history.back();
+    else navigateOffer(fallback, true);
+  };
+  const openOffers = () => navigateOffer('/offers');
   const openAccountSettings = () => { window.history.pushState({ accounts: true }, '', '/accounts'); setActiveTab('accounts'); };
   const openSubscriptionPage = (page: 'trial-details' | 'subscription') => {
     window.history.pushState({ subscriptionPage: page }, '', page === 'trial-details' ? '/trial' : '/subscription');
@@ -419,6 +434,7 @@ export default function App() {
   // Keep the browser and mobile Back controls aligned with full-page admin routes.
   useEffect(() => {
     const onPopState = () => {
+      setOfferLocation(window.location.pathname + window.location.search);
       const next = tabFromHistory(window.location, window.history.state);
       setAdminRoute(window.location.pathname);
       setActiveTab(next === 'admin' && !adminPinVerified ? 'admin-pin' : next);
@@ -1420,7 +1436,7 @@ export default function App() {
   };
 
   const offerPath = window.location.pathname.match(/^\/offers\/ad\/([^/]+)\/?$/);
-  if (offerPath) return <OfferDetailPage lang={lang} offerId={offerPath[1]} />;
+  if (offerPath) return <OfferDetailPage lang={lang} offerId={offerPath[1]} onBack={backFromOffer} />;
 
   // Public offers are browsable without financial account sign-in.
   if (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) {
@@ -1430,18 +1446,19 @@ export default function App() {
     return <OffersPage
       lang={lang}
       categorySlug={categorySlug}
-      onAddAd={() => { window.location.assign('/offers/new'); }}
-      onOpenCategory={(slug) => {
-        window.location.assign(`/offers/category/${encodeURIComponent(slug)}`);
-      }}
+      onNavigate={navigateOffer}
       onBack={() => {
-        if (categorySlug) {
-          if (window.history.state?.offerCategory) window.history.back();
-          else window.location.assign('/offers');
-        } else if (window.history.state?.offers) window.history.back();
-        else { window.history.replaceState({}, '', '/'); setActiveTab('home'); }
+        if (categorySlug) backFromOffer('/offers');
+        else if (window.history.state?.offers) window.history.back();
+        else navigateOffer('/', true);
       }}
     />;
+  }
+
+  const creatingOffer = window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment';
+  const backFromCreateOffer = () => backFromOffer(new URLSearchParams(window.location.search).has('renew') ? '/settings/ads' : '/offers');
+  if (creatingOffer && isAuthChecking) {
+    return <AdSignInGate lang={lang} checking onBack={backFromCreateOffer} onSignIn={loginWithGoogle} />;
   }
 
   // 1. Splash / Auth Checking State
@@ -1466,9 +1483,9 @@ export default function App() {
   }
 
   // Browsing is public, but creating or preparing an advertisement requires sign-in.
-  if (window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment') {
-    if (!authUser) return <AdSignInGate lang={lang} onBack={() => window.location.assign('/offers')} onSignIn={loginWithGoogle} />;
-    return <CreateOfferPage lang={lang} onBack={() => window.location.assign(new URLSearchParams(window.location.search).has('renew') ? '/settings/ads' : '/offers')} />;
+  if (creatingOffer) {
+    if (!authUser) return <AdSignInGate lang={lang} onBack={backFromCreateOffer} onSignIn={loginWithGoogle} />;
+    return <CreateOfferPage lang={lang} onBack={backFromCreateOffer} onNavigate={navigateOffer} />;
   }
 
   // 2. Dedicated Full-Page Auth & Registration (No popups / No modals)
@@ -1489,8 +1506,8 @@ export default function App() {
   }
 
   if (window.location.pathname === '/settings/ads') {
-    return <MyOfferAdsPage uid={authUser.uid} lang={lang} onBack={() => {
-      if (window.history.state?.myAds) window.history.back();
+    return <MyOfferAdsPage uid={authUser.uid} lang={lang} onNavigate={navigateOffer} onBack={() => {
+      if (window.history.state?.myAds || window.history.state?.offerBack === '/') window.history.back();
       else {
         window.history.replaceState({ myBucketTab: 'settings' }, '', '/');
         setActiveTab('settings');

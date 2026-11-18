@@ -7,7 +7,7 @@ export const DEMO_ADS = [
   { id: 'demo-fashion-1', categorySlug: 'fashion', ar: ['تشكيلة ملابس جديدة', 'اكتشف تشكيلة ملابس يومية تناسب مختلف الأذواق.', 'بيت الأناقة'], en: ['New clothing collection', 'Explore an everyday collection for different tastes.', 'Style House'], image: 'fashion.jpg' },
   { id: 'demo-fashion-2', categorySlug: 'fashion', ar: ['عرض على الإكسسوارات', 'تشكيلة إكسسوارات لإكمال إطلالتك.', 'لمسة'], en: ['Accessories offer', 'A selection of accessories to complete your look.', 'Lamsa'], image: 'shop.jpg' },
   { id: 'demo-fashion-3', categorySlug: 'fashion', ar: ['أساسيات كل يوم', 'قطع عملية مريحة للاستخدام اليومي.', 'خطوة'], en: ['Everyday essentials', 'Comfortable practical pieces for daily wear.', 'Khotwa'], image: 'fashion.jpg' },
-  { id: 'demo-home-1', categorySlug: 'home-shopping', ar: ['لمسة طبيعية لمنزلك', 'شاهد مثالًا لفيديو قصير عن النباتات والزهور.', 'ركن البيت'], en: ['A natural touch for your home', 'Watch a short sample video about plants and flowers.', 'Home Corner'], video: 'flower.mp4' },
+  { id: 'demo-home-1', categorySlug: 'home-shopping', ar: ['فيديو تجريبي بالصوت', 'شغّل الفيديو لتجربة الصوت.', 'ركن البيت'], en: ['Video with sound', 'Play the video to test the audio.', 'Home Corner'], video: 'sound-test.mp4' },
   { id: 'demo-home-2', categorySlug: 'home-shopping', ar: ['مستلزمات البيت', 'اكتشف تشكيلة عملية لاحتياجات البيت اليومية.', 'بيتنا'], en: ['Home essentials', 'Discover practical items for everyday home needs.', 'Beitna'], image: 'shop.jpg' },
   { id: 'demo-food-1', categorySlug: 'food-beverages', ar: ['منتجات لمائدتك', 'أفكار لوجبات شهية تجمع الأسرة.', 'زاد'], en: ['For your table', 'Ideas for delicious meals to share with family.', 'Zad'], image: 'food.jpg' },
 ] as const;

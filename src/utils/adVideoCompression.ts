@@ -1,5 +1,5 @@
 /** Compress using native browser APIs; never silently claim compression on unsupported devices. */
-export async function compressAdVideo(file: File): Promise<File> {
+export async function compressAdVideo(file: File, onProgress?: (percent: number) => void): Promise<File> {
   if (!['video/mp4', 'video/webm', 'video/quicktime'].includes(file.type)) throw new Error('unsupported_video');
   const video = document.createElement('video');
   const sourceUrl = URL.createObjectURL(file);
@@ -33,6 +33,12 @@ export async function compressAdVideo(file: File): Promise<File> {
       video.onended = () => { if (recorder.state !== 'inactive') recorder.stop(); };
       video.onerror = () => { if (recorder.state !== 'inactive') recorder.stop(); reject(new Error('invalid_video')); };
     });
+    const reportProgress = () => {
+      const percent = Math.floor((video.currentTime / video.duration) * 100);
+      onProgress?.(Math.min(99, percent));
+    };
+    video.ontimeupdate = reportProgress;
+    reportProgress();
     recorder.start();
     await video.play();
     const blob = await result;
@@ -40,6 +46,7 @@ export async function compressAdVideo(file: File): Promise<File> {
     if (blob.size >= file.size) return file;
     return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.webm', { type: 'video/webm', lastModified: file.lastModified });
   } finally {
+    video.ontimeupdate = null;
     video.pause();
     stream?.getTracks().forEach(track => track.stop());
     video.removeAttribute('src'); video.load(); URL.revokeObjectURL(sourceUrl);

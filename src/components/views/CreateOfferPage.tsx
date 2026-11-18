@@ -41,6 +41,7 @@ export function CreateOfferPage({ lang, onBack }: Props) {
   const [dateError, setDateError] = useState<'invalid' | 'order' | 'past' | null>(null);
   const [image, setImage] = useState<File | null>(null);
   const [imageStatus, setImageStatus] = useState<'idle' | 'compressing' | 'ready' | 'error'>('idle');
+  const [videoProgress, setVideoProgress] = useState<number | 'checking' | null>(null);
   const [mediaError, setMediaError] = useState<'generic' | 'video_too_long' | 'video_too_large'>('generic');
   const [compressionNotice, setCompressionNotice] = useState(false);
   const [uploadState, setUploadState] = useState<'idle' | 'uploading' | 'verifying' | 'success' | 'error'>('idle');
@@ -250,13 +251,19 @@ export function CreateOfferPage({ lang, onBack }: Props) {
               <input id="offer-image" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime" disabled={uploadState === 'uploading' || uploadState === 'verifying'} onChange={async event => {
                 const next = event.target.files?.[0] ?? null;
                 const selection = ++imageSelection.current;
+                setVideoProgress(null);
                 setImage(null); setMediaError('generic'); setCompressionNotice(false); setUploadState('idle'); setUploadError(''); setPendingUpload(null); setVerifiedUpload(null);
                 if (!next) { setImageStatus('idle'); return; }
                 const isVideo = next.type.startsWith('video/');
                 if ((!isVideo && next.size > 5 * 1024 * 1024) || !['image/png', 'image/jpeg', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime'].includes(next.type)) { setImageStatus('error'); return; }
                 setImageStatus('compressing');
+                if (isVideo) setVideoProgress('checking');
                 try {
-                  const result = isVideo ? await compressAdVideo(next) : await compressAdImage(next);
+                  const result = isVideo
+                    ? await compressAdVideo(next, progress => {
+                      if (selection === imageSelection.current) setVideoProgress(progress);
+                    })
+                    : await compressAdImage(next);
                   if (selection === imageSelection.current) { setImage(result); setImageStatus('ready'); }
                 } catch (error) {
                   if (selection === imageSelection.current) {
@@ -268,7 +275,20 @@ export function CreateOfferPage({ lang, onBack }: Props) {
                 }
               }} className="block w-full text-xs text-slate-600 file:me-3 file:border-0 file:rounded-lg file:bg-emerald-50 file:text-emerald-800 file:font-bold file:px-3 file:py-2" />
               <p className="text-xs text-slate-500">{ar ? 'للتجربة: الصور حتى 5 ميجابايت، والفيديو حتى 25 ميجابايت ودقيقة واحدة. تجهيز الفيديو قد يستغرق مدة تشغيله.' : 'For this preview: images up to 5 MB; videos up to 25 MB and one minute. Video preparation may take its full duration.'}</p>
-              {imageStatus === 'compressing' && <p role="status" className="text-xs text-slate-600">{ar ? 'جاري تجهيز الملف...' : 'Preparing file...'}</p>}
+              {imageStatus === 'compressing' && (videoProgress === null
+                ? <p role="status" className="text-xs text-slate-600">{ar ? 'جاري تجهيز الصورة...' : 'Preparing the image…'}</p>
+                : <div className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-900">
+                  <div className="flex items-center justify-between gap-2 text-sm font-bold">
+                    <p role="status">{videoProgress === 'checking'
+                      ? (ar ? 'جاري فحص الفيديو...' : 'Checking the video…')
+                      : (ar ? 'جاري تجهيز الفيديو للمعاينة...' : 'Preparing the video for preview…')}</p>
+                    {typeof videoProgress === 'number' && <span dir="ltr">{videoProgress}%</span>}
+                  </div>
+                  <progress max={100} value={typeof videoProgress === 'number' ? videoProgress : undefined}
+                    aria-label={ar ? 'تقدّم تجهيز الفيديو' : 'Video preparation progress'}
+                    className="block h-2.5 w-full accent-emerald-700" />
+                  <p className="text-xs">{ar ? 'التجهيز بيتم على جهازك وقد يستغرق مدة الفيديو. خليك في الصفحة لحد ما تظهر المعاينة.' : 'Preparation runs on your device and can take as long as the video. Keep this page open until the preview appears.'}</p>
+                </div>)}
               {imageStatus === 'ready' && <p role="status" className="text-xs text-emerald-700">{ar ? 'الملف جاهز للمعاينة.' : 'File is ready for preview.'}</p>}
               {compressionNotice && <p className="text-xs text-amber-800">{ar ? 'المتصفح لا يدعم ضغط الفيديو؛ المعاينة تستخدم الملف الأصلي على جهازك.' : 'This browser cannot compress video; the local preview uses the original file.'}</p>}
               {imageStatus === 'error' && <p role="alert" className="text-xs text-red-700">{mediaError === 'video_too_long' ? (ar ? 'مدة الفيديو أكتر من دقيقة. اختار فيديو مدته دقيقة أو أقل.' : 'The video is longer than one minute. Choose a video of one minute or less.') : mediaError === 'video_too_large' ? (ar ? 'حجم الفيديو أكبر من 25 ميجابايت. اختار ملفًا أصغر.' : 'The video exceeds 25 MB. Choose a smaller file.') : (ar ? 'تعذر تجهيز الملف. تأكد من الحجم ونوع الملف ودعم المتصفح.' : 'Could not prepare the file. Check its size, type and browser support.')}</p>}

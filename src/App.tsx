@@ -1421,6 +1421,28 @@ export default function App() {
   const offerPath = window.location.pathname.match(/^\/offers\/ad\/([^/]+)\/?$/);
   if (offerPath) return <OfferDetailPage lang={lang} offerId={offerPath[1]} />;
 
+  // Public offers are browsable without financial account sign-in.
+  if (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) {
+    const categorySlug = window.location.pathname.startsWith('/offers/category/')
+      ? decodeURIComponent(window.location.pathname.slice('/offers/category/'.length))
+      : null;
+    return <OffersPage
+      lang={lang}
+      categorySlug={categorySlug}
+      onAddAd={() => { window.location.assign('/offers/new'); }}
+      onOpenCategory={(slug) => {
+        window.location.assign(`/offers/category/${encodeURIComponent(slug)}`);
+      }}
+      onBack={() => {
+        if (categorySlug) {
+          if (window.history.state?.offerCategory) window.history.back();
+          else window.location.assign('/offers');
+        } else if (window.history.state?.offers) window.history.back();
+        else { window.history.replaceState({}, '', '/'); setActiveTab('home'); }
+      }}
+    />;
+  }
+
   // 1. Splash / Auth Checking State
   if (isAuthChecking) {
     return (
@@ -1446,28 +1468,6 @@ export default function App() {
   if (window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment') {
     if (!authUser) return <AdSignInGate lang={lang} onBack={() => window.location.assign('/offers')} onSignIn={loginWithGoogle} />;
     return <CreateOfferPage lang={lang} onBack={() => window.location.assign('/offers')} />;
-  }
-
-  // Public offers are browsable without financial account sign-in.
-  if (activeTab === 'offers') {
-    const categorySlug = window.location.pathname.startsWith('/offers/category/')
-      ? decodeURIComponent(window.location.pathname.slice('/offers/category/'.length))
-      : null;
-    return <OffersPage
-      lang={lang}
-      categorySlug={categorySlug}
-      onAddAd={() => { window.location.assign('/offers/new'); }}
-      onOpenCategory={(slug) => {
-        window.location.assign(`/offers/category/${encodeURIComponent(slug)}`);
-      }}
-      onBack={() => {
-        if (categorySlug) {
-          if (window.history.state?.offerCategory) window.history.back();
-          else window.location.assign('/offers');
-        } else if (window.history.state?.offers) window.history.back();
-        else { window.history.replaceState({}, '', '/'); setActiveTab('home'); }
-      }}
-    />;
   }
 
   // 2. Dedicated Full-Page Auth & Registration (No popups / No modals)

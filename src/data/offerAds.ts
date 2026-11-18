@@ -24,4 +24,4 @@ export type ReviewOfferAd = PublicOfferAd & {
   rejectionReason: string;
 };
 
-export type MyOfferAd = Pick<ReviewOfferAd, 'id' | 'title' | 'merchant' | 'status' | 'submittedAt' | 'startsAt' | 'endsAt' | 'rejectionReason'>;
+export type MyOfferAd = Pick<ReviewOfferAd, 'id' | 'title' | 'merchant' | 'status' | 'submittedAt' | 'startsAt' | 'endsAt' | 'rejectionReason'> & { deleteAfter: number | null };

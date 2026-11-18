@@ -1,3 +1,4 @@
+import type { PublicOfferAd } from '../../data/offerAds';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, ArrowLeft, ImagePlus, Megaphone, CheckCircle2, X } from 'lucide-react';
 import type { Language } from '../../types';
@@ -40,6 +41,26 @@ export function CreateOfferPage({ lang, onBack }: Props) {
   const [startsAt, setStartsAt] = useState(emptyAdSchedule);
   const [endsAt, setEndsAt] = useState(emptyAdSchedule);
   const [dateError, setDateError] = useState<'invalid' | 'order' | 'past' | null>(null);
+  const renewId = new URLSearchParams(window.location.search).get('renew');
+  const [renewState, setRenewState] = useState<'loading' | 'ready' | 'error'>(renewId ? 'loading' : 'ready');
+  const [reusedMedia, setReusedMedia] = useState<PublicOfferAd['media']>();
+  useEffect(() => {
+    if (!renewId) return;
+    let active = true;
+    offerAdsRequest<PublicOfferAd>('ads.renewal', { id: renewId }, true)
+      .then(ad => {
+        if (!active) return;
+        setTitle(ad.title);
+        setDescription(ad.description);
+        setCategory(ad.categorySlug);
+        setMerchant(ad.merchant);
+        setContact(ad.contact);
+        setReusedMedia(ad.media);
+        setRenewState('ready');
+      })
+      .catch(() => { if (active) setRenewState('error'); });
+    return () => { active = false; };
+  }, [renewId]);
   const [image, setImage] = useState<File | null>(null);
   const [imageStatus, setImageStatus] = useState<'idle' | 'compressing' | 'ready' | 'error'>('idle');
   const [videoProgress, setVideoProgress] = useState<number | 'checking' | null>(null);
@@ -77,7 +98,9 @@ export function CreateOfferPage({ lang, onBack }: Props) {
   useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
   const [videoPoster, setVideoPoster] = useState<{ source: string; url: string } | null>(null);
   const isVideo = image?.type.startsWith('video/') ?? false;
-  const poster = videoPoster?.source === imageUrl ? videoPoster?.url : undefined;
+  const previewUrl = imageUrl ?? reusedMedia?.url;
+  const previewType = image ? (isVideo ? 'video' : 'image') : reusedMedia?.type;
+  const poster = image ? (videoPoster?.source === imageUrl ? videoPoster?.url : undefined) : reusedMedia?.poster;
   useEffect(() => {
     setVideoPoster(null);
     if (!isVideo || !imageUrl) return;
@@ -113,6 +136,7 @@ export function CreateOfferPage({ lang, onBack }: Props) {
     }
     if (fileInput.current) fileInput.current.value = '';
     submission.current = null;
+    setReusedMedia(undefined);
     setImage(null);
     setImageStatus('idle');
     setVideoProgress(null);
@@ -219,13 +243,14 @@ export function CreateOfferPage({ lang, onBack }: Props) {
       const prepared = await offerAdsRequest<{ submitted: boolean; signed: SignedAdUpload | null }>('ads.prepare', {
         id: draft.id, title, description, merchant, contact, categorySlug: category,
         startsAt: start.getTime(), endsAt: end.getTime(),
-        resourceType: image ? (isVideo ? 'video' : 'image') : null, bytes: image?.size ?? 0,
+        resourceType: previewType ?? null, bytes: image?.size ?? (reusedMedia ? 1 : 0),
       }, true);
       if (cancelSend.current && !prepared.submitted) return;
       if (!prepared.submitted) {
-        if (image && prepared.signed && !draft.media) {
+        const source = image ?? reusedMedia?.url;
+        if (source && prepared.signed && !draft.media) {
           setSendProgress(0);
-          draft.media = await uploadAdMedia(image, prepared.signed, setSendProgress);
+          draft.media = await uploadAdMedia(source, prepared.signed, setSendProgress);
         }
         setSendProgress(null);
         if (cancelSend.current) return;
@@ -237,7 +262,11 @@ export function CreateOfferPage({ lang, onBack }: Props) {
     } catch (error) {
       if (cancelSend.current) return;
       const code = error instanceof Error ? error.message : '';
-      setSendError(code === 'ad_daily_limit'
+      setSendError(code === 'ad_free_interval'
+        ? (ar ? 'لسه ما مرّتش المدة المطلوبة من آخر إعلان مجاني اتوافق عليه، حتى لو انتهى الإعلان أو اتحذف.' : 'Your free-ad interval has not passed since the last approval, even if that ad ended or was deleted.')
+        : code === 'ad_pending_exists'
+          ? (ar ? 'عندك إعلان مجاني بانتظار الموافقة. استنى قرار الإدارة قبل إرسال إعلان تاني.' : 'You already have a free ad awaiting review. Wait for the decision before submitting another.')
+        : code === 'ad_daily_limit'
         ? (ar ? 'وصلت للحد اليومي لإرسال الإعلانات. حاول يوم تاني.' : 'You reached the daily ad limit. Try again another day.')
         : code === 'ad_video_duration_unavailable'
           ? (ar ? 'الفيديو اترفع ولسه بيتفحص. جرّب الإرسال تاني بعد شوية.' : 'The video uploaded and is still being processed. Try sending again shortly.')
@@ -283,7 +312,7 @@ export function CreateOfferPage({ lang, onBack }: Props) {
       );
     }
     return <AdPaymentCheckout lang={lang} advertiserName={merchant} adTitle={title} startsAt={start} endsAt={end}
-      mediaType={image ? (image.type.startsWith('video/') ? 'video' : 'image') : 'none'} onBack={returnFromPayment} />;
+      mediaType={previewType ?? 'none'} onBack={returnFromPayment} />;
   }
 
   const label = 'block text-xs font-extrabold text-slate-700 mb-1.5';
@@ -303,7 +332,14 @@ export function CreateOfferPage({ lang, onBack }: Props) {
         </div>
       </header>
       <main className="max-w-xl mx-auto px-4 py-5 pb-20 space-y-5">
-        {submitted ? (
+        {renewState !== 'ready' ? (
+          <section className="rounded-2xl border border-slate-200 bg-white p-5">
+            <p role={renewState === 'error' ? 'alert' : 'status'}>{renewState === 'loading'
+              ? (ar ? 'جاري تحميل بيانات الإعلان المنتهي...' : 'Loading the expired ad…')
+              : (ar ? 'تعذّر فتح الإعلان لإعادة الإرسال. راجع «إعلاناتي» وحاول تاني.' : 'Could not open this ad for renewal. Check My ads and try again.')}</p>
+            {renewState === 'error' && <a className="mt-3 inline-block font-bold text-emerald-800 underline" href="/settings/ads">{ar ? 'إعلاناتي' : 'My ads'}</a>}
+          </section>
+        ) : submitted ? (
           <section className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950">
             <h2 className="flex items-center gap-2 font-extrabold"><CheckCircle2 className="size-5" />{ar ? 'تم إرسال إعلانك للمراجعة' : 'Your ad was sent for review'}</h2>
             <p className="text-sm">{ar ? 'هيظهر في القسم خلال مدة النشر المحددة بعد موافقة الإدارة.' : 'It will appear in its category during the selected dates after approval.'}</p>
@@ -312,8 +348,8 @@ export function CreateOfferPage({ lang, onBack }: Props) {
         ) : preview ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-4">
             <h2 className="font-extrabold">{ar ? 'معاينة الإعلان قبل الإرسال' : 'Preview before submission'}</h2>
-            {imageUrl && image?.type.startsWith('video/') && <p className="text-xs text-slate-500">{ar ? 'تجربة مشاهدة الزائر: 3 مرات يوميًا على هذا المتصفح.' : 'Visitor playback demo: 3 plays per day in this browser.'}</p>}
-            <AdCreativeCard lang={lang} title={title} description={description} merchant={merchant} contact={contact} mediaUrl={imageUrl} poster={poster} mediaType={image?.type.startsWith('video/') ? 'video' : 'image'} videoQuotaId="local-ad-preview-demo" />
+            {previewUrl && previewType === 'video' && <p className="text-xs text-slate-500">{ar ? 'تجربة مشاهدة الزائر: 3 مرات يوميًا على هذا المتصفح.' : 'Visitor playback demo: 3 plays per day in this browser.'}</p>}
+            <AdCreativeCard lang={lang} title={title} description={description} merchant={merchant} contact={contact} mediaUrl={previewUrl} poster={poster} mediaType={previewType} videoQuotaId="local-ad-preview-demo" />
             <p className="text-xs text-slate-600">{ar ? 'بداية النشر:' : 'Publication starts:'} {adScheduleDate(startsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
             <p className="text-xs text-slate-600">{ar ? 'نهاية النشر:' : 'Publication ends:'} {adScheduleDate(endsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
             <button type="button" disabled={hasSubmission || cancellingSend} onClick={() => setPreview(false)} className="w-full rounded-xl border border-emerald-600 text-emerald-700 py-3 text-sm font-bold disabled:opacity-50">{ar ? 'تعديل الإعلان' : 'Edit advertisement'}</button>
@@ -388,6 +424,7 @@ export function CreateOfferPage({ lang, onBack }: Props) {
                 preparation.current = controller;
                 submission.current = null;
                 setSendError('');
+                setReusedMedia(undefined);
                 setVideoProgress(null);
                 setImage(null); setMediaError('generic'); setCompressionNotice(false); setUploadState('idle'); setUploadError(''); setPendingUpload(null); setVerifiedUpload(null);
                 if (!next) { setImageStatus('idle'); return; }
@@ -411,7 +448,7 @@ export function CreateOfferPage({ lang, onBack }: Props) {
                   }
                 }
               }} className="block min-w-0 flex-1 text-xs text-slate-600 file:me-3 file:border-0 file:rounded-lg file:bg-emerald-50 file:text-emerald-800 file:font-bold file:px-3 file:py-2" />
-                {imageStatus !== 'idle' && <button type="button" onClick={() => void removeMedia()} disabled={removingMedia}
+                {(imageStatus !== 'idle' || reusedMedia) && <button type="button" onClick={() => void removeMedia()} disabled={removingMedia}
                   aria-label={ar ? 'إلغاء وإزالة الملف' : 'Cancel and remove media'}
                   title={ar ? 'إلغاء وإزالة الملف' : 'Cancel and remove media'}
                   className="grid size-11 shrink-0 place-items-center rounded-xl border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50">
@@ -437,7 +474,7 @@ export function CreateOfferPage({ lang, onBack }: Props) {
               {imageStatus === 'ready' && <p role="status" className="text-xs text-emerald-700">{ar ? 'الملف جاهز للمعاينة.' : 'File is ready for preview.'}</p>}
               {compressionNotice && <p className="text-xs text-amber-800">{ar ? 'المتصفح لا يدعم ضغط الفيديو؛ المعاينة تستخدم الملف الأصلي على جهازك.' : 'This browser cannot compress video; the local preview uses the original file.'}</p>}
               {imageStatus === 'error' && <p role="alert" className="text-xs text-red-700">{mediaError === 'video_too_long' ? (ar ? 'مدة الفيديو أكتر من دقيقة. اختار فيديو مدته دقيقة أو أقل.' : 'The video is longer than one minute. Choose a video of one minute or less.') : mediaError === 'video_too_large' ? (ar ? 'حجم الفيديو أكبر من 25 ميجابايت. اختار ملفًا أصغر.' : 'The video exceeds 25 MB. Choose a smaller file.') : (ar ? 'تعذر تجهيز الملف. تأكد من الحجم ونوع الملف ودعم المتصفح.' : 'Could not prepare the file. Check its size, type and browser support.')}</p>}
-              {imageUrl && (image?.type.startsWith('video/') ? <AdVideoPlayer src={imageUrl} poster={poster} label={ar ? 'معاينة فيديو الإعلان' : 'Advertisement video preview'} className="w-full max-h-48 object-contain rounded-xl bg-slate-50" /> : <img src={imageUrl} alt={ar ? 'معاينة الصورة' : 'Image preview'} className="w-full max-h-48 object-contain rounded-xl bg-slate-50" />)}
+              {previewUrl && (previewType === 'video' ? <AdVideoPlayer src={previewUrl} poster={poster} label={ar ? 'معاينة فيديو الإعلان' : 'Advertisement video preview'} className="w-full max-h-48 object-contain rounded-xl bg-slate-50" /> : <img src={previewUrl} alt={ar ? 'معاينة الصورة' : 'Image preview'} className="w-full max-h-48 object-contain rounded-xl bg-slate-50" />)}
               {isAdmin && image && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 space-y-3">
                 <p className="text-xs font-bold text-emerald-900">{ar ? 'اختبار رفع للإدارة فقط' : 'Admin-only upload test'}</p>
                 <p className="text-xs leading-relaxed text-emerald-800">{ar ? 'يرفع الملف فعليًا إلى Cloudinary. لن يُحفظ الإعلان في Firebase أو يُرسل للمراجعة بعد، وتقدر تحذف الملف التجريبي بزر ×.' : 'Uploads the file to Cloudinary. The ad is not yet saved to Firebase or submitted for review; Use × to remove the test file from Cloudinary.'}</p>

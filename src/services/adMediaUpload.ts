@@ -19,7 +19,7 @@ export type UploadedAdMedia = {
 };
 
 /** Returns untrusted provider response data; the server must verify it before storing or using it. */
-export function uploadAdMedia(file: File, signed: SignedAdUpload, onProgress: (percent: number) => void, signal?: AbortSignal): Promise<UploadedAdMedia> {
+export function uploadAdMedia(file: File | string, signed: SignedAdUpload, onProgress: (percent: number) => void, signal?: AbortSignal): Promise<UploadedAdMedia> {
   if (!/^[a-zA-Z0-9_-]+$/.test(signed.cloudName) || !['image', 'video'].includes(signed.resourceType) || signed.deliveryType !== 'authenticated') return Promise.reject(new Error('invalid_upload_configuration'));
   if (signal?.aborted) return Promise.reject(new Error('upload_cancelled'));
   const form = new FormData();

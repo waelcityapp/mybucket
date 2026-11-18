@@ -10,13 +10,13 @@ import { AdVideoPlayer } from '../AdVideoPlayer';
 export function OfferDetailPage({ lang, offerId }: { lang: Language; offerId: string }) {
   const ar = lang === 'ar';
   const demo = DEMO_ADS.find(ad => ad.id === offerId);
-  const [result, setResult] = useState<{ id: string; offer?: PublicOfferAd | null; failed?: boolean }>();
+  const [result, setResult] = useState<{ id: string; offer?: PublicOfferAd | null; expired?: boolean; failed?: boolean }>();
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (demo) return;
     let active = true;
-    offerAdsRequest<PublicOfferAd | null>('ads.detail', { id: offerId })
-      .then(offer => { if (active) setResult({ id: offerId, offer }); })
+    offerAdsRequest<PublicOfferAd | { expired: true } | null>('ads.detail', { id: offerId })
+      .then(offer => { if (active) setResult(offer && 'expired' in offer ? { id: offerId, expired: true } : { id: offerId, offer }); })
       .catch(() => { if (active) setResult({ id: offerId, failed: true }); });
     return () => { active = false; };
   }, [attempt, demo, offerId]);
@@ -26,6 +26,7 @@ export function OfferDetailPage({ lang, offerId }: { lang: Language; offerId: st
   const [title, description, merchant] = demo ? (ar ? demo.ar : demo.en) : live
     ? [live.title, live.description, live.merchant]
     : [current?.failed ? (ar ? 'تعذّر تحميل العرض' : 'Could not load the offer')
+      : current?.expired ? (ar ? 'انتهت مدة العرض' : 'This offer has ended')
       : current ? (ar ? 'العرض غير متاح' : 'Offer unavailable') : (ar ? 'جاري تحميل العرض...' : 'Loading offer…')];
   const contactPhone = live?.contact ? adContactPhone(live.contact) : null;
   const categorySlug = demo?.categorySlug ?? live?.categorySlug;

@@ -1468,7 +1468,7 @@ export default function App() {
   // Browsing is public, but creating or preparing an advertisement requires sign-in.
   if (window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment') {
     if (!authUser) return <AdSignInGate lang={lang} onBack={() => window.location.assign('/offers')} onSignIn={loginWithGoogle} />;
-    return <CreateOfferPage lang={lang} onBack={() => window.location.assign('/offers')} />;
+    return <CreateOfferPage lang={lang} onBack={() => window.location.assign(new URLSearchParams(window.location.search).has('renew') ? '/settings/ads' : '/offers')} />;
   }
 
   // 2. Dedicated Full-Page Auth & Registration (No popups / No modals)

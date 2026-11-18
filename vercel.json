@@ -1,8 +1,10 @@
 {
+  "crons": [{ "path": "/api/gateway", "schedule": "0 2 * * *" }],
   "headers": [
     {
       "source": "/offers/ad/:id(demo-[a-z0-9-]+)",
-      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+      "crons": [{ "path": "/api/gateway", "schedule": "0 2 * * *" }],
+  "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
     }
   ],
   "rewrites": [

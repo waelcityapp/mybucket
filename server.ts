@@ -58,11 +58,11 @@ async function startServer() {
         const { readMyOfferAds } = await import('./server/offerAds.js');
         return res.json({ ok: true, data: await readMyOfferAds(user.uid) });
       }
-      if (action === 'ads.prepare' || action === 'ads.submit' || action === 'ads.cancel') {
+      if (action === 'ads.prepare' || action === 'ads.submit' || action === 'ads.cancel' || action === 'ads.renewal' || action === 'ads.deleteExpired') {
         const { sendOfferAd } = await import('./server/offerAds.js');
         return res.json({ ok: true, data: await sendOfferAd(action, user.uid, payload) });
       }
-      if (action === 'admin.ads.list' || action === 'admin.ads.review') {
+      if (action === 'admin.ads.list' || action === 'admin.ads.review' || action === 'admin.ads.policy') {
         if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
         const { reviewOfferAds } = await import('./server/offerAds.js');
         return res.json({ ok: true, data: await reviewOfferAds(action, user.uid, payload) });

@@ -14,6 +14,27 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
   const [notice, setNotice] = useState('');
   const [decision, setDecision] = useState<{ id: string; status: 'approved' | 'rejected' } | null>(null);
   const [reason, setReason] = useState('');
+  const [days, setDays] = useState('');
+  const [policyBusy, setPolicyBusy] = useState(false);
+  const [policyMessage, setPolicyMessage] = useState('');
+  useEffect(() => {
+    let active = true;
+    offerAdsRequest<{ freeIntervalDays: number }>('admin.ads.policy', {}, true)
+      .then(policy => { if (active) setDays(String(policy.freeIntervalDays)); })
+      .catch(() => { if (active) setPolicyMessage(ar ? 'تعذّر تحميل مدة الإعلان المجاني.' : 'Could not load the free ad interval.'); });
+    return () => { active = false; };
+  }, [ar]);
+  const savePolicy = async () => {
+    setPolicyBusy(true);
+    setPolicyMessage('');
+    try {
+      const policy = await offerAdsRequest<{ freeIntervalDays: number }>('admin.ads.policy', { freeIntervalDays: Number(days) }, true);
+      setDays(String(policy.freeIntervalDays));
+      setPolicyMessage(ar ? 'تم حفظ المدة.' : 'Interval saved.');
+    } catch {
+      setPolicyMessage(ar ? 'تعذّر حفظ المدة.' : 'Could not save the interval.');
+    } finally { setPolicyBusy(false); }
+  };
 
   useEffect(() => {
     let active = true;
@@ -46,6 +67,8 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
       } else {
         setError(code === 'ad_schedule_expired'
           ? (ar ? 'موعد نشر الإعلان انتهى. تقدر ترفضه وتسجل السبب.' : 'The publication window has ended. You can reject the ad and record a reason.')
+          : code === 'ad_free_interval'
+            ? (ar ? 'لسه ما مرّتش المدة المطلوبة من آخر إعلان مجاني تمت الموافقة عليه لهذا الحساب.' : 'This account’s free ad interval has not passed since its last approval.')
           : (ar ? 'تعذّر حفظ القرار. حاول مرة تانية.' : 'Could not save the decision. Try again.'));
       }
     } finally { setBusy(false); }
@@ -55,6 +78,15 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
   const date = (value: number) => new Date(value).toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: 'Africa/Cairo' });
   const button = 'min-h-11 rounded-xl px-3 text-sm font-bold disabled:opacity-50';
   return <div className="space-y-4">
+    <form onSubmit={event => { event.preventDefault(); void savePolicy(); }} className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
+      <label className="block text-sm font-bold" htmlFor="free-ad-interval">{ar ? 'المدة بين الموافقات على الإعلانات المجانية (أيام)' : 'Days between free ad approvals'}</label>
+      <div className="flex flex-wrap gap-2">
+        <input id="free-ad-interval" type="number" min="1" max="90" required value={days} disabled={policyBusy}
+          onChange={event => setDays(event.target.value)} className="w-24 rounded-xl border border-slate-200 bg-white px-3 text-slate-900" />
+        <button type="submit" disabled={policyBusy || !days} className={`${button} bg-emerald-700 text-white`}>{ar ? 'حفظ' : 'Save'}</button>
+      </div>
+      {policyMessage && <p role="status" className="text-xs text-slate-700">{policyMessage}</p>}
+    </form>
     <div className="flex flex-wrap gap-2" aria-label={ar ? 'حالة الإعلان' : 'Ad status'}>
       {(['pending', 'approved', 'rejected'] as const).map(value => <button type="button" key={value} disabled={busy}
         aria-pressed={status === value} onClick={() => { if (status !== value) { setAds(null); setStatus(value); setDecision(null); setNotice(''); } }}

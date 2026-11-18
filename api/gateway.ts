@@ -15,6 +15,18 @@ type VercelResponse = {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method === 'GET') {
+    const secret = process.env.CRON_SECRET;
+    if (!secret || req.headers.authorization !== `Bearer ${secret}`) return res.status(401).json({ ok: false });
+    try {
+      const { purgeExpiredOffers } = await import('../server/offerAds.js');
+      const result = await purgeExpiredOffers();
+      return res.status(result.failed ? 503 : 200).json(result);
+    } catch (error) {
+      console.error('Advertisement cleanup failed:', error);
+      return res.status(500).json({ ok: false });
+    }
+  }
   if (req.method !== 'POST') {
     return res.status(405).json({ ok: false, error: 'method_not_allowed', message: 'Use POST for gateway operations.' });
   }
@@ -56,11 +68,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { readMyOfferAds } = await import('../server/offerAds.js');
       return res.status(200).json({ ok: true, data: await readMyOfferAds(user.uid) });
     }
-    if (action === 'ads.prepare' || action === 'ads.submit' || action === 'ads.cancel') {
+    if (action === 'ads.prepare' || action === 'ads.submit' || action === 'ads.cancel' || action === 'ads.renewal' || action === 'ads.deleteExpired') {
       const { sendOfferAd } = await import('../server/offerAds.js');
       return res.status(200).json({ ok: true, data: await sendOfferAd(action, user.uid, payload) });
     }
-    if (action === 'admin.ads.list' || action === 'admin.ads.review') {
+    if (action === 'admin.ads.list' || action === 'admin.ads.review' || action === 'admin.ads.policy') {
       if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
       const { reviewOfferAds } = await import('../server/offerAds.js');
       return res.status(200).json({ ok: true, data: await reviewOfferAds(action, user.uid, payload) });

@@ -588,3 +588,7 @@ Advertiser names appear above advertisement titles in every public card, offer d
 Account settings link to a private My Ads page. The gateway lists submitted advertisements owned by the signed-in account, with review outcome and current publication window. Complete phone numbers on public offer details are shown as blue telephone links.
 
 Profile settings show My Ads in a dedicated My Activity section after the Google account card, with room for future favorites and a role-gated marketer wallet when available.
+
+### Free ad approval interval and expiration
+
+Free submissions allow one pending ad per account and require a configurable 7-day interval from the most recent approval by default. Renewal opens an editable copy with new required publication dates, uses the same interval, and requires new approval. Rejection does not start an interval. The existing daily upload-attempt guard still applies. Expired ads remain eligible for renewal or permanent deletion for ten days. The daily authorized cleanup job deletes Cloudinary assets (including derived media) before removing Firestore ad documents, with retries on provider failure. Renewed offers own independent copies of their assets. An account-level last approval timestamp remains after removing the ad so removal cannot reset the interval.

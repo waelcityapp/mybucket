@@ -39,6 +39,18 @@ const CATEGORIES: OfferCategory[] = [
 ];
 
 
+function previewDescription(description: string) {
+  const text = description.trim().replace(/\s+/gu, ' ');
+  const characters = Array.from(text);
+  if (characters.length <= 120) return text;
+  const prefix = characters.slice(0, 119).join('').trimEnd();
+  const lastSpace = prefix.lastIndexOf(' ');
+  const completeWords = characters[119] === ' ' || characters[118] === ' ' || lastSpace < 0
+    ? prefix
+    : prefix.slice(0, lastSpace);
+  return completeWords + '…';
+}
+
 export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySlug, onNavigate }) => {
   const isAr = lang === 'ar';
   const BackIcon = isAr ? ArrowRight : ArrowLeft;
@@ -131,11 +143,11 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                                 <Store className="size-4 shrink-0 text-emerald-700 dark:text-emerald-400" aria-hidden="true" /><span className="min-w-0 break-words">{merchant}</span>
                               </p>
                               <h2 className="break-words text-lg font-extrabold leading-snug">{adTitle}</h2>
-                              <p className="line-clamp-2 break-words text-sm text-slate-600 dark:text-slate-300">{description}</p>
+                              <p className="line-clamp-2 break-words text-sm text-slate-600 dark:text-slate-300">{previewDescription(description)}</p>
                               <div className="mt-auto flex justify-end pt-1">
-                                <a href={`/offers/ad/${ad.id}`} onClick={event => followInternalLink(event, onNavigate)} aria-label={`${isAr ? 'شوف العرض' : 'View offer'} · ${adTitle}`}
+                                <a href={`/offers/ad/${ad.id}`} onClick={event => followInternalLink(event, onNavigate)} aria-label={`${isAr ? 'مزيد من التفاصيل' : 'More details'} · ${adTitle}`}
                                   className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-50 px-3 text-sm font-bold text-emerald-900 hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-emerald-600 dark:bg-emerald-950 dark:text-emerald-200 dark:hover:bg-emerald-900">
-                                  {isAr ? 'شوف العرض' : 'View offer'} <ForwardIcon className="size-4" aria-hidden="true" />
+                                  {isAr ? 'مزيد من التفاصيل' : 'More details'} <ForwardIcon className="size-4" aria-hidden="true" />
                                 </a>
                               </div>
                             </div>

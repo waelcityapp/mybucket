@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft, ArrowRight, Search, Plus, Landmark, UtensilsCrossed, ShoppingBasket,
   Shirt, Plane, Dumbbell, Car, HeartPulse, House, GraduationCap,
   Gift, Smartphone, Store, Play, type LucideIcon
 } from 'lucide-react';
 import { Language } from '../../types';
+import type { PublicOfferAd } from '../../data/offerAds';
+import { offerAdsRequest } from '../../services/offerAdsClient';
 import { DEMO_ADS } from '../../data/demoAds';
 
 interface OffersPageProps {
@@ -42,12 +44,31 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
   const BackIcon = isAr ? ArrowRight : ArrowLeft;
   const ForwardIcon = isAr ? ArrowLeft : ArrowRight;
   const [search, setSearch] = useState('');
+  const [published, setPublished] = useState<PublicOfferAd[] | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setLoadError(false);
+    offerAdsRequest<PublicOfferAd[]>('ads.list')
+      .then(ads => { if (active) setPublished(ads); })
+      .catch(() => { if (active) setLoadError(true); });
+    return () => { active = false; };
+  }, [attempt]);
   const category = CATEGORIES.find(item => item.slug === categorySlug);
   const list = useMemo(() => CATEGORIES.filter(item =>
     `${item.ar} ${item.en}`.toLowerCase().includes(search.trim().toLowerCase())
   ), [search]);
 
-  const categoryCount = (slug: string) => DEMO_ADS.filter(offer => offer.categorySlug === slug).length;
+  const categoryCount = (slug: string) => published?.filter(offer => offer.categorySlug === slug).length;
+  const demoAds = DEMO_ADS.filter(ad => ad.categorySlug === categorySlug).map(ad => {
+    const [title, description, merchant] = isAr ? ad.ar : ad.en;
+    const media = 'video' in ad ? { type: 'video' as const, poster: `/demo-ads/${ad.poster}`, url: `/demo-ads/${ad.video}` }
+      : 'image' in ad ? { type: 'image' as const, url: `/demo-ads/${ad.image}` } : undefined;
+    return { id: ad.id, title, description, merchant, media };
+  });
+  const realAds = published?.filter(ad => ad.categorySlug === categorySlug) ?? [];
+  const visibleAds = realAds.length ? realAds : demoAds;
   const title = category ? (isAr ? category.ar : category.en) : (isAr ? 'وفّر مع My Bucket' : 'Save with My Bucket');
 
   return (
@@ -74,39 +95,37 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
       </header>
 
       <main className={`mx-auto px-4 py-6 pb-16 ${categorySlug ? "max-w-7xl" : "max-w-xl"}`}>
+        {loadError ? <p role="alert" className="mb-4 text-sm text-red-700">
+          {isAr ? 'تعذّر تحميل العروض المنشورة.' : 'Could not load published ads.'}{' '}
+          <button type="button" className="font-bold underline" onClick={() => setAttempt(value => value + 1)}>{isAr ? 'حاول تاني' : 'Retry'}</button>
+        </p> : published === null && <p role="status" className="mb-4 text-sm text-slate-600">{isAr ? 'جاري تحميل العروض المنشورة...' : 'Loading published ads…'}</p>}
         {categorySlug ? (
           <section className="space-y-4">
             {category ? (
               <>
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{isAr ? 'إعلانات القسم التجريبية' : 'Demo ads in this category'}</p>
-                  <span className="rounded-full bg-emerald-50 border border-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1.5">
-                    {isAr ? `${categoryCount(category.slug)} إعلان` : `${categoryCount(category.slug)} offers`}
-                  </span>
-                </div>
-                {categoryCount(category.slug) > 0 ? (
+                {visibleAds.length > 0 ? (
                   <div className="space-y-4">
-                    <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-semibold text-amber-900">{isAr ? 'الإعلانات دي أمثلة تجريبية، والعروض وأسماء المعلنين غير حقيقية.' : 'These are demonstration ads; the offers and advertisers are fictional.'}</p>
+                    {realAds.length === 0 && <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-semibold text-amber-900">{isAr ? 'الإعلانات دي أمثلة تجريبية، والعروض وأسماء المعلنين غير حقيقية.' : 'These are demonstration ads with fictional offers and advertisers.'}</p>}
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {DEMO_ADS.filter(ad => ad.categorySlug === category.slug).map(ad => {
-                        const [adTitle, description, merchant] = isAr ? ad.ar : ad.en;
-                        const hasVideo = 'video' in ad;
+                      {visibleAds.map(ad => {
+                        const { title: adTitle, description, merchant, media } = ad;
+                        const hasVideo = media?.type === 'video';
                         return (
                           <article key={ad.id} className="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                            {'image' in ad && <img src={`/demo-ads/${ad.image}`} alt="" loading="lazy" className="aspect-video w-full bg-slate-100 object-cover dark:bg-slate-800" />}
+                            {media?.type === 'image' && <img src={media.url} alt="" loading="lazy" className="aspect-video w-full bg-slate-100 object-cover dark:bg-slate-800" />}
                             {hasVideo && <a href={`/offers/ad/${ad.id}`}
                               aria-label={`${isAr ? 'شوف الفيديو' : 'View video'} · ${adTitle}`}
                               className="relative block aspect-video bg-emerald-950 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white">
-                              <img src={`/demo-ads/${ad.poster}`} alt="" loading="lazy" className="h-full w-full object-cover" />
+                              {media?.poster && <img src={media.poster} alt="" loading="lazy" className="h-full w-full object-cover" />}
                               <span className="absolute inset-0 grid place-items-center" aria-hidden="true">
                                 <span className="grid size-12 place-items-center rounded-full bg-black/70 text-white">
                                   <Play className="size-5 fill-current" />
                                 </span>
                               </span>
                             </a>}
-                            <span className={`w-fit rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-900 ${'image' in ad || hasVideo ? 'absolute start-3 top-3' : 'ms-3 mt-3'}`}>
+                            {realAds.length === 0 && <span className={`w-fit rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-900 ${media ? 'absolute start-3 top-3' : 'ms-3 mt-3'}`}>
                               {isAr ? 'إعلان تجريبي' : 'Demo ad'}
-                            </span>
+                            </span>}
                             <div className="flex flex-1 flex-col gap-2 p-3.5">
                               <h2 className="break-words text-lg font-extrabold leading-snug">{adTitle}</h2>
                               <p className="line-clamp-2 break-words text-sm text-slate-600 dark:text-slate-300">{description}</p>
@@ -125,7 +144,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                       })}
                     </div>
                   </div>
-                ) : <div className="bg-white border border-slate-200 rounded-2xl p-9 text-center">
+                ) : published !== null && <div className="bg-white border border-slate-200 rounded-2xl p-9 text-center">
                   <Gift className="w-10 h-10 text-slate-300 mx-auto mb-3" />
                   <h2 className="text-base font-bold">{isAr ? 'لا توجد عروض منشورة في هذا القسم حاليًا' : 'No published offers in this category yet'}</h2>
                   <p className="text-sm text-slate-500 mt-2">{isAr ? 'عند إضافة عروض حقيقية، هتظهر هنا.' : 'Published offers will appear here once available.'}</p>
@@ -175,7 +194,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-extrabold leading-snug">{isAr ? item.ar : item.en}</h4>
-                        <p className="text-xs text-slate-500 mt-1">{isAr ? `إعلانات تجريبية: ${categoryCount(item.slug)}` : `Demo ads: ${categoryCount(item.slug)}`}</p>
+                        {published && <p className="text-xs text-slate-500 mt-1">{isAr ? `عروض منشورة: ${categoryCount(item.slug)}` : `Published ads: ${categoryCount(item.slug)}`}</p>}
                       </div>
                       <ForwardIcon className="w-4 h-4 text-slate-400 shrink-0" />
                     </a>

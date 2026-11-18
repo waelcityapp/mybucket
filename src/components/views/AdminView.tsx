@@ -1,3 +1,4 @@
+import { AdminOfferAds } from './AdminOfferAds';
 import { useState } from 'react';
 import {
   ArrowLeft, ArrowRight, CheckCircle2, Database, RotateCcw, ShieldCheck,
@@ -40,7 +41,7 @@ export function AdminView({
     { id: 'users' as const, icon: Users, title: ar ? 'مستخدمى التطبيق' : 'App users', desc: ar ? 'التسجيل والتثبيت والاشتراكات والتحكم بالحسابات' : 'Registrations, installs, plans and account controls', ready: true },
     { id: 'subscriptions' as const, icon: CreditCard, title: ar ? 'الاشتراكات' : 'Subscriptions', desc: ar ? 'التحكم في مدد Pro وBasic لجميع المستخدمين' : 'Global Pro and Basic trial days', ready: true },
     { id: 'marketers' as const, icon: Megaphone, title: ar ? 'المسوقون' : 'Marketers', desc: ar ? 'الأكواد والعمولات' : 'Codes and commissions', ready: false },
-    { id: 'ads' as const, icon: PanelsTopLeft, title: ar ? 'إدارة الإعلانات' : 'Ads management', desc: ar ? 'الإعلانات والعروض المنشورة' : 'Published ads and offers', ready: false },
+    { id: 'ads' as const, icon: PanelsTopLeft, title: ar ? 'إدارة الإعلانات' : 'Ads management', desc: ar ? 'مراجعة الإعلانات الواردة والموافقة أو الرفض' : 'Review, approve or reject submitted ads', ready: true },
     { id: 'reports' as const, icon: MessageSquareText, title: ar ? 'البلاغات' : 'Reports', desc: ar ? 'تقييمات المحلل المحلي والتحكم فيها' : 'Local analyzer feedback and controls', ready: true },
     { id: 'ai' as const, icon: BrainCircuit, title: ar ? 'الذكاء الاصطناعي' : 'Artificial intelligence', desc: ar ? 'Gemini والاستهلاك واختيار النموذج' : 'Gemini, usage and model selection', ready: true },
     { id: 'branding' as const, icon: Palette, title: ar ? 'التحكم في هوية التطبيق' : 'App identity', desc: ar ? 'تغيير الاسم والأيقونة عبر Cloudinary' : 'Edit the name and Cloudinary icon', ready: true },
@@ -133,6 +134,8 @@ export function AdminView({
               </div>
             </div>
           )}
+
+          {selected === 'ads' && <AdminOfferAds lang={lang} />}
 
           {selected === 'reports' && (
             <button type="button" onClick={onOpenFeedbackAdmin}

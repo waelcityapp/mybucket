@@ -36,6 +36,10 @@ async function startServer() {
         const { getAppIdentity } = await import('./server/appIdentity.js');
         return res.json({ ok: true, data: await getAppIdentity() });
       }
+      if (req.body?.action === 'ads.list' || req.body?.action === 'ads.detail') {
+        const { readPublicOfferAds } = await import('./server/offerAds.js');
+        return res.json({ ok: true, data: await readPublicOfferAds(req.body.action, req.body.payload || {}) });
+      }
       const user = await verifyAuthenticatedUser(req);
       const action = req.body?.action;
       const payload = req.body?.payload || {};
@@ -50,6 +54,16 @@ async function startServer() {
         const data = action === 'admin.identity.signUpload' ? signBrandIconUpload(payload) : await saveAppIdentity(payload, user.uid);
         return res.json({ ok: true, data });
       }
+      if (action === 'ads.prepare' || action === 'ads.submit' || action === 'ads.cancel') {
+        const { sendOfferAd } = await import('./server/offerAds.js');
+        return res.json({ ok: true, data: await sendOfferAd(action, user.uid, payload) });
+      }
+      if (action === 'admin.ads.list' || action === 'admin.ads.review') {
+        if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+        const { reviewOfferAds } = await import('./server/offerAds.js');
+        return res.json({ ok: true, data: await reviewOfferAds(action, user.uid, payload) });
+      }
+
       if (action === 'admin.ads.testUploadSign' || action === 'admin.ads.testUploadConfirm' || action === 'admin.ads.testUploadDelete') {
         if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
         const { signAdminAdTestUpload, confirmAdminAdTestUpload, deleteAdminAdTestUpload } = await import('./server/adminAdTestUpload.js');

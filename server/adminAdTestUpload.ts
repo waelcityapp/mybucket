@@ -17,23 +17,23 @@ function resource(value: unknown): ResourceType {
 }
 
 /** Owner-only test: gateway must authenticate and authorize before calling. No Firebase writes. */
-export function signAdminAdTestUpload(uid: string, payload: Record<string, unknown>, cfg = config(), now = Date.now(), id: string = randomUUID()) {
+export function signAdminAdTestUpload(uid: string, payload: Record<string, unknown>, cfg = config(), now = Date.now(), id: string = randomUUID(), folder: 'test' | 'submissions' = 'test') {
   owner(uid);
   const resourceType = resource(payload.resourceType);
   const limit = (resourceType === 'image' ? 5 : 25) * 1024 * 1024;
   if (!Number.isSafeInteger(payload.bytes) || (payload.bytes as number) <= 0 || (payload.bytes as number) > limit || !Number.isFinite(now) || !idPattern.test(id)) return fail('invalid_upload_request');
-  const publicId = `mybucket/ads/test/${uid}/${id}`;
+  const publicId = `mybucket/ads/${folder}/${uid}/${id}`;
   const timestamp = Math.floor(now / 1000);
   const signingString = `overwrite=false&public_id=${publicId}&timestamp=${timestamp}&type=authenticated&upload_preset=${cfg.uploadPreset}`;
   const signature = createHash('sha1').update(signingString + cfg.apiSecret).digest('hex');
   return { cloudName: cfg.cloudName, apiKey: cfg.apiKey, uploadPreset: cfg.uploadPreset, publicId, timestamp, signature, resourceType, deliveryType: 'authenticated' as const };
 }
 
-export async function confirmAdminAdTestUpload(uid: string, payload: Record<string, unknown>, cfg = config(), getResource = fetch) {
+export async function confirmAdminAdTestUpload(uid: string, payload: Record<string, unknown>, cfg = config(), getResource = fetch, folder: 'test' | 'submissions' = 'test') {
   owner(uid);
   const resourceType = resource(payload.resourceType);
   const publicId = payload.publicId;
-  if (typeof publicId !== 'string' || !publicId.startsWith(`mybucket/ads/test/${uid}/`) || !idPattern.test(publicId.slice(`mybucket/ads/test/${uid}/`.length))) return fail('invalid_upload_request');
+  if (typeof publicId !== 'string' || !publicId.startsWith(`mybucket/ads/${folder}/${uid}/`) || !idPattern.test(publicId.slice(`mybucket/ads/${folder}/${uid}/`.length))) return fail('invalid_upload_request');
   const version = payload.version, signature = payload.responseSignature;
   if (typeof version !== 'number' || !Number.isSafeInteger(version) || version <= 0 || typeof signature !== 'string' || !/^[a-f0-9]{40}$/.test(signature)) return fail('invalid_upload_response');
   const expected = createHash('sha1').update(`public_id=${publicId}&version=${version}${cfg.apiSecret}`).digest();
@@ -64,11 +64,11 @@ export async function confirmAdminAdTestUpload(uid: string, payload: Record<stri
 }
 
 /** Delete only the authenticated test asset in the current administrator's folder. */
-export async function deleteAdminAdTestUpload(uid: string, payload: Record<string, unknown>, cfg = config(), destroy = fetch) {
+export async function deleteAdminAdTestUpload(uid: string, payload: Record<string, unknown>, cfg = config(), destroy = fetch, folder: 'test' | 'submissions' = 'test') {
   owner(uid);
   const resourceType = resource(payload.resourceType);
   const publicId = payload.publicId;
-  const prefix = `mybucket/ads/test/${uid}/`;
+  const prefix = `mybucket/ads/${folder}/${uid}/`;
   if (typeof publicId !== 'string' || !publicId.startsWith(prefix) || !idPattern.test(publicId.slice(prefix.length))) {
     return fail('invalid_upload_request');
   }

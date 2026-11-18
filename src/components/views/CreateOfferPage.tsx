@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { ArrowRight, ArrowLeft, ImagePlus, Megaphone, CheckCircle2, ShieldAlert, X } from 'lucide-react';
+import { ArrowRight, ArrowLeft, ImagePlus, Megaphone, CheckCircle2, X } from 'lucide-react';
 import type { Language } from '../../types';
 import { compressAdImage } from '../../utils/adImageCompression';
 import { captureAdVideoPoster } from '../../utils/adVideoPoster';
@@ -9,6 +9,7 @@ import { AdPaymentCheckout } from './AdPaymentCheckout';
 import { AdCreativeCard } from '../AdCreativeCard';
 import { AdScheduleFields } from '../AdScheduleFields';
 import { adScheduleDate, emptyAdSchedule } from '../../utils/adSchedule';
+import { offerAdsRequest } from '../../services/offerAdsClient';
 import { auth } from '../../lib/firebase';
 import { uploadAdMedia, type SignedAdUpload, type UploadedAdMedia } from '../../services/adMediaUpload';
 
@@ -63,7 +64,15 @@ export function CreateOfferPage({ lang, onBack }: Props) {
     window.addEventListener('popstate', syncCheckoutRoute);
     return () => window.removeEventListener('popstate', syncCheckoutRoute);
   }, []);
-  const [reviewPreview, setReviewPreview] = useState(false);
+  const submission = useRef<{ id: string; media: UploadedAdMedia | null } | null>(null);
+  const [hasSubmission, setHasSubmission] = useState(false);
+  const [cancellingSend, setCancellingSend] = useState(false);
+  const [cancelRequired, setCancelRequired] = useState(false);
+  const cancelSend = useRef(false);
+  const [sending, setSending] = useState(false);
+  const [sendProgress, setSendProgress] = useState<number | null>(null);
+  const [sendError, setSendError] = useState('');
+  const [submitted, setSubmitted] = useState(false);
   const imageUrl = useMemo(() => image ? URL.createObjectURL(image) : null, [image]);
   useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
   const [videoPoster, setVideoPoster] = useState<{ source: string; url: string } | null>(null);
@@ -103,6 +112,7 @@ export function CreateOfferPage({ lang, onBack }: Props) {
       }
     }
     if (fileInput.current) fileInput.current.value = '';
+    submission.current = null;
     setImage(null);
     setImageStatus('idle');
     setVideoProgress(null);
@@ -161,6 +171,83 @@ export function CreateOfferPage({ lang, onBack }: Props) {
     setDateError(null);
     if (title.trim() && description.trim() && category && merchant.trim()) setPreview(true);
   };
+  const discardSubmission = async () => {
+    if (!submission.current) return;
+    setCancellingSend(true);
+    setSendError('');
+    try {
+      await offerAdsRequest('ads.cancel', { id: submission.current.id }, true);
+      submission.current = null;
+      setHasSubmission(false);
+      setCancelRequired(false);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      if (code === 'ad_already_submitted') setSubmitted(true);
+      else {
+        setCancelRequired(true);
+        setSendError(ar ? 'تعذّر إلغاء الإرسال وحذف الملف. اضغط × للمحاولة تاني.' : 'Could not cancel the submission and remove the media. Press × to retry.');
+      }
+    } finally {
+      setCancellingSend(false);
+      cancelSend.current = false;
+    }
+  };
+  const requestCancel = () => {
+    if (cancellingSend || submitted) return;
+    if (sending) {
+      cancelSend.current = true;
+      setCancellingSend(true);
+    } else {
+      void discardSubmission();
+    }
+  };
+  const sendForReview = async () => {
+    if (sending || cancellingSend || cancelRequired || submitted || tier !== 'free') return;
+    const start = adScheduleDate(startsAt);
+    const end = adScheduleDate(endsAt);
+    if (!start || !end || end.getTime() <= Date.now()) {
+      setSendError(ar ? 'راجع تاريخ بداية ونهاية النشر.' : 'Check the publication dates.');
+      return;
+    }
+    const draft = submission.current ?? { id: crypto.randomUUID(), media: null };
+    submission.current = draft;
+    setHasSubmission(true);
+    setSending(true);
+    setSendProgress(null);
+    setSendError('');
+    try {
+      const prepared = await offerAdsRequest<{ submitted: boolean; signed: SignedAdUpload | null }>('ads.prepare', {
+        id: draft.id, title, description, merchant, contact, categorySlug: category,
+        startsAt: start.getTime(), endsAt: end.getTime(),
+        resourceType: image ? (isVideo ? 'video' : 'image') : null, bytes: image?.size ?? 0,
+      }, true);
+      if (cancelSend.current && !prepared.submitted) return;
+      if (!prepared.submitted) {
+        if (image && prepared.signed && !draft.media) {
+          setSendProgress(0);
+          draft.media = await uploadAdMedia(image, prepared.signed, setSendProgress);
+        }
+        setSendProgress(null);
+        if (cancelSend.current) return;
+        await offerAdsRequest('ads.submit', { ...draft.media, id: draft.id }, true);
+      }
+      cancelSend.current = false;
+      setCancellingSend(false);
+      setSubmitted(true);
+    } catch (error) {
+      if (cancelSend.current) return;
+      const code = error instanceof Error ? error.message : '';
+      setSendError(code === 'ad_daily_limit'
+        ? (ar ? 'وصلت للحد اليومي لإرسال الإعلانات. حاول يوم تاني.' : 'You reached the daily ad limit. Try again another day.')
+        : code === 'ad_video_duration_unavailable'
+          ? (ar ? 'الفيديو اترفع ولسه بيتفحص. جرّب الإرسال تاني بعد شوية.' : 'The video uploaded and is still being processed. Try sending again shortly.')
+          : (ar ? 'تعذّر إرسال الإعلان. راجع البيانات وحاول مرة تانية.' : 'Could not submit the ad. Check the details and try again.'));
+    } finally {
+      if (cancelSend.current) await discardSubmission();
+      setSending(false);
+      setSendProgress(null);
+    }
+  };
   const goToPayment = () => {
     if (!preview || tier !== 'featured') return;
     if (window.location.pathname !== '/offers/new/payment') {
@@ -206,7 +293,7 @@ export function CreateOfferPage({ lang, onBack }: Props) {
     <div dir={ar ? 'rtl' : 'ltr'} className="min-h-screen bg-[#F8FAFC] text-slate-900">
       <header className="bg-white border-b border-slate-200">
         <div className="max-w-xl mx-auto px-4 py-4 flex items-center gap-3">
-          <button type="button" disabled={removingMedia} onClick={preview ? () => setPreview(false) : onBack}
+          <button type="button" disabled={removingMedia || sending || cancellingSend || (hasSubmission && !submitted)} onClick={preview && !submitted ? () => setPreview(false) : onBack}
             className="w-11 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 inline-flex items-center justify-center shrink-0"
             aria-label={ar ? 'العودة' : 'Back'}><BackIcon className="w-5 h-5" /></button>
           <div className="min-w-0">
@@ -216,38 +303,36 @@ export function CreateOfferPage({ lang, onBack }: Props) {
         </div>
       </header>
       <main className="max-w-xl mx-auto px-4 py-5 pb-20 space-y-5">
-        <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-3 flex items-start gap-2">
-          <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
-          <p className="text-xs leading-relaxed">{ar
-            ? 'هذه صفحة تجهيز ومراجعة الإعلان فقط. الحفظ والإرسال والموافقة والنشر والدفع لم تُفعَّل بعد؛ لن يتم نشر أي إعلان من هذه الصفحة.'
-            : 'This is a draft and review screen only. Saving, submitting, approval, publishing and payments are not enabled; no advertisement will be published.'}</p>
-        </div>
-        {preview ? (
+        {submitted ? (
+          <section className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950">
+            <h2 className="flex items-center gap-2 font-extrabold"><CheckCircle2 className="size-5" />{ar ? 'تم إرسال إعلانك للمراجعة' : 'Your ad was sent for review'}</h2>
+            <p className="text-sm">{ar ? 'هيظهر في القسم خلال مدة النشر المحددة بعد موافقة الإدارة.' : 'It will appear in its category during the selected dates after approval.'}</p>
+            <a className="inline-flex min-h-11 items-center font-bold underline" href="/offers">{ar ? 'العودة للعروض' : 'Back to offers'}</a>
+          </section>
+        ) : preview ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-4">
-            <div className="flex items-center gap-2"><CheckCircle2 className="w-5 h-5 text-emerald-600" /><h2 className="font-extrabold">{ar ? 'معاينة الإعلان قبل الإرسال' : 'Preview before submission'}</h2></div>
-            <div className="grid grid-cols-2 gap-2" aria-label={ar ? 'طريقة المعاينة' : 'Preview mode'}>
-              <button type="button" aria-pressed={!reviewPreview} onClick={() => setReviewPreview(false)} className={`rounded-xl border px-3 py-2 text-xs font-bold ${!reviewPreview ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-600'}`}>{ar ? 'شكل الإعلان' : 'Advertisement'}</button>
-              <button type="button" aria-pressed={reviewPreview} onClick={() => setReviewPreview(true)} className={`rounded-xl border px-3 py-2 text-xs font-bold ${reviewPreview ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-600'}`}>{ar ? 'شكل مراجعة الإدارة' : 'Admin review'}</button>
-            </div>
-            {reviewPreview && <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">{ar ? 'تصميم تجريبي لشاشة المراجعة. الموافقة والرفض غير مفعّلين بعد.' : 'Review screen demonstration. Approval and rejection are not enabled yet.'}</p>}
+            <h2 className="font-extrabold">{ar ? 'معاينة الإعلان قبل الإرسال' : 'Preview before submission'}</h2>
             {imageUrl && image?.type.startsWith('video/') && <p className="text-xs text-slate-500">{ar ? 'تجربة مشاهدة الزائر: 3 مرات يوميًا على هذا المتصفح.' : 'Visitor playback demo: 3 plays per day in this browser.'}</p>}
             <AdCreativeCard lang={lang} title={title} description={description} merchant={merchant} contact={contact} mediaUrl={imageUrl} poster={poster} mediaType={image?.type.startsWith('video/') ? 'video' : 'image'} videoQuotaId="local-ad-preview-demo" />
-            {reviewPreview && <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-xs font-bold text-emerald-900">{ar ? 'نوع الإعلان:' : 'Advertisement type:'} {tier === 'free' ? (ar ? 'مجاني' : 'Free') : (ar ? 'مميز' : 'Featured')}</div>}
             <p className="text-xs text-slate-600">{ar ? 'بداية النشر:' : 'Publication starts:'} {adScheduleDate(startsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
             <p className="text-xs text-slate-600">{ar ? 'نهاية النشر:' : 'Publication ends:'} {adScheduleDate(endsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
-            {reviewPreview && <div className="grid grid-cols-2 gap-2"><button type="button" disabled className="rounded-xl bg-emerald-100 text-emerald-800 opacity-60 py-2 text-xs font-bold">{ar ? 'موافقة' : 'Approve'}</button><button type="button" disabled className="rounded-xl bg-red-100 text-red-800 opacity-60 py-2 text-xs font-bold">{ar ? 'رفض' : 'Reject'}</button></div>}
-            <button type="button" onClick={() => setPreview(false)} className="w-full rounded-xl border border-emerald-600 text-emerald-700 py-3 text-sm font-bold">{ar ? 'تعديل الإعلان' : 'Edit advertisement'}</button>
+            <button type="button" disabled={hasSubmission || cancellingSend} onClick={() => setPreview(false)} className="w-full rounded-xl border border-emerald-600 text-emerald-700 py-3 text-sm font-bold disabled:opacity-50">{ar ? 'تعديل الإعلان' : 'Edit advertisement'}</button>
             <div className="space-y-2 rounded-xl bg-slate-50 p-3 text-center">
-              <p className="text-xs font-bold text-slate-700">{tier === 'free' ? (ar ? 'الإعلان المجاني سيُرسل للإدارة للمراجعة والموافقة.' : 'Free ads will be sent to the administrator for review and approval.') : (ar ? 'الإعلان المميز سينتقل إلى صفحة الدفع قبل إرساله للمراجعة.' : 'Featured ads will proceed to payment before review.')}</p>
-              <button type="button" onClick={goToPayment} disabled={tier === 'free'}
-                className={tier === 'featured'
-                  ? 'w-full rounded-xl bg-emerald-700 px-3 py-3 text-sm font-extrabold text-white hover:bg-emerald-800'
-                  : 'w-full rounded-xl bg-slate-200 px-3 py-3 text-sm font-bold text-slate-500'}>
-                {tier === 'free' ? (ar ? 'الإرسال للإدارة — قريبًا' : 'Send for review — coming soon') : (ar ? 'الانتقال إلى صفحة الدفع' : 'Continue to payment')}
+              <button type="button" onClick={tier === 'free' ? () => void sendForReview() : goToPayment} disabled={sending || cancellingSend || cancelRequired}
+                className="w-full rounded-xl bg-emerald-700 px-3 py-3 text-sm font-extrabold text-white hover:bg-emerald-800 disabled:opacity-50">
+                {tier === 'free' ? (sending ? (ar ? 'جاري إرسال الإعلان...' : 'Sending ad…') : (ar ? 'إرسال للمراجعة' : 'Send for review')) : (ar ? 'الانتقال إلى صفحة الدفع' : 'Continue to payment')}
               </button>
-              <p className="text-xs text-slate-500">{tier === 'free'
-                ? (ar ? 'إرسال الإعلان المجاني للمراجعة لم يُفعّل بعد.' : 'Sending free ads for review is not enabled yet.')
-                : (ar ? 'صفحة الدفع متاحة للمعاينة. لا توجد رسوم أو تحويلات أو إرسال فعلي حتى تفعيل نظام الدفع.' : 'Checkout is available for preview only. No payments, transfers or actual submission are enabled yet.')}</p>
+              {hasSubmission && <button type="button" aria-label={ar ? 'إلغاء الإرسال' : 'Cancel submission'}
+                disabled={cancellingSend} onClick={requestCancel}
+                className="inline-flex min-h-11 items-center gap-1 rounded-xl px-3 text-sm font-bold text-red-700 disabled:opacity-50">
+                <X className="size-5" aria-hidden="true" />{ar ? 'إلغاء الإرسال' : 'Cancel submission'}
+              </button>}
+              {cancellingSend && <p role="status" className="text-xs text-slate-600">{ar ? 'جاري إلغاء الإرسال وتنظيف الملف...' : 'Cancelling the submission and cleaning up the media…'}</p>}
+              {sendProgress !== null && <progress max={100} value={sendProgress} aria-label={ar ? 'تقدّم رفع الملف' : 'Media upload progress'} className="block h-2 w-full accent-emerald-700" />}
+              {sendError && <p role="alert" className="text-sm text-red-700">{sendError}</p>}
+              <p className="text-xs text-slate-600">{tier === 'free'
+                ? (ar ? 'الإعلان يظهر للجمهور بعد موافقة الإدارة.' : 'Your ad becomes public after the administrator approves it.')
+                : (ar ? 'صفحة دفع الإعلان المميز متاحة للمعاينة.' : 'Featured ad checkout is available for preview.')}</p>
             </div>
           </section>
         ) : (
@@ -301,6 +386,8 @@ export function CreateOfferPage({ lang, onBack }: Props) {
                 preparation.current?.abort();
                 const controller = new AbortController();
                 preparation.current = controller;
+                submission.current = null;
+                setSendError('');
                 setVideoProgress(null);
                 setImage(null); setMediaError('generic'); setCompressionNotice(false); setUploadState('idle'); setUploadError(''); setPendingUpload(null); setVerifiedUpload(null);
                 if (!next) { setImageStatus('idle'); return; }

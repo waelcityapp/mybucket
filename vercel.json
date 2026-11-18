@@ -1,7 +1,7 @@
 {
   "headers": [
     {
-      "source": "/offers/ad/:path*",
+      "source": "/offers/ad/:id(demo-[a-z0-9-]+)",
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
     }
   ],

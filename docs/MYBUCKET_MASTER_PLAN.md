@@ -578,3 +578,7 @@ Video drafts now generate a local thumbnail from an early frame for both adverti
 Public offer browsing renders independently of financial authentication initialization. Video draft preparation shows an indeterminate check followed by progress based on video processing time.
 
 Draft media can be cancelled or removed. For owner-only Cloudinary test uploads, removal waits for the active transfer to settle and deletes the authenticated asset through the gateway before clearing the selection.
+
+### Live advertisement submission and moderation
+
+Signed-in users can submit free advertisements with optional authenticated Cloudinary media. The gateway verifies the media and persists the submission in Firestore. Only the owner account can list moderation queues or approve and reject. The guest catalog and offer detail read only approved ads during their scheduled window. Video posters come from a signed Cloudinary frame transformation. Featured checkout remains a preview until its payment process is enabled.

@@ -20,6 +20,7 @@ import { INITIAL_PROMO_BANNER, INITIAL_PERK_DEALS } from './data/dealsData';
 import { PromoBannerData, PerkDealItem } from './types/deals';
 import { PromoBanner } from './components/PromoBanner';
 import { DealsModal } from './components/DealsModal';
+import { OfferDetailPage } from './components/views/OfferDetailPage';
 import { OffersPage } from './components/views/OffersPage';
 import { CreateOfferPage } from './components/views/CreateOfferPage';
 import { AdSignInGate } from './components/views/AdSignInGate';
@@ -1416,6 +1417,9 @@ export default function App() {
       throw error;
     }
   };
+
+  const offerPath = window.location.pathname.match(/^\/offers\/ad\/([^/]+)\/?$/);
+  if (offerPath) return <OfferDetailPage lang={lang} offerId={offerPath[1]} />;
 
   // 1. Splash / Auth Checking State
   if (isAuthChecking) {

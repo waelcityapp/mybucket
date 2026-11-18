@@ -2,10 +2,9 @@ import React, { useMemo, useState } from 'react';
 import {
   ArrowLeft, ArrowRight, Search, Plus, Landmark, UtensilsCrossed, ShoppingBasket,
   Shirt, Plane, Dumbbell, Car, HeartPulse, House, GraduationCap,
-  Gift, Smartphone, type LucideIcon
+  Gift, Smartphone, Store, Video, type LucideIcon
 } from 'lucide-react';
 import { Language } from '../../types';
-import { AdCreativeCard } from '../AdCreativeCard';
 import { DEMO_ADS } from '../../data/demoAds';
 
 interface OffersPageProps {
@@ -52,8 +51,8 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
   const title = category ? (isAr ? category.ar : category.en) : (isAr ? 'وفّر مع My Bucket' : 'Save with My Bucket');
 
   return (
-    <div dir={isAr ? 'rtl' : 'ltr'} className="min-h-screen bg-[#F8FAFC] text-slate-900">
-      <header className="bg-white border-b border-slate-200">
+    <div dir={isAr ? 'rtl' : 'ltr'} className="min-h-screen bg-[#F8FAFC] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+      <header className="bg-white border-b border-slate-200 dark:bg-slate-900 dark:border-slate-800">
         <div className="max-w-xl mx-auto px-4 py-4 flex items-center gap-3">
           <button type="button" onClick={onBack} aria-label={isAr ? 'رجوع' : 'Back'}
             className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 shrink-0">
@@ -74,13 +73,13 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
         </div>
       </header>
 
-      <main className="max-w-xl mx-auto px-4 py-6 pb-16">
+      <main className={`mx-auto px-4 py-6 pb-16 ${categorySlug ? "max-w-7xl" : "max-w-xl"}`}>
         {categorySlug ? (
           <section className="space-y-4">
             {category ? (
               <>
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-slate-700">{isAr ? 'إعلانات القسم التجريبية' : 'Demo ads in this category'}</p>
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{isAr ? 'إعلانات القسم التجريبية' : 'Demo ads in this category'}</p>
                   <span className="rounded-full bg-emerald-50 border border-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1.5">
                     {isAr ? `${categoryCount(category.slug)} إعلان` : `${categoryCount(category.slug)} offers`}
                   </span>
@@ -88,14 +87,36 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                 {categoryCount(category.slug) > 0 ? (
                   <div className="space-y-4">
                     <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-semibold text-amber-900">{isAr ? 'الإعلانات دي أمثلة تجريبية، والعروض وأسماء المعلنين غير حقيقية.' : 'These are demonstration ads; the offers and advertisers are fictional.'}</p>
-                    {DEMO_ADS.filter(ad => ad.categorySlug === category.slug).map(ad => {
-                      const [adTitle, description, merchant] = isAr ? ad.ar : ad.en;
-                      const media = 'video' in ad ? ad.video : 'image' in ad ? ad.image : undefined;
-                      return <div key={ad.id}>
-                        <p className="text-xs font-bold text-amber-800 mb-2">{isAr ? 'إعلان تجريبي' : 'Demo advertisement'}</p>
-                        <AdCreativeCard lang={lang} title={adTitle} description={description} merchant={merchant} mediaUrl={media ? `/demo-ads/${media}` : undefined} mediaType={'video' in ad ? 'video' : 'image'} videoQuotaId={'video' in ad ? ad.id : undefined} />
-                      </div>;
-                    })}
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {DEMO_ADS.filter(ad => ad.categorySlug === category.slug).map(ad => {
+                        const [adTitle, description, merchant] = isAr ? ad.ar : ad.en;
+                        const hasVideo = 'video' in ad;
+                        return (
+                          <article key={ad.id} className="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                            {'image' in ad && <img src={`/demo-ads/${ad.image}`} alt="" loading="lazy" className="aspect-video w-full bg-slate-100 object-cover dark:bg-slate-800" />}
+                            {hasVideo && <div className="flex aspect-video items-center justify-center bg-emerald-950 text-emerald-200">
+                              <Video className="size-10" aria-label={isAr ? 'فيديو الإعلان' : 'Advertisement video'} />
+                            </div>}
+                            <span className={`w-fit rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-900 ${'image' in ad || hasVideo ? 'absolute start-3 top-3' : 'ms-3 mt-3'}`}>
+                              {isAr ? 'إعلان تجريبي' : 'Demo ad'}
+                            </span>
+                            <div className="flex flex-1 flex-col gap-2 p-3.5">
+                              <h2 className="break-words text-lg font-extrabold leading-snug">{adTitle}</h2>
+                              <p className="line-clamp-2 break-words text-sm text-slate-600 dark:text-slate-300">{description}</p>
+                              <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pt-1">
+                                <span className="flex min-w-0 items-center gap-1.5 break-words text-sm font-semibold">
+                                  <Store className="size-4 shrink-0 text-emerald-700 dark:text-emerald-400" aria-hidden="true" />{merchant}
+                                </span>
+                                <a href={`/offers/ad/${ad.id}`} aria-label={`${isAr ? 'شوف العرض' : 'View offer'} · ${adTitle}`}
+                                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-50 px-3 text-sm font-bold text-emerald-900 hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-emerald-600 dark:bg-emerald-950 dark:text-emerald-200 dark:hover:bg-emerald-900">
+                                  {isAr ? 'شوف العرض' : 'View offer'} <ForwardIcon className="size-4" aria-hidden="true" />
+                                </a>
+                              </div>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
                   </div>
                 ) : <div className="bg-white border border-slate-200 rounded-2xl p-9 text-center">
                   <Gift className="w-10 h-10 text-slate-300 mx-auto mb-3" />

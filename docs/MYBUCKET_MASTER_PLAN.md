@@ -584,3 +584,5 @@ Draft media can be cancelled or removed. For owner-only Cloudinary test uploads,
 Signed-in users can submit free advertisements with optional authenticated Cloudinary media. The gateway verifies the media and persists the submission in Firestore. Only the owner account can list moderation queues or approve and reject. The guest catalog and offer detail read only approved ads during their scheduled window. Video posters come from a signed Cloudinary frame transformation. Featured checkout remains a preview until its payment process is enabled.
 
 Advertiser names appear above advertisement titles in every public card, offer detail and shared review preview.
+
+Account settings link to a private My Ads page. The gateway lists submitted advertisements owned by the signed-in account, with review outcome and current publication window. Complete phone numbers on public offer details are shown as blue telephone links.

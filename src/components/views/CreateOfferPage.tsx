@@ -307,7 +307,7 @@ export function CreateOfferPage({ lang, onBack }: Props) {
           <section className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950">
             <h2 className="flex items-center gap-2 font-extrabold"><CheckCircle2 className="size-5" />{ar ? 'تم إرسال إعلانك للمراجعة' : 'Your ad was sent for review'}</h2>
             <p className="text-sm">{ar ? 'هيظهر في القسم خلال مدة النشر المحددة بعد موافقة الإدارة.' : 'It will appear in its category during the selected dates after approval.'}</p>
-            <a className="inline-flex min-h-11 items-center font-bold underline" href="/offers">{ar ? 'العودة للعروض' : 'Back to offers'}</a>
+            <a className="inline-flex min-h-11 items-center font-bold underline" href="/settings/ads">{ar ? 'تابع الإعلان في إعلاناتي' : 'Track the ad in My ads'}</a>
           </section>
         ) : preview ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-4">

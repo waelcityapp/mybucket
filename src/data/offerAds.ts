@@ -23,3 +23,5 @@ export type ReviewOfferAd = PublicOfferAd & {
   submittedAt: number;
   rejectionReason: string;
 };
+
+export type MyOfferAd = Pick<ReviewOfferAd, 'id' | 'title' | 'merchant' | 'status' | 'submittedAt' | 'startsAt' | 'endsAt' | 'rejectionReason'>;

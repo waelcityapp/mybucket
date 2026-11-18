@@ -11,6 +11,7 @@ import {
   User as UserIcon,
   ExternalLink,
   MessageSquareText,
+  Megaphone,
 } from 'lucide-react';
 import { Language, AuthUser } from '../../types';
 import { UserSubscription } from '../../types/prototypeSubscription';
@@ -31,6 +32,7 @@ interface SettingsViewProps {
   onLogin: () => void;
   onLogout: () => void;
   onOpenMobileLink: () => void;
+  onOpenMyAds: () => void;
 }
 
 export function SettingsView({
@@ -47,6 +49,7 @@ export function SettingsView({
   onLogin,
   onLogout,
   onOpenMobileLink,
+  onOpenMyAds,
 }: SettingsViewProps) {
   const t = translations[lang];
   const [zeroConfirmed, setZeroConfirmed] = useState(false);
@@ -114,6 +117,15 @@ export function SettingsView({
                 </div>
               </div>
             </div>
+
+            <a href="/settings/ads" onClick={event => {
+              if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              event.preventDefault();
+              onOpenMyAds();
+            }} className="flex min-h-11 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-sm font-bold text-emerald-900 hover:bg-emerald-100">
+              <Megaphone className="size-4 shrink-0" aria-hidden="true" />
+              {lang === 'ar' ? 'إعلاناتي' : 'My ads'}
+            </a>
 
             <div className="flex items-center gap-2">
               <button

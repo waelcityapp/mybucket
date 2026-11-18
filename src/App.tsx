@@ -51,6 +51,7 @@ import { BottomNav } from './components/BottomNav';
 import { TransactionsView } from './components/views/TransactionsView';
 import { AccountsView } from './components/views/AccountsView';
 import { CategoriesView } from './components/views/CategoriesView';
+import { MyOfferAdsPage } from './components/views/MyOfferAdsPage';
 import { SettingsView } from './components/views/SettingsView';
 import { SearchView } from './components/views/SearchView';
 import { CheckCircle2, Smartphone, Cloud, ArrowRight, Sparkles, Clock, BookOpen, Tag } from 'lucide-react';
@@ -1487,6 +1488,16 @@ export default function App() {
     return <AdminNewUserSimulation lang={lang} identity={appIdentity} onExit={backToAdminSections} />;
   }
 
+  if (window.location.pathname === '/settings/ads') {
+    return <MyOfferAdsPage uid={authUser.uid} lang={lang} onBack={() => {
+      if (window.history.state?.myAds) window.history.back();
+      else {
+        window.history.replaceState({ myBucketTab: 'settings' }, '', '/');
+        setActiveTab('settings');
+      }
+    }} />;
+  }
+
   if (activeTab === 'guide') {
     return <UsageGuideView lang={lang} onBack={() => { if (window.history.state?.guide) window.history.back(); else { window.history.replaceState({}, '', '/'); setActiveTab('home'); } }} />;
   }
@@ -1958,6 +1969,12 @@ export default function App() {
             onLogin={handleGoogleLogin}
             onLogout={handleGoogleLogout}
             onOpenMobileLink={() => setIsMobileModalOpen(true)}
+            onOpenMyAds={() => {
+              window.history.pushState({ myBucketTab: 'settings', myAds: true }, '', '/settings/ads');
+              setActiveTab('settings');
+              setAdminRoute('/settings/ads');
+              window.scrollTo(0, 0);
+            }}
           />
         )}
         {activeTab === 'admin-pin' && isAdmin && authUser && (

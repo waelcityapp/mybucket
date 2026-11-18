@@ -52,6 +52,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, data });
     }
 
+    if (action === 'ads.mine') {
+      const { readMyOfferAds } = await import('../server/offerAds.js');
+      return res.status(200).json({ ok: true, data: await readMyOfferAds(user.uid) });
+    }
     if (action === 'ads.prepare' || action === 'ads.submit' || action === 'ads.cancel') {
       const { sendOfferAd } = await import('../server/offerAds.js');
       return res.status(200).json({ ok: true, data: await sendOfferAd(action, user.uid, payload) });

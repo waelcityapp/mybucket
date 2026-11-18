@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { getAdminFirestore } from './firebaseAdmin.js';
 import { confirmAdminAdTestUpload, deleteAdminAdTestUpload, signAdminAdTestUpload } from './adminAdTestUpload.js';
 import { SubscriptionError } from './subscriptionService.js';
-import { OFFER_CATEGORY_IDS, type OfferAdStatus, type PublicOfferAd } from '../src/data/offerAds.js';
+import { OFFER_CATEGORY_IDS, type MyOfferAd, type OfferAdStatus, type PublicOfferAd } from '../src/data/offerAds.js';
 
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 type Payload = Record<string, unknown>;
@@ -92,6 +92,15 @@ export async function readPublicOfferAds(action: string, payload: Payload, db = 
     const ad = doc.data() as StoredAd;
     return isPublicOffer(ad, now) ? [offerView(doc.id, ad)] : [];
   }).sort((a, b) => b.startsAt - a.startsAt);
+}
+
+export async function readMyOfferAds(uid: string, db = getAdminFirestore()): Promise<MyOfferAd[]> {
+  const snapshot = await db.collection('offerAds').where('ownerId', '==', uid).get();
+  return snapshot.docs.flatMap(doc => {
+    const { title, merchant, status, submittedAt, startsAt, endsAt, rejectionReason } = doc.data() as StoredAd;
+    if (status !== 'pending' && status !== 'approved' && status !== 'rejected') return [];
+    return [{ id: doc.id, title, merchant, status, submittedAt, startsAt, endsAt, rejectionReason }];
+  }).sort((a, b) => b.submittedAt - a.submittedAt);
 }
 
 export async function sendOfferAd(action: string, uid: string, payload: Payload, db = getAdminFirestore()) {

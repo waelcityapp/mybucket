@@ -4,6 +4,7 @@ import type { Language } from '../../types';
 import type { PublicOfferAd } from '../../data/offerAds';
 import { offerAdsRequest } from '../../services/offerAdsClient';
 import { DEMO_ADS } from '../../data/demoAds';
+import { adContactPhone } from '../../utils/adContactPhone';
 import { AdVideoPlayer } from '../AdVideoPlayer';
 
 export function OfferDetailPage({ lang, offerId }: { lang: Language; offerId: string }) {
@@ -26,6 +27,7 @@ export function OfferDetailPage({ lang, offerId }: { lang: Language; offerId: st
     ? [live.title, live.description, live.merchant]
     : [current?.failed ? (ar ? 'تعذّر تحميل العرض' : 'Could not load the offer')
       : current ? (ar ? 'العرض غير متاح' : 'Offer unavailable') : (ar ? 'جاري تحميل العرض...' : 'Loading offer…')];
+  const contactPhone = live?.contact ? adContactPhone(live.contact) : null;
   const categorySlug = demo?.categorySlug ?? live?.categorySlug;
   const image = demo && 'image' in demo ? `/demo-ads/${demo.image}` : live?.media?.type === 'image' ? live.media.url : undefined;
   const video = demo && 'video' in demo ? { url: `/demo-ads/${demo.video}`, poster: `/demo-ads/${demo.poster}` }
@@ -71,7 +73,8 @@ export function OfferDetailPage({ lang, offerId }: { lang: Language; offerId: st
             {demo && <p className="text-sm text-slate-600 dark:text-slate-300">{ar ? 'ده مثال تجريبي للعرض ومش متاح للشراء.' : 'This is a fictional offer for demonstration.'}</p>}
             {live && <div className="space-y-1 text-sm text-slate-600 dark:text-slate-300">
               <p>{ar ? 'العرض متاح لحد' : 'Available until'} {new Date(live.endsAt).toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: 'Africa/Cairo', timeZoneName: 'short' })}</p>
-              {live.contact && <p className="break-words"><strong>{ar ? 'للتواصل' : 'Contact'}</strong> {live.contact}</p>}
+              {live.contact && <p className="break-words"><strong>{ar ? 'للتواصل' : 'Contact'}</strong>{' '}
+                {contactPhone ? <a href={contactPhone} dir="ltr" className="inline-block font-bold text-blue-700 underline underline-offset-2 dark:text-blue-300">{live.contact}</a> : live.contact}</p>}
             </div>}
           </div>}
           {current?.failed && <button type="button" className="m-4 font-bold text-emerald-700 underline dark:text-emerald-300" onClick={() => { setResult(undefined); setAttempt(value => value + 1); }}>{ar ? 'حاول تاني' : 'Retry'}</button>}

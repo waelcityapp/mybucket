@@ -54,6 +54,10 @@ async function startServer() {
         const data = action === 'admin.identity.signUpload' ? signBrandIconUpload(payload) : await saveAppIdentity(payload, user.uid);
         return res.json({ ok: true, data });
       }
+      if (action === 'ads.mine') {
+        const { readMyOfferAds } = await import('./server/offerAds.js');
+        return res.json({ ok: true, data: await readMyOfferAds(user.uid) });
+      }
       if (action === 'ads.prepare' || action === 'ads.submit' || action === 'ads.cancel') {
         const { sendOfferAd } = await import('./server/offerAds.js');
         return res.json({ ok: true, data: await sendOfferAd(action, user.uid, payload) });

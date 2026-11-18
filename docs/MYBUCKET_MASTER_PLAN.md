@@ -572,3 +572,5 @@ The public demo catalog uses responsive cards with direct links to bilingual ful
 The public demo video now uses the supplied audible 30-second sample to verify playback with sound.
 
 The demo video uses a still frame as its clickable catalog thumbnail and as the player poster on the offer page.
+
+Video drafts now generate a local thumbnail from an early frame for both advertiser and admin-review previews. The preview remains usable if frame extraction fails. Persisting thumbnails for real review and public delivery will be part of the submission and approval workflow.

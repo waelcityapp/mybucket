@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, ArrowLeft, ImagePlus, Megaphone, CheckCircle2, ShieldAlert } from 'lucide-react';
 import type { Language } from '../../types';
 import { compressAdImage } from '../../utils/adImageCompression';
+import { captureAdVideoPoster } from '../../utils/adVideoPoster';
 import { compressAdVideo } from '../../utils/adVideoCompression';
 import { AdVideoPlayer } from '../AdVideoPlayer';
 import { AdPaymentCheckout } from './AdPaymentCheckout';
@@ -58,6 +59,14 @@ export function CreateOfferPage({ lang, onBack }: Props) {
   const [reviewPreview, setReviewPreview] = useState(false);
   const imageUrl = useMemo(() => image ? URL.createObjectURL(image) : null, [image]);
   useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
+  const [videoPoster, setVideoPoster] = useState<{ source: string; url: string } | null>(null);
+  const isVideo = image?.type.startsWith('video/') ?? false;
+  const poster = videoPoster?.source === imageUrl ? videoPoster?.url : undefined;
+  useEffect(() => {
+    setVideoPoster(null);
+    if (!isVideo || !imageUrl) return;
+    return captureAdVideoPoster(imageUrl, url => setVideoPoster({ source: imageUrl, url }));
+  }, [imageUrl, isVideo]);
   const isAdmin = auth.currentUser?.email?.trim().toLowerCase() === 'waelvts@gmail.com';
   const uploadTest = async () => {
     const user = auth.currentUser;
@@ -175,7 +184,7 @@ export function CreateOfferPage({ lang, onBack }: Props) {
             </div>
             {reviewPreview && <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">{ar ? 'تصميم تجريبي لشاشة المراجعة. الموافقة والرفض غير مفعّلين بعد.' : 'Review screen demonstration. Approval and rejection are not enabled yet.'}</p>}
             {imageUrl && image?.type.startsWith('video/') && <p className="text-xs text-slate-500">{ar ? 'تجربة مشاهدة الزائر: 3 مرات يوميًا على هذا المتصفح.' : 'Visitor playback demo: 3 plays per day in this browser.'}</p>}
-            <AdCreativeCard lang={lang} title={title} description={description} merchant={merchant} contact={contact} mediaUrl={imageUrl} mediaType={image?.type.startsWith('video/') ? 'video' : 'image'} videoQuotaId="local-ad-preview-demo" />
+            <AdCreativeCard lang={lang} title={title} description={description} merchant={merchant} contact={contact} mediaUrl={imageUrl} poster={poster} mediaType={image?.type.startsWith('video/') ? 'video' : 'image'} videoQuotaId="local-ad-preview-demo" />
             {reviewPreview && <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-xs font-bold text-emerald-900">{ar ? 'نوع الإعلان:' : 'Advertisement type:'} {tier === 'free' ? (ar ? 'مجاني' : 'Free') : (ar ? 'مميز' : 'Featured')}</div>}
             <p className="text-xs text-slate-600">{ar ? 'بداية النشر:' : 'Publication starts:'} {adScheduleDate(startsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
             <p className="text-xs text-slate-600">{ar ? 'نهاية النشر:' : 'Publication ends:'} {adScheduleDate(endsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
@@ -263,7 +272,7 @@ export function CreateOfferPage({ lang, onBack }: Props) {
               {imageStatus === 'ready' && <p role="status" className="text-xs text-emerald-700">{ar ? 'الملف جاهز للمعاينة.' : 'File is ready for preview.'}</p>}
               {compressionNotice && <p className="text-xs text-amber-800">{ar ? 'المتصفح لا يدعم ضغط الفيديو؛ المعاينة تستخدم الملف الأصلي على جهازك.' : 'This browser cannot compress video; the local preview uses the original file.'}</p>}
               {imageStatus === 'error' && <p role="alert" className="text-xs text-red-700">{mediaError === 'video_too_long' ? (ar ? 'مدة الفيديو أكتر من دقيقة. اختار فيديو مدته دقيقة أو أقل.' : 'The video is longer than one minute. Choose a video of one minute or less.') : mediaError === 'video_too_large' ? (ar ? 'حجم الفيديو أكبر من 25 ميجابايت. اختار ملفًا أصغر.' : 'The video exceeds 25 MB. Choose a smaller file.') : (ar ? 'تعذر تجهيز الملف. تأكد من الحجم ونوع الملف ودعم المتصفح.' : 'Could not prepare the file. Check its size, type and browser support.')}</p>}
-              {imageUrl && (image?.type.startsWith('video/') ? <AdVideoPlayer src={imageUrl} label={ar ? 'معاينة فيديو الإعلان' : 'Advertisement video preview'} className="w-full max-h-48 object-contain rounded-xl bg-slate-50" /> : <img src={imageUrl} alt={ar ? 'معاينة الصورة' : 'Image preview'} className="w-full max-h-48 object-contain rounded-xl bg-slate-50" />)}
+              {imageUrl && (image?.type.startsWith('video/') ? <AdVideoPlayer src={imageUrl} poster={poster} label={ar ? 'معاينة فيديو الإعلان' : 'Advertisement video preview'} className="w-full max-h-48 object-contain rounded-xl bg-slate-50" /> : <img src={imageUrl} alt={ar ? 'معاينة الصورة' : 'Image preview'} className="w-full max-h-48 object-contain rounded-xl bg-slate-50" />)}
               {isAdmin && image && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 space-y-3">
                 <p className="text-xs font-bold text-emerald-900">{ar ? 'اختبار رفع للإدارة فقط' : 'Admin-only upload test'}</p>
                 <p className="text-xs leading-relaxed text-emerald-800">{ar ? 'يرفع الملف فعليًا إلى Cloudinary. لن يُحفظ الإعلان في Firebase أو يُرسل للمراجعة بعد، والملف التجريبي سيبقى في Cloudinary.' : 'Uploads the file to Cloudinary. The ad is not yet saved to Firebase or submitted for review; the test file remains in Cloudinary.'}</p>

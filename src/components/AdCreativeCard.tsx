@@ -8,16 +8,17 @@ type Props = {
   merchant: string;
   contact?: string;
   mediaUrl?: string | null;
+  poster?: string;
   mediaType?: 'image' | 'video';
   videoQuotaId?: string;
 };
 
 /** One creative presentation for advertiser, reviewer and future public displays. */
-export function AdCreativeCard({ lang, title, description, merchant, contact, mediaUrl, mediaType, videoQuotaId }: Props) {
+export function AdCreativeCard({ lang, title, description, merchant, contact, mediaUrl, poster, mediaType, videoQuotaId }: Props) {
   const ar = lang === 'ar';
   return <article dir={ar ? 'rtl' : 'ltr'} className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
     {mediaUrl && (mediaType === 'video'
-      ? <AdVideoPlayer src={mediaUrl} adId={videoQuotaId} lang={lang} label={ar ? 'فيديو الإعلان' : 'Advertisement video'} className="w-full max-h-56 object-contain bg-slate-50" />
+      ? <AdVideoPlayer src={mediaUrl} poster={poster} adId={videoQuotaId} lang={lang} label={ar ? 'فيديو الإعلان' : 'Advertisement video'} className="w-full max-h-56 object-contain bg-slate-50" />
       : <img src={mediaUrl} alt={ar ? 'صورة الإعلان' : 'Advertisement image'} className="w-full max-h-56 object-contain bg-slate-50" />)}
     <div className="p-4 space-y-3">
       <h3 className="text-lg font-extrabold break-words">{title}</h3>

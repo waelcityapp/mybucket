@@ -1,5 +1,6 @@
 /** Compress using native browser APIs; never silently claim compression on unsupported devices. */
-export async function compressAdVideo(file: File, onProgress?: (percent: number) => void): Promise<File> {
+export async function compressAdVideo(file: File, onProgress?: (percent: number) => void, signal?: AbortSignal): Promise<File> {
+  signal?.throwIfAborted();
   if (!['video/mp4', 'video/webm', 'video/quicktime'].includes(file.type)) throw new Error('unsupported_video');
   const video = document.createElement('video');
   const sourceUrl = URL.createObjectURL(file);
@@ -7,12 +8,18 @@ export async function compressAdVideo(file: File, onProgress?: (percent: number)
   video.muted = true;
   video.playsInline = true;
   let stream: MediaStream | null = null;
+  let metadataTimer: number | undefined;
+  let rejectPreparation: (reason: unknown) => void = () => {};
+  const cancel = () => rejectPreparation(signal?.reason);
+  signal?.addEventListener('abort', cancel, { once: true });
   try {
     await new Promise<void>((resolve, reject) => {
-      const timer = window.setTimeout(() => reject(new Error('invalid_video')), 10000);
-      video.onloadedmetadata = () => { window.clearTimeout(timer); resolve(); };
-      video.onerror = () => { window.clearTimeout(timer); reject(new Error('invalid_video')); };
+      rejectPreparation = reject;
+      metadataTimer = window.setTimeout(() => reject(new Error('invalid_video')), 10000);
+      video.onloadedmetadata = () => { window.clearTimeout(metadataTimer); resolve(); };
+      video.onerror = () => { window.clearTimeout(metadataTimer); reject(new Error('invalid_video')); };
     });
+    signal?.throwIfAborted();
     if (!Number.isFinite(video.duration) || video.duration <= 0) throw new Error('invalid_video_duration');
     if (video.duration > 60) throw new Error('video_too_long');
     if (file.size > 25 * 1024 * 1024) throw new Error('video_too_large');
@@ -27,6 +34,7 @@ export async function compressAdVideo(file: File, onProgress?: (percent: number)
     const recorder = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 1_200_000, audioBitsPerSecond: 96_000 });
     const chunks: Blob[] = [];
     const result = new Promise<Blob>((resolve, reject) => {
+      rejectPreparation = reject;
       recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
       recorder.onerror = () => reject(new Error('video_compression_failed'));
       recorder.onstop = () => resolve(new Blob(chunks, { type: 'video/webm' }));
@@ -40,13 +48,17 @@ export async function compressAdVideo(file: File, onProgress?: (percent: number)
     video.ontimeupdate = reportProgress;
     reportProgress();
     recorder.start();
-    await video.play();
-    const blob = await result;
+    const [, blob] = await Promise.all([video.play(), result]);
     if (!blob.size) throw new Error('video_compression_failed');
     if (blob.size >= file.size) return file;
     return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.webm', { type: 'video/webm', lastModified: file.lastModified });
   } finally {
+    signal?.removeEventListener('abort', cancel);
+    window.clearTimeout(metadataTimer);
     video.ontimeupdate = null;
+    video.onloadedmetadata = null;
+    video.onended = null;
+    video.onerror = null;
     video.pause();
     stream?.getTracks().forEach(track => track.stop());
     video.removeAttribute('src'); video.load(); URL.revokeObjectURL(sourceUrl);

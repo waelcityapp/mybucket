@@ -48,10 +48,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, data });
     }
 
-    if (action === 'admin.ads.testUploadSign' || action === 'admin.ads.testUploadConfirm') {
+    if (action === 'admin.ads.testUploadSign' || action === 'admin.ads.testUploadConfirm' || action === 'admin.ads.testUploadDelete') {
       if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
-      const { signAdminAdTestUpload, confirmAdminAdTestUpload } = await import('../server/adminAdTestUpload.js');
-      const data = action === 'admin.ads.testUploadSign' ? signAdminAdTestUpload(user.uid, payload) : await confirmAdminAdTestUpload(user.uid, payload);
+      const { signAdminAdTestUpload, confirmAdminAdTestUpload, deleteAdminAdTestUpload } = await import('../server/adminAdTestUpload.js');
+      const data = action === 'admin.ads.testUploadSign' ? signAdminAdTestUpload(user.uid, payload) : action === 'admin.ads.testUploadConfirm' ? await confirmAdminAdTestUpload(user.uid, payload) : await deleteAdminAdTestUpload(user.uid, payload);
       return res.status(200).json({ ok: true, data });
     }
 

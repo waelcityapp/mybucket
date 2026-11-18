@@ -62,3 +62,27 @@ export async function confirmAdminAdTestUpload(uid: string, payload: Record<stri
   }
   return { publicId, resourceType, assetId: data.asset_id, secureUrl: secureUrl.href, version, bytes: data.bytes, format: data.format };
 }
+
+/** Delete only the authenticated test asset in the current administrator's folder. */
+export async function deleteAdminAdTestUpload(uid: string, payload: Record<string, unknown>, cfg = config(), destroy = fetch) {
+  owner(uid);
+  const resourceType = resource(payload.resourceType);
+  const publicId = payload.publicId;
+  const prefix = `mybucket/ads/test/${uid}/`;
+  if (typeof publicId !== 'string' || !publicId.startsWith(prefix) || !idPattern.test(publicId.slice(prefix.length))) {
+    return fail('invalid_upload_request');
+  }
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const fields = { invalidate: 'true', public_id: publicId, timestamp, type: 'authenticated' };
+  const signedFields = new URLSearchParams(fields);
+  const signature = createHash('sha1').update(Object.entries(fields).map(([key, value]) => `${key}=${value}`).join('&') + cfg.apiSecret).digest('hex');
+  signedFields.set('signature', signature);
+  signedFields.set('api_key', cfg.apiKey);
+  const response = await destroy(`https://api.cloudinary.com/v1_1/${cfg.cloudName}/${resourceType}/destroy`, {
+    method: 'POST', body: signedFields, signal: AbortSignal.timeout(12000),
+  });
+  if (!response.ok) return fail('ad_upload_delete_failed', 503);
+  const data = await response.json();
+  if (data.result !== 'ok' && data.result !== 'not found') return fail('ad_upload_delete_failed', 503);
+  return { removed: true };
+}

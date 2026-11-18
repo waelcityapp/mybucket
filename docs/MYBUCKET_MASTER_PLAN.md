@@ -576,3 +576,5 @@ The demo video uses a still frame as its clickable catalog thumbnail and as the 
 Video drafts now generate a local thumbnail from an early frame for both advertiser and admin-review previews. The preview remains usable if frame extraction fails. Persisting thumbnails for real review and public delivery will be part of the submission and approval workflow.
 
 Public offer browsing renders independently of financial authentication initialization. Video draft preparation shows an indeterminate check followed by progress based on video processing time.
+
+Draft media can be cancelled or removed. For owner-only Cloudinary test uploads, removal waits for the active transfer to settle and deletes the authenticated asset through the gateway before clearing the selection.

@@ -586,3 +586,5 @@ Signed-in users can submit free advertisements with optional authenticated Cloud
 Advertiser names appear above advertisement titles in every public card, offer detail and shared review preview.
 
 Account settings link to a private My Ads page. The gateway lists submitted advertisements owned by the signed-in account, with review outcome and current publication window. Complete phone numbers on public offer details are shown as blue telephone links.
+
+Profile settings show My Ads in a dedicated My Activity section after the Google account card, with room for future favorites and a role-gated marketer wallet when available.

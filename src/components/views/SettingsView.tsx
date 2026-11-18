@@ -12,6 +12,8 @@ import {
   ExternalLink,
   MessageSquareText,
   Megaphone,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Language, AuthUser } from '../../types';
 import { UserSubscription } from '../../types/prototypeSubscription';
@@ -52,6 +54,8 @@ export function SettingsView({
   onOpenMyAds,
 }: SettingsViewProps) {
   const t = translations[lang];
+  const ar = lang === 'ar';
+  const Chevron = ar ? ChevronLeft : ChevronRight;
   const [zeroConfirmed, setZeroConfirmed] = useState(false);
 
   const handleZeroBalances = async () => {
@@ -65,7 +69,7 @@ export function SettingsView({
     <div className="space-y-5 pb-20">
       <div>
         <h1 className="text-xl font-extrabold text-slate-900 ">
-          {t.settingsTitle}
+          {ar ? 'الملف الشخصي والإعدادات' : 'Profile and settings'}
         </h1>
         <p className="text-xs text-slate-500">
           {lang === 'ar' ? 'إدارة حسابك والمزامنة السحابية وتفضيلات التطبيق' : 'Manage your account, cloud sync, and preferences'}
@@ -118,15 +122,6 @@ export function SettingsView({
               </div>
             </div>
 
-            <a href="/settings/ads" onClick={event => {
-              if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-              event.preventDefault();
-              onOpenMyAds();
-            }} className="flex min-h-11 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-sm font-bold text-emerald-900 hover:bg-emerald-100">
-              <Megaphone className="size-4 shrink-0" aria-hidden="true" />
-              {lang === 'ar' ? 'إعلاناتي' : 'My ads'}
-            </a>
-
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -172,6 +167,25 @@ export function SettingsView({
           </div>
         )}
       </div>
+
+      {user && <section aria-labelledby="settings-activity-title" className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+        <h2 id="settings-activity-title" className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
+          {ar ? 'نشاطي' : 'My activity'}
+        </h2>
+        <a href="/settings/ads" onClick={event => {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          onOpenMyAds();
+        }} className="flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-start hover:border-emerald-300 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-emerald-600 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+            <Megaphone className="size-4" aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1 text-sm font-bold text-slate-900 dark:text-slate-100">
+            {ar ? 'إعلاناتي' : 'My ads'}
+          </span>
+          <Chevron className="size-4 shrink-0 text-slate-500 dark:text-slate-300" aria-hidden="true" />
+        </a>
+      </section>}
 
       {/* 2. Subscription & Promo Code Card */}
       {subscriptionUnavailable && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p>{lang === 'ar' ? 'تعذر تحميل حالة اشتراكك. تحقق من الاتصال وحاول مرة أخرى.' : 'Could not load your subscription. Check your connection and try again.'}</p>{onRetrySubscription && <button type="button" onClick={onRetrySubscription} className="mt-2 font-bold underline">{lang === 'ar' ? 'إعادة المحاولة' : 'Try again'}</button>}</div>}

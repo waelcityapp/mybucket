@@ -43,7 +43,7 @@ export function OfferDetailPage({ lang, offerId }: { lang: Language; offerId: st
           {offer && 'image' in offer && <img src={`/demo-ads/${offer.image}`} alt={title}
             className="max-h-[60vh] w-full bg-slate-100 object-contain dark:bg-slate-800" />}
           {offer && 'video' in offer && <div className="px-4 sm:px-6">
-            <AdVideoPlayer src={`/demo-ads/${offer.video}`} lang={lang} adId={offer.id}
+            <AdVideoPlayer src={`/demo-ads/${offer.video}`} poster={`/demo-ads/${offer.poster}`} lang={lang} adId={offer.id}
               label={title} className="max-h-[60vh] w-full rounded-xl bg-black object-contain" />
           </div>}
           {offer && <div className="space-y-3 p-4 sm:p-6">

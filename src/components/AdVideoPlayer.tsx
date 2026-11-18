@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { adVideoPlays, DAILY_AD_VIDEO_PLAYS, nextCairoVideoDay, takeAdVideoPlay } from '../utils/adVideoQuota';
 
-type Props = { src: string; label: string; className?: string; adId?: string; lang?: 'ar' | 'en' };
+type Props = { src: string; poster?: string; label: string; className?: string; adId?: string; lang?: 'ar' | 'en' };
 
 /** User-initiated playback; pause when off-screen or when the page is hidden. */
-export function AdVideoPlayer({ src, label, className, adId, lang = 'ar' }: Props) {
+export function AdVideoPlayer({ src, poster, label, className, adId, lang = 'ar' }: Props) {
   const ref = useRef<HTMLVideoElement>(null);
   const [message, setMessage] = useState('');
   const [remaining, setRemaining] = useState<number | null>(null);
@@ -68,7 +68,7 @@ export function AdVideoPlayer({ src, label, className, adId, lang = 'ar' }: Prop
     }
   };
   return <div>
-    <video ref={ref} src={src} aria-label={label} controls playsInline preload="none" className={className} onPlay={onPlay} />
+    <video ref={ref} src={src} poster={poster} aria-label={label} controls playsInline preload="none" className={className} onPlay={onPlay} />
     {adId && remaining !== null && <p className="mt-1 text-xs text-slate-600">{lang === 'ar' ? `مرات التشغيل المتبقية اليوم: ${remaining}` : `Plays remaining today: ${remaining}`}</p>}
     {message && <p role="status" className="mt-1 text-xs font-bold text-amber-800">{message}</p>}
   </div>;

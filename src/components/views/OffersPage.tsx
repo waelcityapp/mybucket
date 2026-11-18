@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   ArrowLeft, ArrowRight, Search, Plus, Landmark, UtensilsCrossed, ShoppingBasket,
   Shirt, Plane, Dumbbell, Car, HeartPulse, House, GraduationCap,
-  Gift, Smartphone, Store, Video, type LucideIcon
+  Gift, Smartphone, Store, Play, type LucideIcon
 } from 'lucide-react';
 import { Language } from '../../types';
 import { DEMO_ADS } from '../../data/demoAds';
@@ -94,9 +94,16 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                         return (
                           <article key={ad.id} className="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                             {'image' in ad && <img src={`/demo-ads/${ad.image}`} alt="" loading="lazy" className="aspect-video w-full bg-slate-100 object-cover dark:bg-slate-800" />}
-                            {hasVideo && <div className="flex aspect-video items-center justify-center bg-emerald-950 text-emerald-200">
-                              <Video className="size-10" aria-label={isAr ? 'فيديو الإعلان' : 'Advertisement video'} />
-                            </div>}
+                            {hasVideo && <a href={`/offers/ad/${ad.id}`}
+                              aria-label={`${isAr ? 'شوف الفيديو' : 'View video'} · ${adTitle}`}
+                              className="relative block aspect-video bg-emerald-950 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white">
+                              <img src={`/demo-ads/${ad.poster}`} alt="" loading="lazy" className="h-full w-full object-cover" />
+                              <span className="absolute inset-0 grid place-items-center" aria-hidden="true">
+                                <span className="grid size-12 place-items-center rounded-full bg-black/70 text-white">
+                                  <Play className="size-5 fill-current" />
+                                </span>
+                              </span>
+                            </a>}
                             <span className={`w-fit rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-900 ${'image' in ad || hasVideo ? 'absolute start-3 top-3' : 'ms-3 mt-3'}`}>
                               {isAr ? 'إعلان تجريبي' : 'Demo ad'}
                             </span>

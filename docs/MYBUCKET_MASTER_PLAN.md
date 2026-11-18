@@ -570,3 +570,5 @@ Ten explicitly labelled fictional advertisements let visitors inspect the shared
 The public demo catalog uses responsive cards with direct links to bilingual full-page details at `/offers/ad/<id>`. Detail pages can be opened by guests and preserve image, video and text-only formats. Demo offer responses carry `X-Robots-Tag: noindex`. Indexing and sitemap entries for real offers depend on a verified publication flow that exposes only admin-approved ads.
 
 The public demo video now uses the supplied audible 30-second sample to verify playback with sound.
+
+The demo video uses a still frame as its clickable catalog thumbnail and as the player poster on the offer page.

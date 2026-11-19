@@ -71,16 +71,17 @@ export function AdPaymentCheckout({
   const runDays = adRunDays(startsAt, endsAt);
   const amount = (value: number) => new Intl.NumberFormat(ar ? 'ar-EG' : 'en-EG', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 }).format(value);
   const phoneSaved = !!savedPhone && normalizePaymentContactPhone(phone) === savedPhone;
-  const [paymentReady, setPaymentReady] = useState<'checking' | 'yes' | 'no'>('checking');
+  type PaymentAvailability = 'checking' | 'yes' | 'daily_limit' | 'active' | 'paused' | 'error';
+  const [paymentReady, setPaymentReady] = useState<PaymentAvailability>('checking');
   const [availabilityAttempt, setAvailabilityAttempt] = useState(0);
   useEffect(() => {
     let active = true;
     setPaymentReady('checking');
-    offerAdsRequest<{ available: boolean }>('ads.paidAvailability', { hasMedia: mediaType !== 'none' }, true)
-      .then(result => { if (active) setPaymentReady(result.available ? 'yes' : 'no'); })
-      .catch(() => { if (active) setPaymentReady('no'); });
+    offerAdsRequest<{ available: boolean; reason?: 'daily_limit' | 'active' | 'paused' }>('ads.paidAvailability', {}, true)
+      .then(result => { if (active) setPaymentReady(result.available ? 'yes' : (result.reason ?? 'error')); })
+      .catch(() => { if (active) setPaymentReady('error'); });
     return () => { active = false; };
-  }, [mediaType, availabilityAttempt]);
+  }, [availabilityAttempt]);
   const [sending, setSending] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [sendError, setSendError] = useState('');
@@ -119,6 +120,9 @@ export function AdPaymentCheckout({
       window.scrollTo(0, 0);
     } catch (error) {
       const code = error instanceof Error ? error.message : '';
+      if (code === 'ad_upload_daily_limit') setPaymentReady('daily_limit');
+      if (code === 'ad_upload_active') setPaymentReady('active');
+      if (code === 'ad_upload_paused') setPaymentReady('paused');
       setSendError(code === 'ad_upload_daily_limit'
         ? (ar ? 'حصة رفع الملفات غير كافية حاليًا. جرّب بعد منتصف الليل بتوقيت القاهرة واحتفظ بالإيصال.' : 'Your upload allowance is too low right now. Keep your receipt and retry after midnight Cairo time.')
         : code === 'ad_upload_active' || code === 'ad_upload_paused'
@@ -287,11 +291,20 @@ export function AdPaymentCheckout({
                 <a href={INSTA_PAY_LINK} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-xl bg-emerald-700 px-4 font-bold text-white">
                   {ar ? 'فتح إنستا باي' : 'Open InstaPay'}
                 </a>
-              ) : !phoneSaved ? <p className="text-xs font-semibold">{ar ? 'احفظ رقم المتابعة عشان تفتح رابط إنستا باي.' : 'Save your contact number to open InstaPay.'}</p>
-                : paymentReady === 'checking' ? <p role="status" className="text-xs">{ar ? 'جاري التحقق من إتاحة الإرسال...' : 'Checking submission availability…'}</p>
-                : <p role="alert" className="text-xs font-semibold">{ar ? 'إرسال الإيصال غير متاح حاليًا.' : 'Receipt submission is unavailable right now.'}{' '}
-                  <button type="button" onClick={() => setAvailabilityAttempt(value => value + 1)} className="underline">{ar ? 'تحقق تاني' : 'Check again'}</button>
-                </p>}
+              ) : <div className="space-y-2">
+                <button type="button" disabled className="min-h-11 rounded-xl bg-slate-200 px-4 text-sm font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  {ar ? 'فتح إنستا باي' : 'Open InstaPay'}
+                </button>
+                <p role="status" className="text-xs font-semibold">
+                  {paymentReady === 'checking' ? (ar ? 'جاري التحقق من إتاحة الإرسال...' : 'Checking submission availability…')
+                    : paymentReady === 'daily_limit' ? (ar ? 'استخدمت ٣ محاولات الرفع المتاحة النهارده. الرابط هيتاح بعد تجديد الحصة عند منتصف الليل بتوقيت القاهرة.' : 'You have used today’s three upload attempts. The link becomes available after midnight Cairo time.')
+                    : paymentReady === 'active' ? (ar ? 'عندك رفع قيد التنفيذ أو التحقق. كمّله الأول.' : 'You have an upload in progress. Complete it first.')
+                    : paymentReady === 'paused' ? (ar ? 'رفع الإيصالات متوقف مؤقتًا.' : 'Receipt uploads are temporarily paused.')
+                    : paymentReady === 'error' ? (ar ? 'تعذّر التحقق من إتاحة الإرسال.' : 'Could not check submission availability.')
+                    : (ar ? 'احفظ رقم المتابعة عشان تفتح رابط إنستا باي.' : 'Save your contact number to open InstaPay.')}
+                  {paymentReady !== 'yes' && paymentReady !== 'checking' && <> <button type="button" onClick={() => setAvailabilityAttempt(value => value + 1)} className="underline">{ar ? 'تحقق تاني' : 'Check again'}</button></>}
+                </p>
+              </div>}
             </section>
 
             <section className="space-y-3" aria-labelledby="ad-receipt-title">

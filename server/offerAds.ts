@@ -237,9 +237,10 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
     const [usage, lease, policy] = await Promise.all([
       uploadUsage(db, cairoDay.format(now)).doc(uid).get(), activeUpload(db, uid).get(), policyRef(db).get(),
     ]);
-    if (policy.data()?.uploadsPaused === true) return { available: false };
-    const permits = payload.hasMedia === true ? 2 : 1;
-    return { available: (usage.data()?.issued ?? 0) + permits <= MAX_UPLOADS && (lease.data()?.expiresAt ?? 0) <= now };
+    if (policy.data()?.uploadsPaused === true) return { available: false, reason: 'paused' };
+    if ((usage.data()?.issued ?? 0) >= MAX_UPLOADS) return { available: false, reason: 'daily_limit' };
+    if ((lease.data()?.expiresAt ?? 0) > now) return { available: false, reason: 'active' };
+    return { available: true };
   }
   if (action === 'ads.paymentContact') {
     const ref = db.collection('offerAdPaymentContacts').doc(uid);
@@ -317,7 +318,7 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
       if (existing && existing.mediaType !== mediaType) return fail('invalid_media_type');
       let signed = null;
       let receiptSigned = null;
-      const permits = Number(!!mediaType) + Number(featured);
+      const permits = Number(!!mediaType || featured);
       if (permits) {
         if (existing?.uploadDay) return fail('ad_upload_already_issued', 409);
         const usage = uploadUsage(db, day).doc(uid);

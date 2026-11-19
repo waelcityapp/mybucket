@@ -322,7 +322,8 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
       );
     }
     return <AdPaymentCheckout lang={lang} advertiserName={merchant} adTitle={title} startsAt={start} endsAt={end}
-      mediaType={previewType ?? 'none'} onBack={returnFromPayment} />;
+      mediaType={previewType ?? 'none'} adDescription={description} categorySlug={category} adContact={contact}
+      mediaFile={image ?? reusedMedia?.url} onBack={returnFromPayment} onNavigate={onNavigate} />;
   }
 
   const label = 'block text-xs font-extrabold text-slate-700 mb-1.5';
@@ -386,7 +387,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
               {sendError && <p role="alert" className="text-sm text-red-700">{sendError}</p>}
               <p className="text-xs text-slate-600">{tier === 'free'
                 ? (ar ? 'الإعلان يظهر للجمهور بعد موافقة الإدارة.' : 'Your ad becomes public after the administrator approves it.')
-                : (ar ? 'صفحة دفع الإعلان المميز متاحة للمعاينة.' : 'Featured ad checkout is available for preview.')}</p>
+                : (ar ? 'ادفع عبر إنستا باي وأرسل الإيصال مع الإعلان للمراجعة.' : 'Pay via InstaPay and send the receipt with your ad for review.')}</p>
             </div>
           </section>
         ) : (

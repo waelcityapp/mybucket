@@ -68,7 +68,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { readMyOfferAds } = await import('../server/offerAds.js');
       return res.status(200).json({ ok: true, data: await readMyOfferAds(user.uid) });
     }
-    if (action === 'ads.paymentContact' || action === 'ads.freePolicy' || action === 'ads.freeEligibility' || action === 'ads.prepare' || action === 'ads.submit' || action === 'ads.cancel' || action === 'ads.renewal' || action === 'ads.deleteExpired') {
+    if (action === 'ads.paidAvailability' || action === 'ads.paymentContact' || action === 'ads.freePolicy' || action === 'ads.freeEligibility' || action === 'ads.prepare' || action === 'ads.submit' || action === 'ads.cancel' || action === 'ads.renewal' || action === 'ads.deleteExpired') {
       const { sendOfferAd } = await import('../server/offerAds.js');
       return res.status(200).json({ ok: true, data: await sendOfferAd(action, user.uid, payload) });
     }

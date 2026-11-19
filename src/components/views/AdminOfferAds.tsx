@@ -22,6 +22,7 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [decision, setDecision] = useState<{ id: string; status: 'approved' | 'rejected' } | null>(null);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [reason, setReason] = useState('');
   const [uploadStats, setUploadStats] = useState<UploadStats | null>(null);
   const [statsError, setStatsError] = useState(false);
@@ -83,7 +84,7 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
     setError('');
     setNotice('');
     try {
-      await offerAdsRequest('admin.ads.review', { ...decision, reason }, true);
+      await offerAdsRequest('admin.ads.review', { ...decision, reason, paymentConfirmed }, true);
       setAds(items => items?.filter(ad => ad.id !== decision.id) ?? null);
       setNotice(decision.status === 'approved'
         ? (ar ? 'تمت الموافقة. الإعلان يظهر للجمهور خلال موعد النشر المحدد.' : 'Approved. The ad appears during its publication window.')
@@ -159,28 +160,43 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
     {ads?.length === 0 && <p className="rounded-xl border bg-white p-4 text-sm text-slate-600">{ar ? 'مفيش إعلانات بالحالة دي حاليًا.' : 'There are no ads with this status.'}</p>}
     <div className="grid gap-4 lg:grid-cols-2">
       {ads?.map(ad => <div key={ad.id} className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-white p-3">
+        <span className={`inline-block rounded-full px-3 py-1 text-xs font-extrabold ${ad.payment ? 'bg-amber-100 text-amber-900' : 'bg-slate-100 text-slate-700'}`}>
+          {ad.payment ? (ar ? 'إعلان مميز' : 'Featured ad') : (ar ? 'إعلان مجاني' : 'Free ad')}
+        </span>
         <AdCreativeCard lang={lang} title={ad.title} description={ad.description} merchant={ad.merchant} contact={ad.contact}
           mediaUrl={ad.media?.url} mediaType={ad.media?.type} poster={ad.media?.poster} />
         <dl className="space-y-1 text-xs text-slate-600">
           <div><dt className="inline font-bold">{ar ? 'وصل في' : 'Received'} </dt><dd className="inline">{date(ad.submittedAt)}</dd></div>
           <div><dt className="inline font-bold">{ar ? 'مدة النشر بتوقيت القاهرة' : 'Publication window, Cairo time'} </dt><dd className="inline">{date(ad.startsAt)} — {date(ad.endsAt)}</dd></div>
         </dl>
+        {ad.payment && <section className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-slate-900">
+          <h3 className="font-extrabold">{ar ? 'إيصال إنستا باي' : 'InstaPay receipt'}</h3>
+          <p>{ar ? 'المبلغ المطلوب' : 'Expected amount'} · {new Intl.NumberFormat(ar ? 'ar-EG' : 'en-EG', { style: 'currency', currency: 'EGP' }).format(ad.payment.amountEgp)}</p>
+          <p>{ar ? 'رقم المتابعة' : 'Contact number'} · <bdi>{ad.payment.phone}</bdi></p>
+          {ad.payment.receiptUrl ? <a href={ad.payment.receiptUrl} target="_blank" rel="noopener noreferrer" className="inline-block font-bold text-emerald-800 underline">
+            {ar ? 'فتح صورة الإيصال' : 'Open receipt image'}
+          </a> : <p role="alert" className="font-bold text-rose-700">{ar ? 'تعذّر الوصول للإيصال.' : 'Receipt unavailable.'}</p>}
+        </section>}
         {ad.rejectionReason && <p className="whitespace-pre-wrap break-words text-sm text-slate-700">{ad.rejectionReason}</p>}
         {status === 'approved' && ad.startsAt <= Date.now() && ad.endsAt > Date.now() && <a className="inline-block text-sm font-bold text-emerald-700 underline" href={`/offers/ad/${ad.id}`}>{ar ? 'افتح الإعلان المنشور' : 'Open published ad'}</a>}
         {status === 'pending' && (decision?.id === ad.id ? <div className="space-y-2 rounded-xl bg-slate-50 p-3">
           <p className="text-sm font-bold">{decision.status === 'approved'
             ? (ar ? 'تأكيد الموافقة على نشر الإعلان في المدة المحددة؟' : 'Confirm approval for the selected publication window?')
             : (ar ? 'تأكيد رفض الإعلان؟' : 'Confirm rejection?')}</p>
+          {decision.status === 'approved' && ad.payment && <label className="flex items-start gap-2 text-sm font-bold">
+            <input type="checkbox" checked={paymentConfirmed} onChange={event => setPaymentConfirmed(event.target.checked)} />
+            {ar ? 'راجعت الإيصال واتأكدت إن التحويل وصل بالمبلغ المطلوب.' : 'I checked the receipt and confirmed the expected transfer was received.'}
+          </label>}
           {decision.status === 'rejected' && <label className="block text-xs font-bold">{ar ? 'سبب الرفض (اختياري)' : 'Rejection reason (optional)'}
             <textarea maxLength={500} value={reason} onChange={event => setReason(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-2" />
           </label>}
           <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy} onClick={() => void review()} className={`${button} ${decision.status === 'approved' ? 'bg-emerald-700' : 'bg-red-700'} text-white`}>{ar ? 'تأكيد القرار' : 'Confirm decision'}</button>
+            <button type="button" disabled={busy || (decision.status === 'approved' && !!ad.payment && (!paymentConfirmed || !ad.payment.receiptUrl))} onClick={() => void review()} className={`${button} ${decision.status === 'approved' ? 'bg-emerald-700' : 'bg-red-700'} text-white`}>{ar ? 'تأكيد القرار' : 'Confirm decision'}</button>
             <button type="button" disabled={busy} onClick={() => setDecision(null)} className={`${button} bg-slate-200 text-slate-800`}>{ar ? 'إلغاء' : 'Cancel'}</button>
           </div>
         </div> : <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={busy || ad.endsAt <= Date.now()} onClick={() => { setReason(''); setDecision({ id: ad.id, status: 'approved' }); }} className={`${button} bg-emerald-700 text-white`}>{ar ? 'موافقة' : 'Approve'}</button>
-          <button type="button" disabled={busy} onClick={() => { setReason(''); setDecision({ id: ad.id, status: 'rejected' }); }} className={`${button} bg-red-50 text-red-800`}>{ar ? 'رفض' : 'Reject'}</button>
+          <button type="button" disabled={busy || (!ad.payment && ad.endsAt <= Date.now())} onClick={() => { setReason(''); setPaymentConfirmed(false); setDecision({ id: ad.id, status: 'approved' }); }} className={`${button} bg-emerald-700 text-white`}>{ar ? 'موافقة' : 'Approve'}</button>
+          <button type="button" disabled={busy} onClick={() => { setReason(''); setPaymentConfirmed(false); setDecision({ id: ad.id, status: 'rejected' }); }} className={`${button} bg-red-50 text-red-800`}>{ar ? 'رفض' : 'Reject'}</button>
         </div>)}
       </div>)}
     </div>

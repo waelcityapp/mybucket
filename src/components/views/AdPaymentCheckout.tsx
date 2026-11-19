@@ -1,7 +1,9 @@
+import { uploadAdMedia, type SignedAdUpload, type UploadedAdMedia } from '../../services/adMediaUpload';
+import { followInternalLink } from '../../utils/navigationHistory';
 import { AD_TIME_ZONE } from '../../utils/adSchedule';
-import { useEffect, useMemo, useState, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import {
-  ArrowLeft, ArrowRight, CalendarDays, Check, Clock3, CreditCard, FileCheck2,
+  ArrowLeft, ArrowRight, CalendarDays, Check, LoaderCircle, CreditCard, FileCheck2,
   FileText, Image as ImageIcon, Phone, ShieldCheck, Upload, UserRound, Video, X
 } from 'lucide-react';
 import type { Language } from '../../types';
@@ -9,7 +11,7 @@ import { offerAdsRequest } from '../../services/offerAdsClient';
 import { AD_TRIAL_DAILY_PRICE_EGP, normalizePaymentContactPhone, adRunDays, isPaymentContactPhoneValid, isReceiptImageAllowed } from '../../utils/adCheckout';
 
 const INSTA_PAY_LINK = 'https://ipn.eg/S/wael1011/instapay/2dvaYQ';
-const receiptSubmissionEnabled = false;
+type PaidPreparation = { submitted: boolean; signed: SignedAdUpload | null; receiptSigned?: SignedAdUpload };
 
 interface Props {
   lang: Language;
@@ -18,11 +20,16 @@ interface Props {
   startsAt: Date;
   endsAt: Date;
   mediaType: 'image' | 'video' | 'none';
+  adDescription: string;
+  categorySlug: string;
+  adContact: string;
+  mediaFile?: File | string;
   onBack: () => void;
+  onNavigate: (path: string) => void;
 }
 
 export function AdPaymentCheckout({
-  lang, advertiserName, adTitle, startsAt, endsAt, mediaType, onBack
+  lang, advertiserName, adTitle, startsAt, endsAt, mediaType, adDescription, categorySlug, adContact, mediaFile, onBack, onNavigate
 }: Props) {
   const ar = lang === 'ar';
   const BackIcon = ar ? ArrowRight : ArrowLeft;
@@ -61,6 +68,65 @@ export function AdPaymentCheckout({
   const runDays = adRunDays(startsAt, endsAt);
   const amount = (value: number) => new Intl.NumberFormat(ar ? 'ar-EG' : 'en-EG', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 }).format(value);
   const phoneSaved = !!savedPhone && normalizePaymentContactPhone(phone) === savedPhone;
+  const [paymentReady, setPaymentReady] = useState<'checking' | 'yes' | 'no'>('checking');
+  const [availabilityAttempt, setAvailabilityAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setPaymentReady('checking');
+    offerAdsRequest<{ available: boolean }>('ads.paidAvailability', { hasMedia: mediaType !== 'none' }, true)
+      .then(result => { if (active) setPaymentReady(result.available ? 'yes' : 'no'); })
+      .catch(() => { if (active) setPaymentReady('no'); });
+    return () => { active = false; };
+  }, [mediaType, availabilityAttempt]);
+  const [sending, setSending] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [sendError, setSendError] = useState('');
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const sendLock = useRef(false);
+  const paymentDraft = useRef<{ id: string; prepared?: PaidPreparation; receipt?: UploadedAdMedia; media?: UploadedAdMedia } | null>(null);
+  const submit = async () => {
+    if (sendLock.current || !receiptFile || !phoneSaved || runDays === null || submitted) return;
+    sendLock.current = true;
+    setSending(true);
+    setSendError('');
+    const draft = paymentDraft.current ?? { id: crypto.randomUUID() };
+    paymentDraft.current = draft;
+    try {
+      draft.prepared ??= await offerAdsRequest<PaidPreparation>('ads.prepare', {
+        id: draft.id, tier: 'featured', title: adTitle, description: adDescription, merchant: advertiserName,
+        categorySlug, contact: adContact, paymentPhone: savedPhone, amountEgp: runDays * AD_TRIAL_DAILY_PRICE_EGP,
+        startsAt: startsAt.getTime(), endsAt: endsAt.getTime(), resourceType: mediaType === 'none' ? null : mediaType,
+        bytes: typeof mediaFile === 'string' ? 1 : mediaFile?.size ?? 0, receiptBytes: receiptFile.size,
+      }, true);
+      if (!draft.prepared.submitted) {
+        if (!draft.prepared.receiptSigned) throw new Error('receipt_required');
+        if (!draft.receipt) {
+          setUploadProgress(0);
+          draft.receipt = await uploadAdMedia(receiptFile, draft.prepared.receiptSigned, setUploadProgress);
+        }
+        if (mediaFile && draft.prepared.signed && !draft.media) {
+          setUploadProgress(0);
+          draft.media = await uploadAdMedia(mediaFile, draft.prepared.signed, setUploadProgress);
+        }
+        setUploadProgress(null);
+        const result = await offerAdsRequest<{ submitted: boolean }>('ads.submit', { id: draft.id, ...draft.media, receipt: draft.receipt }, true);
+        if (result.submitted !== true) throw new Error('ad_submission_unconfirmed');
+      }
+      setSubmitted(true);
+      window.scrollTo(0, 0);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      setSendError(code === 'ad_upload_daily_limit'
+        ? (ar ? 'حصة رفع الملفات غير كافية حاليًا. جرّب بعد منتصف الليل بتوقيت القاهرة واحتفظ بالإيصال.' : 'Your upload allowance is too low right now. Keep your receipt and retry after midnight Cairo time.')
+        : code === 'ad_upload_active' || code === 'ad_upload_paused'
+          ? (ar ? 'رفع الملفات غير متاح حاليًا. احتفظ بالإيصال وحاول تاني بعد قليل.' : 'Uploads are temporarily unavailable. Keep your receipt and try again shortly.')
+          : (ar ? 'إرسال الإعلان ما اكتملش. احتفظ بالإيصال وحاول تاني من نفس الصفحة.' : 'Submission did not finish. Keep the receipt and try again from this page.'));
+    } finally {
+      sendLock.current = false;
+      setSending(false);
+      setUploadProgress(null);
+    }
+  };
   const dates = new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: AD_TIME_ZONE });
   const receiptPreviewUrl = useMemo(() => receiptFile ? URL.createObjectURL(receiptFile) : null, [receiptFile]);
 
@@ -69,7 +135,7 @@ export function AdPaymentCheckout({
   }, [receiptPreviewUrl]);
 
   const selectReceipt = (file: File | null) => {
-    if (!file) return;
+    if (!file || sendLock.current || paymentDraft.current?.prepared) return;
     if (!isReceiptImageAllowed(file.type, file.size)) {
       setReceiptError(ar
         ? 'اختر صورة JPG أو PNG أو WebP بحجم لا يتجاوز 5 ميجابايت.'
@@ -99,6 +165,14 @@ export function AdPaymentCheckout({
     );
   };
 
+  if (submitted) return <main dir={ar ? 'rtl' : 'ltr'} className="min-h-screen bg-slate-50 p-5 dark:bg-slate-950">
+    <section role="status" className="mx-auto max-w-xl space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950">
+      <h1 className="flex items-center gap-2 text-lg font-extrabold"><Check className="size-5" aria-hidden="true" />{ar ? 'مبروك! تم إرسال إعلانك المميز والإيصال للإدارة بنجاح.' : 'Your featured ad and receipt were sent successfully.'}</h1>
+      <p className="text-sm">{ar ? 'تتم المراجعة والرد خلال ٢٤ ساعة تقريبًا. تقدر تتابع من الملف الشخصي في «إعلاناتي».' : 'Review usually takes around 24 hours. Track the status in My ads in your profile.'}</p>
+      <a href="/settings/ads" onClick={event => followInternalLink(event, onNavigate)} className="inline-flex min-h-11 items-center font-bold underline">{ar ? 'متابعة الإعلان' : 'Track ad'}</a>
+    </section>
+  </main>;
+
   return (
     <main dir={ar ? 'rtl' : 'ltr'} className="min-h-screen bg-[#F8FAFC] px-3 py-5 pb-16 text-slate-900 sm:px-6 sm:py-8 dark:bg-slate-950 dark:text-white">
       <div className="mx-auto w-full max-w-3xl space-y-4">
@@ -116,7 +190,7 @@ export function AdPaymentCheckout({
                 </p>
               </div>
             </div>
-            <button type="button" onClick={onBack} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 text-xs font-extrabold text-slate-700 hover:bg-slate-50 sm:self-center dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+            <button type="button" onClick={onBack} disabled={sending || !!paymentDraft.current?.prepared} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 text-xs font-extrabold text-slate-700 hover:bg-slate-50 sm:self-center dark:border-slate-700 dark:bg-slate-800 dark:text-white">
               <BackIcon className="h-4 w-4" />
               {ar ? 'الرجوع لتعديل الإعلان' : 'Back to edit advertisement'}
             </button>
@@ -126,8 +200,8 @@ export function AdPaymentCheckout({
             <div role="status" className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
               <p>{ar
-                ? 'السعر المعروض للتجربة. استقبال تحويلات إنستا باي وإرسال الإيصالات لسه غير متاحين. ما تحوّلش أي مبلغ حاليًا.'
-                : 'This is a trial price. InstaPay transfers and receipt submission are not available yet. Do not transfer money now.'}</p>
+                ? 'السعر الحالي ١٠٠ جنيه لكل يوم. الإدارة بتراجع الإيصال والتحويل قبل الموافقة على النشر.'
+                : 'The current rate is EGP 100 per day. The administrator checks the receipt and transfer before approving publication.'}</p>
             </div>
 
             <section aria-labelledby="ad-checkout-invoice" className="space-y-4 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 sm:p-6 dark:border-slate-700 dark:bg-slate-950/50">
@@ -175,7 +249,7 @@ export function AdPaymentCheckout({
               </label>
               <div className="relative">
                 <input id="ad-checkout-phone" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" value={phone}
-                  onChange={event => setPhone(event.target.value)} maxLength={24} disabled={phoneState === 'loading' || phoneState === 'saving'}
+                  onChange={event => setPhone(event.target.value)} maxLength={24} disabled={phoneState === 'loading' || phoneState === 'saving' || sending || !!paymentDraft.current?.prepared}
                   placeholder={ar ? 'مثال: 01000000000' : 'Example: 01000000000'}
                   aria-invalid={phoneTouched && !phoneValid}
                   aria-describedby="ad-checkout-phone-help"
@@ -205,15 +279,15 @@ export function AdPaymentCheckout({
               <p className="text-sm leading-6 text-slate-700 dark:text-slate-200">{ar
                 ? 'رابط إنستا باي بيفتح التحويل. اكتب مبلغ الفاتورة داخل إنستا باي، وبعد التحويل ارجع هنا عشان ترفق صورة الإيصال وترسلها للمراجعة.'
                 : 'The InstaPay link opens the transfer. Enter the invoice amount in InstaPay, then return here to attach and submit your receipt.'}</p>
-              {receiptSubmissionEnabled ? (
+              {phoneSaved && runDays !== null && paymentReady === 'yes' ? (
                 <a href={INSTA_PAY_LINK} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-xl bg-emerald-700 px-4 font-bold text-white">
                   {ar ? 'فتح إنستا باي' : 'Open InstaPay'}
                 </a>
-              ) : (
-                <button type="button" disabled className="min-h-11 rounded-xl bg-slate-200 px-4 font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                  {ar ? 'فتح إنستا باي — غير متاح حاليًا' : 'Open InstaPay — currently unavailable'}
-                </button>
-              )}
+              ) : !phoneSaved ? <p className="text-xs font-semibold">{ar ? 'احفظ رقم المتابعة عشان تفتح رابط إنستا باي.' : 'Save your contact number to open InstaPay.'}</p>
+                : paymentReady === 'checking' ? <p role="status" className="text-xs">{ar ? 'جاري التحقق من إتاحة الإرسال...' : 'Checking submission availability…'}</p>
+                : <p role="alert" className="text-xs font-semibold">{ar ? 'إرسال الإيصال غير متاح حاليًا.' : 'Receipt submission is unavailable right now.'}{' '}
+                  <button type="button" onClick={() => setAvailabilityAttempt(value => value + 1)} className="underline">{ar ? 'تحقق تاني' : 'Check again'}</button>
+                </p>}
             </section>
 
             <section className="space-y-3" aria-labelledby="ad-receipt-title">
@@ -228,7 +302,7 @@ export function AdPaymentCheckout({
                       <Check className="h-4 w-4" />
                       {ar ? 'تم اختيار الصورة على جهازك فقط' : 'Image selected locally only'}
                     </p>
-                    <button type="button" onClick={() => { setReceiptFile(null); setReceiptError(''); }}
+                    <button type="button" disabled={sending || !!paymentDraft.current?.prepared} onClick={() => { setReceiptFile(null); setReceiptError(''); }}
                       className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 text-xs font-bold text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
                       <X className="h-4 w-4" />{ar ? 'حذف وتغيير الصورة' : 'Remove and change'}
                     </button>
@@ -254,22 +328,19 @@ export function AdPaymentCheckout({
                 </div>
               )}
               {receiptError && <p role="alert" className="text-xs font-bold text-rose-700">{receiptError}</p>}
-              <p className="text-xs leading-5 text-slate-500 dark:text-slate-300">{ar
-                ? 'للمعاينة فقط: اختيار صورة هنا لا يعني إرسال الإيصال للإدارة أو رفعه إلى Cloudinary.'
-                : 'Preview only: selecting an image does not submit it to administrators or upload it to Cloudinary.'}</p>
             </section>
 
             <section className="space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
-              <button type="button" disabled className="flex min-h-13 w-full items-center justify-center gap-2 rounded-2xl bg-slate-200 px-5 py-4 text-sm font-black text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                <ShieldCheck className="h-5 w-5" />
-                {ar ? 'إرسال الإعلان وإيصال الدفع للمراجعة — قريبًا' : 'Send ad and receipt for review — coming soon'}
+              <button type="button" onClick={() => void submit()} disabled={sending || !phoneSaved || !receiptFile || runDays === null}
+                className="flex min-h-13 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-4 text-sm font-extrabold text-white disabled:opacity-50">
+                {sendError ? (ar ? 'إعادة المحاولة' : 'Try again') : (ar ? 'إرسال الإعلان وإيصال الدفع للمراجعة' : 'Send ad and receipt for review')}
               </button>
-              <p role="status" className="flex items-start justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-center text-xs font-semibold leading-6 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                <Clock3 className="mt-0.5 h-4 w-4 shrink-0" />
-                {ar
-                  ? 'سيُفعّل إرسال الإعلان للمراجعة بعد ربط الأسعار والفاتورة وإيصالات الدفع بالخادم. لن يُنشر أي إعلان دون موافقة الإدارة.'
-                  : 'Submission for review will be enabled after server-side pricing, invoicing and receipt storage are ready. No ad will publish without admin approval.'}
-              </p>
+              {sending && <div role="status" className="grid justify-items-center gap-2 py-3 text-sm font-bold">
+                <LoaderCircle className="size-7 motion-safe:animate-spin" aria-hidden="true" />
+                <p>{ar ? 'جاري إرسال الإعلان، برجاء الانتظار' : 'Sending your ad. Please wait.'}</p>
+                {uploadProgress !== null && <progress max={100} value={uploadProgress} aria-label={ar ? 'تقدّم رفع الملف' : 'Upload progress'} className="w-full accent-emerald-700" />}
+              </div>}
+              {sendError && <p role="alert" className="text-sm font-bold text-rose-700 dark:text-rose-300">{sendError}</p>}
             </section>
           </div>
         </section>

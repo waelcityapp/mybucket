@@ -23,7 +23,7 @@ export function FeaturedAdInfoPage({ lang, onBack }: { lang: Language; onBack: (
       </section>
       <section className="space-y-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-900 dark:bg-emerald-950">
         <h2 className="font-extrabold">{ar ? 'الباقات والأسعار' : 'Packages and pricing'}</h2>
-        <p className="text-sm">{ar ? 'الباقات والأسعار لسه قيد التحديد. الدفع غير متاح حاليًا.' : 'Packages and prices are still being decided. Payments are currently unavailable.'}</p>
+        <p className="text-sm">{ar ? 'السعر التجريبي ١٠٠ جنيه لكل يوم. الدفع عبر إنستا باي وإرسال الإيصال للمراجعة.' : 'Trial rate: EGP 100 per day. Pay through InstaPay and submit the receipt for review.'}</p>
       </section>
     </div>
   </main>;

@@ -28,7 +28,7 @@ test('receipt preview only accepts correctly typed size-limited images', () => {
   assert.equal(isReceiptImageAllowed('image/png', 0), false);
 });
 
-test('ad checkout uses a real route and keeps payment submission disabled', () => {
+test('ad checkout uses a real route and uses InstaPay and submits a private receipt', () => {
   const app = readFileSync('src/App.tsx', 'utf8');
   const create = readFileSync('src/components/views/CreateOfferPage.tsx', 'utf8');
   const checkout = readFileSync('src/components/views/AdPaymentCheckout.tsx', 'utf8');
@@ -39,6 +39,8 @@ test('ad checkout uses a real route and keeps payment submission disabled', () =
   assert.match(checkout, /https:\/\/ipn\.eg\/S\//);
   assert.doesNotMatch(checkout, /InstaPay recipient number/);
   assert.doesNotMatch(checkout, /Vodafone Cash|Copy transfer number/);
-  assert.match(checkout, /type="button" disabled/);
+  assert.match(checkout, /href=\{INSTA_PAY_LINK\}/);
+  assert.match(checkout, /'ads\.submit'/);
+  assert.match(checkout, /receipt: draft\.receipt/);
   assert.doesNotMatch(checkout, /\/api\/gateway|localStorage|fetch\s*\(/);
 });

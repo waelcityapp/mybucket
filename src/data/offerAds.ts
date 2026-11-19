@@ -22,6 +22,7 @@ export type ReviewOfferAd = PublicOfferAd & {
   status: OfferAdStatus;
   submittedAt: number;
   rejectionReason: string;
+  payment?: { amountEgp: number; phone: string; receiptUrl?: string };
 };
 
 export type MyOfferAd = Pick<ReviewOfferAd, 'id' | 'title' | 'merchant' | 'status' | 'submittedAt' | 'startsAt' | 'endsAt' | 'rejectionReason'> & { deleteAfter: number | null };

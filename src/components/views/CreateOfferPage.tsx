@@ -245,7 +245,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
         setHasSubmission(false);
       }
       const errors = {
-        ad_upload_daily_limit: ar ? 'استخدمت ٣ محاولات رفع النهارده. الحصة بتتجدد الساعة ١٢ بالليل بتوقيت القاهرة.' : 'You have used today’s three upload attempts. They reset at midnight Cairo time.',
+        ad_upload_daily_limit: ar ? 'استخدمت كل محاولات الرفع المتاحة النهارده. الحصة بتتجدد الساعة ١٢ بالليل بتوقيت القاهرة.' : 'You have used all of today’s upload attempts. They reset at midnight Cairo time.',
         ad_upload_active: ar ? 'عندك ملف قيد الرفع أو التحقق. كمّله أو ألغيه قبل محاولة رفع تانية.' : 'Complete or cancel your current upload before starting another.',
         ad_upload_paused: ar ? 'رفع ملفات الإعلانات متوقف مؤقتًا. حاول لاحقًا.' : 'Ad media uploads are temporarily paused.',
         ad_free_interval: ar ? 'لسه ما مرّتش المدة المطلوبة من آخر إعلان مجاني اتوافق عليه.' : 'Your free-ad interval has not passed since the last approval.',

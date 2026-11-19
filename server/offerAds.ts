@@ -7,6 +7,7 @@ import { OFFER_CATEGORY_IDS, type MyOfferAd, type OfferAdStatus, type PublicOffe
 
 const DAY = 86400000;
 const MAX_UPLOADS = 3;
+const OWNER_MAX_UPLOADS = 20;
 const cairoDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' });
 const EXPIRED_RETENTION = 10 * DAY;
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
@@ -231,14 +232,15 @@ export async function purgeExpiredOffers(db = getAdminFirestore()) {
   return { removed: results.length - failed, failed };
 }
 
-export async function sendOfferAd(action: string, uid: string, payload: Payload, db = getAdminFirestore()) {
+export async function sendOfferAd(action: string, uid: string, payload: Payload, db = getAdminFirestore(), isOwner = false) {
+  const uploadLimit = isOwner ? OWNER_MAX_UPLOADS : MAX_UPLOADS;
   if (action === 'ads.paidAvailability') {
     const now = Date.now();
     const [usage, lease, policy] = await Promise.all([
       uploadUsage(db, cairoDay.format(now)).doc(uid).get(), activeUpload(db, uid).get(), policyRef(db).get(),
     ]);
     if (policy.data()?.uploadsPaused === true) return { available: false, reason: 'paused' };
-    if ((usage.data()?.issued ?? 0) >= MAX_UPLOADS) return { available: false, reason: 'daily_limit' };
+    if ((usage.data()?.issued ?? 0) >= uploadLimit) return { available: false, reason: 'daily_limit' };
     if ((lease.data()?.expiresAt ?? 0) > now) return { available: false, reason: 'active' };
     return { available: true };
   }
@@ -326,13 +328,13 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
         const [used, active, policy] = await Promise.all([tx.get(usage), tx.get(lease), tx.get(policyRef(db))]);
         if (policy.data()?.uploadsPaused === true) return fail('ad_upload_paused', 503);
         const count = used.data()?.issued ?? 0;
-        if (count + permits > MAX_UPLOADS) return fail('ad_upload_daily_limit', 429);
+        if (count + permits > uploadLimit) return fail('ad_upload_daily_limit', 429);
         if ((active.data()?.expiresAt ?? 0) > now) return fail('ad_upload_active', 409);
         if (mediaType) signed = signAdminAdTestUpload(uid, payload, undefined, now, id, 'submissions');
         if (featured) receiptSigned = signAdminAdTestUpload(uid, {
           resourceType: 'image', bytes: payload.receiptBytes,
         }, undefined, now, id, 'receipts');
-        tx.set(usage, { issued: count + permits }, { merge: true });
+        tx.set(usage, { issued: count + permits, limit: uploadLimit }, { merge: true });
         tx.set(lease, { id, expiresAt: now + 3600000 });
       } else if (!existing) {
         const quota = db.collection('offerAdUploadLimits').doc(`${uid}_${day}`);
@@ -410,7 +412,7 @@ export async function reviewOfferAds(action: string, uid: string, payload: Paylo
       totals.verified += data.verified ?? 0;
       totals.bytes += data.bytes ?? 0;
       totals.cancellations += data.cancellations ?? 0;
-      if (data.issued >= MAX_UPLOADS) totals.limitedAccounts++;
+      if (data.issued >= (data.limit ?? MAX_UPLOADS)) totals.limitedAccounts++;
     }
     return { ...totals, uploadsPaused: policy.data()?.uploadsPaused === true };
   }

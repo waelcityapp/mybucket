@@ -622,3 +622,5 @@ Advertisement dates explicitly label Cairo time in display copy, without browser
 VIP ads use the paid InstaPay review workflow at EGP 200 per started 24-hour billing day. Featured remains EGP 100. Approved, active VIP ads appear on the offers landing page and lead their category, followed by Featured and Free. Browse Categories remains available, and categories are the default when no VIP ads are live.
 
 Paid ad media and its required receipt use one shared submission attempt. The checkout keeps the InstaPay control visible and explains any block before transfer. Existing daily counters remain in effect.
+
+The verified app owner has 20 ad upload attempts per Cairo day. The general account limit remains three. The protected gateway determines the owner exception.

@@ -297,7 +297,7 @@ export function AdPaymentCheckout({
                 </button>
                 <p role="status" className="text-xs font-semibold">
                   {paymentReady === 'checking' ? (ar ? 'جاري التحقق من إتاحة الإرسال...' : 'Checking submission availability…')
-                    : paymentReady === 'daily_limit' ? (ar ? 'استخدمت ٣ محاولات الرفع المتاحة النهارده. الرابط هيتاح بعد تجديد الحصة عند منتصف الليل بتوقيت القاهرة.' : 'You have used today’s three upload attempts. The link becomes available after midnight Cairo time.')
+                    : paymentReady === 'daily_limit' ? (ar ? 'استخدمت كل محاولات الرفع المتاحة النهارده. الرابط هيتاح بعد تجديد الحصة عند منتصف الليل بتوقيت القاهرة.' : 'You have used all of today’s upload attempts. The link becomes available after midnight Cairo time.')
                     : paymentReady === 'active' ? (ar ? 'عندك رفع قيد التنفيذ أو التحقق. كمّله الأول.' : 'You have an upload in progress. Complete it first.')
                     : paymentReady === 'paused' ? (ar ? 'رفع الإيصالات متوقف مؤقتًا.' : 'Receipt uploads are temporarily paused.')
                     : paymentReady === 'error' ? (ar ? 'تعذّر التحقق من إتاحة الإرسال.' : 'Could not check submission availability.')

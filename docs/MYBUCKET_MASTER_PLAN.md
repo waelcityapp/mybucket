@@ -598,3 +598,5 @@ Offer categories, advert details, creation and My Ads links transition in the ex
 Public advertisement cards show at most 120 characters of description and clamp to two lines. More Details opens the full description on the offer page.
 
 Ad creation uses localized image and video picker buttons with separate file-type filters.
+
+The free ad form checks eligibility before enabling its fields for new and renewed ads. Final submission still rechecks eligibility on the server.

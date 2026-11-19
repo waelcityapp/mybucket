@@ -113,7 +113,7 @@ export async function readMyOfferAds(uid: string, db = getAdminFirestore()): Pro
 
 const policyRef = (db: ReturnType<typeof getAdminFirestore>) => db.collection('offerAdSettings').doc('policy');
 
-async function assertFreeOfferAvailable(
+async function freeOfferEligibility(
   db: ReturnType<typeof getAdminFirestore>,
   tx: FirebaseFirestore.Transaction,
   uid: string,
@@ -130,10 +130,18 @@ async function assertFreeOfferAvailable(
   let lastApproval = ledger.data()?.lastApproval ?? 0;
   for (const doc of existing.docs) {
     const ad = doc.data() as StoredAd;
-    if (requireNoPending && ad.status === 'pending' && doc.id !== id) fail('ad_pending_exists', 409);
+    if (requireNoPending && ad.status === 'pending' && doc.id !== id) return { status: 'pending' } as const;
     if (ad.status === 'approved' || ad.status === 'deleting') lastApproval = Math.max(lastApproval, ad.reviewedAt ?? 0);
   }
-  if (lastApproval && lastApproval + days * DAY > now) return fail('ad_free_interval', 429);
+  const availableAt = lastApproval + days * DAY;
+  if (lastApproval && availableAt > now) return { status: 'interval', availableAt } as const;
+  return { status: 'available' } as const;
+}
+
+async function assertFreeOfferAvailable(...args: Parameters<typeof freeOfferEligibility>) {
+  const eligibility = await freeOfferEligibility(...args);
+  if (eligibility.status === 'pending') fail('ad_pending_exists', 409);
+  if (eligibility.status === 'interval') fail('ad_free_interval', 429);
 }
 
 export async function readOfferForRenewal(uid: string, payload: Payload, db = getAdminFirestore()) {
@@ -185,6 +193,9 @@ export async function purgeExpiredOffers(db = getAdminFirestore()) {
 }
 
 export async function sendOfferAd(action: string, uid: string, payload: Payload, db = getAdminFirestore()) {
+  if (action === 'ads.freeEligibility') {
+    return db.runTransaction(tx => freeOfferEligibility(db, tx, uid, '', Date.now(), true), { readOnly: true });
+  }
   if (action === 'ads.renewal') return readOfferForRenewal(uid, payload, db);
   const id = adId(payload.id);
   if (action === 'ads.deleteExpired') return removeExpiredOffer(uid, id, db);

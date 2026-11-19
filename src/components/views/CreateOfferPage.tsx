@@ -39,6 +39,18 @@ interface Props { lang: Language; onBack: () => void; onNavigate: (path: string)
 export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   const ar = lang === 'ar';
   const [tier, setTier] = useState<'free' | 'featured'>('free');
+  type Eligibility = { status: 'available' | 'pending' } | { status: 'interval'; availableAt: number };
+  const [eligibility, setEligibility] = useState<Eligibility | 'checking' | 'error'>('checking');
+  const [eligibilityAttempt, setEligibilityAttempt] = useState(0);
+  const freeFieldsLocked = tier === 'free' && (typeof eligibility === 'string' || eligibility.status !== 'available');
+  useEffect(() => {
+    if (tier !== 'free') return;
+    let active = true;
+    offerAdsRequest<Eligibility>('ads.freeEligibility', {}, true)
+      .then(result => { if (active) setEligibility(result); })
+      .catch(() => { if (active) setEligibility('error'); });
+    return () => { active = false; };
+  }, [tier, eligibilityAttempt]);
   const [category, setCategory] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -200,6 +212,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   };
   const handleReview = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (freeFieldsLocked) return;
     const start = adScheduleDate(startsAt), end = adScheduleDate(endsAt);
     if (!start || !end) { setDateError('invalid'); return; }
     if (end.getTime() <= start.getTime()) { setDateError('order'); return; }
@@ -389,7 +402,10 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
               <h2 className="font-extrabold text-sm">{ar ? '1. نوع الإعلان' : '1. Advertisement type'}</h2>
               <div className="grid grid-cols-2 gap-3">
                 {(['free', 'featured'] as const).map(value => (
-                  <button key={value} type="button" aria-pressed={tier === value} onClick={() => setTier(value)}
+                  <button key={value} type="button" aria-pressed={tier === value} onClick={() => {
+                    if (value === 'free' && tier !== 'free') setEligibility('checking');
+                    setTier(value);
+                  }}
                     className={`rounded-xl border p-3 text-start text-sm font-extrabold transition-colors ${tier === value ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-700'}`}>
                     {value === 'free' ? (ar ? 'مجاني' : 'Free') : (ar ? 'مميز' : 'Featured')}
                     <span className="block text-[11px] font-normal mt-1">{value === 'free' ? (ar ? 'بدون باقة مدفوعة' : 'No paid package') : (ar ? 'السعر والمميزات لاحقًا' : 'Pricing and benefits to follow')}</span>
@@ -397,6 +413,20 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                 ))}
               </div>
             </section>
+            {tier === 'free' && eligibility === 'checking' && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">
+              {ar ? 'بنتأكد إن فيه إعلان مجاني متاح لحسابك...' : 'Checking whether you can submit a free ad…'}
+            </p>}
+            {tier === 'free' && eligibility === 'error' && <div role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+              {ar ? 'تعذّر التحقق من إتاحة الإعلان المجاني.' : 'Could not check free ad availability.'}{' '}
+              <button type="button" className="font-bold underline" onClick={() => { setEligibility('checking'); setEligibilityAttempt(value => value + 1); }}>{ar ? 'حاول تاني' : 'Retry'}</button>
+            </div>}
+            {tier === 'free' && typeof eligibility === 'object' && eligibility.status !== 'available' && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">
+              {eligibility.status === 'pending'
+                ? (ar ? 'عندك إعلان مجاني بانتظار الموافقة. استنى قرار الإدارة قبل إرسال إعلان تاني.' : 'You already have a free ad awaiting review. Wait for the decision before submitting another.')
+                : (ar ? 'تقدر ترسل إعلان مجاني تاني بعد' : 'You can submit your next free ad after') + ' ' +
+                  new Date(eligibility.availableAt).toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZoneName: 'short' })}
+            </p>}
+            <fieldset disabled={freeFieldsLocked} className="m-0 min-w-0 space-y-5 border-0 p-0 disabled:opacity-60">
             <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
               <h2 className="font-extrabold text-sm">{ar ? '2. بيانات الإعلان' : '2. Advertisement details'}</h2>
               <div><label htmlFor="offer-category" className={label}>{ar ? 'القسم' : 'Category'}</label>
@@ -516,6 +546,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
 
             </section>
             <button type="submit" disabled={removingMedia || imageStatus === 'compressing' || uploadState === 'uploading' || uploadState === 'verifying'} className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold py-3 flex justify-center items-center gap-2"><Megaphone className="w-5 h-5" />{ar ? 'مراجعة الإعلان' : 'Review advertisement'}</button>
+            </fieldset>
           </form>
         )}
       </main>

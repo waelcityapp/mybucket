@@ -13,7 +13,6 @@ import { AdCreativeCard } from '../AdCreativeCard';
 import { AdScheduleFields } from '../AdScheduleFields';
 import { AD_TIME_ZONE, adScheduleDate, emptyAdSchedule } from '../../utils/adSchedule';
 import { offerAdsRequest } from '../../services/offerAdsClient';
-import { auth } from '../../lib/firebase';
 import { uploadAdMedia, type SignedAdUpload, type UploadedAdMedia } from '../../services/adMediaUpload';
 
 const mediaAccept = {
@@ -93,11 +92,6 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   const [videoProgress, setVideoProgress] = useState<number | 'checking' | null>(null);
   const [mediaError, setMediaError] = useState<'generic' | 'video_too_long' | 'video_too_large'>('generic');
   const [compressionNotice, setCompressionNotice] = useState(false);
-  const [uploadState, setUploadState] = useState<'idle' | 'uploading' | 'verifying' | 'success' | 'error'>('idle');
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadError, setUploadError] = useState('');
-  const [pendingUpload, setPendingUpload] = useState<UploadedAdMedia | null>(null);
-  const [verifiedUpload, setVerifiedUpload] = useState<{ secureUrl: string; publicId: string } | null>(null);
   const imageSelection = useRef(0);
   const fileInput = useRef<HTMLInputElement>(null);
   const openMediaPicker = (kind: keyof typeof mediaAccept) => {
@@ -107,9 +101,6 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     input.click();
   };
   const preparation = useRef<AbortController | null>(null);
-  const inFlightUpload = useRef<Promise<UploadedAdMedia> | null>(null);
-  const [testAsset, setTestAsset] = useState<Pick<SignedAdUpload, 'publicId' | 'resourceType'> | null>(null);
-  const [removingMedia, setRemovingMedia] = useState(false);
   useEffect(() => () => preparation.current?.abort(), []);
   const [preview, setPreview] = useState(false);
   const [featuredInfoOpen, setFeaturedInfoOpen] = useState(() => window.location.pathname === '/offers/new/featured');
@@ -149,34 +140,9 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     if (!isVideo || !imageUrl) return;
     return captureAdVideoPoster(imageUrl, url => setVideoPoster({ source: imageUrl, url }));
   }, [imageUrl, isVideo]);
-  const isAdmin = auth.currentUser?.email?.trim().toLowerCase() === 'waelvts@gmail.com';
-  const gateway = async (action: string, payload: Record<string, unknown>) => {
-    const user = auth.currentUser;
-    if (!user) throw new Error('authentication_required');
-    const response = await fetch('/api/gateway', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + await user.getIdToken() }, body: JSON.stringify({ action, payload }) });
-    const result = await response.json();
-    if (!response.ok || !result?.ok) throw new Error(typeof result?.error === 'string' ? result.error : 'upload_failed');
-    return result.data;
-  };
-  const removeMedia = async () => {
-    if (removingMedia) return;
+  const removeMedia = () => {
     ++imageSelection.current;
     preparation.current?.abort();
-    setUploadError('');
-    if (testAsset) {
-      setRemovingMedia(true);
-      try {
-        // Wait for Cloudinary's response before deleting, so a late upload cannot recreate the asset.
-        await inFlightUpload.current?.catch(() => undefined);
-        await gateway('admin.ads.testUploadDelete', testAsset);
-      } catch {
-        setUploadState('error');
-        setUploadError(ar ? 'تعذّر حذف الملف من Cloudinary. اضغط × لإعادة المحاولة.' : 'Could not delete the file from Cloudinary. Press × to retry.');
-        return;
-      } finally {
-        setRemovingMedia(false);
-      }
-    }
     if (fileInput.current) fileInput.current.value = '';
     submission.current = null;
     setReusedMedia(undefined);
@@ -184,50 +150,6 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     setImageStatus('idle');
     setVideoProgress(null);
     setCompressionNotice(false);
-    setUploadState('idle');
-    setPendingUpload(null);
-    setVerifiedUpload(null);
-    setTestAsset(null);
-    inFlightUpload.current = null;
-  };
-  const uploadTest = async () => {
-    if (!image || !isAdmin || removingMedia || (testAsset && !pendingUpload) || uploadState === 'uploading' || uploadState === 'verifying') return;
-    const selection = imageSelection.current;
-    setUploadState('uploading'); setUploadProgress(pendingUpload ? 100 : 0); setUploadError('');
-    try {
-      let uploaded = pendingUpload;
-      if (!uploaded) {
-        const resourceType = image.type.startsWith('video/') ? 'video' : 'image';
-        const signed = await gateway('admin.ads.testUploadSign', { resourceType, bytes: image.size }) as SignedAdUpload;
-        if (selection !== imageSelection.current) return;
-        setTestAsset({ publicId: signed.publicId, resourceType: signed.resourceType });
-        inFlightUpload.current = uploadAdMedia(image, signed, progress => {
-          if (selection === imageSelection.current) setUploadProgress(progress);
-        });
-        uploaded = await inFlightUpload.current;
-        if (selection !== imageSelection.current) return;
-        setPendingUpload(uploaded);
-      }
-      setUploadState('verifying');
-      const data = await gateway('admin.ads.testUploadConfirm', { publicId: uploaded.publicId, resourceType: uploaded.resourceType, version: uploaded.version, responseSignature: uploaded.responseSignature });
-      if (selection !== imageSelection.current) return;
-      if (typeof data?.secureUrl !== 'string' || data?.publicId !== uploaded.publicId) throw new Error('upload_failed');
-      setVerifiedUpload({ secureUrl: data.secureUrl, publicId: data.publicId });
-      setUploadState('success');
-    } catch (error) {
-      if (selection !== imageSelection.current) return;
-      const code = error instanceof Error ? error.message : '';
-      setUploadError(code === 'ad_upload_not_configured'
-        ? (ar ? 'إعدادات Cloudinary غير مكتملة على الخادم.' : 'Cloudinary server configuration is incomplete.')
-        : code === 'ad_video_duration_unavailable'
-          ? (ar ? 'الفيديو اترفع، لكن Cloudinary لم يرجع مدته بعد. اضغط إعادة التأكد من الرفع، من غير ما ترفع الملف تاني.' : 'Video uploaded, but Cloudinary did not return its duration yet. Retry verification without uploading again.')
-          : code === 'invalid_video_duration'
-            ? (ar ? 'مدة الفيديو المرفوع تجاوزت دقيقة واحدة. اختر فيديو أقصر.' : 'The uploaded video exceeds one minute. Choose a shorter video.')
-            : code === 'ad_upload_verification_failed'
-              ? (ar ? 'الفيديو اترفع، لكن تعذر الاتصال بـ Cloudinary للتأكد منه. حاول إعادة التأكد من الرفع.' : 'Video uploaded, but Cloudinary verification is unavailable. Retry verification.')
-              : (ar ? 'تعذر الرفع أو التأكد منه. حاول مرة أخرى.' : 'Upload or verification failed. Please try again.'));
-      setUploadState('error');
-    }
   };
   const handleReview = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -386,7 +308,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     <div dir={ar ? 'rtl' : 'ltr'} className="min-h-screen bg-[#F8FAFC] text-slate-900">
       <header className="bg-white border-b border-slate-200">
         <div className="max-w-xl mx-auto px-4 py-4 flex items-center gap-3">
-          <button type="button" disabled={removingMedia || sending || cancellingSend || (hasSubmission && !submitted)} onClick={preview && !submitted ? () => setPreview(false) : onBack}
+          <button type="button" disabled={sending || cancellingSend || (hasSubmission && !submitted)} onClick={preview && !submitted ? () => setPreview(false) : onBack}
             className="w-11 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 inline-flex items-center justify-center shrink-0"
             aria-label={ar ? 'العودة' : 'Back'}><BackIcon className="w-5 h-5" /></button>
           <div className="min-w-0">
@@ -412,7 +334,6 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
         ) : preview ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-4">
             <h2 className="font-extrabold">{ar ? 'معاينة الإعلان قبل الإرسال' : 'Preview before submission'}</h2>
-            {previewUrl && previewType === 'video' && <p className="text-xs text-slate-500">{ar ? 'تجربة مشاهدة الزائر: 3 مرات يوميًا على هذا المتصفح.' : 'Visitor playback demo: 3 plays per day in this browser.'}</p>}
             <AdCreativeCard lang={lang} title={title} description={description} merchant={merchant} contact={contact} mediaUrl={previewUrl} poster={poster} mediaType={previewType} videoQuotaId="local-ad-preview-demo" />
             <p className="text-xs text-slate-600">{ar ? 'بداية النشر:' : 'Publication starts:'} {adScheduleDate(startsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: AD_TIME_ZONE })}</p>
             <p className="text-xs text-slate-600">{ar ? 'نهاية النشر:' : 'Publication ends:'} {adScheduleDate(endsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: AD_TIME_ZONE })}</p>
@@ -428,7 +349,10 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                 <X className="size-5" aria-hidden="true" />{ar ? 'إلغاء الإرسال' : 'Cancel submission'}
               </button>}
               {cancellingSend && <p role="status" className="text-xs text-slate-600">{ar ? 'جاري إلغاء الإرسال وتنظيف الملف...' : 'Cancelling the submission and cleaning up the media…'}</p>}
-              {sendProgress !== null && <progress max={100} value={sendProgress} aria-label={ar ? 'تقدّم رفع الملف' : 'Media upload progress'} className="block h-2 w-full accent-emerald-700" />}
+              {sendProgress !== null && <div className="space-y-1">
+                <p className="text-xs font-bold">{ar ? 'جاري رفع الملف' : 'Uploading media'} <span dir="ltr">{sendProgress}%</span></p>
+                <progress max={100} value={sendProgress} aria-label={ar ? 'تقدّم رفع الملف' : 'Media upload progress'} className="block h-2 w-full accent-emerald-700" />
+              </div>}
               {sendError && <p role="alert" className="text-sm text-red-700">{sendError}</p>}
               <p className="text-xs text-slate-600">{tier === 'free'
                 ? (ar ? 'الإعلان يظهر للجمهور بعد موافقة الإدارة.' : 'Your ad becomes public after the administrator approves it.')
@@ -507,7 +431,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
             <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
               <h2 className="flex items-center gap-2 font-extrabold text-sm"><ImagePlus className="w-5 h-5 text-emerald-700" aria-hidden="true" />{ar ? '4. صورة أو فيديو الإعلان (اختياري)' : '4. Advertisement image or video (optional)'}</h2>
               <div className="flex items-center gap-2">
-              <input ref={fileInput} type="file" hidden disabled={removingMedia || !!testAsset || uploadState === 'uploading' || uploadState === 'verifying'} onChange={async event => {
+              <input ref={fileInput} type="file" hidden onChange={async event => {
                 const input = event.currentTarget;
                 const next = input.files?.[0];
                 if (!next) return;
@@ -521,7 +445,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                 setSendError('');
                 setReusedMedia(undefined);
                 setVideoProgress(null);
-                setImage(null); setMediaError('generic'); setCompressionNotice(false); setUploadState('idle'); setUploadError(''); setPendingUpload(null); setVerifiedUpload(null);
+                setImage(null); setMediaError('generic'); setCompressionNotice(false);
                 const isVideo = next.type.startsWith('video/');
                 if ((!isVideo && next.size > 5 * 1024 * 1024) || !acceptedTypes.includes(next.type)) { setImageStatus('error'); return; }
                 setImageStatus('compressing');
@@ -546,22 +470,21 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                   {(['image', 'video'] as const).map(kind => {
                     const Icon = kind === 'image' ? ImagePlus : Video;
                     return <button key={kind} type="button" onClick={() => openMediaPicker(kind)}
-                      disabled={removingMedia || !!testAsset || uploadState === 'uploading' || uploadState === 'verifying'}
+
                       className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-2 text-sm font-bold text-emerald-900 hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-emerald-700 disabled:opacity-50">
                       <Icon className="size-4 shrink-0" aria-hidden="true" />
                       {kind === 'image' ? (ar ? 'تحميل صورة' : 'Upload image') : (ar ? 'تحميل فيديو' : 'Upload video')}
                     </button>;
                   })}
                 </div>
-                {(imageStatus !== 'idle' || reusedMedia) && <button type="button" onClick={() => void removeMedia()} disabled={removingMedia}
+                {(imageStatus !== 'idle' || reusedMedia) && <button type="button" onClick={removeMedia}
                   aria-label={ar ? 'إلغاء وإزالة الملف' : 'Cancel and remove media'}
                   title={ar ? 'إلغاء وإزالة الملف' : 'Cancel and remove media'}
                   className="grid size-11 shrink-0 place-items-center rounded-xl border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50">
                   <X className="size-5" aria-hidden="true" />
                 </button>}
               </div>
-              {removingMedia && <p role="status" className="text-xs text-slate-600">{ar ? 'جاري إلغاء العملية وحذف الملف من Cloudinary...' : 'Cancelling and removing the file from Cloudinary…'}</p>}
-              <p className="text-xs text-slate-500">{ar ? 'للتجربة: الصور حتى 5 ميجابايت، والفيديو حتى 25 ميجابايت ودقيقة واحدة. تجهيز الفيديو قد يستغرق مدة تشغيله.' : 'For this preview: images up to 5 MB; videos up to 25 MB and one minute. Video preparation may take its full duration.'}</p>
+              <p className="text-xs text-slate-500">{ar ? 'الصور حتى ٥ ميجابايت، والفيديو حتى ٢٥ ميجابايت ومدته دقيقة كحد أقصى. الملف بيتجهّز على جهازك، والرفع يبدأ عند الإرسال للمراجعة.' : 'Images up to 5 MB. Videos up to 25 MB and one minute. Files are prepared on your device and uploaded when you submit for review.'}</p>
               {imageStatus === 'compressing' && (videoProgress === null
                 ? <p role="status" className="text-xs text-slate-600">{ar ? 'جاري تجهيز الصورة...' : 'Preparing the image…'}</p>
                 : <div className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-900">
@@ -580,21 +503,10 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
               {compressionNotice && <p className="text-xs text-amber-800">{ar ? 'المتصفح لا يدعم ضغط الفيديو؛ المعاينة تستخدم الملف الأصلي على جهازك.' : 'This browser cannot compress video; the local preview uses the original file.'}</p>}
               {imageStatus === 'error' && <p role="alert" className="text-xs text-red-700">{mediaError === 'video_too_long' ? (ar ? 'مدة الفيديو أكتر من دقيقة. اختار فيديو مدته دقيقة أو أقل.' : 'The video is longer than one minute. Choose a video of one minute or less.') : mediaError === 'video_too_large' ? (ar ? 'حجم الفيديو أكبر من 25 ميجابايت. اختار ملفًا أصغر.' : 'The video exceeds 25 MB. Choose a smaller file.') : (ar ? 'تعذر تجهيز الملف. تأكد من الحجم ونوع الملف ودعم المتصفح.' : 'Could not prepare the file. Check its size, type and browser support.')}</p>}
               {previewUrl && (previewType === 'video' ? <AdVideoPlayer src={previewUrl} poster={poster} label={ar ? 'معاينة فيديو الإعلان' : 'Advertisement video preview'} className="w-full max-h-48 object-contain rounded-xl bg-slate-50" /> : <img src={previewUrl} alt={ar ? 'معاينة الصورة' : 'Image preview'} className="w-full max-h-48 object-contain rounded-xl bg-slate-50" />)}
-              {isAdmin && image && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 space-y-3">
-                <p className="text-xs font-bold text-emerald-900">{ar ? 'اختبار رفع للإدارة فقط' : 'Admin-only upload test'}</p>
-                <p className="text-xs leading-relaxed text-emerald-800">{ar ? 'يرفع الملف فعليًا إلى Cloudinary. لن يُحفظ الإعلان في Firebase أو يُرسل للمراجعة بعد، وتقدر تحذف الملف التجريبي بزر ×.' : 'Uploads the file to Cloudinary. The ad is not yet saved to Firebase or submitted for review; Use × to remove the test file from Cloudinary.'}</p>
-                {uploadState !== 'success' && <button type="button" onClick={() => void uploadTest()} disabled={removingMedia || (!!testAsset && !pendingUpload) || uploadState === 'uploading' || uploadState === 'verifying'} className="w-full rounded-xl bg-emerald-700 px-3 py-2 text-sm font-bold text-white disabled:opacity-50">{pendingUpload ? (ar ? 'إعادة التأكد من الرفع' : 'Retry verification') : (ar ? 'رفع تجريبي إلى Cloudinary' : 'Test upload to Cloudinary')}</button>}
-                {(uploadState === 'uploading' || uploadState === 'verifying' || uploadState === 'success') && <div className="space-y-2 text-xs font-bold text-emerald-900">
-                  <div className="flex items-center justify-between gap-2"><span>{ar ? 'نسبة رفع الملف' : 'Upload progress'}</span><span dir="ltr">{uploadState === 'uploading' ? uploadProgress : 100}%</span></div>
-                  <progress aria-label={ar ? 'نسبة رفع الملف' : 'Upload progress'} max={100} value={uploadState === 'uploading' ? uploadProgress : 100} className="block h-3 w-full accent-emerald-700" />
-                </div>}
-                {uploadState === 'verifying' && <p role="status" className="text-xs text-emerald-900">{ar ? 'اكتمل إرسال الملف، جاري التأكد منه...' : 'File sent; verifying...'}</p>}
-                {uploadState === 'success' && verifiedUpload && <p role="status" className="text-xs font-bold text-emerald-900">{ar ? 'تم التحميل بنجاح' : 'Upload completed successfully'}</p>}
-                {uploadError && <p role="alert" className="text-xs text-red-700">{uploadError}</p>}
-              </div>}
+
 
             </section>
-            <button type="submit" disabled={removingMedia || imageStatus === 'compressing' || uploadState === 'uploading' || uploadState === 'verifying'} className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold py-3 flex justify-center items-center gap-2"><Megaphone className="w-5 h-5" />{ar ? 'مراجعة الإعلان' : 'Review advertisement'}</button>
+            <button type="submit" disabled={imageStatus === 'compressing'} className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold py-3 flex justify-center items-center gap-2"><Megaphone className="w-5 h-5" />{ar ? 'مراجعة الإعلان' : 'Review advertisement'}</button>
             </fieldset>}
           </form>
         )}

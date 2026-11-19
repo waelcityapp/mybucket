@@ -612,3 +612,5 @@ Free ad submission displays a sending indicator and acknowledges success only af
 Featured checkout displays an InstaPay-only preview at EGP 100 per started 24-hour billing day. Authenticated users can save and reuse their validated Egyptian mobile contact. Receiving transfers and receipt submission remain unavailable pending recipient configuration and the live payment workflow.
 
 My Bucket reuses the CityEve event checkout InstaPay recipient number as requested. It is displayed for reference with a notice to wait until receipt submission is enabled before transferring.
+
+My Bucket checkout uses the CityEve booking InstaPay deep link as the configured payment destination. The personal recipient phone is removed. The link stays inactive until paid receipt submission is available. Empty contact fields show an explicitly labelled example and saving validates that the user has entered their own number.

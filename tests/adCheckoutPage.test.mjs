@@ -36,7 +36,8 @@ test('ad checkout uses a real route and keeps payment submission disabled', () =
   assert.match(create, /offerPaymentPreview/);
   assert.match(create, /<AdPaymentCheckout/);
   assert.match(checkout, /Invoice Summary/);
-  assert.match(checkout, /InstaPay/);
+  assert.match(checkout, /https:\/\/ipn\.eg\/S\//);
+  assert.doesNotMatch(checkout, /InstaPay recipient number/);
   assert.doesNotMatch(checkout, /Vodafone Cash|Copy transfer number/);
   assert.match(checkout, /type="button" disabled/);
   assert.doesNotMatch(checkout, /\/api\/gateway|localStorage|fetch\s*\(/);

@@ -8,6 +8,9 @@ import type { Language } from '../../types';
 import { offerAdsRequest } from '../../services/offerAdsClient';
 import { AD_TRIAL_DAILY_PRICE_EGP, normalizePaymentContactPhone, adRunDays, isPaymentContactPhoneValid, isReceiptImageAllowed } from '../../utils/adCheckout';
 
+const INSTA_PAY_LINK = 'https://ipn.eg/S/wael1011/instapay/2dvaYQ';
+const receiptSubmissionEnabled = false;
+
 interface Props {
   lang: Language;
   advertiserName: string;
@@ -24,6 +27,7 @@ export function AdPaymentCheckout({
   const ar = lang === 'ar';
   const BackIcon = ar ? ArrowRight : ArrowLeft;
   const [phone, setPhone] = useState('');
+  const [phoneTouched, setPhoneTouched] = useState(false);
   const [savedPhone, setSavedPhone] = useState('');
   const [phoneState, setPhoneState] = useState<'loading' | 'ready' | 'saving' | 'error'>('loading');
   useEffect(() => {
@@ -34,7 +38,12 @@ export function AdPaymentCheckout({
     return () => { active = false; };
   }, []);
   const savePhone = async () => {
-    if (!isPaymentContactPhoneValid(phone) || phoneState === 'saving') return;
+    setPhoneTouched(true);
+    if (!isPaymentContactPhoneValid(phone)) {
+      document.getElementById('ad-checkout-phone')?.focus();
+      return;
+    }
+    if (phoneState === 'saving') return;
     setPhoneState('saving');
     try {
       const result = await offerAdsRequest<{ phone: string }>('ads.paymentContact', { phone }, true);
@@ -167,20 +176,22 @@ export function AdPaymentCheckout({
               <div className="relative">
                 <input id="ad-checkout-phone" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" value={phone}
                   onChange={event => setPhone(event.target.value)} maxLength={24} disabled={phoneState === 'loading' || phoneState === 'saving'}
-                  placeholder="01012345678"
+                  placeholder={ar ? 'مثال: 01000000000' : 'Example: 01000000000'}
+                  aria-invalid={phoneTouched && !phoneValid}
+                  aria-describedby="ad-checkout-phone-help"
                   className="min-h-12 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
               </div>
-              {phone && <p role="status" className={phoneValid ? 'flex items-center gap-1 text-xs font-bold text-emerald-700 dark:text-emerald-300' : 'text-xs font-bold text-rose-700 dark:text-rose-300'}>
+              {(phoneTouched || phone) && <p role="status" className={phoneValid ? 'flex items-center gap-1 text-xs font-bold text-emerald-700 dark:text-emerald-300' : 'text-xs font-bold text-rose-700 dark:text-rose-300'}>
                 {phoneValid ? <Check className="h-4 w-4" /> : null}
                 {phoneValid ? (ar ? 'صيغة الرقم صحيحة' : 'Valid number format') : (ar ? 'أدخل رقم موبايل مصري صحيح.' : 'Enter a valid Egyptian mobile number.')}
               </p>}
-              <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">{ar
-                ? 'احفظ الرقم في حسابك عشان يظهر تلقائيًا في الإعلانات المميزة القادمة. تقدر تغيّره في أي وقت.'
-                : 'Save this number to prefill it for future featured ads. You can change it anytime.'}</p>
+              <p id="ad-checkout-phone-help" className="text-xs leading-5 text-slate-500 dark:text-slate-400">{ar
+                ? 'اكتب رقم موبايلك، ثم احفظه. الرقم في الخانة مثال. احفظ الرقم في حسابك عشان يظهر تلقائيًا في الإعلانات المميزة القادمة. تقدر تغيّره في أي وقت.'
+                : 'Enter and save your own mobile number. The placeholder is an example. Your saved number will appear for future featured ads.'}</p>
               {phoneState === 'loading' && <p role="status" className="text-xs">{ar ? 'جاري تحميل رقم المتابعة...' : 'Loading your contact number…'}</p>}
               {phoneState === 'error' && <p role="alert" className="text-xs text-rose-700">{ar ? 'تعذّر تحميل أو حفظ الرقم. تقدر تدخله وتحفظه تاني.' : 'Could not load or save the number. Enter it and try saving again.'}</p>}
               {phoneSaved && <p role="status" className="text-xs font-bold text-emerald-700">{ar ? 'الرقم محفوظ في حسابك.' : 'Number saved to your account.'}</p>}
-              <button type="button" onClick={() => void savePhone()} disabled={!phoneValid || phoneSaved || phoneState === 'saving' || phoneState === 'loading'}
+              <button type="button" onClick={() => void savePhone()} disabled={phoneSaved || phoneState === 'saving' || phoneState === 'loading'}
                 className="min-h-11 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-50">
                 {phoneState === 'saving' ? (ar ? 'جاري الحفظ...' : 'Saving…') : (ar ? 'حفظ رقم المتابعة' : 'Save contact number')}
               </button>
@@ -191,13 +202,18 @@ export function AdPaymentCheckout({
                 <ShieldCheck className="h-5 w-5" />
                 {ar ? 'تعليمات الدفع' : 'Payment instructions'}
               </h2>
-              <dl className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm dark:border-emerald-800 dark:bg-slate-900">
-                <dt className="font-semibold">{ar ? 'رقم استقبال إنستا باي' : 'InstaPay recipient number'}</dt>
-                <dd dir="ltr" className="font-mono font-bold">01010764256</dd>
-              </dl>
-              <p className="text-xs leading-6 text-slate-700 dark:text-slate-200">{ar
-                ? 'استقبال المدفوعات لسه غير متاح. انتظر تفعيل إرسال الإيصال للمراجعة قبل التحويل.'
-                : 'Payments are not available yet. Wait until you can submit the receipt for review before transferring.'}</p>
+              <p className="text-sm leading-6 text-slate-700 dark:text-slate-200">{ar
+                ? 'رابط إنستا باي بيفتح التحويل. اكتب مبلغ الفاتورة داخل إنستا باي، وبعد التحويل ارجع هنا عشان ترفق صورة الإيصال وترسلها للمراجعة.'
+                : 'The InstaPay link opens the transfer. Enter the invoice amount in InstaPay, then return here to attach and submit your receipt.'}</p>
+              {receiptSubmissionEnabled ? (
+                <a href={INSTA_PAY_LINK} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-xl bg-emerald-700 px-4 font-bold text-white">
+                  {ar ? 'فتح إنستا باي' : 'Open InstaPay'}
+                </a>
+              ) : (
+                <button type="button" disabled className="min-h-11 rounded-xl bg-slate-200 px-4 font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  {ar ? 'فتح إنستا باي — غير متاح حاليًا' : 'Open InstaPay — currently unavailable'}
+                </button>
+              )}
             </section>
 
             <section className="space-y-3" aria-labelledby="ad-receipt-title">

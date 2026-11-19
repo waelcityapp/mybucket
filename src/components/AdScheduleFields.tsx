@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CalendarDays, Check, ChevronDown, ChevronUp, Clock3, X } from 'lucide-react';
 import type { Language } from '../types';
-import { adScheduleDate, type AdScheduleValue } from '../utils/adSchedule';
+import { AD_TIME_ZONE, adScheduleDate, cairoAdScheduleNow, type AdScheduleValue } from '../utils/adSchedule';
 
 type Props = { id: 'start' | 'end'; lang: Language; value: AdScheduleValue; onChange: (value: AdScheduleValue) => void };
 
@@ -26,22 +26,7 @@ export function AdScheduleFields({ id, lang, value, onChange }: Props) {
 
   const openPicker = () => {
     if (open) { setOpen(false); return; }
-    // Capture the user's device-local date and time at the exact moment
-    // the calendar is opened. Previously confirmed dates are preserved.
-    if (adScheduleDate(value)) {
-      setDraft(value);
-    } else {
-      const now = new Date();
-      const hour = now.getHours();
-      setDraft({
-        day: String(now.getDate()),
-        month: String(now.getMonth() + 1),
-        year: String(now.getFullYear()),
-        hour: String(hour % 12 || 12),
-        minute: String(now.getMinutes()).padStart(2, '0'),
-        period: hour < 12 ? 'am' : 'pm',
-      });
-    }
+    setDraft(adScheduleDate(value) ? value : cairoAdScheduleNow());
     setPickerError(false);
     setOpen(true);
   };
@@ -66,8 +51,8 @@ export function AdScheduleFields({ id, lang, value, onChange }: Props) {
   };
 
   const locale = ar ? 'ar-EG' : 'en-GB';
-  const dateText = selectedDate?.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
-  const timeText = selectedDate?.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit', hour12: true });
+  const dateText = selectedDate?.toLocaleDateString(locale, { timeZone: AD_TIME_ZONE, day: 'numeric', month: 'long', year: 'numeric' });
+  const timeText = selectedDate?.toLocaleTimeString(locale, { timeZone: AD_TIME_ZONE, hour: 'numeric', minute: '2-digit', hour12: true });
   const panelId = 'ad-schedule-' + id;
 
   return (

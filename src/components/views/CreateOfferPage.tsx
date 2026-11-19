@@ -1,3 +1,4 @@
+import { FeaturedAdInfoPage } from './FeaturedAdInfoPage';
 import { followInternalLink } from '../../utils/navigationHistory';
 import type { PublicOfferAd } from '../../data/offerAds';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
@@ -10,7 +11,7 @@ import { AdVideoPlayer } from '../AdVideoPlayer';
 import { AdPaymentCheckout } from './AdPaymentCheckout';
 import { AdCreativeCard } from '../AdCreativeCard';
 import { AdScheduleFields } from '../AdScheduleFields';
-import { adScheduleDate, emptyAdSchedule } from '../../utils/adSchedule';
+import { AD_TIME_ZONE, adScheduleDate, emptyAdSchedule } from '../../utils/adSchedule';
 import { offerAdsRequest } from '../../services/offerAdsClient';
 import { auth } from '../../lib/firebase';
 import { uploadAdMedia, type SignedAdUpload, type UploadedAdMedia } from '../../services/adMediaUpload';
@@ -38,7 +39,15 @@ interface Props { lang: Language; onBack: () => void; onNavigate: (path: string)
 
 export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   const ar = lang === 'ar';
-  const [tier, setTier] = useState<'free' | 'featured'>('free');
+  const [tier, setTier] = useState<'free' | 'featured' | null>(null);
+  const [freeDays, setFreeDays] = useState(7);
+  useEffect(() => {
+    let active = true;
+    offerAdsRequest<{ freeIntervalDays: number }>('ads.freePolicy', {}, true)
+      .then(policy => { if (active) setFreeDays(policy.freeIntervalDays); })
+      .catch(() => { /* The eligibility check still enforces the live policy. */ });
+    return () => { active = false; };
+  }, []);
   type Eligibility = { status: 'available' | 'pending' } | { status: 'interval'; availableAt: number };
   const [eligibility, setEligibility] = useState<Eligibility | 'checking' | 'error'>('checking');
   const [eligibilityAttempt, setEligibilityAttempt] = useState(0);
@@ -103,9 +112,19 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   const [removingMedia, setRemovingMedia] = useState(false);
   useEffect(() => () => preparation.current?.abort(), []);
   const [preview, setPreview] = useState(false);
+  const [featuredInfoOpen, setFeaturedInfoOpen] = useState(() => window.location.pathname === '/offers/new/featured');
+  const featuredInfoHref = '/offers/new/featured' + window.location.search;
+  const openFeaturedInfo = (path: string) => {
+    window.history.pushState({ myBucketTab: 'offers', featuredInfo: true }, '', path);
+    setFeaturedInfoOpen(true);
+    window.scrollTo(0, 0);
+  };
   const [checkoutOpen, setCheckoutOpen] = useState(() => window.location.pathname === '/offers/new/payment');
   useEffect(() => {
-    const syncCheckoutRoute = () => setCheckoutOpen(window.location.pathname === '/offers/new/payment');
+    const syncCheckoutRoute = () => {
+      setCheckoutOpen(window.location.pathname === '/offers/new/payment');
+      setFeaturedInfoOpen(window.location.pathname === '/offers/new/featured');
+    };
     window.addEventListener('popstate', syncCheckoutRoute);
     return () => window.removeEventListener('popstate', syncCheckoutRoute);
   }, []);
@@ -212,7 +231,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   };
   const handleReview = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (freeFieldsLocked) return;
+    if (!tier || freeFieldsLocked) return;
     const start = adScheduleDate(startsAt), end = adScheduleDate(endsAt);
     if (!start || !end) { setDateError('invalid'); return; }
     if (end.getTime() <= start.getTime()) { setDateError('order'); return; }
@@ -317,6 +336,14 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     }
     setCheckoutOpen(false);
   };
+  if (featuredInfoOpen) return <FeaturedAdInfoPage lang={lang} onBack={() => {
+    if (window.history.state?.featuredInfo) window.history.back();
+    else {
+      window.history.replaceState({ myBucketTab: 'offers' }, '', '/offers/new' + window.location.search);
+      setFeaturedInfoOpen(false);
+    }
+  }} />;
+
   if (checkoutOpen) {
     const start = adScheduleDate(startsAt);
     const end = adScheduleDate(endsAt);
@@ -375,8 +402,8 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
             <h2 className="font-extrabold">{ar ? 'معاينة الإعلان قبل الإرسال' : 'Preview before submission'}</h2>
             {previewUrl && previewType === 'video' && <p className="text-xs text-slate-500">{ar ? 'تجربة مشاهدة الزائر: 3 مرات يوميًا على هذا المتصفح.' : 'Visitor playback demo: 3 plays per day in this browser.'}</p>}
             <AdCreativeCard lang={lang} title={title} description={description} merchant={merchant} contact={contact} mediaUrl={previewUrl} poster={poster} mediaType={previewType} videoQuotaId="local-ad-preview-demo" />
-            <p className="text-xs text-slate-600">{ar ? 'بداية النشر:' : 'Publication starts:'} {adScheduleDate(startsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
-            <p className="text-xs text-slate-600">{ar ? 'نهاية النشر:' : 'Publication ends:'} {adScheduleDate(endsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
+            <p className="text-xs text-slate-600">{ar ? 'بداية النشر:' : 'Publication starts:'} {adScheduleDate(startsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: AD_TIME_ZONE })}</p>
+            <p className="text-xs text-slate-600">{ar ? 'نهاية النشر:' : 'Publication ends:'} {adScheduleDate(endsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: AD_TIME_ZONE })}</p>
             <button type="button" disabled={hasSubmission || cancellingSend} onClick={() => setPreview(false)} className="w-full rounded-xl border border-emerald-600 text-emerald-700 py-3 text-sm font-bold disabled:opacity-50">{ar ? 'تعديل الإعلان' : 'Edit advertisement'}</button>
             <div className="space-y-2 rounded-xl bg-slate-50 p-3 text-center">
               <button type="button" onClick={tier === 'free' ? () => void sendForReview() : goToPayment} disabled={sending || cancellingSend || cancelRequired}
@@ -402,14 +429,24 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
               <h2 className="font-extrabold text-sm">{ar ? '1. نوع الإعلان' : '1. Advertisement type'}</h2>
               <div className="grid grid-cols-2 gap-3">
                 {(['free', 'featured'] as const).map(value => (
-                  <button key={value} type="button" aria-pressed={tier === value} onClick={() => {
+                  <div key={value} className="grid content-start gap-1">
+                  <button type="button" aria-pressed={tier === value} onClick={() => {
                     if (value === 'free' && tier !== 'free') setEligibility('checking');
                     setTier(value);
                   }}
-                    className={`rounded-xl border p-3 text-start text-sm font-extrabold transition-colors ${tier === value ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-700'}`}>
+                    className={`min-h-16 rounded-xl border p-3 text-start text-sm font-extrabold transition-colors ${tier === value ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-700'}`}>
                     {value === 'free' ? (ar ? 'مجاني' : 'Free') : (ar ? 'مميز' : 'Featured')}
-                    <span className="block text-[11px] font-normal mt-1">{value === 'free' ? (ar ? 'بدون باقة مدفوعة' : 'No paid package') : (ar ? 'السعر والمميزات لاحقًا' : 'Pricing and benefits to follow')}</span>
+                    {value === 'free' && <span className="mt-1 block text-xs font-normal">
+                      {freeDays === 7 ? (ar ? 'إعلان واحد كل أسبوع' : 'One ad per week')
+                        : freeDays === 1 ? (ar ? 'إعلان واحد يوميًا' : 'One ad per day')
+                        : (ar ? `إعلان واحد كل ${new Intl.NumberFormat('ar-EG').format(freeDays)} يوم` : `One ad every ${freeDays} days`)}
+                    </span>}
                   </button>
+                  {value === 'featured' && <a href={featuredInfoHref} onClick={event => followInternalLink(event, openFeaturedInfo)}
+                    className="inline-flex min-h-11 items-center px-1 text-xs font-bold text-emerald-800 underline underline-offset-2">
+                    {ar ? 'مميزات الإعلان المدفوع والأسعار' : 'Paid ad benefits and pricing'}
+                  </a>}
+                  </div>
                 ))}
               </div>
             </section>
@@ -424,9 +461,9 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
               {eligibility.status === 'pending'
                 ? (ar ? 'عندك إعلان مجاني بانتظار الموافقة. استنى قرار الإدارة قبل إرسال إعلان تاني.' : 'You already have a free ad awaiting review. Wait for the decision before submitting another.')
                 : (ar ? 'تقدر ترسل إعلان مجاني تاني بعد' : 'You can submit your next free ad after') + ' ' +
-                  new Date(eligibility.availableAt).toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZoneName: 'short' })}
+                  new Date(eligibility.availableAt).toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: AD_TIME_ZONE, timeZoneName: 'short' })}
             </p>}
-            <fieldset disabled={freeFieldsLocked} className="m-0 min-w-0 space-y-5 border-0 p-0 disabled:opacity-60">
+            {tier && !freeFieldsLocked && <fieldset className="m-0 min-w-0 space-y-5 border-0 p-0">
             <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
               <h2 className="font-extrabold text-sm">{ar ? '2. بيانات الإعلان' : '2. Advertisement details'}</h2>
               <div><label htmlFor="offer-category" className={label}>{ar ? 'القسم' : 'Category'}</label>
@@ -450,7 +487,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
             </section>
             <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
               <h2 className="font-extrabold text-sm">{ar ? '3. مدة النشر' : '3. Publication schedule'}</h2>
-              <p className="text-xs text-slate-500">{ar ? 'المواعيد حسب توقيت جهازك. الإعلان لا يظهر إلا بعد موافقة الإدارة.' : 'Times use your device time zone. The advertisement appears only after admin approval.'}</p>
+              <p className="text-xs text-slate-500">{ar ? 'المواعيد بتوقيت القاهرة. الإعلان لا يظهر إلا بعد موافقة الإدارة.' : 'All times are in Cairo time. The advertisement appears only after admin approval.'}</p>
               <AdScheduleFields id="start" lang={lang} value={startsAt} onChange={value => { setStartsAt(value); setDateError(null); }} />
               <AdScheduleFields id="end" lang={lang} value={endsAt} onChange={value => { setEndsAt(value); setDateError(null); }} />
               {dateError && <p role="alert" className="text-xs font-bold text-red-700">{dateError === 'invalid' ? (ar ? 'يرجى اختيار تاريخ ووقت صحيحين لبداية النشر ونهايته.' : 'Please choose valid start and end dates and times.') : dateError === 'order' ? (ar ? 'يجب أن يكون موعد نهاية النشر بعد موعد بدايته.' : 'The publication end must be after its start.') : (ar ? 'موعد نهاية النشر قد مضى. يرجى اختيار موعد في المستقبل.' : 'The publication end has passed. Please choose a future date and time.')}</p>}
@@ -546,7 +583,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
 
             </section>
             <button type="submit" disabled={removingMedia || imageStatus === 'compressing' || uploadState === 'uploading' || uploadState === 'verifying'} className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold py-3 flex justify-center items-center gap-2"><Megaphone className="w-5 h-5" />{ar ? 'مراجعة الإعلان' : 'Review advertisement'}</button>
-            </fieldset>
+            </fieldset>}
           </form>
         )}
       </main>

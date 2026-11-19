@@ -1,3 +1,4 @@
+import { AD_TIME_ZONE } from '../../utils/adSchedule';
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
 import {
   ArrowLeft, ArrowRight, CalendarDays, Check, Clock3, Copy, CreditCard, FileCheck2,
@@ -27,7 +28,7 @@ export function AdPaymentCheckout({
   const [dragging, setDragging] = useState(false);
   const phoneValid = isPaymentContactPhoneValid(phone);
   const runDays = adRunDays(startsAt, endsAt);
-  const dates = new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+  const dates = new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: AD_TIME_ZONE });
   const receiptPreviewUrl = useMemo(() => receiptFile ? URL.createObjectURL(receiptFile) : null, [receiptFile]);
 
   useEffect(() => {

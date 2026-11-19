@@ -193,6 +193,9 @@ export async function purgeExpiredOffers(db = getAdminFirestore()) {
 }
 
 export async function sendOfferAd(action: string, uid: string, payload: Payload, db = getAdminFirestore()) {
+  if (action === 'ads.freePolicy') {
+    return { freeIntervalDays: (await policyRef(db).get()).data()?.freeIntervalDays ?? 7 };
+  }
   if (action === 'ads.freeEligibility') {
     return db.runTransaction(tx => freeOfferEligibility(db, tx, uid, '', Date.now(), true), { readOnly: true });
   }

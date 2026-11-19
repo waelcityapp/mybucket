@@ -1455,7 +1455,7 @@ export default function App() {
     />;
   }
 
-  const creatingOffer = window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment';
+  const creatingOffer = window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment' || window.location.pathname === '/offers/new/featured';
   const backFromCreateOffer = () => backFromOffer(new URLSearchParams(window.location.search).has('renew') ? '/settings/ads' : '/offers');
   if (creatingOffer && isAuthChecking) {
     return <AdSignInGate lang={lang} checking onBack={backFromCreateOffer} onSignIn={loginWithGoogle} />;

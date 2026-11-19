@@ -596,3 +596,5 @@ Free submissions allow one pending ad per account and require a configurable 7-d
 Offer categories, advert details, creation and My Ads links transition in the existing app session without reloading Firebase authentication. Direct create-offer links scope the initial auth check to the create screen.
 
 Public advertisement cards show at most 120 characters of description and clamp to two lines. More Details opens the full description on the offer page.
+
+Ad creation uses localized image and video picker buttons with separate file-type filters.

@@ -1,7 +1,7 @@
 import { followInternalLink } from '../../utils/navigationHistory';
 import type { PublicOfferAd } from '../../data/offerAds';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { ArrowRight, ArrowLeft, ImagePlus, Megaphone, CheckCircle2, X } from 'lucide-react';
+import { ArrowRight, ArrowLeft, ImagePlus, Megaphone, CheckCircle2, Video, X } from 'lucide-react';
 import type { Language } from '../../types';
 import { compressAdImage } from '../../utils/adImageCompression';
 import { captureAdVideoPoster } from '../../utils/adVideoPoster';
@@ -14,6 +14,11 @@ import { adScheduleDate, emptyAdSchedule } from '../../utils/adSchedule';
 import { offerAdsRequest } from '../../services/offerAdsClient';
 import { auth } from '../../lib/firebase';
 import { uploadAdMedia, type SignedAdUpload, type UploadedAdMedia } from '../../services/adMediaUpload';
+
+const mediaAccept = {
+  image: 'image/png,image/jpeg,image/webp',
+  video: 'video/mp4,video/webm,video/quicktime',
+};
 
 const categories = [
   { id: 'banks-finance', ar: 'البنوك والمؤسسات المالية', en: 'Banks & Financial Services' },
@@ -74,6 +79,12 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   const [verifiedUpload, setVerifiedUpload] = useState<{ secureUrl: string; publicId: string } | null>(null);
   const imageSelection = useRef(0);
   const fileInput = useRef<HTMLInputElement>(null);
+  const openMediaPicker = (kind: keyof typeof mediaAccept) => {
+    const input = fileInput.current;
+    if (!input || input.disabled) return;
+    input.accept = mediaAccept[kind];
+    input.click();
+  };
   const preparation = useRef<AbortController | null>(null);
   const inFlightUpload = useRef<Promise<UploadedAdMedia> | null>(null);
   const [testAsset, setTestAsset] = useState<Pick<SignedAdUpload, 'publicId' | 'resourceType'> | null>(null);
@@ -415,10 +426,14 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
               {dateError && <p role="alert" className="text-xs font-bold text-red-700">{dateError === 'invalid' ? (ar ? 'يرجى اختيار تاريخ ووقت صحيحين لبداية النشر ونهايته.' : 'Please choose valid start and end dates and times.') : dateError === 'order' ? (ar ? 'يجب أن يكون موعد نهاية النشر بعد موعد بدايته.' : 'The publication end must be after its start.') : (ar ? 'موعد نهاية النشر قد مضى. يرجى اختيار موعد في المستقبل.' : 'The publication end has passed. Please choose a future date and time.')}</p>}
             </section>
             <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-              <label htmlFor="offer-image" className="flex items-center gap-2 font-extrabold text-sm"><ImagePlus className="w-5 h-5 text-emerald-700" />{ar ? '4. صورة أو فيديو الإعلان (اختياري)' : '4. Advertisement image or video (optional)'}</label>
+              <h2 className="flex items-center gap-2 font-extrabold text-sm"><ImagePlus className="w-5 h-5 text-emerald-700" aria-hidden="true" />{ar ? '4. صورة أو فيديو الإعلان (اختياري)' : '4. Advertisement image or video (optional)'}</h2>
               <div className="flex items-center gap-2">
-              <input ref={fileInput} id="offer-image" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime" disabled={removingMedia || !!testAsset || uploadState === 'uploading' || uploadState === 'verifying'} onChange={async event => {
-                const next = event.target.files?.[0] ?? null;
+              <input ref={fileInput} type="file" hidden disabled={removingMedia || !!testAsset || uploadState === 'uploading' || uploadState === 'verifying'} onChange={async event => {
+                const input = event.currentTarget;
+                const next = input.files?.[0];
+                if (!next) return;
+                const acceptedTypes = input.accept.split(',');
+                input.value = '';
                 const selection = ++imageSelection.current;
                 preparation.current?.abort();
                 const controller = new AbortController();
@@ -428,9 +443,8 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                 setReusedMedia(undefined);
                 setVideoProgress(null);
                 setImage(null); setMediaError('generic'); setCompressionNotice(false); setUploadState('idle'); setUploadError(''); setPendingUpload(null); setVerifiedUpload(null);
-                if (!next) { setImageStatus('idle'); return; }
                 const isVideo = next.type.startsWith('video/');
-                if ((!isVideo && next.size > 5 * 1024 * 1024) || !['image/png', 'image/jpeg', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime'].includes(next.type)) { setImageStatus('error'); return; }
+                if ((!isVideo && next.size > 5 * 1024 * 1024) || !acceptedTypes.includes(next.type)) { setImageStatus('error'); return; }
                 setImageStatus('compressing');
                 if (isVideo) setVideoProgress('checking');
                 try {
@@ -448,7 +462,18 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                     setImageStatus('error');
                   }
                 }
-              }} className="block min-w-0 flex-1 text-xs text-slate-600 file:me-3 file:border-0 file:rounded-lg file:bg-emerald-50 file:text-emerald-800 file:font-bold file:px-3 file:py-2" />
+              }} />
+                <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
+                  {(['image', 'video'] as const).map(kind => {
+                    const Icon = kind === 'image' ? ImagePlus : Video;
+                    return <button key={kind} type="button" onClick={() => openMediaPicker(kind)}
+                      disabled={removingMedia || !!testAsset || uploadState === 'uploading' || uploadState === 'verifying'}
+                      className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-2 text-sm font-bold text-emerald-900 hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-emerald-700 disabled:opacity-50">
+                      <Icon className="size-4 shrink-0" aria-hidden="true" />
+                      {kind === 'image' ? (ar ? 'تحميل صورة' : 'Upload image') : (ar ? 'تحميل فيديو' : 'Upload video')}
+                    </button>;
+                  })}
+                </div>
                 {(imageStatus !== 'idle' || reusedMedia) && <button type="button" onClick={() => void removeMedia()} disabled={removingMedia}
                   aria-label={ar ? 'إلغاء وإزالة الملف' : 'Cancel and remove media'}
                   title={ar ? 'إلغاء وإزالة الملف' : 'Cancel and remove media'}

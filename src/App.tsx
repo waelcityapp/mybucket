@@ -1436,7 +1436,7 @@ export default function App() {
   };
 
   const offerPath = window.location.pathname.match(/^\/offers\/ad\/([^/]+)\/?$/);
-  if (offerPath) return <OfferDetailPage lang={lang} offerId={offerPath[1]} onBack={backFromOffer} />;
+  if (offerPath) return <OfferDetailPage lang={lang} offerId={offerPath[1]} onBack={(path) => backFromOffer(window.history.state?.offerBack === '/offers' ? '/offers' : path)} />;
 
   // Public offers are browsable without financial account sign-in.
   if (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) {
@@ -1448,7 +1448,8 @@ export default function App() {
       categorySlug={categorySlug}
       onNavigate={navigateOffer}
       onBack={() => {
-        if (categorySlug) backFromOffer('/offers');
+        if (categorySlug) backFromOffer(window.history.state?.offerBack === '/offers?view=categories' ? '/offers?view=categories' : '/offers');
+        else if (new URLSearchParams(window.location.search).get('view') === 'categories') backFromOffer('/offers');
         else if (window.history.state?.offers) window.history.back();
         else navigateOffer('/', true);
       }}

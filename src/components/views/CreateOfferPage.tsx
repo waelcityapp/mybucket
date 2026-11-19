@@ -38,7 +38,7 @@ interface Props { lang: Language; onBack: () => void; onNavigate: (path: string)
 
 export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   const ar = lang === 'ar';
-  const [tier, setTier] = useState<'free' | 'featured' | null>(null);
+  const [tier, setTier] = useState<'free' | 'featured' | 'vip' | null>(null);
   const [freeDays, setFreeDays] = useState(7);
   useEffect(() => {
     let active = true;
@@ -280,7 +280,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     setPreview(false);
   };
   const goToPayment = () => {
-    if (!preview || tier !== 'featured') return;
+    if (!preview || (tier !== 'featured' && tier !== 'vip')) return;
     if (window.location.pathname !== '/offers/new/payment') {
       window.history.pushState({ myBucketTab: 'offers', offerPaymentPreview: true }, '', '/offers/new/payment');
     }
@@ -305,7 +305,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   if (checkoutOpen) {
     const start = adScheduleDate(startsAt);
     const end = adScheduleDate(endsAt);
-    if (!preview || tier !== 'featured' || !start || !end || !title.trim() || !merchant.trim() || !category) {
+    if (!preview || (tier !== 'featured' && tier !== 'vip') || !start || !end || !title.trim() || !merchant.trim() || !category) {
       return (
         <main dir={ar ? 'rtl' : 'ltr'} className="min-h-screen bg-slate-50 px-4 py-12 text-slate-900">
           <section className="mx-auto max-w-xl space-y-4 rounded-2xl border border-emerald-100 bg-white p-6">
@@ -321,7 +321,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
         </main>
       );
     }
-    return <AdPaymentCheckout lang={lang} advertiserName={merchant} adTitle={title} startsAt={start} endsAt={end}
+    return <AdPaymentCheckout tier={tier} lang={lang} advertiserName={merchant} adTitle={title} startsAt={start} endsAt={end}
       mediaType={previewType ?? 'none'} adDescription={description} categorySlug={category} adContact={contact}
       mediaFile={image ?? reusedMedia?.url} onBack={returnFromPayment} onNavigate={onNavigate} />;
   }
@@ -394,21 +394,24 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
           <form onSubmit={handleReview} className="space-y-5">
             <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
               <h2 className="font-extrabold text-sm">{ar ? '1. نوع الإعلان' : '1. Advertisement type'}</h2>
-              <div className="grid grid-cols-2 gap-3">
-                {(['free', 'featured'] as const).map(value => (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {(['free', 'featured', 'vip'] as const).map(value => (
                   <div key={value} className="grid content-start gap-1">
                   <button type="button" aria-pressed={tier === value} onClick={() => {
                     if (value === 'free' && tier !== 'free') setEligibility('checking');
                     setTier(value);
                   }}
                     className={`min-h-16 rounded-xl border p-3 text-start text-sm font-extrabold transition-colors ${tier === value ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-700'}`}>
-                    {value === 'free' ? (ar ? 'مجاني' : 'Free') : (ar ? 'مميز' : 'Featured')}
+                    {value === 'free' ? (ar ? 'مجاني' : 'Free') : value === 'vip' ? 'VIP' : (ar ? 'مميز' : 'Featured')}
                     {value === 'free' && <span className="mt-1 block text-xs font-normal">
                       {freeDays === 7 ? (ar ? 'إعلان واحد كل أسبوع' : 'One ad per week')
                         : freeDays === 1 ? (ar ? 'إعلان واحد يوميًا' : 'One ad per day')
                         : (ar ? `إعلان واحد كل ${new Intl.NumberFormat('ar-EG').format(freeDays)} يوم` : `One ad every ${freeDays} days`)}
                     </span>}
                   </button>
+                  {value !== 'free' && <span className="text-xs text-slate-600">
+                    {ar ? (value === 'vip' ? '٢٠٠ جنيه / يوم' : '١٠٠ جنيه / يوم') : (value === 'vip' ? 'EGP 200 / day' : 'EGP 100 / day')}
+                  </span>}
                   {value === 'featured' && <a href={featuredInfoHref} onClick={event => followInternalLink(event, openFeaturedInfo)}
                     className="inline-flex min-h-11 items-center px-1 text-xs font-bold text-emerald-800 underline underline-offset-2">
                     {ar ? 'مميزات الإعلان المدفوع والأسعار' : 'Paid ad benefits and pricing'}

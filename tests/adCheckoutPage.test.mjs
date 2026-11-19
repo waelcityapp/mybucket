@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { adRunDays, isPaymentContactPhoneValid, isReceiptImageAllowed, MAX_RECEIPT_IMAGE_BYTES } from '../src/utils/adCheckout.ts';
+import { adRunDays, paidAdDailyPrice, isPaymentContactPhoneValid, isReceiptImageAllowed, MAX_RECEIPT_IMAGE_BYTES } from '../src/utils/adCheckout.ts';
 
 test('payment contact accepts Egyptian mobile formats and rejects malformed numbers', () => {
   assert.equal(isPaymentContactPhoneValid('01012345678'), true);
@@ -43,4 +43,9 @@ test('ad checkout uses a real route and uses InstaPay and submits a private rece
   assert.match(checkout, /'ads\.submit'/);
   assert.match(checkout, /receipt: draft\.receipt/);
   assert.doesNotMatch(checkout, /\/api\/gateway|localStorage|fetch\s*\(/);
+});
+
+test('Featured and VIP have distinct trial prices', () => {
+  assert.equal(paidAdDailyPrice('featured'), 100);
+  assert.equal(paidAdDailyPrice('vip'), 200);
 });

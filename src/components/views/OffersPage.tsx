@@ -79,8 +79,17 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
       : 'image' in ad ? { type: 'image' as const, url: `/demo-ads/${ad.image}` } : undefined;
     return { id: ad.id, title, description, merchant, media };
   });
-  const realAds = published?.filter(ad => ad.categorySlug === categorySlug) ?? [];
-  const visibleAds = realAds.length ? realAds : demoAds;
+  const vipAds = published?.filter(ad => ad.tier === 'vip') ?? [];
+  const categoriesOnly = new URLSearchParams(window.location.search).get('view') === 'categories';
+  const showVip = !categorySlug && !categoriesOnly && vipAds.length > 0;
+  const rotation = vipAds.length ? Math.floor(Date.now() / 60000) % vipAds.length : 0;
+  const rank = { vip: 0, featured: 1, free: 2 };
+  const realAds = published?.filter(ad => ad.categorySlug === categorySlug)
+    .sort((a, b) => rank[a.tier ?? 'free'] - rank[b.tier ?? 'free']) ?? [];
+  const visibleAds = showVip ? [...vipAds.slice(rotation), ...vipAds.slice(0, rotation)]
+    : realAds.length ? realAds : demoAds;
+  const showingDemos = !showVip && realAds.length === 0;
+  const [vipLimit, setVipLimit] = useState(9);
   const title = category ? (isAr ? category.ar : category.en) : (isAr ? 'وفّر مع My Bucket' : 'Save with My Bucket');
 
   return (
@@ -106,20 +115,30 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
         </div>
       </header>
 
-      <main className={`mx-auto px-4 py-6 pb-16 ${categorySlug ? "max-w-7xl" : "max-w-xl"}`}>
+      <main className={`mx-auto px-4 py-6 pb-16 ${categorySlug || showVip ? "max-w-7xl" : "max-w-xl"}`}>
         {loadError ? <p role="alert" className="mb-4 text-sm text-red-700">
           {isAr ? 'تعذّر تحميل العروض المنشورة.' : 'Could not load published ads.'}{' '}
           <button type="button" className="font-bold underline" onClick={() => setAttempt(value => value + 1)}>{isAr ? 'حاول تاني' : 'Retry'}</button>
         </p> : published === null && <p role="status" className="mb-4 text-sm text-slate-600">{isAr ? 'جاري تحميل العروض المنشورة...' : 'Loading published ads…'}</p>}
-        {categorySlug ? (
+        {categorySlug || showVip ? (
           <section className="space-y-4">
-            {category ? (
+            {category || showVip ? (
               <>
+                {showVip && <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-lg font-extrabold">{isAr ? 'عروض VIP' : 'VIP offers'}</h2>
+                  <a href="/offers?view=categories" onClick={event => followInternalLink(event, onNavigate)}
+                    className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white">
+                    <Search className="size-4" aria-hidden="true" />{isAr ? 'تصفّح الأقسام' : 'Browse categories'}
+                  </a>
+                </div>}
                 {visibleAds.length > 0 ? (
                   <div className="space-y-4">
-                    {realAds.length === 0 && <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-semibold text-amber-900">{isAr ? 'الإعلانات دي أمثلة تجريبية، والعروض وأسماء المعلنين غير حقيقية.' : 'These are demonstration ads with fictional offers and advertisers.'}</p>}
+                    {showingDemos && <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-semibold text-amber-900">{isAr ? 'الإعلانات دي أمثلة تجريبية، والعروض وأسماء المعلنين غير حقيقية.' : 'These are demonstration ads with fictional offers and advertisers.'}</p>}
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {visibleAds.map(ad => {
+                      {(showVip ? visibleAds.slice(0, vipLimit) : visibleAds).map(ad => {
+                        const tier = 'tier' in ad ? ad.tier : undefined;
+                        const badge = showingDemos ? (isAr ? 'إعلان تجريبي' : 'Demo ad')
+                          : tier === 'vip' ? 'VIP' : tier === 'featured' ? (isAr ? 'مميز' : 'Featured') : null;
                         const { title: adTitle, description, merchant, media } = ad;
                         const hasVideo = media?.type === 'video';
                         return (
@@ -135,8 +154,8 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                                 </span>
                               </span>
                             </a>}
-                            {realAds.length === 0 && <span className={`w-fit rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-900 ${media ? 'absolute start-3 top-3' : 'ms-3 mt-3'}`}>
-                              {isAr ? 'إعلان تجريبي' : 'Demo ad'}
+                            {badge && <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-bold ${tier === 'vip' ? 'bg-amber-100 text-amber-900' : 'bg-emerald-50 text-emerald-900'} ${media ? 'absolute start-3 top-3' : 'ms-3 mt-3'}`}>
+                              {badge}
                             </span>}
                             <div className="flex flex-1 flex-col gap-2 p-3.5">
                               <p className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
@@ -155,6 +174,10 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                         );
                       })}
                     </div>
+                    {showVip && vipLimit < visibleAds.length && <button type="button" onClick={() => setVipLimit(value => value + 9)}
+                      className="min-h-11 rounded-xl border border-emerald-200 px-4 text-sm font-bold text-emerald-800 dark:text-emerald-300">
+                      {isAr ? 'عرض المزيد' : 'Show more'}
+                    </button>}
                   </div>
                 ) : published !== null && <div className="bg-white border border-slate-200 rounded-2xl p-9 text-center">
                   <Gift className="w-10 h-10 text-slate-300 mx-auto mb-3" />
@@ -177,8 +200,8 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                 type="search"
                 value={search}
                 onChange={event => setSearch(event.target.value)}
-                placeholder={isAr ? 'ابحث عن عرض أو فرصة توفير...' : 'Search offers or savings opportunities...'}
-                aria-label={isAr ? 'البحث عن عروض وفرص توفير' : 'Search offers and savings opportunities'}
+                placeholder={isAr ? 'ابحث عن قسم...' : 'Search categories…'}
+                aria-label={isAr ? 'البحث عن قسم' : 'Search categories'}
                 className="w-full h-12 rounded-2xl bg-white border border-slate-200 ps-11 pe-4 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
               />
             </label>

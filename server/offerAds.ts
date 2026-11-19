@@ -1,4 +1,4 @@
-import { AD_TRIAL_DAILY_PRICE_EGP, adRunDays, normalizePaymentContactPhone } from '../src/utils/adCheckout.js';
+import { paidAdDailyPrice, adRunDays, normalizePaymentContactPhone } from '../src/utils/adCheckout.js';
 import { createHash } from 'node:crypto';
 import { getAdminFirestore } from './firebaseAdmin.js';
 import { confirmAdminAdTestUpload, deleteAdminAdTestUpload, signAdminAdTestUpload } from './adminAdTestUpload.js';
@@ -18,7 +18,7 @@ type StoredAd = AdFields & {
   status: OfferAdStatus | 'draft' | 'cancelled' | 'deleting';
   mediaType: StoredMedia['resourceType'] | null;
   media: StoredMedia | null;
-  payment?: { method: 'instapay'; amountEgp: number; phone: string };
+  payment?: { method: 'instapay'; tier?: 'featured' | 'vip'; amountEgp: number; phone: string };
   receipt?: StoredMedia;
   submittedAt: number;
   reviewedAt?: number;
@@ -82,7 +82,7 @@ function mediaView(media: StoredMedia): PublicOfferAd['media'] {
 
 function offerView(id: string, ad: StoredAd): PublicOfferAd {
   const { title, description, merchant, categorySlug, contact, startsAt, endsAt, media } = ad;
-  return { id, title, description, merchant, categorySlug, contact, startsAt, endsAt, media: media ? mediaView(media) : undefined };
+  return { id, title, description, merchant, categorySlug, contact, startsAt, endsAt, tier: ad.payment ? ad.payment.tier ?? 'featured' : 'free', media: media ? mediaView(media) : undefined };
 }
 
 export function isPublicOffer(ad: Pick<StoredAd, 'status' | 'startsAt' | 'endsAt'>, now: number) {
@@ -109,12 +109,12 @@ export async function readPublicOfferAds(action: string, payload: Payload, db = 
 export async function readMyOfferAds(uid: string, db = getAdminFirestore()): Promise<MyOfferAd[]> {
   const now = Date.now();
   const snapshot = await db.collection('offerAds').where('ownerId', '==', uid).get();
-  return snapshot.docs.flatMap(doc => {
-    const { title, merchant, status, submittedAt, startsAt, endsAt, rejectionReason } = doc.data() as StoredAd;
+  return snapshot.docs.flatMap<MyOfferAd>(doc => {
+    const { title, merchant, status, submittedAt, startsAt, endsAt, rejectionReason, payment } = doc.data() as StoredAd;
     if (status !== 'pending' && status !== 'approved' && status !== 'rejected') return [];
     const deleteAfter = status === 'approved' && now >= endsAt ? endsAt + EXPIRED_RETENTION : null;
     if (deleteAfter !== null && now >= deleteAfter) return [];
-    return [{ id: doc.id, title, merchant, status, submittedAt, startsAt, endsAt, rejectionReason, deleteAfter }];
+    return [{ id: doc.id, title, merchant, tier: payment ? payment.tier ?? 'featured' : 'free', status, submittedAt, startsAt, endsAt, rejectionReason, deleteAfter }];
   }).sort((a, b) => b.submittedAt - a.submittedAt);
 }
 
@@ -294,12 +294,15 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
   }
 
   if (action === 'ads.prepare') {
-    const featured = payload.tier === 'featured';
+    if (payload.tier !== undefined && payload.tier !== 'free' && payload.tier !== 'featured' && payload.tier !== 'vip') return fail('invalid_ad_details');
+    const paidTier = payload.tier === 'featured' || payload.tier === 'vip' ? payload.tier : null;
+    const featured = paidTier !== null;
     const fields = adFields(payload, featured);
     const phone = typeof payload.paymentPhone === 'string' && payload.paymentPhone.length <= 24 ? normalizePaymentContactPhone(payload.paymentPhone) : null;
     if (featured && !phone) return fail('invalid_payment_phone');
     const days = adRunDays(new Date(fields.startsAt), new Date(fields.endsAt));
-    if (featured && (!days || payload.amountEgp !== days * AD_TRIAL_DAILY_PRICE_EGP)) return fail('invalid_payment_amount');
+    const amountEgp = paidTier && days ? days * paidAdDailyPrice(paidTier) : null;
+    if (featured && (amountEgp === null || payload.amountEgp !== amountEgp)) return fail('invalid_payment_amount');
     const mediaType = payload.resourceType;
     if (mediaType !== null && mediaType !== 'image' && mediaType !== 'video') return fail('invalid_media_type');
     return db.runTransaction(async tx => {
@@ -310,7 +313,7 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
       if (existing?.status === 'cancelled') return fail('ad_cancelled', 409);
       if (existing && existing.status !== 'draft') return { submitted: true, signed: null };
       if (!featured) await assertFreeOfferAvailable(db, tx, uid, id, now, true);
-      if (existing && !!existing.payment !== featured) return fail('invalid_ad_details');
+      if (existing && (existing.payment ? existing.payment.tier ?? 'featured' : null) !== paidTier) return fail('invalid_ad_details');
       if (existing && existing.mediaType !== mediaType) return fail('invalid_media_type');
       let signed = null;
       let receiptSigned = null;
@@ -339,7 +342,7 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
       tx.set(ref, {
         ...fields, ownerId: uid, status: 'draft', mediaType, media: null, submittedAt: 0, rejectionReason: '',
         ...(permits && { uploadDay: day, uploadCleanupAt: now + DAY }),
-        ...(featured && { payment: { method: 'instapay', amountEgp: days! * AD_TRIAL_DAILY_PRICE_EGP, phone } }),
+        ...(paidTier && { payment: { method: 'instapay', tier: paidTier, amountEgp, phone } }),
       });
       return { submitted: false, signed, receiptSigned };
     });

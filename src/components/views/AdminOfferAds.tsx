@@ -161,7 +161,7 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
     <div className="grid gap-4 lg:grid-cols-2">
       {ads?.map(ad => <div key={ad.id} className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-white p-3">
         <span className={`inline-block rounded-full px-3 py-1 text-xs font-extrabold ${ad.payment ? 'bg-amber-100 text-amber-900' : 'bg-slate-100 text-slate-700'}`}>
-          {ad.payment ? (ar ? 'إعلان مميز' : 'Featured ad') : (ar ? 'إعلان مجاني' : 'Free ad')}
+          {ad.tier === 'vip' ? 'VIP' : ad.payment ? (ar ? 'إعلان مميز' : 'Featured ad') : (ar ? 'إعلان مجاني' : 'Free ad')}
         </span>
         <AdCreativeCard lang={lang} title={ad.title} description={ad.description} merchant={ad.merchant} contact={ad.contact}
           mediaUrl={ad.media?.url} mediaType={ad.media?.type} poster={ad.media?.poster} />

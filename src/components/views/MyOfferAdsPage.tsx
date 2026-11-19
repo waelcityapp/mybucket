@@ -99,6 +99,7 @@ export function MyOfferAdsPage({ uid, lang, onBack, onNavigate }: { uid: string;
           <article className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <p className="break-words text-sm font-semibold">{ad.merchant}</p>
           <h2 className="break-words font-extrabold">{ad.title}</h2>
+          {ad.tier === 'vip' && <p className="w-fit rounded-full bg-amber-100 px-2.5 py-1 text-xs font-extrabold text-amber-900">VIP</p>}
           <p className={`w-fit rounded-lg px-2.5 py-1 text-xs font-bold ${badge}`}>{status}</p>
           <p className="text-xs text-slate-600 dark:text-slate-300">{ar ? 'تاريخ الإرسال' : 'Submitted'} · {date(ad.submittedAt)}</p>
           {ad.status === 'approved' && <p className="text-xs text-slate-600 dark:text-slate-300">{ar ? 'مدة النشر بتوقيت القاهرة' : 'Publication window, Cairo time'} · {date(ad.startsAt)} — {date(ad.endsAt)}</p>}

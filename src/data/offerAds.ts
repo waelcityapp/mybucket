@@ -4,11 +4,14 @@ export const OFFER_CATEGORY_IDS = [
   'home-shopping', 'education-services', 'technology',
 ] as const;
 
+export type OfferTier = 'free' | 'featured' | 'vip';
+
 export type OfferAdStatus = 'pending' | 'approved' | 'rejected';
 
 export type PublicOfferAd = {
   id: string;
   categorySlug: string;
+  tier?: OfferTier;
   title: string;
   description: string;
   merchant: string;
@@ -25,4 +28,4 @@ export type ReviewOfferAd = PublicOfferAd & {
   payment?: { amountEgp: number; phone: string; receiptUrl?: string };
 };
 
-export type MyOfferAd = Pick<ReviewOfferAd, 'id' | 'title' | 'merchant' | 'status' | 'submittedAt' | 'startsAt' | 'endsAt' | 'rejectionReason'> & { deleteAfter: number | null };
+export type MyOfferAd = Pick<ReviewOfferAd, 'id' | 'title' | 'merchant' | 'tier' | 'status' | 'submittedAt' | 'startsAt' | 'endsAt' | 'rejectionReason'> & { deleteAfter: number | null };

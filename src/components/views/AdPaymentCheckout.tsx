@@ -8,12 +8,13 @@ import {
 } from 'lucide-react';
 import type { Language } from '../../types';
 import { offerAdsRequest } from '../../services/offerAdsClient';
-import { AD_TRIAL_DAILY_PRICE_EGP, normalizePaymentContactPhone, adRunDays, isPaymentContactPhoneValid, isReceiptImageAllowed } from '../../utils/adCheckout';
+import { paidAdDailyPrice, normalizePaymentContactPhone, adRunDays, isPaymentContactPhoneValid, isReceiptImageAllowed } from '../../utils/adCheckout';
 
 const INSTA_PAY_LINK = 'https://ipn.eg/S/wael1011/instapay/2dvaYQ';
 type PaidPreparation = { submitted: boolean; signed: SignedAdUpload | null; receiptSigned?: SignedAdUpload };
 
 interface Props {
+  tier: 'featured' | 'vip';
   lang: Language;
   advertiserName: string;
   adTitle: string;
@@ -29,9 +30,11 @@ interface Props {
 }
 
 export function AdPaymentCheckout({
-  lang, advertiserName, adTitle, startsAt, endsAt, mediaType, adDescription, categorySlug, adContact, mediaFile, onBack, onNavigate
+  tier, lang, advertiserName, adTitle, startsAt, endsAt, mediaType, adDescription, categorySlug, adContact, mediaFile, onBack, onNavigate
 }: Props) {
   const ar = lang === 'ar';
+  const dailyPrice = paidAdDailyPrice(tier);
+  const tierLabel = tier === 'vip' ? 'VIP' : (ar ? 'مميز' : 'Featured');
   const BackIcon = ar ? ArrowRight : ArrowLeft;
   const [phone, setPhone] = useState('');
   const [phoneTouched, setPhoneTouched] = useState(false);
@@ -93,8 +96,8 @@ export function AdPaymentCheckout({
     paymentDraft.current = draft;
     try {
       draft.prepared ??= await offerAdsRequest<PaidPreparation>('ads.prepare', {
-        id: draft.id, tier: 'featured', title: adTitle, description: adDescription, merchant: advertiserName,
-        categorySlug, contact: adContact, paymentPhone: savedPhone, amountEgp: runDays * AD_TRIAL_DAILY_PRICE_EGP,
+        id: draft.id, tier, title: adTitle, description: adDescription, merchant: advertiserName,
+        categorySlug, contact: adContact, paymentPhone: savedPhone, amountEgp: runDays * dailyPrice,
         startsAt: startsAt.getTime(), endsAt: endsAt.getTime(), resourceType: mediaType === 'none' ? null : mediaType,
         bytes: typeof mediaFile === 'string' ? 1 : mediaFile?.size ?? 0, receiptBytes: receiptFile.size,
       }, true);
@@ -167,7 +170,7 @@ export function AdPaymentCheckout({
 
   if (submitted) return <main dir={ar ? 'rtl' : 'ltr'} className="min-h-screen bg-slate-50 p-5 dark:bg-slate-950">
     <section role="status" className="mx-auto max-w-xl space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950">
-      <h1 className="flex items-center gap-2 text-lg font-extrabold"><Check className="size-5" aria-hidden="true" />{ar ? 'مبروك! تم إرسال إعلانك المميز والإيصال للإدارة بنجاح.' : 'Your featured ad and receipt were sent successfully.'}</h1>
+      <h1 className="flex items-center gap-2 text-lg font-extrabold"><Check className="size-5" aria-hidden="true" />{ar ? `مبروك! تم إرسال إعلانك ${tierLabel} والإيصال للإدارة بنجاح.` : `Your ${tierLabel} ad and receipt were sent successfully.`}</h1>
       <p className="text-sm">{ar ? 'تتم المراجعة والرد خلال ٢٤ ساعة تقريبًا. تقدر تتابع من الملف الشخصي في «إعلاناتي».' : 'Review usually takes around 24 hours. Track the status in My ads in your profile.'}</p>
       <a href="/settings/ads" onClick={event => followInternalLink(event, onNavigate)} className="inline-flex min-h-11 items-center font-bold underline">{ar ? 'متابعة الإعلان' : 'Track ad'}</a>
     </section>
@@ -200,8 +203,8 @@ export function AdPaymentCheckout({
             <div role="status" className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
               <p>{ar
-                ? 'السعر الحالي ١٠٠ جنيه لكل يوم. الإدارة بتراجع الإيصال والتحويل قبل الموافقة على النشر.'
-                : 'The current rate is EGP 100 per day. The administrator checks the receipt and transfer before approving publication.'}</p>
+                ? 'الإدارة بتراجع الإيصال والتحويل قبل الموافقة على النشر.'
+                : 'The administrator checks the receipt and transfer before approving publication.'}</p>
             </div>
 
             <section aria-labelledby="ad-checkout-invoice" className="space-y-4 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 sm:p-6 dark:border-slate-700 dark:bg-slate-950/50">
@@ -218,6 +221,7 @@ export function AdPaymentCheckout({
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {summaryItem(ar ? 'اسم المعلن' : 'Advertiser', advertiserName, UserRound)}
                 {summaryItem(ar ? 'الإعلان' : 'Advertisement', adTitle, FileText)}
+                {summaryItem(ar ? 'نوع الإعلان' : 'Ad tier', tierLabel, CreditCard)}
                 {summaryItem(ar ? 'مدة الإعلان' : 'Advertisement duration',
                   runDays === null ? '—' : (ar ? String(runDays) + ' يوم' : String(runDays) + ' days'), CalendarDays)}
                 {summaryItem(ar ? 'نوع الوسائط' : 'Media',
@@ -232,12 +236,12 @@ export function AdPaymentCheckout({
               <div className="space-y-3 border-t border-emerald-200 pt-4 text-sm dark:border-slate-700">
                 <div className="flex items-center justify-between gap-3 text-slate-600 dark:text-slate-300">
                   <span>{ar ? 'السعر التجريبي لليوم' : 'Trial daily rate'}</span>
-                  <span className="font-bold">{amount(AD_TRIAL_DAILY_PRICE_EGP)}</span>
+                  <span className="font-bold">{amount(dailyPrice)}</span>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-300">{ar ? 'أي جزء من يوم يتحسب يوم كامل.' : 'A partial day is billed as a full day.'}</p>
                 <div className="flex items-center justify-between gap-3 border-t border-emerald-200 pt-3 text-base font-black dark:border-slate-700">
                   <span className="flex items-center gap-2"><CreditCard className="h-5 w-5 text-emerald-700" />{ar ? 'إجمالي المبلغ المطلوب' : 'Total due'}</span>
-                  <span className="rounded-xl bg-emerald-700 px-4 py-2 text-white">{runDays === null ? '—' : amount(runDays * AD_TRIAL_DAILY_PRICE_EGP)}</span>
+                  <span className="rounded-xl bg-emerald-700 px-4 py-2 text-white">{runDays === null ? '—' : amount(runDays * dailyPrice)}</span>
                 </div>
               </div>
             </section>

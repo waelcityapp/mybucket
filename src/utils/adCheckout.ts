@@ -6,6 +6,11 @@ export function isReceiptImageAllowed(type: string, bytes: number): boolean {
 }
 
 export const AD_TRIAL_DAILY_PRICE_EGP = 100;
+export const AD_VIP_DAILY_PRICE_EGP = 200;
+
+export function paidAdDailyPrice(tier: 'featured' | 'vip') {
+  return tier === 'vip' ? AD_VIP_DAILY_PRICE_EGP : AD_TRIAL_DAILY_PRICE_EGP;
+}
 
 export function normalizePaymentContactPhone(phone: string): string | null {
   const digits = phone.trim().replace(/[٠-٩۰-۹]/g, digit =>

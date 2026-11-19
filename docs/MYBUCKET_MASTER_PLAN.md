@@ -626,3 +626,5 @@ Paid ad media and its required receipt use one shared submission attempt. The ch
 The verified app owner has 20 ad upload attempts per Cairo day. The general account limit remains three. The protected gateway determines the owner exception.
 
 Admin review previews payment receipts inline next to the expected amount, using the protected image URL without redirecting the administrator.
+
+Landing-page VIP cards link to their category above the advertiser. Offer details link to all ads in their own category.

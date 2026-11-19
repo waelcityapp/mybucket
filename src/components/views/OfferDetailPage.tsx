@@ -55,7 +55,7 @@ export function OfferDetailPage({ lang, offerId, onBack }: { lang: Language; off
         <a href={categorySlug ? `/offers/category/${categorySlug}` : '/offers'} onClick={event => followInternalLink(event, onBack)}
           className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-bold text-emerald-800 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-emerald-600 dark:text-emerald-200 dark:hover:bg-emerald-950">
           <BackIcon className="size-5" aria-hidden="true" />
-          {ar ? 'كل عروض القسم' : 'Back to offers'}
+          {categorySlug ? (ar ? 'كل إعلانات القسم' : 'All ads in this category') : (ar ? 'العودة للعروض' : 'Back to offers')}
         </a>
         <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="space-y-3 p-4 sm:p-6">

@@ -77,7 +77,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
     const [title, description, merchant] = isAr ? ad.ar : ad.en;
     const media = 'video' in ad ? { type: 'video' as const, poster: `/demo-ads/${ad.poster}`, url: `/demo-ads/${ad.video}` }
       : 'image' in ad ? { type: 'image' as const, url: `/demo-ads/${ad.image}` } : undefined;
-    return { id: ad.id, title, description, merchant, media };
+    return { id: ad.id, categorySlug: ad.categorySlug, title, description, merchant, media };
   });
   const vipAds = published?.filter(ad => ad.tier === 'vip') ?? [];
   const categoriesOnly = new URLSearchParams(window.location.search).get('view') === 'categories';
@@ -140,6 +140,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                         const badge = showingDemos ? (isAr ? 'إعلان تجريبي' : 'Demo ad')
                           : tier === 'vip' ? 'VIP' : tier === 'featured' ? (isAr ? 'مميز' : 'Featured') : null;
                         const { title: adTitle, description, merchant, media } = ad;
+                        const cardCategory = showVip ? CATEGORIES.find(item => item.slug === ad.categorySlug) : undefined;
                         const hasVideo = media?.type === 'video';
                         return (
                           <article key={ad.id} className="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -158,6 +159,10 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                               {badge}
                             </span>}
                             <div className="flex flex-1 flex-col gap-2 p-3.5">
+                              {cardCategory && <a href={`/offers/category/${cardCategory.slug}`} onClick={event => followInternalLink(event, onNavigate)}
+                                className="w-fit max-w-full break-words rounded text-xs font-bold text-emerald-800 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-emerald-600 dark:text-emerald-300">
+                                {isAr ? cardCategory.ar : cardCategory.en}
+                              </a>}
                               <p className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
                                 <Store className="size-4 shrink-0 text-emerald-700 dark:text-emerald-400" aria-hidden="true" /><span className="min-w-0 break-words">{merchant}</span>
                               </p>

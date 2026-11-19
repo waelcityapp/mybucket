@@ -608,3 +608,5 @@ Ad submissions reserve at most three Cloudinary permits per account per Cairo ca
 The ad editor no longer offers a test-upload workflow or provider-specific copy. Media is prepared locally in the editor and uploaded only during submission for review. The retired admin test gateway actions are disabled.
 
 Free ad submission displays a sending indicator and acknowledges success only after the gateway confirms submission. Recovery messages distinguish transfer failure, post-upload submission failure, invalid video duration and account limits. Saved upload proof is reused when retrying a failed submission.
+
+Featured checkout displays an InstaPay-only preview at EGP 100 per started 24-hour billing day. Authenticated users can save and reuse their validated Egyptian mobile contact. Receiving transfers and receipt submission remain unavailable pending recipient configuration and the live payment workflow.

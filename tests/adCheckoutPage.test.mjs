@@ -7,6 +7,8 @@ test('payment contact accepts Egyptian mobile formats and rejects malformed numb
   assert.equal(isPaymentContactPhoneValid('01012345678'), true);
   assert.equal(isPaymentContactPhoneValid('+201012345678'), true);
   assert.equal(isPaymentContactPhoneValid('010-1234-5678'), true);
+  assert.equal(isPaymentContactPhoneValid('٠١٥١٢٣٤٥٦٧٨'), true);
+  assert.equal(isPaymentContactPhoneValid('00201112345678'), true);
   assert.equal(isPaymentContactPhoneValid('123'), false);
   assert.equal(isPaymentContactPhoneValid('0111234567'), false);
 });
@@ -34,7 +36,8 @@ test('ad checkout uses a real route and keeps payment submission disabled', () =
   assert.match(create, /offerPaymentPreview/);
   assert.match(create, /<AdPaymentCheckout/);
   assert.match(checkout, /Invoice Summary/);
-  assert.match(checkout, /Vodafone Cash/);
+  assert.match(checkout, /InstaPay/);
+  assert.doesNotMatch(checkout, /Vodafone Cash|Copy transfer number/);
   assert.match(checkout, /type="button" disabled/);
   assert.doesNotMatch(checkout, /\/api\/gateway|localStorage|fetch\s*\(/);
 });

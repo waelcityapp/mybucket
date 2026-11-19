@@ -1,11 +1,12 @@
 import { AD_TIME_ZONE } from '../../utils/adSchedule';
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
 import {
-  ArrowLeft, ArrowRight, CalendarDays, Check, Clock3, Copy, CreditCard, FileCheck2,
+  ArrowLeft, ArrowRight, CalendarDays, Check, Clock3, CreditCard, FileCheck2,
   FileText, Image as ImageIcon, Phone, ShieldCheck, Upload, UserRound, Video, X
 } from 'lucide-react';
 import type { Language } from '../../types';
-import { adRunDays, isPaymentContactPhoneValid, isReceiptImageAllowed } from '../../utils/adCheckout';
+import { offerAdsRequest } from '../../services/offerAdsClient';
+import { AD_TRIAL_DAILY_PRICE_EGP, normalizePaymentContactPhone, adRunDays, isPaymentContactPhoneValid, isReceiptImageAllowed } from '../../utils/adCheckout';
 
 interface Props {
   lang: Language;
@@ -23,11 +24,34 @@ export function AdPaymentCheckout({
   const ar = lang === 'ar';
   const BackIcon = ar ? ArrowRight : ArrowLeft;
   const [phone, setPhone] = useState('');
+  const [savedPhone, setSavedPhone] = useState('');
+  const [phoneState, setPhoneState] = useState<'loading' | 'ready' | 'saving' | 'error'>('loading');
+  useEffect(() => {
+    let active = true;
+    offerAdsRequest<{ phone: string }>('ads.paymentContact', {}, true)
+      .then(({ phone }) => { if (active) { setPhone(phone); setSavedPhone(phone); setPhoneState('ready'); } })
+      .catch(() => { if (active) setPhoneState('error'); });
+    return () => { active = false; };
+  }, []);
+  const savePhone = async () => {
+    if (!isPaymentContactPhoneValid(phone) || phoneState === 'saving') return;
+    setPhoneState('saving');
+    try {
+      const result = await offerAdsRequest<{ phone: string }>('ads.paymentContact', { phone }, true);
+      setPhone(result.phone);
+      setSavedPhone(result.phone);
+      setPhoneState('ready');
+    } catch {
+      setPhoneState('error');
+    }
+  };
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [receiptError, setReceiptError] = useState('');
   const [dragging, setDragging] = useState(false);
   const phoneValid = isPaymentContactPhoneValid(phone);
   const runDays = adRunDays(startsAt, endsAt);
+  const amount = (value: number) => new Intl.NumberFormat(ar ? 'ar-EG' : 'en-EG', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 }).format(value);
+  const phoneSaved = !!savedPhone && normalizePaymentContactPhone(phone) === savedPhone;
   const dates = new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: AD_TIME_ZONE });
   const receiptPreviewUrl = useMemo(() => receiptFile ? URL.createObjectURL(receiptFile) : null, [receiptFile]);
 
@@ -93,8 +117,8 @@ export function AdPaymentCheckout({
             <div role="status" className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
               <p>{ar
-                ? 'هذه معاينة لصفحة الدفع فقط. الأسعار ورقم استقبال التحويلات وإرسال إيصالات الدفع لم تُفعّل بعد في My Bucket. لا تحوّل أي مبلغ الآن، ولن يتم حفظ صورة الإيصال على الخادم.'
-                : 'This is a payment-page preview. Pricing, receiving transfer details and receipt submission are not enabled in My Bucket yet. Do not transfer money now; the receipt image is not saved to the server.'}</p>
+                ? 'السعر المعروض للتجربة. استقبال تحويلات إنستا باي وإرسال الإيصالات لسه غير متاحين. ما تحوّلش أي مبلغ حاليًا.'
+                : 'This is a trial price. InstaPay transfers and receipt submission are not available yet. Do not transfer money now.'}</p>
             </div>
 
             <section aria-labelledby="ad-checkout-invoice" className="space-y-4 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 sm:p-6 dark:border-slate-700 dark:bg-slate-950/50">
@@ -124,16 +148,13 @@ export function AdPaymentCheckout({
               </div>
               <div className="space-y-3 border-t border-emerald-200 pt-4 text-sm dark:border-slate-700">
                 <div className="flex items-center justify-between gap-3 text-slate-600 dark:text-slate-300">
-                  <span>{ar ? 'تكلفة نشر الإعلان المميز' : 'Featured ad placement cost'}</span>
-                  <span className="font-bold">{ar ? 'السعر قيد التحديد' : 'Pricing not configured'}</span>
+                  <span>{ar ? 'السعر التجريبي لليوم' : 'Trial daily rate'}</span>
+                  <span className="font-bold">{amount(AD_TRIAL_DAILY_PRICE_EGP)}</span>
                 </div>
-                {mediaType === 'video' && <div className="flex items-center justify-between gap-3 text-slate-600 dark:text-slate-300">
-                  <span>{ar ? 'تكلفة الفيديو الإضافية' : 'Video surcharge'}</span>
-                  <span className="font-bold">{ar ? 'غير محددة' : 'Not configured'}</span>
-                </div>}
+                <p className="text-xs text-slate-600 dark:text-slate-300">{ar ? 'أي جزء من يوم يتحسب يوم كامل.' : 'A partial day is billed as a full day.'}</p>
                 <div className="flex items-center justify-between gap-3 border-t border-emerald-200 pt-3 text-base font-black dark:border-slate-700">
                   <span className="flex items-center gap-2"><CreditCard className="h-5 w-5 text-emerald-700" />{ar ? 'إجمالي المبلغ المطلوب' : 'Total due'}</span>
-                  <span className="rounded-xl bg-emerald-700 px-4 py-2 text-white">{ar ? 'لم يُحدد بعد' : 'Not set yet'}</span>
+                  <span className="rounded-xl bg-emerald-700 px-4 py-2 text-white">{runDays === null ? '—' : amount(runDays * AD_TRIAL_DAILY_PRICE_EGP)}</span>
                 </div>
               </div>
             </section>
@@ -145,17 +166,24 @@ export function AdPaymentCheckout({
               </label>
               <div className="relative">
                 <input id="ad-checkout-phone" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" value={phone}
-                  onChange={event => setPhone(event.target.value)} maxLength={20}
+                  onChange={event => setPhone(event.target.value)} maxLength={24} disabled={phoneState === 'loading' || phoneState === 'saving'}
                   placeholder="01012345678"
                   className="min-h-12 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
               </div>
               {phone && <p role="status" className={phoneValid ? 'flex items-center gap-1 text-xs font-bold text-emerald-700 dark:text-emerald-300' : 'text-xs font-bold text-rose-700 dark:text-rose-300'}>
                 {phoneValid ? <Check className="h-4 w-4" /> : null}
-                {phoneValid ? (ar ? 'رقم صحيح' : 'Valid phone number') : (ar ? 'أدخل رقم موبايل مصري صحيح.' : 'Enter a valid Egyptian mobile number.')}
+                {phoneValid ? (ar ? 'صيغة الرقم صحيحة' : 'Valid number format') : (ar ? 'أدخل رقم موبايل مصري صحيح.' : 'Enter a valid Egyptian mobile number.')}
               </p>}
               <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">{ar
-                ? 'سيُستخدم هذا الرقم للمتابعة بعد تفعيل استقبال طلبات الدفع.'
-                : 'This number will be used for follow-up once payment requests are enabled.'}</p>
+                ? 'احفظ الرقم في حسابك عشان يظهر تلقائيًا في الإعلانات المميزة القادمة. تقدر تغيّره في أي وقت.'
+                : 'Save this number to prefill it for future featured ads. You can change it anytime.'}</p>
+              {phoneState === 'loading' && <p role="status" className="text-xs">{ar ? 'جاري تحميل رقم المتابعة...' : 'Loading your contact number…'}</p>}
+              {phoneState === 'error' && <p role="alert" className="text-xs text-rose-700">{ar ? 'تعذّر تحميل أو حفظ الرقم. تقدر تدخله وتحفظه تاني.' : 'Could not load or save the number. Enter it and try saving again.'}</p>}
+              {phoneSaved && <p role="status" className="text-xs font-bold text-emerald-700">{ar ? 'الرقم محفوظ في حسابك.' : 'Number saved to your account.'}</p>}
+              <button type="button" onClick={() => void savePhone()} disabled={!phoneValid || phoneSaved || phoneState === 'saving' || phoneState === 'loading'}
+                className="min-h-11 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-50">
+                {phoneState === 'saving' ? (ar ? 'جاري الحفظ...' : 'Saving…') : (ar ? 'حفظ رقم المتابعة' : 'Save contact number')}
+              </button>
             </section>
 
             <section className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:p-5 dark:border-emerald-900 dark:bg-emerald-950/30">
@@ -164,18 +192,8 @@ export function AdPaymentCheckout({
                 {ar ? 'تعليمات الدفع' : 'Payment instructions'}
               </h2>
               <p className="text-sm leading-7 text-slate-700 dark:text-slate-200">{ar
-                ? 'ستتاح التحويلات باستخدام إنستا باي أو فودافون كاش بعد اعتماد الأسعار وبيانات استقبال المدفوعات. لن نعرض رقم تحويل من تطبيق آخر تلقائيًا.'
-                : 'InstaPay and Vodafone Cash transfer details will appear after pricing and recipient details are approved. A different app’s payment number is not automatically reused.'}</p>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-emerald-200 pt-3 dark:border-emerald-900">
-                <div className="flex flex-wrap gap-2 text-xs font-black text-slate-700 dark:text-slate-200">
-                  <span className="rounded-full border border-emerald-200 bg-white px-3 py-1.5 dark:border-emerald-800 dark:bg-slate-900">InstaPay</span>
-                  <span className="rounded-full border border-emerald-200 bg-white px-3 py-1.5 dark:border-emerald-800 dark:bg-slate-900">Vodafone Cash</span>
-                </div>
-                <button type="button" disabled className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-slate-200 px-4 text-xs font-extrabold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                  <Copy className="h-4 w-4" />
-                  {ar ? 'نسخ رقم التحويل بعد التفعيل' : 'Copy transfer number when enabled'}
-                </button>
-              </div>
+                ? 'إنستا باي هي طريقة التحويل المعتمدة للصفحة. بيانات استقبال التحويل هتظهر لما الدفع يتفعّل.'
+                : 'InstaPay is the transfer method for this page. Recipient details will appear when payments are enabled.'}</p>
             </section>
 
             <section className="space-y-3" aria-labelledby="ad-receipt-title">

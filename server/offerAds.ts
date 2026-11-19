@@ -1,3 +1,4 @@
+import { normalizePaymentContactPhone } from '../src/utils/adCheckout.js';
 import { createHash } from 'node:crypto';
 import { getAdminFirestore } from './firebaseAdmin.js';
 import { confirmAdminAdTestUpload, deleteAdminAdTestUpload, signAdminAdTestUpload } from './adminAdTestUpload.js';
@@ -224,6 +225,14 @@ export async function purgeExpiredOffers(db = getAdminFirestore()) {
 }
 
 export async function sendOfferAd(action: string, uid: string, payload: Payload, db = getAdminFirestore()) {
+  if (action === 'ads.paymentContact') {
+    const ref = db.collection('offerAdPaymentContacts').doc(uid);
+    if (payload.phone === undefined) return { phone: (await ref.get()).data()?.phone ?? '' };
+    const phone = typeof payload.phone === 'string' && payload.phone.length <= 24 ? normalizePaymentContactPhone(payload.phone) : null;
+    if (!phone) return fail('invalid_payment_phone');
+    await ref.set({ phone }, { merge: true });
+    return { phone };
+  }
   if (action === 'ads.freePolicy') {
     return { freeIntervalDays: (await policyRef(db).get()).data()?.freeIntervalDays ?? 7 };
   }

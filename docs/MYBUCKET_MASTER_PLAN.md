@@ -624,3 +624,5 @@ VIP ads use the paid InstaPay review workflow at EGP 200 per started 24-hour bil
 Paid ad media and its required receipt use one shared submission attempt. The checkout keeps the InstaPay control visible and explains any block before transfer. Existing daily counters remain in effect.
 
 The verified app owner has 20 ad upload attempts per Cairo day. The general account limit remains three. The protected gateway determines the owner exception.
+
+Admin review previews payment receipts inline next to the expected amount, using the protected image URL without redirecting the administrator.

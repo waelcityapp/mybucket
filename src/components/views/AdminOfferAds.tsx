@@ -15,6 +15,7 @@ type UploadStats = {
 
 export function AdminOfferAds({ lang }: { lang: Language }) {
   const ar = lang === 'ar';
+  const [receiptErrors, setReceiptErrors] = useState<Record<string, boolean>>({});
   const [status, setStatus] = useState<OfferAdStatus>('pending');
   const [ads, setAds] = useState<ReviewOfferAd[] | null>(null);
   const [refresh, setRefresh] = useState(0);
@@ -71,6 +72,7 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
   useEffect(() => {
     let active = true;
     setAds(null);
+    setReceiptErrors({});
     setError('');
     offerAdsRequest<ReviewOfferAd[]>('admin.ads.list', { status }, true)
       .then(result => { if (active) setAds(result); })
@@ -173,9 +175,18 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
           <h3 className="font-extrabold">{ar ? 'إيصال إنستا باي' : 'InstaPay receipt'}</h3>
           <p>{ar ? 'المبلغ المطلوب' : 'Expected amount'} · {new Intl.NumberFormat(ar ? 'ar-EG' : 'en-EG', { style: 'currency', currency: 'EGP' }).format(ad.payment.amountEgp)}</p>
           <p>{ar ? 'رقم المتابعة' : 'Contact number'} · <bdi>{ad.payment.phone}</bdi></p>
-          {ad.payment.receiptUrl ? <a href={ad.payment.receiptUrl} target="_blank" rel="noopener noreferrer" className="inline-block font-bold text-emerald-800 underline">
-            {ar ? 'فتح صورة الإيصال' : 'Open receipt image'}
-          </a> : <p role="alert" className="font-bold text-rose-700">{ar ? 'تعذّر الوصول للإيصال.' : 'Receipt unavailable.'}</p>}
+          {ad.payment.receiptUrl ? <details className="space-y-3">
+            <summary className="min-h-11 cursor-pointer py-3 font-bold text-emerald-800 underline underline-offset-2">
+              {ar ? 'عرض صورة الإيصال' : 'Show receipt image'}
+            </summary>
+            <img src={ad.payment.receiptUrl} loading="lazy" referrerPolicy="no-referrer"
+              alt={ar ? 'صورة إيصال تحويل إنستا باي' : 'InstaPay transfer receipt'}
+              onError={() => setReceiptErrors(previous => ({ ...previous, [ad.id]: true }))}
+              className={receiptErrors[ad.id] ? 'hidden' : 'block h-auto w-full rounded-lg border border-amber-200 bg-white'} />
+            {receiptErrors[ad.id] && <p role="alert" className="text-sm font-bold text-rose-700">
+              {ar ? 'تعذّر تحميل صورة الإيصال. حدّث قائمة الإعلانات وحاول تاني.' : 'Could not load the receipt image. Refresh the ad list and try again.'}
+            </p>}
+          </details> : <p role="alert" className="font-bold text-rose-700">{ar ? 'تعذّر الوصول للإيصال.' : 'Receipt unavailable.'}</p>}
         </section>}
         {ad.rejectionReason && <p className="whitespace-pre-wrap break-words text-sm text-slate-700">{ad.rejectionReason}</p>}
         {status === 'approved' && ad.startsAt <= Date.now() && ad.endsAt > Date.now() && <a className="inline-block text-sm font-bold text-emerald-700 underline" href={`/offers/ad/${ad.id}`}>{ar ? 'افتح الإعلان المنشور' : 'Open published ad'}</a>}

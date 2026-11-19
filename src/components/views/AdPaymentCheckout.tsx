@@ -226,8 +226,8 @@ export function AdPaymentCheckout({
                       : (ar ? 'بدون وسائط' : 'No media'), mediaType === 'video' ? Video : ImageIcon)}
               </div>
               <div className="grid grid-cols-1 gap-2 text-xs leading-6 text-slate-600 sm:grid-cols-2 dark:text-slate-300">
-                <p>{ar ? 'بداية النشر: ' : 'Starts: '}{dates.format(startsAt)}</p>
-                <p>{ar ? 'نهاية النشر: ' : 'Ends: '}{dates.format(endsAt)}</p>
+                <p>{ar ? 'بداية النشر بتوقيت القاهرة ' : 'Starts (Cairo time) '}{dates.format(startsAt)}</p>
+                <p>{ar ? 'نهاية النشر بتوقيت القاهرة ' : 'Ends (Cairo time) '}{dates.format(endsAt)}</p>
               </div>
               <div className="space-y-3 border-t border-emerald-200 pt-4 text-sm dark:border-slate-700">
                 <div className="flex items-center justify-between gap-3 text-slate-600 dark:text-slate-300">

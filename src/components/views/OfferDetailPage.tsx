@@ -1,3 +1,4 @@
+import { AD_TIME_ZONE } from '../../utils/adSchedule';
 import { followInternalLink } from '../../utils/navigationHistory';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, Store } from 'lucide-react';
@@ -74,7 +75,7 @@ export function OfferDetailPage({ lang, offerId, onBack }: { lang: Language; off
             <p className="whitespace-pre-wrap break-words leading-relaxed">{description}</p>
             {demo && <p className="text-sm text-slate-600 dark:text-slate-300">{ar ? 'ده مثال تجريبي للعرض ومش متاح للشراء.' : 'This is a fictional offer for demonstration.'}</p>}
             {live && <div className="space-y-1 text-sm text-slate-600 dark:text-slate-300">
-              <p>{ar ? 'العرض متاح لحد' : 'Available until'} {new Date(live.endsAt).toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: 'Africa/Cairo', timeZoneName: 'short' })}</p>
+              <p>{ar ? 'العرض متاح لحد' : 'Available until'} {new Date(live.endsAt).toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: AD_TIME_ZONE })} {ar ? 'بتوقيت القاهرة' : 'Cairo time'}</p>
               {live.contact && <p className="break-words"><strong>{ar ? 'للتواصل' : 'Contact'}</strong>{' '}
                 {contactPhone ? <a href={contactPhone} dir="ltr" className="inline-block font-bold text-blue-700 underline underline-offset-2 dark:text-blue-300">{live.contact}</a> : live.contact}</p>}
             </div>}

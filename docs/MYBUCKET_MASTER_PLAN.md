@@ -616,3 +616,5 @@ My Bucket reuses the CityEve event checkout InstaPay recipient number as request
 My Bucket checkout uses the CityEve booking InstaPay deep link as the configured payment destination. The personal recipient phone is removed. The link stays inactive until paid receipt submission is available. Empty contact fields show an explicitly labelled example and saving validates that the user has entered their own number.
 
 Featured ads now use the CityEve InstaPay link and require server-verified receipt media, priced server-side at EGP 100 per started 24-hour day. Receipts use authenticated delivery and are listed in the admin queue only. Approval requires an explicit transfer check. If review passes the requested start, the paid window shifts to preserve its duration.
+
+Advertisement dates explicitly label Cairo time in display copy, without browser-generated GMT offsets.

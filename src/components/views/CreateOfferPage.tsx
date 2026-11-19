@@ -2,7 +2,7 @@ import { FeaturedAdInfoPage } from './FeaturedAdInfoPage';
 import { followInternalLink } from '../../utils/navigationHistory';
 import type { PublicOfferAd } from '../../data/offerAds';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { ArrowRight, ArrowLeft, ImagePlus, Megaphone, CheckCircle2, Video, X } from 'lucide-react';
+import { ArrowRight, ArrowLeft, ImagePlus, Megaphone, CheckCircle2, LoaderCircle, Video, X } from 'lucide-react';
 import type { Language } from '../../types';
 import { compressAdImage } from '../../utils/adImageCompression';
 import { captureAdVideoPoster } from '../../utils/adVideoPoster';
@@ -127,6 +127,8 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   const [sending, setSending] = useState(false);
   const [sendProgress, setSendProgress] = useState<number | null>(null);
   const [sendError, setSendError] = useState('');
+  const [sendRecovery, setSendRecovery] = useState<'retry' | 'restartUpload' | 'changeVideo' | null>(null);
+  const sendLock = useRef(false);
   const [submitted, setSubmitted] = useState(false);
   const imageUrl = useMemo(() => image ? URL.createObjectURL(image) : null, [image]);
   useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
@@ -162,7 +164,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     if (title.trim() && description.trim() && category && merchant.trim()) setPreview(true);
   };
   const discardSubmission = async () => {
-    if (!submission.current) return;
+    if (!submission.current) return true;
     setCancellingSend(true);
     setSendError('');
     try {
@@ -170,6 +172,8 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
       submission.current = null;
       setHasSubmission(false);
       setCancelRequired(false);
+      setSendRecovery(null);
+      return true;
     } catch (error) {
       const code = error instanceof Error ? error.message : '';
       if (code === 'ad_already_submitted') setSubmitted(true);
@@ -177,6 +181,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
         setCancelRequired(true);
         setSendError(ar ? 'تعذّر إلغاء الإرسال وحذف الملف. اضغط × للمحاولة تاني.' : 'Could not cancel the submission and remove the media. Press × to retry.');
       }
+      return false;
     } finally {
       setCancellingSend(false);
       cancelSend.current = false;
@@ -192,20 +197,24 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     }
   };
   const sendForReview = async () => {
-    if (sending || cancellingSend || cancelRequired || submitted || tier !== 'free') return;
+    if (sendLock.current || cancellingSend || cancelRequired || submitted || tier !== 'free') return;
     const start = adScheduleDate(startsAt);
     const end = adScheduleDate(endsAt);
     if (!start || !end || end.getTime() <= Date.now()) {
       setSendError(ar ? 'راجع تاريخ بداية ونهاية النشر.' : 'Check the publication dates.');
       return;
     }
-    const draft = submission.current ?? { id: crypto.randomUUID(), media: null };
-    submission.current = draft;
-    setHasSubmission(true);
+    sendLock.current = true;
     setSending(true);
     setSendProgress(null);
     setSendError('');
+    let stage: 'prepare' | 'upload' | 'submit' = 'prepare';
     try {
+      if (sendRecovery === 'restartUpload' && !await discardSubmission()) return;
+      const draft = submission.current ?? { id: crypto.randomUUID(), media: null };
+      submission.current = draft;
+      setHasSubmission(true);
+      setSendRecovery(null);
       const prepared = draft.media ? { submitted: false, signed: null } : await offerAdsRequest<{ submitted: boolean; signed: SignedAdUpload | null }>('ads.prepare', {
         id: draft.id, title, description, merchant, contact, categorySlug: category,
         startsAt: start.getTime(), endsAt: end.getTime(),
@@ -215,12 +224,15 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
       if (!prepared.submitted) {
         const source = image ?? reusedMedia?.url;
         if (source && prepared.signed && !draft.media) {
+          stage = 'upload';
           setSendProgress(0);
           draft.media = await uploadAdMedia(source, prepared.signed, setSendProgress);
         }
         setSendProgress(null);
         if (cancelSend.current) return;
-        await offerAdsRequest('ads.submit', { ...draft.media, id: draft.id }, true);
+        stage = 'submit';
+        const result = await offerAdsRequest<{ submitted: boolean }>('ads.submit', { ...draft.media, id: draft.id }, true);
+        if (result.submitted !== true) throw new Error('ad_submission_unconfirmed');
       }
       cancelSend.current = false;
       setCancellingSend(false);
@@ -232,28 +244,40 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
         submission.current = null;
         setHasSubmission(false);
       }
-      setSendError(code === 'ad_upload_daily_limit'
-        ? (ar ? 'استخدمت ٣ محاولات رفع النهارده. الحصة بتتجدد الساعة ١٢ بالليل بتوقيت القاهرة.' : 'You have used today’s three upload attempts. They reset at midnight Cairo time.')
-        : code === 'ad_upload_active'
-          ? (ar ? 'عندك ملف قيد الرفع أو التحقق. كمّله أو ألغيه قبل محاولة رفع تانية.' : 'Complete or cancel your current upload before starting another.')
-          : code === 'ad_upload_paused'
-            ? (ar ? 'رفع ملفات الإعلانات متوقف مؤقتًا. حاول لاحقًا.' : 'Ad media uploads are temporarily paused.')
-            : code === 'ad_upload_already_issued'
-              ? (ar ? 'اتصدر إذن رفع للمحاولة دي بالفعل. اضغط إلغاء الإرسال قبل رفع الملف من جديد.' : 'An upload was already authorized for this attempt. Cancel the submission before uploading again.')
-              : code === 'ad_free_interval'
-        ? (ar ? 'لسه ما مرّتش المدة المطلوبة من آخر إعلان مجاني اتوافق عليه، حتى لو انتهى الإعلان أو اتحذف.' : 'Your free-ad interval has not passed since the last approval, even if that ad ended or was deleted.')
-        : code === 'ad_pending_exists'
-          ? (ar ? 'عندك إعلان مجاني بانتظار الموافقة. استنى قرار الإدارة قبل إرسال إعلان تاني.' : 'You already have a free ad awaiting review. Wait for the decision before submitting another.')
-        : code === 'ad_daily_limit'
-        ? (ar ? 'وصلت للحد اليومي لإرسال الإعلانات. حاول يوم تاني.' : 'You reached the daily ad limit. Try again another day.')
-        : code === 'ad_video_duration_unavailable'
-          ? (ar ? 'الفيديو اترفع ولسه بيتفحص. جرّب الإرسال تاني بعد شوية.' : 'The video uploaded and is still being processed. Try sending again shortly.')
-          : (ar ? 'تعذّر إرسال الإعلان. راجع البيانات وحاول مرة تانية.' : 'Could not submit the ad. Check the details and try again.'));
+      const errors = {
+        ad_upload_daily_limit: ar ? 'استخدمت ٣ محاولات رفع النهارده. الحصة بتتجدد الساعة ١٢ بالليل بتوقيت القاهرة.' : 'You have used today’s three upload attempts. They reset at midnight Cairo time.',
+        ad_upload_active: ar ? 'عندك ملف قيد الرفع أو التحقق. كمّله أو ألغيه قبل محاولة رفع تانية.' : 'Complete or cancel your current upload before starting another.',
+        ad_upload_paused: ar ? 'رفع ملفات الإعلانات متوقف مؤقتًا. حاول لاحقًا.' : 'Ad media uploads are temporarily paused.',
+        ad_free_interval: ar ? 'لسه ما مرّتش المدة المطلوبة من آخر إعلان مجاني اتوافق عليه.' : 'Your free-ad interval has not passed since the last approval.',
+        ad_pending_exists: ar ? 'عندك إعلان مجاني بانتظار الموافقة.' : 'You already have a free ad awaiting review.',
+        ad_daily_limit: ar ? 'وصلت للحد اليومي لإرسال الإعلانات. حاول يوم تاني.' : 'You reached the daily ad limit. Try again another day.',
+      };
+      if (code === 'invalid_video_duration') {
+        setSendRecovery('changeVideo');
+        setSendError(ar ? 'مدة الفيديو غير مناسبة. اختار فيديو مدته دقيقة أو أقل.' : 'Choose a video with a valid duration of one minute or less.');
+      } else if (stage === 'upload' || code === 'ad_upload_already_issued') {
+        setSendRecovery('restartUpload');
+        setSendError(ar ? 'رفع الملف ما اكتملش. اتأكد من الإنترنت وحاول تاني.' : 'The upload did not complete. Check your connection and try again.');
+      } else if (Object.hasOwn(errors, code)) {
+        setSendRecovery(null);
+        setSendError(errors[code as keyof typeof errors]);
+      } else {
+        setSendRecovery('retry');
+        setSendError(submission.current?.media
+          ? (ar ? 'تم رفع الملف، لكن إرسال الإعلان للمراجعة ما اكتملش. تقدر تحاول تاني بنفس الملف.' : 'Your file was uploaded, but submission did not finish. You can retry with the same file.')
+          : (ar ? 'تعذّر إرسال الإعلان حاليًا. حاول مرة تانية بعد قليل.' : 'Could not submit the ad right now. Try again shortly.'));
+      }
     } finally {
       if (cancelSend.current) await discardSubmission();
+      sendLock.current = false;
       setSending(false);
       setSendProgress(null);
     }
+  };
+  const changeInvalidVideo = async () => {
+    if (!await discardSubmission()) return;
+    removeMedia();
+    setPreview(false);
   };
   const goToPayment = () => {
     if (!preview || tier !== 'featured') return;
@@ -326,10 +350,10 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
             {renewState === 'error' && <a className="mt-3 inline-block font-bold text-emerald-800 underline" href="/settings/ads" onClick={event => followInternalLink(event, onNavigate)}>{ar ? 'إعلاناتي' : 'My ads'}</a>}
           </section>
         ) : submitted ? (
-          <section className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950">
-            <h2 className="flex items-center gap-2 font-extrabold"><CheckCircle2 className="size-5" />{ar ? 'تم إرسال إعلانك للمراجعة' : 'Your ad was sent for review'}</h2>
-            <p className="text-sm">{ar ? 'هيظهر في القسم خلال مدة النشر المحددة بعد موافقة الإدارة.' : 'It will appear in its category during the selected dates after approval.'}</p>
-            <a className="inline-flex min-h-11 items-center font-bold underline" href="/settings/ads" onClick={event => followInternalLink(event, onNavigate)}>{ar ? 'تابع الإعلان في إعلاناتي' : 'Track the ad in My ads'}</a>
+          <section role="status" className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950">
+            <h2 className="flex items-center gap-2 font-extrabold"><CheckCircle2 className="size-5" />{ar ? 'مبروك! تم إرسال إعلانك للإدارة بنجاح.' : 'Your ad was sent successfully.'}</h2>
+            <p className="text-sm">{ar ? 'تتم المراجعة والرد خلال ٢٤ ساعة تقريبًا. تقدر تتابع حالة إعلانك من ملفك الشخصي في قسم «إعلاناتي».' : 'Review usually takes around 24 hours. Follow your ad’s status in My ads in your profile.'}</p>
+            <a className="inline-flex min-h-11 items-center font-bold underline" href="/settings/ads" onClick={event => followInternalLink(event, onNavigate)}>{ar ? 'متابعة الإعلان' : 'Track ad'}</a>
           </section>
         ) : preview ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-4">
@@ -339,10 +363,16 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
             <p className="text-xs text-slate-600">{ar ? 'نهاية النشر:' : 'Publication ends:'} {adScheduleDate(endsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: AD_TIME_ZONE })}</p>
             <button type="button" disabled={hasSubmission || cancellingSend} onClick={() => setPreview(false)} className="w-full rounded-xl border border-emerald-600 text-emerald-700 py-3 text-sm font-bold disabled:opacity-50">{ar ? 'تعديل الإعلان' : 'Edit advertisement'}</button>
             <div className="space-y-2 rounded-xl bg-slate-50 p-3 text-center">
-              <button type="button" onClick={tier === 'free' ? () => void sendForReview() : goToPayment} disabled={sending || cancellingSend || cancelRequired}
+              <button type="button" onClick={tier === 'free' ? () => void sendForReview() : goToPayment} disabled={sending || cancellingSend || cancelRequired || sendRecovery === 'changeVideo'}
                 className="w-full rounded-xl bg-emerald-700 px-3 py-3 text-sm font-extrabold text-white hover:bg-emerald-800 disabled:opacity-50">
-                {tier === 'free' ? (sending ? (ar ? 'جاري إرسال الإعلان...' : 'Sending ad…') : (ar ? 'إرسال للمراجعة' : 'Send for review')) : (ar ? 'الانتقال إلى صفحة الدفع' : 'Continue to payment')}
+                {tier === 'free' ? (sending ? (ar ? 'جاري إرسال الإعلان...' : 'Sending ad…') : (sendRecovery === 'retry' || sendRecovery === 'restartUpload' ? (ar ? 'إعادة المحاولة' : 'Try again') : (ar ? 'إرسال للمراجعة' : 'Send for review'))) : (ar ? 'الانتقال إلى صفحة الدفع' : 'Continue to payment')}
               </button>
+              {sending && !cancellingSend && <div role="status" className="grid justify-items-center gap-2 py-3 text-sm font-bold text-emerald-900">
+                <LoaderCircle className="size-7 motion-safe:animate-spin" aria-hidden="true" />
+                <p>{ar ? 'جاري إرسال الإعلان، برجاء الانتظار' : 'Sending your ad. Please wait.'}</p>
+              </div>}
+              {sendRecovery === 'changeVideo' && <button type="button" disabled={cancellingSend} onClick={() => void changeInvalidVideo()}
+                className="min-h-11 rounded-xl bg-emerald-100 px-3 text-sm font-bold text-emerald-900">{ar ? 'تغيير الفيديو' : 'Change video'}</button>}
               {hasSubmission && <button type="button" aria-label={ar ? 'إلغاء الإرسال' : 'Cancel submission'}
                 disabled={cancellingSend} onClick={requestCancel}
                 className="inline-flex min-h-11 items-center gap-1 rounded-xl px-3 text-sm font-bold text-red-700 disabled:opacity-50">

@@ -606,3 +606,5 @@ Ad creation starts with no selected tier. The fields appear after selecting feat
 Ad submissions reserve at most three Cloudinary permits per account per Cairo calendar day and serialize active media attempts. Cancellation does not restore quota. The production cleanup job removes abandoned media drafts after 24 hours. Owner dashboard totals show issued, verified and cancelled uploads, accounts at limit and verified media volume, with a pause for new permits and a high-volume or cancellation-ratio alert.
 
 The ad editor no longer offers a test-upload workflow or provider-specific copy. Media is prepared locally in the editor and uploaded only during submission for review. The retired admin test gateway actions are disabled.
+
+Free ad submission displays a sending indicator and acknowledges success only after the gateway confirms submission. Recovery messages distinguish transfer failure, post-upload submission failure, invalid video duration and account limits. Saved upload proof is reused when retrying a failed submission.

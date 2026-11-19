@@ -4,6 +4,15 @@ import { offerAdsRequest } from '../../services/offerAdsClient';
 import type { Language } from '../../types';
 import { AdCreativeCard } from '../AdCreativeCard';
 
+type UploadStats = {
+  issued: number;
+  verified: number;
+  bytes: number;
+  cancellations: number;
+  limitedAccounts: number;
+  uploadsPaused: boolean;
+};
+
 export function AdminOfferAds({ lang }: { lang: Language }) {
   const ar = lang === 'ar';
   const [status, setStatus] = useState<OfferAdStatus>('pending');
@@ -14,6 +23,28 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
   const [notice, setNotice] = useState('');
   const [decision, setDecision] = useState<{ id: string; status: 'approved' | 'rejected' } | null>(null);
   const [reason, setReason] = useState('');
+  const [uploadStats, setUploadStats] = useState<UploadStats | null>(null);
+  const [statsError, setStatsError] = useState(false);
+  const [statsBusy, setStatsBusy] = useState(false);
+  useEffect(() => {
+    let active = true;
+    setStatsError(false);
+    offerAdsRequest<UploadStats>('admin.ads.uploadStats', {}, true)
+      .then(stats => { if (active) setUploadStats(stats); })
+      .catch(() => { if (active) setStatsError(true); });
+    return () => { active = false; };
+  }, [refresh]);
+  const setUploadsPaused = async (uploadsPaused: boolean) => {
+    setStatsBusy(true);
+    setStatsError(false);
+    try {
+      setUploadStats(await offerAdsRequest<UploadStats>('admin.ads.uploadStats', { uploadsPaused }, true));
+    } catch {
+      setStatsError(true);
+    } finally {
+      setStatsBusy(false);
+    }
+  };
   const [days, setDays] = useState('');
   const [policyBusy, setPolicyBusy] = useState(false);
   const [policyMessage, setPolicyMessage] = useState('');
@@ -78,6 +109,35 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
   const date = (value: number) => new Date(value).toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: 'Africa/Cairo' });
   const button = 'min-h-11 rounded-xl px-3 text-sm font-bold disabled:opacity-50';
   return <div className="space-y-4">
+    <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-extrabold">{ar ? 'رفع ملفات الإعلانات اليوم بتوقيت القاهرة' : 'Ad media uploads today, Cairo time'}</h2>
+        <button type="button" disabled={statsBusy} onClick={() => setRefresh(value => value + 1)}
+          className="text-xs font-bold text-emerald-800 underline">{ar ? 'تحديث الأرقام' : 'Refresh totals'}</button>
+      </div>
+      {statsError && <p role="alert" className="text-sm text-red-700">{ar ? 'تعذّر تحديث بيانات الرفع. حاول تاني.' : 'Could not update upload information. Try again.'}</p>}
+      {!statsError && !uploadStats && <p role="status" className="text-sm text-slate-600">{ar ? 'جاري تحميل ملخص الرفع...' : 'Loading upload summary…'}</p>}
+      {uploadStats && <>
+        <dl className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
+          {[
+            [ar ? 'أذونات الرفع' : 'Upload permits', uploadStats.issued],
+            [ar ? 'ملفات مؤكدة' : 'Verified files', uploadStats.verified],
+            [ar ? 'إلغاءات' : 'Cancellations', uploadStats.cancellations],
+            [ar ? 'حسابات استنفدت الحصة' : 'Accounts at limit', uploadStats.limitedAccounts],
+            [ar ? 'حجم الملفات المؤكدة (م.ب)' : 'Verified media (MB)', uploadStats.bytes / 1_000_000],
+          ].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-slate-50 p-2.5">
+            <dt className="text-xs text-slate-600">{label}</dt>
+            <dd className="mt-1 font-extrabold">{new Intl.NumberFormat(ar ? 'ar-EG' : 'en-GB', { maximumFractionDigits: 2 }).format(Number(value))}</dd>
+          </div>)}
+        </dl>
+        {(uploadStats.issued >= 30 || (uploadStats.issued >= 10 && uploadStats.cancellations * 2 >= uploadStats.issued)) &&
+          <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-900">{ar ? 'نشاط رفع مرتفع اليوم. راجع أعداد الرفع والإلغاء.' : 'High upload activity today. Check upload and cancellation totals.'}</p>}
+        <button type="button" disabled={statsBusy} onClick={() => void setUploadsPaused(!uploadStats.uploadsPaused)}
+          className={`${button} ${uploadStats.uploadsPaused ? 'bg-emerald-700 text-white' : 'bg-rose-50 text-rose-800'}`}>
+          {uploadStats.uploadsPaused ? (ar ? 'استئناف الرفع الجديد' : 'Resume new uploads') : (ar ? 'إيقاف الرفع الجديد مؤقتًا' : 'Pause new uploads')}
+        </button>
+      </>}
+    </section>
     <form onSubmit={event => { event.preventDefault(); void savePolicy(); }} className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
       <label className="block text-sm font-bold" htmlFor="free-ad-interval">{ar ? 'المدة بين الموافقات على الإعلانات المجانية (أيام)' : 'Days between free ad approvals'}</label>
       <div className="flex flex-wrap gap-2">

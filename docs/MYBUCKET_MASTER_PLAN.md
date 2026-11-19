@@ -602,3 +602,5 @@ Ad creation uses localized image and video picker buttons with separate file-typ
 The free ad form checks eligibility before enabling its fields for new and renewed ads. Final submission still rechecks eligibility on the server.
 
 Ad creation starts with no selected tier. The fields appear after selecting featured or an eligible free ad. A full featured information page shows proposed benefits and pricing availability without making payment commitments. Ad publication dates are selected and displayed in Africa/Cairo, including checkout.
+
+Ad submissions reserve at most three Cloudinary permits per account per Cairo calendar day and serialize active media attempts. Cancellation does not restore quota. The production cleanup job removes abandoned media drafts after 24 hours. Owner dashboard totals show issued, verified and cancelled uploads, accounts at limit and verified media volume, with a pause for new permits and a high-volume or cancellation-ratio alert.

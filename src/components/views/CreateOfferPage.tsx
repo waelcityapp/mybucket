@@ -284,7 +284,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     setSendProgress(null);
     setSendError('');
     try {
-      const prepared = await offerAdsRequest<{ submitted: boolean; signed: SignedAdUpload | null }>('ads.prepare', {
+      const prepared = draft.media ? { submitted: false, signed: null } : await offerAdsRequest<{ submitted: boolean; signed: SignedAdUpload | null }>('ads.prepare', {
         id: draft.id, title, description, merchant, contact, categorySlug: category,
         startsAt: start.getTime(), endsAt: end.getTime(),
         resourceType: previewType ?? null, bytes: image?.size ?? (reusedMedia ? 1 : 0),
@@ -306,7 +306,19 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     } catch (error) {
       if (cancelSend.current) return;
       const code = error instanceof Error ? error.message : '';
-      setSendError(code === 'ad_free_interval'
+      if (code === 'ad_upload_daily_limit' || code === 'ad_upload_active' || code === 'ad_upload_paused') {
+        submission.current = null;
+        setHasSubmission(false);
+      }
+      setSendError(code === 'ad_upload_daily_limit'
+        ? (ar ? 'استخدمت ٣ محاولات رفع النهارده. الحصة بتتجدد الساعة ١٢ بالليل بتوقيت القاهرة.' : 'You have used today’s three upload attempts. They reset at midnight Cairo time.')
+        : code === 'ad_upload_active'
+          ? (ar ? 'عندك ملف قيد الرفع أو التحقق. كمّله أو ألغيه قبل محاولة رفع تانية.' : 'Complete or cancel your current upload before starting another.')
+          : code === 'ad_upload_paused'
+            ? (ar ? 'رفع ملفات الإعلانات متوقف مؤقتًا. حاول لاحقًا.' : 'Ad media uploads are temporarily paused.')
+            : code === 'ad_upload_already_issued'
+              ? (ar ? 'اتصدر إذن رفع للمحاولة دي بالفعل. اضغط إلغاء الإرسال قبل رفع الملف من جديد.' : 'An upload was already authorized for this attempt. Cancel the submission before uploading again.')
+              : code === 'ad_free_interval'
         ? (ar ? 'لسه ما مرّتش المدة المطلوبة من آخر إعلان مجاني اتوافق عليه، حتى لو انتهى الإعلان أو اتحذف.' : 'Your free-ad interval has not passed since the last approval, even if that ad ended or was deleted.')
         : code === 'ad_pending_exists'
           ? (ar ? 'عندك إعلان مجاني بانتظار الموافقة. استنى قرار الإدارة قبل إرسال إعلان تاني.' : 'You already have a free ad awaiting review. Wait for the decision before submitting another.')

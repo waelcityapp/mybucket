@@ -5,6 +5,8 @@ import { SubscriptionError } from './subscriptionService.js';
 import { OFFER_CATEGORY_IDS, type MyOfferAd, type OfferAdStatus, type PublicOfferAd } from '../src/data/offerAds.js';
 
 const DAY = 86400000;
+const MAX_UPLOADS = 3;
+const cairoDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' });
 const EXPIRED_RETENTION = 10 * DAY;
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 type Payload = Record<string, unknown>;
@@ -17,6 +19,8 @@ type StoredAd = AdFields & {
   media: StoredMedia | null;
   submittedAt: number;
   reviewedAt?: number;
+  uploadDay?: string;
+  uploadCleanupAt?: number;
   rejectionReason: string;
 };
 
@@ -178,15 +182,42 @@ export async function removeExpiredOffer(uid: string, id: string, db = getAdminF
   return { removed: true };
 }
 
+const uploadUsage = (db: ReturnType<typeof getAdminFirestore>, day: string) =>
+  db.collection('offerAdUploadDays').doc(day).collection('accounts');
+const activeUpload = (db: ReturnType<typeof getAdminFirestore>, uid: string) =>
+  db.collection('offerAdActiveUploads').doc(uid);
+
+async function purgeAbandonedUpload(doc: FirebaseFirestore.QueryDocumentSnapshot, db: ReturnType<typeof getAdminFirestore>) {
+  const asset = await db.runTransaction(async tx => {
+    const ad = (await tx.get(doc.ref)).data() as StoredAd | undefined;
+    if (!ad || (ad.status !== 'draft' && ad.status !== 'cancelled') || !ad.mediaType ||
+        !ad.uploadCleanupAt || ad.uploadCleanupAt > Date.now()) return null;
+    const lease = activeUpload(db, ad.ownerId);
+    const leaseData = (await tx.get(lease)).data();
+    if (leaseData?.id === doc.id) tx.delete(lease);
+    tx.update(doc.ref, { status: 'cancelled' });
+    return { ownerId: ad.ownerId, type: ad.mediaType };
+  });
+  if (!asset) return;
+  await deleteAdminAdTestUpload(asset.ownerId, {
+    publicId: `mybucket/ads/submissions/${asset.ownerId}/${doc.id}`, resourceType: asset.type,
+  }, undefined, undefined, 'submissions');
+  await doc.ref.delete();
+}
+
 export async function purgeExpiredOffers(db = getAdminFirestore()) {
   const cutoff = Date.now() - EXPIRED_RETENTION;
   const ads = db.collection('offerAds');
-  const [expired, retry] = await Promise.all([
+  const [expired, retry, abandoned] = await Promise.all([
     ads.where('publishedUntil', '>', 0).where('publishedUntil', '<=', cutoff).limit(40).get(),
     ads.where('status', '==', 'deleting').limit(40).get(),
+    ads.where('uploadCleanupAt', '>', 0).where('uploadCleanupAt', '<=', Date.now()).limit(40).get(),
   ]);
   const unique = new Map([...expired.docs, ...retry.docs].map(doc => [doc.id, doc]));
-  const results = await Promise.allSettled([...unique.values()].map(doc => removeExpiredOffer(doc.get('ownerId'), doc.id, db)));
+  const results = await Promise.allSettled([
+    ...[...unique.values()].map(doc => removeExpiredOffer(doc.get('ownerId'), doc.id, db)),
+    ...abandoned.docs.map(doc => purgeAbandonedUpload(doc, db)),
+  ]);
   const failed = results.filter(result => result.status === 'rejected').length;
   if (failed) console.error('Expired advertisement cleanup failures:', failed);
   return { removed: results.length - failed, failed };
@@ -211,6 +242,14 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
       if (draft.ownerId !== uid) return fail('invalid_ad_id', 403);
       if (draft.status === 'cancelled') return draft.mediaType;
       if (draft.status !== 'draft') return fail('ad_already_submitted', 409);
+      if (draft.uploadDay) {
+        const usage = uploadUsage(db, draft.uploadDay).doc(uid);
+        const lease = activeUpload(db, uid);
+        const [usageDoc, leaseDoc] = await Promise.all([tx.get(usage), tx.get(lease)]);
+        tx.set(usage, { cancellations: (usageDoc.data()?.cancellations ?? 0) + 1 }, { merge: true });
+        // Release after the provider confirms deletion, so another upload cannot overlap.
+        if (leaseDoc.data()?.id === id) tx.set(lease, { cancelling: true }, { merge: true });
+      }
       tx.update(ref, { status: 'cancelled' });
       return draft.mediaType;
     });
@@ -219,6 +258,10 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
         publicId: `mybucket/ads/submissions/${uid}/${id}`, resourceType: mediaType,
       }, undefined, undefined, 'submissions');
     }
+    await db.runTransaction(async tx => {
+      const lease = activeUpload(db, uid);
+      if ((await tx.get(lease)).data()?.id === id) tx.delete(lease);
+    });
     return { cancelled: true };
   }
 
@@ -226,22 +269,38 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
     const fields = adFields(payload);
     const mediaType = payload.resourceType;
     if (mediaType !== null && mediaType !== 'image' && mediaType !== 'video') return fail('invalid_media_type');
-    const signed = mediaType && signAdminAdTestUpload(uid, payload, undefined, Date.now(), id, 'submissions');
-    const day = new Date().toISOString().slice(0, 10);
-    const quota = db.collection('offerAdUploadLimits').doc(`${uid}_${day}`);
     return db.runTransaction(async tx => {
+      const now = Date.now();
+      const day = cairoDay.format(now);
       const existing = (await tx.get(ref)).data() as StoredAd | undefined;
       if (existing && existing.ownerId !== uid) return fail('invalid_ad_id', 403);
       if (existing?.status === 'cancelled') return fail('ad_cancelled', 409);
       if (existing && existing.status !== 'draft') return { submitted: true, signed: null };
-      await assertFreeOfferAvailable(db, tx, uid, id, Date.now(), true);
+      await assertFreeOfferAvailable(db, tx, uid, id, now, true);
       if (existing && existing.mediaType !== mediaType) return fail('invalid_media_type');
-      if (!existing) {
+      let signed = null;
+      if (mediaType) {
+        if (existing?.uploadDay) return fail('ad_upload_already_issued', 409);
+        const usage = uploadUsage(db, day).doc(uid);
+        const lease = activeUpload(db, uid);
+        const [used, active, policy] = await Promise.all([tx.get(usage), tx.get(lease), tx.get(policyRef(db))]);
+        if (policy.data()?.uploadsPaused === true) return fail('ad_upload_paused', 503);
+        const count = used.data()?.issued ?? 0;
+        if (count >= MAX_UPLOADS) return fail('ad_upload_daily_limit', 429);
+        if ((active.data()?.expiresAt ?? 0) > now) return fail('ad_upload_active', 409);
+        signed = signAdminAdTestUpload(uid, payload, undefined, now, id, 'submissions');
+        tx.set(usage, { issued: count + 1 }, { merge: true });
+        tx.set(lease, { id, expiresAt: now + 3600000 });
+      } else if (!existing) {
+        const quota = db.collection('offerAdUploadLimits').doc(`${uid}_${day}`);
         const count = (await tx.get(quota)).data()?.count ?? 0;
         if (count >= 5) return fail('ad_daily_limit', 429);
         tx.set(quota, { count: count + 1 });
       }
-      tx.set(ref, { ...fields, ownerId: uid, status: 'draft', mediaType, media: null, submittedAt: 0, rejectionReason: '' });
+      tx.set(ref, {
+        ...fields, ownerId: uid, status: 'draft', mediaType, media: null, submittedAt: 0, rejectionReason: '',
+        ...(signed && { uploadDay: day, uploadCleanupAt: now + DAY }),
+      });
       return { submitted: false, signed };
     });
   }
@@ -253,10 +312,12 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
   expiry(draft, Date.now());
 
   let media: StoredMedia | null = null;
+  let verifiedBytes = 0;
   if (draft.mediaType) {
     const publicId = `mybucket/ads/submissions/${uid}/${id}`;
     if (payload.publicId !== publicId || payload.resourceType !== draft.mediaType) return fail('invalid_upload_request');
     const confirmed = await confirmAdminAdTestUpload(uid, payload, undefined, undefined, 'submissions');
+    verifiedBytes = confirmed.bytes;
     media = { publicId, resourceType: confirmed.resourceType, version: confirmed.version, format: confirmed.format };
   }
   await db.runTransaction(async tx => {
@@ -266,20 +327,44 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
     if (latest.status !== 'draft') return;
     expiry(latest, Date.now());
     await assertFreeOfferAvailable(db, tx, uid, id, Date.now(), true);
+    if (latest.uploadDay) {
+      const usage = uploadUsage(db, latest.uploadDay).doc(uid);
+      const lease = activeUpload(db, uid);
+      const [usageDoc, leaseDoc] = await Promise.all([tx.get(usage), tx.get(lease)]);
+      const totals = usageDoc.data();
+      tx.set(usage, { verified: (totals?.verified ?? 0) + 1, bytes: (totals?.bytes ?? 0) + verifiedBytes }, { merge: true });
+      if (leaseDoc.data()?.id === id) tx.delete(lease);
+    }
     // The per-account write serializes concurrent submissions and decisions, including empty query results.
     tx.set(db.collection('offerAdApprovalLedger').doc(uid), { touchedAt: Date.now() }, { merge: true });
-    tx.update(ref, { status: 'pending', submittedAt: Date.now(), media });
+    tx.update(ref, { status: 'pending', submittedAt: Date.now(), media, uploadCleanupAt: 0 });
   });
   return { submitted: true };
 }
 
 export async function reviewOfferAds(action: string, uid: string, payload: Payload, db = getAdminFirestore()) {
+  if (action === 'admin.ads.uploadStats') {
+    const day = cairoDay.format(Date.now());
+    const ref = policyRef(db);
+    if (typeof payload.uploadsPaused === 'boolean') await ref.set({ uploadsPaused: payload.uploadsPaused }, { merge: true });
+    const [snapshot, policy] = await Promise.all([uploadUsage(db, day).get(), ref.get()]);
+    const totals = { issued: 0, verified: 0, bytes: 0, cancellations: 0, limitedAccounts: 0 };
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      totals.issued += data.issued ?? 0;
+      totals.verified += data.verified ?? 0;
+      totals.bytes += data.bytes ?? 0;
+      totals.cancellations += data.cancellations ?? 0;
+      if (data.issued >= MAX_UPLOADS) totals.limitedAccounts++;
+    }
+    return { ...totals, uploadsPaused: policy.data()?.uploadsPaused === true };
+  }
   if (action === 'admin.ads.policy') {
     const ref = policyRef(db);
     if (payload.freeIntervalDays === undefined) return { freeIntervalDays: (await ref.get()).data()?.freeIntervalDays ?? 7 };
     const days = payload.freeIntervalDays;
     if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > 90) return fail('invalid_ad_interval');
-    await ref.set({ freeIntervalDays: days });
+    await ref.set({ freeIntervalDays: days }, { merge: true });
     return { freeIntervalDays: days };
   }
   if (action === 'admin.ads.list') {

@@ -191,9 +191,13 @@ export function AdPaymentCheckout({
                 <ShieldCheck className="h-5 w-5" />
                 {ar ? 'تعليمات الدفع' : 'Payment instructions'}
               </h2>
-              <p className="text-sm leading-7 text-slate-700 dark:text-slate-200">{ar
-                ? 'إنستا باي هي طريقة التحويل المعتمدة للصفحة. بيانات استقبال التحويل هتظهر لما الدفع يتفعّل.'
-                : 'InstaPay is the transfer method for this page. Recipient details will appear when payments are enabled.'}</p>
+              <dl className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm dark:border-emerald-800 dark:bg-slate-900">
+                <dt className="font-semibold">{ar ? 'رقم استقبال إنستا باي' : 'InstaPay recipient number'}</dt>
+                <dd dir="ltr" className="font-mono font-bold">01010764256</dd>
+              </dl>
+              <p className="text-xs leading-6 text-slate-700 dark:text-slate-200">{ar
+                ? 'استقبال المدفوعات لسه غير متاح. انتظر تفعيل إرسال الإيصال للمراجعة قبل التحويل.'
+                : 'Payments are not available yet. Wait until you can submit the receipt for review before transferring.'}</p>
             </section>
 
             <section className="space-y-3" aria-labelledby="ad-receipt-title">

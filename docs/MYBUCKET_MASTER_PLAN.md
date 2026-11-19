@@ -610,3 +610,5 @@ The ad editor no longer offers a test-upload workflow or provider-specific copy.
 Free ad submission displays a sending indicator and acknowledges success only after the gateway confirms submission. Recovery messages distinguish transfer failure, post-upload submission failure, invalid video duration and account limits. Saved upload proof is reused when retrying a failed submission.
 
 Featured checkout displays an InstaPay-only preview at EGP 100 per started 24-hour billing day. Authenticated users can save and reuse their validated Egyptian mobile contact. Receiving transfers and receipt submission remain unavailable pending recipient configuration and the live payment workflow.
+
+My Bucket reuses the CityEve event checkout InstaPay recipient number as requested. It is displayed for reference with a notice to wait until receipt submission is enabled before transferring.

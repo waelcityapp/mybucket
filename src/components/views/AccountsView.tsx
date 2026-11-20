@@ -16,6 +16,7 @@ interface AccountsViewProps {
 export function AccountsView({ accounts, lang, canAddAccounts, onAddAccount, onDeleteAccount, onEditBalance }: AccountsViewProps) {
   const t = translations[lang];
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [lockedCard, setLockedCard] = useState<string | null>(null);
   const [addRequested, setShowAddModal] = useState(() => window.location.pathname === '/accounts/new');
   const showAddModal = canAddAccounts && addRequested;
   const openAdd = () => { if (!canAddAccounts) { setShowUpgrade(true); return; } window.history.pushState({ accountCreate: true }, '', '/accounts/new'); setShowAddModal(true); };
@@ -241,6 +242,25 @@ export function AccountsView({ accounts, lang, canAddAccounts, onAddAccount, onD
             )}
           </div>
         ))}
+        {!canAddAccounts && [
+          { id: 'visa', label: lang === 'ar' ? 'فيزا' : 'Visa' },
+          { id: 'credit', label: lang === 'ar' ? 'بطاقة الائتمان' : 'Credit card' },
+        ].map(({ id, label }) => (
+          <div key={id} className="overflow-hidden rounded-2xl border border-dashed border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
+            <button type="button" onClick={() => setLockedCard(id)} aria-expanded={lockedCard === id}
+              className="flex min-h-24 w-full items-center gap-3 px-4 text-start text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-emerald-600 dark:text-slate-200 dark:hover:bg-slate-800">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <CreditCard className="size-5" aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1 text-sm font-bold">{label}</span>
+              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-900">Pro</span>
+            </button>
+            {lockedCard === id && <p role="status" className="mx-3 mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900">
+              {lang === 'ar' ? 'يجب الترقية إلى الخطة برو.' : 'Upgrade to the Pro plan.'}
+            </p>}
+          </div>
+        ))}
+
       </div>
 
       {/* Add Account Modal */}

@@ -1,12 +1,12 @@
 import type { ActiveTab } from '../types';
 
-const historyTabs: ActiveTab[] = ['home', 'transactions', 'search', 'accounts', 'categories', 'settings', 'admin'];
+const historyTabs: ActiveTab[] = ['home', 'transactions', 'search', 'accounts', 'categories', 'settings', 'admin', 'guide'];
 
 export function tabFromHistory(location: Location, state: unknown): ActiveTab {
   const path = location.pathname;
   if (path === '/admin' || path.startsWith('/admin/')) return path === '/admin/unlock' ? 'admin-pin' : 'admin';
   if (path === '/trial') return 'trial-details';
-  if (path === '/subscription') return 'subscription';
+  if (path === '/subscription' || path === '/try/subscription') return 'subscription';
   if (path.startsWith('/reminders/')) return 'reminders';
   if (path === '/accounts' || path === '/accounts/new') return 'accounts';
   if (path === '/categories' || path.startsWith('/categories/')) return 'categories';

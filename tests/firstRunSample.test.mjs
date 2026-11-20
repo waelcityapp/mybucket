@@ -7,7 +7,7 @@ const sample = readFileSync('src/components/views/AdminNewUserSimulation.tsx','u
 
 test('new Google accounts see sample home before real account setup', () => {
   assert.match(app, /needsInitialSetup && financialLoaded\.accounts && financialLoaded\.transactions && transactions\.length === 0/);
-  assert.ok(app.indexOf('return <AdminNewUserSimulation') < app.indexOf('if (needsInitialSetup && financialLoaded.accounts) {'));
+  assert.ok(app.indexOf('return <AdminNewUserSimulation lang={lang} realOnboarding') < app.indexOf('if (authUser && needsInitialSetup && financialLoaded.accounts) {'));
   assert.match(app, /onStartReal=\{\(\) => setOnboardingSetupUid\(authUser\.uid\)\}/);
   assert.match(app, /onBack=\{\(\) => setOnboardingSetupUid\(null\)\}/);
 });
@@ -30,7 +30,9 @@ test('home example exposes sample data, edit controls, and explicit opt-in', () 
   assert.match(sample, /<TransactionsView/);
 });
 
-test('guest demo opens the sample dashboard before login', () => {
-  assert.match(app, /if \(!authUser\) \{\s*if \(window.location.pathname === '\/try'\)/);
-  assert.match(app, /guestPreview\s*onExit=\{returnToSignIn\} onStartReal=\{returnToSignIn\}/);
+test('guest demo uses the actual app with separate sample data', () => {
+  assert.match(app, /guestDemo = !authUser/);
+  assert.match(app, /guestDemo \? guestAccounts : cloudAccounts/);
+  assert.match(app, /<VoiceNaturalInput[\s\S]*?guestDemo=\{guestDemo\}/);
+  assert.match(app, /setGuestTransactions/);
 });

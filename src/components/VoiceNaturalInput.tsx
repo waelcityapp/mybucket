@@ -3,7 +3,7 @@ import { Mic, MicOff, Send, Sparkles, Loader2, HelpCircle } from 'lucide-react';
 import { Language, FinancialAccount, Category, Transaction, CurrencyCode } from '../types';
 import { UserSubscription, UserDailyUsage } from '../types/prototypeSubscription';
 import { translations } from '../data/translations';
-import { geminiClient, quotaLocalClient } from '../services/ai/aiClient';
+import { aiClient, geminiClient, quotaLocalClient } from '../services/ai/aiClient';
 import { stageFor } from '../config/subscriptionPolicy';
 import { AIFinancialQuery, AIInterpretationResult, AICorrection } from '../services/ai/types';
 import type { AnalyzerFeedbackContext } from '../services/ai/analyzerFeedbackClient';
@@ -21,6 +21,7 @@ interface VoiceNaturalInputProps {
   onAiEntryUsed?: () => void;
   onAiQueryUsed?: () => void;
   onOpenManualAdd?: () => void;
+  guestDemo?: boolean;
   subscriptionExpired?: boolean;
   onExpiredAttempt?: () => void;
 }
@@ -57,6 +58,7 @@ export function VoiceNaturalInput({
   onTransactionDraft,
   onFinancialQuery,
   onAICorrection,
+  guestDemo = false,
   subscriptionExpired = false,
   onExpiredAttempt,
 }: VoiceNaturalInputProps) {
@@ -149,7 +151,7 @@ export function VoiceNaturalInput({
       const localISO = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();
 
       const phase = userSubscription ? stageFor(userSubscription) : 'expired';
-      const analyzer = phase === 'paid' || phase === 'pro-trial' ? geminiClient : quotaLocalClient;
+      const analyzer = guestDemo ? aiClient : phase === 'paid' || phase === 'pro-trial' ? geminiClient : quotaLocalClient;
       const result: AIInterpretationResult = await analyzer.interpret({
         text,
         accounts: accounts.map((a) => ({

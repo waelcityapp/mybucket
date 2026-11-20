@@ -636,3 +636,5 @@ Free and paid advertisement submission confirmations link to both My Ads and the
 The sign-in screen explains the financial workflow, offers a three-entry in-memory guest demo and public deals, and keeps Google as the real account entry point. Affiliate messaging reflects the Pro discount policy.
 
 The public Try button opens the existing sample dashboard at /try, with local-only sample transactions and accounts. Guest controls return to sign-in and never start the signed-in account setup or admin simulation.
+
+The guest demo now renders the real application home and navigation with isolated sample balances and transactions. Its voice/text analysis uses the local interpreter; guest plans are informational and public offers stay reachable.

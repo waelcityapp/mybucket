@@ -15,13 +15,13 @@ type Stage = 'login' | 'setup' | 'dashboard' | 'offers';
 type DashboardPage = 'overview' | 'accounts' | 'transactions';
 type EntryType = 'income' | 'expense' | 'transfer';
 
-const exampleAccounts = (): FinancialAccount[] => [
+export const exampleAccounts = (): FinancialAccount[] => [
   { id: 'sim_cash', name: 'Cash', nameAr: 'كاش', type: 'cash', balance: 5000, currency: 'EGP', color: '#10b981' },
   { id: 'sim_bank', name: 'Bank account', nameAr: 'حساب بنكي', type: 'bank', balance: 16000, currency: 'EGP', color: '#3b82f6' },
   { id: 'sim_wallet', name: 'Electronic wallet', nameAr: 'محفظة إلكترونية', type: 'wallet', balance: 4000, currency: 'EGP', color: '#06b6d4' },
 ];
 
-const exampleTransactions = (): Transaction[] => {
+export const exampleTransactions = (): Transaction[] => {
   const now = new Date();
   const date = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
   const items: Array<{ id: string; type: EntryType; amount: number; categoryId: string; description: string }> = [

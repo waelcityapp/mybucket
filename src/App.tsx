@@ -63,7 +63,7 @@ import {
 import { FinancialQueryResultCard } from './components/FinancialQueryResultCard';
 import { HomeFinancialOverview } from './components/HomeFinancialOverview';
 import { AdminView, type SectionId } from './components/views/AdminView';
-import { AdminNewUserSimulation } from './components/views/AdminNewUserSimulation';
+import { AdminNewUserSimulation, exampleAccounts, exampleTransactions } from './components/views/AdminNewUserSimulation';
 import { AdminUserGrantView } from './components/views/AdminUserGrantView';
 import { AdminPinView } from './components/views/AdminPinView';
 import { AnalyzerFeedbackAdmin } from './components/views/AnalyzerFeedbackAdmin';
@@ -259,14 +259,20 @@ export default function App() {
   }, []);
   useEffect(() => { applyAppIdentity(appIdentity, lang); }, [appIdentity, lang]);
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname.startsWith('/admin') ? 'admin-pin' : window.location.pathname === '/trial' ? 'trial-details' : window.location.pathname === '/subscription' ? 'subscription' : window.location.pathname.startsWith('/reminders/') ? 'reminders' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : window.location.pathname.startsWith('/categories/') ? 'categories' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/') || window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment') ? 'offers' : 'home');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname.startsWith('/admin') ? 'admin-pin' : window.location.pathname === '/trial' ? 'trial-details' : (window.location.pathname === '/subscription' || window.location.pathname === '/try/subscription') ? 'subscription' : window.location.pathname.startsWith('/reminders/') ? 'reminders' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : window.location.pathname.startsWith('/categories/') ? 'categories' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/') || window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment') ? 'offers' : 'home');
   // Keep in-app tab changes in browser history so the device Back button can restore them.
   const [transactionQuickFilter, setTransactionQuickFilter] = useState<{ period: 'today' | 'month'; currency: string } | null>(null);
   const navigateTab = (tab: ActiveTab, quickFilter: { period: 'today' | 'month'; currency: string } | null = null) => {
     if (tab === 'transactions') setTransactionQuickFilter(quickFilter);
+    if (window.location.pathname === '/try') {
+      if (tab !== activeTab) window.history.pushState({ myBucketTab: tab }, '', '/try');
+      setActiveTab(tab);
+      window.scrollTo(0, 0);
+      return;
+    }
     if (recordTabNavigation(window.history, window.location, activeTab, tab)) setActiveTab(tab);
   };
-  const openGuide = () => { window.history.pushState({ guide: true }, '', '/guide'); setActiveTab('guide'); };
+  const openGuide = () => { window.history.pushState({ guide: true, myBucketTab: 'guide' }, '', window.location.pathname === '/try' ? '/try' : '/guide'); setActiveTab('guide'); };
   const [, setOfferLocation] = useState(() => window.location.pathname + window.location.search);
   const navigateOffer = (path: string, replace = false) => {
     const current = window.location.pathname + window.location.search;
@@ -285,7 +291,7 @@ export default function App() {
   const openOffers = () => navigateOffer('/offers');
   const openAccountSettings = () => { window.history.pushState({ accounts: true }, '', '/accounts'); setActiveTab('accounts'); };
   const openSubscriptionPage = (page: 'trial-details' | 'subscription') => {
-    window.history.pushState({ subscriptionPage: page }, '', page === 'trial-details' ? '/trial' : '/subscription');
+    window.history.pushState({ subscriptionPage: page, offerBack: window.location.pathname }, '', window.location.pathname === '/try' ? '/try/subscription' : page === 'trial-details' ? '/trial' : '/subscription');
     setActiveTab(page);
   };
   // Helper to migrate legacy 'acc_savings_usd' / 'مدخرات دولار' to 'acc_wallet' / 'محافظ إلكترونية' and ensure unique account IDs
@@ -342,9 +348,9 @@ export default function App() {
   };
 
   // Financial state is loaded from the signed-in user's confirmed cloud data.
-  const [accounts, setAccounts] = useState<FinancialAccount[]>([]);
-  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [cloudAccounts, setCloudAccounts] = useState<FinancialAccount[]>([]);
+  const [cloudCategories, setCloudCategories] = useState<Category[]>(INITIAL_CATEGORIES);
+  const [cloudTransactions, setCloudTransactions] = useState<Transaction[]>([]);
   const [financialLoaded, setFinancialLoaded] = useState({ accounts: false, transactions: false });
   const [needsInitialSetup, setNeedsInitialSetup] = useState(false);
   const [onboardingSetupUid, setOnboardingSetupUid] = useState<string | null>(null);
@@ -357,6 +363,17 @@ export default function App() {
 
   // 6. User Auth State & Subscription
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const guestDemo = !authUser && (window.location.pathname === '/try' || window.location.pathname === '/try/subscription');
+  const [guestAccounts, setGuestAccounts] = useState(exampleAccounts);
+  const [guestTransactions, setGuestTransactions] = useState(exampleTransactions);
+  const [guestCategories, setGuestCategories] = useState(INITIAL_CATEGORIES);
+  const accounts = guestDemo ? guestAccounts : cloudAccounts;
+  const transactions = guestDemo ? guestTransactions : cloudTransactions;
+  const categories = guestDemo ? guestCategories : cloudCategories;
+  const setAccounts = guestDemo ? setGuestAccounts : setCloudAccounts;
+  const setTransactions = guestDemo ? setGuestTransactions : setCloudTransactions;
+  const setCategories = guestDemo ? setGuestCategories : setCloudCategories;
+
 
   const [appLockStatus, setAppLockStatus] = useState<LockStatus | null>(null);
   const [appLockUnlocked, setAppLockUnlocked] = useState(false);
@@ -571,9 +588,9 @@ export default function App() {
         setTrialSettingsReady(false);
         lastUserId.current = nextId;
         pendingTransaction.current = null;
-        setAccounts([]);
-        setCategories(INITIAL_CATEGORIES);
-        setTransactions([]);
+        setCloudAccounts([]);
+        setCloudCategories(INITIAL_CATEGORIES);
+        setCloudTransactions([]);
         setFinancialLoaded({ accounts: false, transactions: false });
         setNeedsInitialSetup(false);
         setOnboardingSetupUid(null);
@@ -670,10 +687,10 @@ export default function App() {
     const unsubAccounts = subscribeUserAccounts(authUser.uid, (cloudAccounts) => {
       if (auth.currentUser?.uid !== authUser.uid) return;
       if (cloudAccounts.length > 0) {
-        setAccounts(migrateLegacyAccounts(cloudAccounts).updated);
+        setCloudAccounts(migrateLegacyAccounts(cloudAccounts).updated);
         setNeedsInitialSetup(false);
       } else {
-        setAccounts([]);
+        setCloudAccounts([]);
         setNeedsInitialSetup(true);
       }
       setFinancialLoaded(prev => ({ ...prev, accounts: true }));
@@ -689,7 +706,7 @@ export default function App() {
       transactionReadComplete = true;
       clearTimeout(transactionReadTimer);
       setTransactionReadError(false);
-      setTransactions(migrateLegacyTransactions(cloudTx));
+      setCloudTransactions(migrateLegacyTransactions(cloudTx));
       setFinancialLoaded(prev => ({ ...prev, transactions: true }));
     }, () => {
       if (auth.currentUser?.uid !== authUser.uid) return;
@@ -703,7 +720,7 @@ export default function App() {
     const unsubCategories = subscribeUserCategories(authUser.uid, (cloudCats) => {
       if (auth.currentUser?.uid !== authUser.uid) return;
       if (cloudCats && cloudCats.length > 0) {
-        setCategories(cloudCats);
+        setCloudCategories(cloudCats);
       } else if (trialSettingsReady) {
         initializeDefaultDocuments(authUser.uid, 'categories', INITIAL_CATEGORIES).catch(() => setToastMessage(lang === 'ar' ? 'تعذر إعداد التصنيفات.' : 'Could not initialize categories.'));
       }
@@ -887,11 +904,11 @@ export default function App() {
   // Handle Natural Language / Voice input parsed draft via Gemini AI
   const handleTransactionDraft = (draft: Partial<Transaction>, missingFields: string[], feedback:AnalyzerFeedbackContext) => {
     if (currentTrialExpired) { showExpiredNotice(); return; }
-    setAnalyzerFeedbackContext(feedback);
+    setAnalyzerFeedbackContext(guestDemo ? null : feedback);
     setPrefilledDraft(draft);
     setDraftMissingFields(missingFields || []);
     if (draft.type) setAddModalInitialType(draft.type);
-    if (window.location.pathname !== '/transactions/new') window.history.pushState({ transactionReview: true }, '', '/transactions/new');
+    if (!guestDemo && window.location.pathname !== '/transactions/new') window.history.pushState({ transactionReview: true }, '', '/transactions/new');
     setIsAddModalOpen(true);
   };
 
@@ -914,7 +931,7 @@ export default function App() {
       setPrefilledDraft(updatedDraft);
 
       // Adaptive learning from correction
-      if (updatedDraft.description) {
+      if (!guestDemo && updatedDraft.description) {
         aiLearnedMemory.recordLearning(updatedDraft.description, {
           categoryId: correction.fieldToUpdate === 'categoryId' ? String(val) : updatedDraft.categoryId,
           accountId: correction.fieldToUpdate === 'accountId' ? String(val) : updatedDraft.accountId,
@@ -951,6 +968,25 @@ export default function App() {
 
   // Save only after an atomic, server-confirmed transaction and balance update.
   const handleSaveTransaction = async (newTxData: Omit<Transaction, 'id' | 'createdAt'>): Promise<{ ok: boolean; message?: string }> => {
+    if (guestDemo) {
+      const { type, amount, accountId, toAccountId, currency } = newTxData;
+      const source = accounts.find(account => account.id === accountId);
+      const target = accounts.find(account => account.id === toAccountId);
+      const outgoing = type === 'expense' || type === 'transfer';
+      if (!source || source.currency !== currency || !Number.isFinite(amount) || amount <= 0 ||
+          (type === 'transfer' && (!target || target.id === accountId || target.currency !== currency)) ||
+          (outgoing && source.balance < amount)) {
+        return { ok: false, message: lang === 'ar' ? 'راجع المبلغ والحسابات والرصيد المتاح للعملية التجريبية.' : 'Check the amount, selected accounts and available sample balance.' };
+      }
+      setGuestAccounts(previous => previous.map(account => account.id === accountId
+        ? { ...account, balance: Math.round((account.balance + (outgoing ? -amount : amount)) * 100) / 100 }
+        : type === 'transfer' && account.id === toAccountId
+          ? { ...account, balance: Math.round((account.balance + amount) * 100) / 100 } : account));
+      setGuestTransactions(previous => [{ ...newTxData, id: `sim_${crypto.randomUUID()}`, createdAt: new Date().toISOString() }, ...previous]);
+      setToastMessage(lang === 'ar' ? 'تم تسجيل العملية التجريبية' : 'Sample transaction recorded');
+      window.setTimeout(() => setToastMessage(null), 3500);
+      return { ok: true };
+    }
     if (currentTrialExpired) { showExpiredNotice(); return { ok: false, message: lang === 'ar' ? 'انتهت الفترة المجانية. اختر خطتك للاستمرار.' : 'Your free trial ended. Choose your plan to continue.' }; }
     if (saveInFlight.current) return { ok: false };
     if (!authUser || !financialLoaded.accounts || !financialLoaded.transactions) {
@@ -1489,20 +1525,21 @@ export default function App() {
     return <CreateOfferPage lang={lang} onBack={backFromCreateOffer} onNavigate={navigateOffer} />;
   }
 
-  // 2. Dedicated Full-Page Auth & Registration (No popups / No modals)
-  if (!authUser) {
-    if (window.location.pathname === '/try') {
-      const returnToSignIn = () => backFromOffer('/');
-      return <AdminNewUserSimulation lang={lang} identity={appIdentity} guestPreview
-        onExit={returnToSignIn} onStartReal={returnToSignIn} />;
-    }
+  // 2. Dedicated sign-in, with a separate in-memory guest session.
+  if (!authUser && !guestDemo) {
     return (
       <AuthPage
         lang={lang}
         identity={appIdentity}
         onSuccess={handleAuthGateSuccess}
         onToggleLanguage={handleToggleLanguage}
-        onOpenDemo={() => navigateOffer('/try')}
+        onOpenDemo={() => {
+          setGuestAccounts(exampleAccounts());
+          setGuestTransactions(exampleTransactions());
+          setGuestCategories(INITIAL_CATEGORIES);
+          setActiveFinancialQueryResult(null);
+          navigateOffer('/try');
+        }}
         onOpenOffers={openOffers}
       />
     );
@@ -1513,6 +1550,7 @@ export default function App() {
   }
 
   if (window.location.pathname === '/settings/ads') {
+    if (!authUser) return null;
     return <MyOfferAdsPage uid={authUser.uid} lang={lang} onNavigate={navigateOffer} onBack={() => {
       if (window.history.state?.myAds || window.history.state?.offerBack === '/') window.history.back();
       else {
@@ -1531,12 +1569,12 @@ export default function App() {
   }
 
   // Do not mistake an incomplete Firestore snapshot for a newly empty account.
-  if (!financialLoaded.accounts || (needsInitialSetup && !financialLoaded.transactions && !transactionReadError)) {
+  if (!guestDemo && (!financialLoaded.accounts || (needsInitialSetup && !financialLoaded.transactions && !transactionReadError))) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center p-5 text-sm font-bold text-emerald-800">
       {lang === 'ar' ? 'جاري تحميل بيانات حسابك...' : 'Loading your account data...'}
     </div>;
   }
-  if (needsInitialSetup && transactionReadError) {
+  if (!guestDemo && needsInitialSetup && transactionReadError) {
     return <div dir={lang === 'ar' ? 'rtl' : 'ltr'} className="min-h-screen bg-slate-50 flex items-center justify-center p-5">
       <section className="max-w-sm w-full rounded-2xl border border-amber-200 bg-white p-5 text-center space-y-3">
         <p className="text-sm font-bold text-amber-900">{lang === 'ar' ? 'تعذر التأكد من بيانات عملياتك. لن نبدأ ببيانات تجريبية قبل التأكد من سلامة بياناتك.' : 'We could not verify your transactions. Sample onboarding is paused to protect your data.'}</p>
@@ -1544,7 +1582,7 @@ export default function App() {
       </section>
     </div>;
   }
-  if (needsInitialSetup && financialLoaded.accounts && financialLoaded.transactions && transactions.length === 0 && onboardingSetupUid !== authUser.uid) {
+  if (authUser && needsInitialSetup && financialLoaded.accounts && financialLoaded.transactions && transactions.length === 0 && onboardingSetupUid !== authUser.uid) {
     const trialDaysRemaining = userSubscription ? stageFor(userSubscription) === 'pro-trial'
       ? Math.max(0, Math.ceil((Date.parse(userSubscription.trialStartedAt) + getTrialDurations().proDays * 86400000 - Date.now()) / 86400000))
       : calculateRemainingTrialDays(userSubscription) : null;
@@ -1552,7 +1590,7 @@ export default function App() {
       trialDaysRemaining={trialDaysRemaining} onStartReal={() => setOnboardingSetupUid(authUser.uid)}
       onExit={() => { void handleGoogleLogout(); }} />;
   }
-  if (needsInitialSetup && financialLoaded.accounts) {
+  if (authUser && needsInitialSetup && financialLoaded.accounts) {
     // Account setup is now an explicit choice after exploring sample data.
     // Signing out returns to the existing Google sign-in page without resetting the trial.
     const leaveInitialSetup = async () => {
@@ -1579,7 +1617,7 @@ export default function App() {
   }
 
   // Reminder management uses real pages and browser history, never modal dialogs.
-  if (activeTab === 'reminders' && window.location.pathname.startsWith('/reminders/')) {
+  if (authUser && activeTab === 'reminders' && window.location.pathname.startsWith('/reminders/')) {
     if (window.location.pathname === '/reminders/alerts') return <ReminderAlerts page uid={authUser.uid} lang={lang} onBack={() => window.history.back()} />;
     const reminderKind = window.location.pathname.split('/')[2] === 'receivable' ? 'receivable' : 'obligation';
     return <><ReminderAlerts uid={authUser.uid} lang={lang} onOpen={() => { window.history.pushState({ myBucketTab: 'reminders' }, '', '/reminders/alerts'); setAdminRoute('/reminders/alerts'); }} /><ReminderWorkspace lang={lang} kind={reminderKind} userId={authUser.uid} onHome={() => { window.history.pushState({ myBucketTab: 'home' }, '', '/'); setActiveTab('home'); }} /></>;
@@ -1659,8 +1697,12 @@ export default function App() {
       />
 
       {/* Main Content Area - Mobile First proportions matching reference */}
+      {guestDemo && <div className="mx-auto flex w-full max-w-xl flex-wrap items-center justify-between gap-2 px-4 pt-3 text-xs font-bold text-emerald-900">
+        <span>{lang === 'ar' ? 'تجربة بدون تسجيل · بيانات نموذجية' : 'Guest demo · sample data'}</span>
+        <button type="button" onClick={() => navigateOffer('/')} className="min-h-11 underline">{lang === 'ar' ? 'العودة لصفحة الدخول' : 'Back to sign-in'}</button>
+      </div>}
       <main className={`flex-1 ${isCategoryDetailPageOpen && activeTab === 'categories' ? 'max-w-5xl' : 'max-w-md sm:max-w-xl'} w-full mx-auto p-4 ${showBottomNavigation ? 'pb-32' : 'pb-8'}`}>
-        {activeTab === 'home' && (
+        {activeTab === 'home' && window.location.pathname !== '/try/subscription' && (
           <div className="space-y-4">
             {/* Quick Mobile & Google Account Banner (if not logged in) */}
             {!authUser && (
@@ -1806,6 +1848,7 @@ export default function App() {
                 lang={lang}
                 accounts={accounts}
                 categories={categories}
+                guestDemo={guestDemo}
                 userDailyUsage={dailyUsage}
                 userSubscription={userSubscription}
                 subscriptionExpired={currentTrialExpired}
@@ -1960,7 +2003,7 @@ export default function App() {
             lang={lang}
             authUser={authUser}
             onSelectCategory={(cat) => {
-              window.history.pushState({ myBucketTab: 'categories', categoryDetail: cat.id }, '', '/categories/' + encodeURIComponent(cat.id));
+              if (!guestDemo) window.history.pushState({ myBucketTab: 'categories', categoryDetail: cat.id }, '', '/categories/' + encodeURIComponent(cat.id));
               setSelectedCategoryForDetail(cat);
               setIsCategoryDetailPageOpen(true);
               window.scrollTo(0, 0);
@@ -1968,8 +2011,8 @@ export default function App() {
           />
         ))}
 
-        {(activeTab === 'trial-details' || activeTab === 'subscription') && (
-          <TrialSubscriptionPages lang={lang} subscription={userSubscription} error={subscriptionError ? (lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn) : null} page={activeTab} onBack={() => { window.history.pushState({}, '', activeTab === 'subscription' ? '/trial' : '/'); setActiveTab(activeTab === 'subscription' ? 'trial-details' : 'home'); }} onSubscription={() => openSubscriptionPage('subscription')} onUpdateSubscription={async updated => { const saved = await saveUserSubscriptionToFirestore(authUser.uid, updated); setUserSubscription(saved); }} />
+        {(activeTab === 'trial-details' || activeTab === 'subscription' || (guestDemo && window.location.pathname === '/try/subscription')) && (
+          <TrialSubscriptionPages lang={lang} guest={guestDemo} onSignIn={() => navigateOffer('/')} subscription={guestDemo ? null : userSubscription} error={subscriptionError ? (lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn) : null} page={guestDemo ? 'subscription' : (activeTab as 'trial-details' | 'subscription')} onBack={() => { if (guestDemo) { backFromOffer('/try'); setActiveTab('home'); return; } window.history.pushState({}, '', activeTab === 'subscription' ? '/trial' : '/'); setActiveTab(activeTab === 'subscription' ? 'trial-details' : 'home'); }} onSubscription={() => openSubscriptionPage('subscription')} onUpdateSubscription={async updated => { if (!authUser) return; const saved = await saveUserSubscriptionToFirestore(authUser.uid, updated); setUserSubscription(saved); }} />
         )}
 
         {activeTab === 'settings' && (

@@ -35,6 +35,23 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
   const stage = subscription ? stageFor(subscription) : null;
   const checkout = new URLSearchParams(window.location.search).get('checkout');
   const plan = checkout === 'basic' || checkout === 'pro' ? checkout : null;
+  const choosePlan = (selected: 'basic' | 'pro') => onNavigate?.(`/subscription?checkout=${selected}`);
+  const closeCheckout = () => {
+    const previous = window.history.state?.offerBack;
+    if (typeof previous === 'string' && /^\/subscription(?:\?plan=pro)?$/.test(previous)) window.history.back();
+    else onNavigate?.('/subscription', true);
+  };
+
+  if (page === 'subscription' && !guest && plan && onNavigate) {
+    return <section className="mx-auto max-w-lg space-y-4 pb-8">
+      <button type="button" onClick={closeCheckout} className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-slate-600 hover:text-emerald-700 dark:text-slate-200">
+        <ArrowRight aria-hidden="true" className={`size-4 ${ar ? '' : 'rotate-180'}`} />
+        {ar ? 'العودة للخطط' : 'Back to plans'}
+      </button>
+      <SubscriptionPayment lang={lang} plan={plan} onClose={closeCheckout} />
+    </section>;
+  }
+
   const grant = stage !== 'paid' && stage !== 'paid-basic' ? activeGrant(subscription?.grant) : null;
   const grantEnd = grant ? new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'long', timeZone: 'Africa/Cairo' }).format(new Date(Date.parse(grant.endsAt) - 1)) : null;
   const start = subscription && Number.isFinite(Date.parse(subscription.trialStartedAt))
@@ -79,17 +96,17 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
               <p className="mt-auto rounded-xl bg-slate-100 px-3 py-2 text-center text-sm font-bold text-slate-700">{basicDays === null
                 ? (ar ? 'تجربة مجانية عند التسجيل' : 'Free trial when you sign up')
                 : ar ? `مجانية لأول ${new Intl.NumberFormat('ar-EG').format(basicDays)} يومًا` : `Free for the first ${basicDays} days`}</p>
+              {!guest && onNavigate && <button type="button" onClick={() => choosePlan('basic')} className="min-h-11 rounded-xl bg-emerald-700 px-3 text-sm font-bold text-white">{ar ? 'اشترك أو جدّد Basic' : 'Subscribe or renew Basic'}</button>}
             </div>
             <div ref={proPlan} className="flex flex-col gap-3 rounded-2xl border-2 border-emerald-600 p-4">
               <h2 className="text-lg font-black text-slate-900">Pro</h2>
               <p className="text-2xl font-black text-slate-900">{subscription?.hasAppliedAffiliateCode ? PRO_MARKETER_PRICE_EGP : PRO_PRICE_EGP} <span className="text-sm font-semibold">{ar ? 'جنيه / شهر' : 'EGP / month'}</span></p>
               <p className="text-sm leading-7 text-slate-600">{ar ? 'الخطة المتقدمة؛ الفرق في المميزات سيحدد بعد تجارب الأصدقاء.' : 'Advanced features will be finalized after usability tests.'}</p>
               <p className="text-sm text-emerald-800">{subscription?.hasAppliedAffiliateCode ? (ar ? 'خصم المسوّق محفوظ بدون تمديد الفترة المجانية.' : 'Marketer discount saved; no extra trial days.') : (ar ? 'بكود مسوّق صالح: 120 جنيه شهريًا.' : 'With a valid marketer code: EGP 120/month.')}</p>
+              {!guest && onNavigate && <button type="button" onClick={() => choosePlan('pro')} className="mt-auto min-h-11 rounded-xl bg-emerald-700 px-3 text-sm font-bold text-white">{ar ? 'اشترك أو جدّد Pro' : 'Subscribe or renew Pro'}</button>}
             </div>
           </div>
-          {!guest && onNavigate && <SubscriptionPayment lang={lang} plan={plan}
-            onPickPlan={selected => onNavigate(`/subscription?checkout=${selected}`)}
-            onClose={() => onNavigate('/subscription', true)} />}
+          {!guest && onNavigate && <SubscriptionPayment lang={lang} plan={null} onClose={closeCheckout} />}
         </>}
       </div>
     </section>

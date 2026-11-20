@@ -16,8 +16,8 @@ const button = 'inline-flex min-h-11 items-center rounded-xl bg-emerald-700 px-4
 const input = 'w-full rounded-xl border border-slate-300 bg-transparent p-3 text-sm';
 const planLabel = (plan: Plan) => plan === 'basic' ? 'Basic' : 'Pro';
 
-export function SubscriptionPayment({ lang, plan, onPickPlan, onClose }: {
-  lang: Language; plan: Plan | null; onPickPlan: (plan: Plan) => void; onClose: () => void;
+export function SubscriptionPayment({ lang, plan, onClose }: {
+  lang: Language; plan: Plan | null; onClose: () => void;
 }) {
   const ar = lang === 'ar';
   const [latest, setLatest] = useState<Payment | null>(null);
@@ -86,7 +86,7 @@ export function SubscriptionPayment({ lang, plan, onPickPlan, onClose }: {
   }
 
   return <div className="space-y-4">
-    {latest && <section className={box}>
+    {latest && (!plan || latest.status === 'pending') && <section className={box}>
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-bold">{ar ? 'آخر طلب اشتراك' : 'Latest subscription request'} · {planLabel(latest.plan)}</h2>
         <button type="button" onClick={() => setRefresh(value => value + 1)} className="text-sm underline">{ar ? 'تحديث الحالة' : 'Refresh status'}</button>
@@ -97,9 +97,7 @@ export function SubscriptionPayment({ lang, plan, onPickPlan, onClose }: {
       {latest.receiptUrl && <a className="text-sm underline" href={latest.receiptUrl} target="_blank" rel="noreferrer">{ar ? 'عرض الإيصال' : 'View receipt'}</a>}
     </section>}
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-900">{error} <button type="button" className="underline" onClick={() => setRefresh(value => value + 1)}>{ar ? 'إعادة المحاولة' : 'Retry'}</button></p>}
-    {loaded && latest?.status !== 'pending' && !plan && <div className="flex flex-wrap gap-2">
-      {(['basic', 'pro'] as const).map(item => <button type="button" key={item} className={button} onClick={() => onPickPlan(item)}>{ar ? 'اشتراك أو تجديد' : 'Subscribe or renew'} {planLabel(item)}</button>)}
-    </div>}
+    {!loaded && plan && !error && <p role="status" className="text-sm">{ar ? 'جارٍ تحميل الدفع…' : 'Loading payment…'}</p>}
     {loaded && plan && latest?.status !== 'pending' && <form onSubmit={submit} className={box}>
       <h2 className="text-lg font-bold">{ar ? 'دفع الاشتراك بإنستاباي' : 'Pay with InstaPay'} · {planLabel(plan)}</h2>
       {quote?.plan === plan ? <>
@@ -109,7 +107,6 @@ export function SubscriptionPayment({ lang, plan, onPickPlan, onClose }: {
         <label className="block text-sm font-bold">{ar ? 'صورة الإيصال' : 'Receipt image'}<input required type="file" accept="image/jpeg,image/png,image/webp" onChange={event => setFile(event.target.files?.[0] ?? null)} className={input} /></label>
         <button type="submit" disabled={sending} className={button}>{sending ? (ar ? 'جارٍ الإرسال…' : 'Sending…') : (ar ? 'إرسال للمراجعة' : 'Submit for review')}</button>
       </> : !error && <p role="status">{ar ? 'جارٍ تحميل المبلغ…' : 'Loading amount…'}</p>}
-      <button type="button" disabled={sending} onClick={onClose} className="block min-h-11 text-sm underline">{ar ? 'العودة للخطط' : 'Back to plans'}</button>
     </form>}
   </div>;
 }

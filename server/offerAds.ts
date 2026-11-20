@@ -4,7 +4,8 @@ import { createHash } from 'node:crypto';
 import { getAdminFirestore } from './firebaseAdmin.js';
 import { confirmAdminAdTestUpload, deleteAdminAdTestUpload, signAdminAdTestUpload } from './adminAdTestUpload.js';
 import { SubscriptionError } from './subscriptionService.js';
-import { OFFER_CATEGORY_IDS, type MyOfferAd, type OfferAdStatus, type PublicOfferAd } from '../src/data/offerAds.js';
+import { DEMO_ADS } from '../src/data/demoAds.js';
+import { type OfferEngagement, type OfferReactionState, OFFER_CATEGORY_IDS, type MyOfferAd, type OfferAdStatus, type PublicOfferAd } from '../src/data/offerAds.js';
 
 const DAY = 86400000;
 const MAX_UPLOADS = 3;
@@ -13,10 +14,12 @@ const cairoDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', ye
 const EXPIRED_RETENTION = 10 * DAY;
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 type Payload = Record<string, unknown>;
-type AdFields = Omit<PublicOfferAd, 'id' | 'media'>;
+type AdFields = Omit<PublicOfferAd, 'id' | 'media' | 'engagement'>;
 type StoredMedia = Pick<Awaited<ReturnType<typeof confirmAdminAdTestUpload>>, 'publicId' | 'resourceType' | 'version' | 'format'>;
 type StoredAd = AdFields & {
   viewCount?: number;
+  likeCount?: number;
+  favoriteCount?: number;
   ownerId: string;
   status: OfferAdStatus | 'draft' | 'cancelled' | 'deleting';
   mediaType: StoredMedia['resourceType'] | null;
@@ -85,7 +88,7 @@ function mediaView(media: StoredMedia): PublicOfferAd['media'] {
 
 function offerView(id: string, ad: StoredAd): PublicOfferAd {
   const { title, description, merchant, categorySlug, contact, startsAt, endsAt, media } = ad;
-  return { id, title, description, merchant, categorySlug, contact, startsAt, endsAt, tier: ad.payment ? ad.payment.tier ?? 'featured' : 'free', media: media ? mediaView(media) : undefined };
+  return { id, title, description, merchant, categorySlug, contact, startsAt, endsAt, engagement: engagementOf(ad), tier: ad.payment ? ad.payment.tier ?? 'featured' : 'free', media: media ? mediaView(media) : undefined };
 }
 
 export function isPublicOffer(ad: Pick<StoredAd, 'status' | 'startsAt' | 'endsAt'>, now: number) {
@@ -113,6 +116,51 @@ export async function readPublishedOffers(includeViews: boolean, db = getAdminFi
     const offer = offerView(doc.id, ad);
     return [includeViews ? { ...offer, viewCount: ad.viewCount ?? 0 } : offer];
   }).sort((a, b) => b.startsAt - a.startsAt);
+}
+
+function engagementOf(data?: Partial<OfferEngagement>): OfferEngagement {
+  return { likeCount: data?.likeCount ?? 0, favoriteCount: data?.favoriteCount ?? 0 };
+}
+
+const reactionsFor = (db: ReturnType<typeof getAdminFirestore>, uid: string) =>
+  db.collection('offerAdReactions').doc(uid).collection('ads');
+
+export async function readDemoOfferEngagement(db = getAdminFirestore()) {
+  const refs = DEMO_ADS.map(ad => db.collection('demoOfferEngagement').doc(ad.id));
+  const docs = await db.getAll(...refs);
+  return Object.fromEntries(docs.map(doc => [doc.id, engagementOf(doc.data())]));
+}
+
+export async function readMyOfferReactions(uid: string, db = getAdminFirestore()) {
+  const snapshot = await reactionsFor(db, uid).get();
+  return Object.fromEntries(snapshot.docs.map(doc => [doc.id, doc.data() as OfferReactionState]));
+}
+
+export async function setOfferReaction(uid: string, payload: Payload, db = getAdminFirestore()) {
+  const { reaction, active } = payload;
+  if ((reaction !== 'liked' && reaction !== 'saved') || typeof active !== 'boolean') return fail('invalid_ad_reaction');
+  const demo = DEMO_ADS.some(ad => ad.id === payload.id);
+  const id = demo ? payload.id as string : adId(payload.id);
+  const adRef = db.collection(demo ? 'demoOfferEngagement' : 'offerAds').doc(id);
+  const userRef = reactionsFor(db, uid).doc(id);
+
+  return db.runTransaction(async tx => {
+    const [adSnapshot, userSnapshot] = await Promise.all([tx.get(adRef), tx.get(userRef)]);
+    const ad = adSnapshot.data() as StoredAd | undefined;
+    if (!demo && (!ad || !isPublicOffer(ad, Date.now()))) return fail('ad_not_available', 404);
+    const previous = userSnapshot.data() as OfferReactionState | undefined;
+    const state = { liked: previous?.liked === true, saved: previous?.saved === true };
+    const engagement = engagementOf(ad);
+    if (state[reaction] === active) return { state, engagement };
+
+    state[reaction] = active;
+    const counter = reaction === 'liked' ? 'likeCount' : 'favoriteCount';
+    engagement[counter] = Math.max(0, engagement[counter] + (active ? 1 : -1));
+    tx.set(adRef, engagement, { merge: true });
+    if (state.liked || state.saved) tx.set(userRef, state);
+    else tx.delete(userRef);
+    return { state, engagement };
+  });
 }
 
 export async function recordOfferCardView(payload: Payload, db = getAdminFirestore()) {

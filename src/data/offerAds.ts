@@ -8,7 +8,12 @@ export type OfferTier = 'free' | 'featured' | 'vip';
 
 export type OfferAdStatus = 'pending' | 'approved' | 'rejected';
 
+export type OfferEngagement = { likeCount: number; favoriteCount: number };
+export type OfferReaction = 'liked' | 'saved';
+export type OfferReactionState = { liked: boolean; saved: boolean };
+
 export type PublicOfferAd = {
+  engagement?: OfferEngagement;
   id: string;
   categorySlug: string;
   tier?: OfferTier;

@@ -1521,6 +1521,8 @@ export default function App() {
     return <OffersPage
       lang={lang}
       showViewCounts={isAdmin}
+      viewerId={authUser?.uid}
+      onSignIn={loginWithGoogle}
       categorySlug={categorySlug}
       onNavigate={navigateOffer}
       onBack={() => {

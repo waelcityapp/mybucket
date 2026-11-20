@@ -6,7 +6,7 @@ import {
   Gift, Smartphone, Store, Play, Eye, type LucideIcon
 } from 'lucide-react';
 import { Language } from '../../types';
-import type { PublicOfferAd } from '../../data/offerAds';
+import type { OfferEngagement, OfferReaction, OfferReactionState, PublicOfferAd } from '../../data/offerAds';
 import { offerAdsRequest } from '../../services/offerAdsClient';
 import { DEMO_ADS } from '../../data/demoAds';
 import { OfferCardActions, readOfferPreference, saveOfferPreference } from '../OfferCardActions';
@@ -14,6 +14,8 @@ import { OfferCardActions, readOfferPreference, saveOfferPreference } from '../O
 interface OffersPageProps {
   lang: Language;
   showViewCounts: boolean;
+  viewerId?: string;
+  onSignIn: () => Promise<{ uid: string }>;
   onBack: () => void;
   categorySlug?: string | null;
   onNavigate: (path: string) => void;
@@ -56,7 +58,7 @@ function previewDescription(description: string) {
 type OfferCard = PublicOfferAd & { viewCount?: number };
 const viewedAdIds = new Set<string>();
 
-export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySlug, onNavigate, showViewCounts }) => {
+export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySlug, onNavigate, showViewCounts, viewerId, onSignIn }) => {
   const isAr = lang === 'ar';
   const BackIcon = isAr ? ArrowRight : ArrowLeft;
   const ForwardIcon = isAr ? ArrowLeft : ArrowRight;
@@ -68,14 +70,22 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
   const [viewsUnavailable, setViewsUnavailable] = useState(false);
   const [demoViews, setDemoViews] = useState<Record<string, number>>({});
   const [favoritesOnly, setFavoritesOnly] = useState(false);
-  const [favorites, setFavorites] = useState<string[]>(() => {
-    try {
-      const saved: unknown = JSON.parse(readOfferPreference('offer-favorites') ?? '[]');
-      return Array.isArray(saved) ? saved.filter(id => typeof id === 'string') : [];
-    } catch {
-      return [];
-    }
-  });
+  type Reactions = Record<string, OfferReactionState>;
+  const [accountReactions, setAccountReactions] = useState<Record<string, Reactions>>({});
+  const reactions = viewerId ? accountReactions[viewerId] : undefined;
+  const reactionRevision = useRef(0);
+  const [demoEngagement, setDemoEngagement] = useState<Record<string, OfferEngagement>>({});
+  useEffect(() => {
+    if (!viewerId) return;
+    let active = true;
+    const revision = reactionRevision.current;
+    offerAdsRequest<Reactions>('ads.reactions', {}, true).then(result => {
+      if (active && revision === reactionRevision.current) {
+        setAccountReactions(current => ({ ...current, [viewerId]: result }));
+      }
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [viewerId, attempt]);
   useEffect(() => {
     let active = true;
     setLoadError(false);
@@ -111,15 +121,34 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
     .sort((a, b) => rank[a.tier ?? 'free'] - rank[b.tier ?? 'free']) ?? [];
   const demoAds = allDemoAds.filter(ad => ad.categorySlug === categorySlug);
   const visibleAds = favoritesOnly
-    ? [...(published ?? []), ...allDemoAds].filter(ad => favorites.includes(ad.id))
+    ? [...(published ?? []), ...allDemoAds].filter(ad => reactions?.[ad.id]?.saved === true)
     : showVip ? [...vipAds.slice(rotation), ...vipAds.slice(0, rotation)]
     : realAds.length ? realAds : demoAds;
   const showingDemos = !favoritesOnly && !showVip && realAds.length === 0;
-  const toggleFavorite = (id: string) => {
-    const next = favorites.includes(id) ? favorites.filter(item => item !== id) : [...favorites, id];
-    setFavorites(next);
-    saveOfferPreference('offer-favorites', JSON.stringify(next));
-  };
+  const hasDemoCards = visibleAds.some(ad => DEMO_ADS.some(demo => demo.id === ad.id));
+  useEffect(() => {
+    if (!hasDemoCards) return;
+    let active = true;
+    const revision = reactionRevision.current;
+    offerAdsRequest<Record<string, OfferEngagement>>('ads.demoEngagement').then(result => {
+      if (active) {
+        setDemoEngagement(current => revision === reactionRevision.current ? result : { ...result, ...current });
+      }
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [hasDemoCards, attempt]);
+
+  async function reactToAd(id: string, demo: boolean, reaction: OfferReaction) {
+    const uid = viewerId ?? (await onSignIn()).uid;
+    const known = accountReactions[uid] ?? await offerAdsRequest<Reactions>('ads.reactions', {}, true);
+    const result = await offerAdsRequest<{ state: OfferReactionState; engagement: OfferEngagement }>(
+      'ads.react', { id, reaction, active: !known[id]?.[reaction] }, true
+    );
+    reactionRevision.current += 1;
+    setAccountReactions(current => ({ ...current, [uid]: { ...known, ...current[uid], [id]: result.state } }));
+    if (demo) setDemoEngagement(current => ({ ...current, [id]: result.engagement }));
+    else setPublished(ads => ads?.map(ad => ad.id === id ? { ...ad, engagement: result.engagement } : ad) ?? null);
+  }
   const [vipLimit, setVipLimit] = useState(9);
   useEffect(() => {
     const grid = gridRef.current;
@@ -168,7 +197,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
       observer.disconnect();
       document.removeEventListener('visibilitychange', observeCards);
     };
-  }, [published, categorySlug, showVip, vipLimit, rotation, showViewCounts, favoritesOnly, favorites]);
+  }, [published, categorySlug, showVip, vipLimit, rotation, showViewCounts, favoritesOnly, reactions]);
 
   const title = category ? (isAr ? category.ar : category.en) : (isAr ? 'وفّر مع My Bucket' : 'Save with My Bucket');
 
@@ -200,7 +229,10 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
           {isAr ? 'تعذّر تحميل العروض المنشورة.' : 'Could not load published ads.'}{' '}
           <button type="button" className="font-bold underline" onClick={() => setAttempt(value => value + 1)}>{isAr ? 'حاول تاني' : 'Retry'}</button>
         </p> : published === null && <p role="status" className="mb-4 text-sm text-slate-600">{isAr ? 'جاري تحميل العروض المنشورة...' : 'Loading published ads…'}</p>}
-        <button type="button" aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly(value => !value)}
+        <button type="button" aria-pressed={favoritesOnly} onClick={() => {
+          if (favoritesOnly || viewerId) setFavoritesOnly(value => !value);
+          else void onSignIn().then(() => setFavoritesOnly(true)).catch(() => {});
+        }}
           className="mb-4 min-h-11 rounded-xl border border-emerald-200 px-4 text-sm font-bold text-emerald-800 dark:text-emerald-300">
           {favoritesOnly ? (isAr ? 'رجوع للإعلانات' : 'Back to offers') : (isAr ? 'إعلاناتي المفضلة' : 'Favorite ads')}
         </button>
@@ -272,7 +304,9 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                                   {isAr ? 'مزيد من التفاصيل' : 'More details'} <ForwardIcon className="size-4" aria-hidden="true" />
                                 </a>
                               </div>
-                              <OfferCardActions id={ad.id} title={adTitle} isAr={isAr} saved={favorites.includes(ad.id)} onToggleSaved={() => toggleFavorite(ad.id)} />
+                              <OfferCardActions id={ad.id} title={adTitle} isAr={isAr} state={reactions?.[ad.id]}
+                                engagement={demo ? demoEngagement[ad.id] : 'engagement' in ad ? ad.engagement : undefined}
+                                onReact={reaction => reactToAd(ad.id, demo, reaction)} />
                             </div>
                           </article>
                         );

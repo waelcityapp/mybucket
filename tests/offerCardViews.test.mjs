@@ -60,3 +60,29 @@ test('the counts endpoint requires authentication', async () => {
   assert.equal(status, 401);
   assert.equal(body.error, 'authentication_required');
 });
+
+test('public totals count each account once and removal updates the correct total', async () => {
+  const { setOfferReaction } = await import('../server/offerAds.ts');
+  const records = new Map();
+  function collection(path) {
+    return { doc: key => ({ path: `${path}/${key}`, collection: child => collection(`${path}/${key}/${child}`) }) };
+  }
+  const db = {
+    collection,
+    runTransaction: callback => callback({
+      get: async ref => ({ data: () => records.get(ref.path) }),
+      set: (ref, value, options) => records.set(ref.path, options?.merge ? { ...records.get(ref.path), ...value } : value),
+      delete: ref => records.delete(ref.path),
+    }),
+  };
+  records.set(`offerAds/${id}`, activeAd);
+  const react = (uid, reaction, active) => setOfferReaction(uid, { id, reaction, active }, db);
+  assert.equal((await react('a', 'liked', true)).engagement.likeCount, 1);
+  assert.equal((await react('a', 'liked', true)).engagement.likeCount, 1);
+  assert.equal((await react('b', 'liked', true)).engagement.likeCount, 2);
+  assert.deepEqual((await react('a', 'saved', true)).engagement, { likeCount: 2, favoriteCount: 1 });
+  assert.deepEqual((await react('a', 'liked', false)).engagement, { likeCount: 1, favoriteCount: 1 });
+  assert.deepEqual((await react('a', 'saved', false)).engagement, { likeCount: 1, favoriteCount: 0 });
+  assert.equal(records.has(`offerAdReactions/a/ads/${id}`), false);
+  await assert.rejects(setOfferReaction('a', { id: 'not-a-demo', reaction: 'liked', active: true }, db), { code: 'invalid_ad_id' });
+});

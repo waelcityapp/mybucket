@@ -646,3 +646,5 @@ The guest dashboard and plans show the admin-configured Basic free period throug
 Published ad cards record a view when at least half of the card is visible in an active tab, once per browser tab session. The approved administrator sees each count on its card while browsing offers. The public list omits counts until public display is approved.
 
 Ad cards include per-browser likes and favorites, a filter for saved ads, and direct share links. Demo cards show locally recorded demonstration views to the administrator, and published cards load administrator counts through the authenticated gateway.
+
+Public ad cards now show shared like and favorite totals. Signed-in Google accounts can set or remove each reaction once per ad, and favorites follow the account across browsers. Previous browser-only reactions are excluded from shared totals. View counts retain administrator-only visibility.

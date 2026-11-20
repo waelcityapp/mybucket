@@ -10,7 +10,7 @@ type Plan = 'basic' | 'pro';
 type Status = 'pending' | 'correction' | 'approved';
 type Payment = {
   uid: string; email: string | null; id: string; plan: Plan; amount: number; code: string | null;
-  status: Status; reference?: string; createdAt: string; reason?: string; paidExpiresAt?: string;
+  status: Status; reference?: string; createdAt: string; reviewedAt?: string; reason?: string; paidExpiresAt?: string;
   receipt: { publicId: string; format: string };
 };
 
@@ -89,7 +89,7 @@ export async function subscriptionPayment(action: string, user: { uid: string; e
     if (!pointer?.id) return null;
     const payment = (await requests.doc(pointer.id).get()).data() as Payment | undefined;
     if (!payment) return null;
-    return { id: payment.id, status: payment.status, plan: payment.plan, amount: payment.amount, reason: payment.reason, paidExpiresAt: payment.paidExpiresAt, receiptUrl: receiptUrl(payment.receipt) };
+    return { id: payment.id, status: payment.status, plan: payment.plan, amount: payment.amount, createdAt: payment.createdAt, reviewedAt: payment.reviewedAt, reason: payment.reason, paidExpiresAt: payment.paidExpiresAt, receiptUrl: receiptUrl(payment.receipt) };
   }
   const plan = payload.plan;
   if (plan !== 'basic' && plan !== 'pro') return fail('invalid_plan');

@@ -9,12 +9,29 @@ import type { Language } from '../../types';
 type Plan = 'basic' | 'pro';
 type Payment = {
   id: string; plan: Plan; amount: number; status: 'pending' | 'correction' | 'approved';
-  reason?: string; paidExpiresAt?: string; receiptUrl?: string; reference?: string; email?: string; code?: string; commission?: number;
+  createdAt?: string; reviewedAt?: string; reason?: string; paidExpiresAt?: string; receiptUrl?: string; reference?: string; email?: string; code?: string; commission?: number;
 };
 const box = 'space-y-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900';
 const button = 'inline-flex min-h-11 items-center rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50';
 const input = 'w-full rounded-xl border border-slate-300 bg-transparent p-3 text-sm';
 const planLabel = (plan: Plan) => plan === 'basic' ? 'Basic' : 'Pro';
+
+function PaymentTimes({ payment, lang }: { payment: Payment; lang: Language }) {
+  const ar = lang === 'ar';
+  const formatter = new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', {
+    dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Cairo',
+  });
+  return <>
+    {[
+      { date: payment.createdAt, label: ar ? 'وقت إرسال الطلب' : 'Submitted' },
+      { date: payment.reviewedAt, label: ar ? 'وقت المراجعة' : 'Reviewed' },
+    ].map(({ date, label }) => date && Number.isFinite(Date.parse(date)) && (
+      <p key={label} className="text-xs text-slate-600 dark:text-slate-300">
+        {label} <time dateTime={date}>{formatter.format(new Date(date))}</time>
+      </p>
+    ))}
+  </>;
+}
 
 export function SubscriptionPayment({ lang, plan, onClose }: {
   lang: Language; plan: Plan | null; onClose: () => void;
@@ -92,6 +109,7 @@ export function SubscriptionPayment({ lang, plan, onClose }: {
         <button type="button" onClick={() => setRefresh(value => value + 1)} className="text-sm underline">{ar ? 'تحديث الحالة' : 'Refresh status'}</button>
       </div>
       <p role="status">{latest.status === 'pending' ? (ar ? 'قيد المراجعة' : 'Under review') : latest.status === 'correction' ? (ar ? 'مطلوب تصحيح' : 'Correction requested') : (ar ? 'تم التفعيل' : 'Activated')}</p>
+      <PaymentTimes payment={latest} lang={lang} />
       {latest.reason && <p>{latest.reason}</p>}
       {latest.paidExpiresAt && <p>{ar ? 'ينتهي في' : 'Ends on'} {new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'long', timeZone: 'Africa/Cairo' }).format(new Date(latest.paidExpiresAt))}</p>}
       {latest.receiptUrl && <a className="text-sm underline" href={latest.receiptUrl} target="_blank" rel="noreferrer">{ar ? 'عرض الإيصال' : 'View receipt'}</a>}
@@ -164,6 +182,7 @@ export function AdminSubscriptionPayments({ lang }: { lang: Language }) {
     {payments?.map(payment => <article key={payment.id} className="space-y-2 rounded-xl border border-slate-200 p-4 text-sm">
       <p className="font-bold">{planLabel(payment.plan)} · {payment.amount} {ar ? 'جنيه' : 'EGP'}</p>
       <p className="break-all">{payment.email}</p>
+      <PaymentTimes payment={payment} lang={lang} />
       {payment.status !== 'pending' && payment.reference && <p>{ar ? 'الرقم المرجعي' : 'Reference'} <bdi>{payment.reference}</bdi></p>}
       {payment.receiptUrl && <a className="block underline" href={payment.receiptUrl} target="_blank" rel="noreferrer">{ar ? 'عرض الإيصال' : 'View receipt'}</a>}
       {payment.code && <p>{ar ? 'كود المسوّق' : 'Marketer code'} <bdi>{payment.code}</bdi></p>}

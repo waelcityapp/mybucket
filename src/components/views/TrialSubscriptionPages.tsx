@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback } from 'react';
 import { ArrowRight, CalendarDays, Tag, ShieldCheck } from 'lucide-react';
 import type { Language } from '../../types';
 import type { UserSubscription } from '../../types/prototypeSubscription';
@@ -23,12 +23,11 @@ interface Props {
 }
 
 export function TrialSubscriptionPages({ lang, subscription, guest = false, guestBasicDays = null, onSignIn, error, page, onBack, onNavigate, onSubscription, onUpdateSubscription }: Props) {
-  const proPlan = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (page === 'subscription' && new URLSearchParams(window.location.search).get('plan') === 'pro') {
-      proPlan.current?.scrollIntoView({ block: 'center' });
+  const proPlan = useCallback((node: HTMLDivElement | null) => {
+    if (node && new URLSearchParams(window.location.search).get('plan') === 'pro') {
+      node.scrollIntoView({ block: 'center' });
     }
-  }, [page]);
+  }, []);
   const ar = lang === 'ar';
   const basicDays = guest ? guestBasicDays : getTrialDurations().basicDays;
   const days = subscription ? calculateRemainingTrialDays(subscription) : null;
@@ -58,6 +57,32 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
     ? new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'long' }).format(new Date(subscription.trialStartedAt)) : null;
   const expiry = subscription && Number.isFinite(Date.parse(subscription.trialExpiresAt))
     ? new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'long' }).format(new Date(subscription.trialExpiresAt)) : null;
+  const planOptions = <>
+      <p className="text-sm leading-7 text-slate-600">{ar ? 'اختر الخطة المناسبة لك. جميع بياناتك المالية محفوظة عند تغيير الخطة.' : 'Choose the plan that suits you. Your financial records remain saved when you change plans.'}</p>
+      {subscription && <AffiliateCodeSection subscription={subscription} lang={lang} onUpdateSubscription={onUpdateSubscription} />}
+      {guest && <button type="button" className="min-h-11 rounded-xl bg-emerald-700 px-3 font-bold text-white" onClick={onSignIn}>{ar ? 'ابدأ بحساب Google' : 'Get started with Google'}</button>}
+      {!grant && stage === 'basic-free' && <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm font-bold text-sky-900">{ar ? `Basic مجانية حتى اليوم ${getTrialDurations().basicDays}. المتبقي: ` : `Basic remains free until day ${getTrialDurations().basicDays}. Days remaining: `}{days}</p>}
+      {stage === 'expired' && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">{ar ? 'انتهت الفترة المجانية. اختر خطة اشتراك لمتابعة استخدام التطبيق.' : 'Your introductory period ended. Choose a subscription plan to continue.'}</p>}
+      {start && <p className="text-xs text-slate-500">{ar ? `تاريخ تسجيلك: ${start}` : `Registration date: ${start}`}</p>}
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4">
+          <h2 className="text-lg font-black text-slate-900">Basic</h2>
+          <p className="text-2xl font-black text-slate-900">{subscription?.hasAppliedAffiliateCode ? BASIC_MARKETER_PRICE_EGP : BASIC_PRICE_EGP} <span className="text-sm font-semibold">{ar ? 'جنيه / شهر' : 'EGP / month'}</span></p>
+          <p className="text-sm leading-7 text-slate-600">{ar ? 'الخطة الأساسية؛ مميزاتها وحدودها قيد الاختبار.' : 'The essential plan; features and limits are being tested.'}</p>
+          <p className="mt-auto rounded-xl bg-slate-100 px-3 py-2 text-center text-sm font-bold text-slate-700">{basicDays === null
+            ? (ar ? 'تجربة مجانية عند التسجيل' : 'Free trial when you sign up')
+            : ar ? `مجانية لأول ${new Intl.NumberFormat('ar-EG').format(basicDays)} يومًا` : `Free for the first ${basicDays} days`}</p>
+          {!guest && onNavigate && <button type="button" onClick={() => choosePlan('basic')} className="min-h-11 rounded-xl bg-emerald-700 px-3 text-sm font-bold text-white">{ar ? 'اشترك أو جدّد Basic' : 'Subscribe or renew Basic'}</button>}
+        </div>
+        <div ref={proPlan} className="flex flex-col gap-3 rounded-2xl border-2 border-emerald-600 p-4">
+          <h2 className="text-lg font-black text-slate-900">Pro</h2>
+          <p className="text-2xl font-black text-slate-900">{subscription?.hasAppliedAffiliateCode ? PRO_MARKETER_PRICE_EGP : PRO_PRICE_EGP} <span className="text-sm font-semibold">{ar ? 'جنيه / شهر' : 'EGP / month'}</span></p>
+          <p className="text-sm leading-7 text-slate-600">{ar ? 'الخطة المتقدمة؛ الفرق في المميزات سيحدد بعد تجارب الأصدقاء.' : 'Advanced features will be finalized after usability tests.'}</p>
+          <p className="text-sm text-emerald-800">{subscription?.hasAppliedAffiliateCode ? (ar ? 'خصم المسوّق محفوظ بدون تمديد الفترة المجانية.' : 'Marketer discount saved; no extra trial days.') : (ar ? 'بكود مسوّق صالح: 120 جنيه شهريًا.' : 'With a valid marketer code: EGP 120/month.')}</p>
+          {!guest && onNavigate && <button type="button" onClick={() => choosePlan('pro')} className="mt-auto min-h-11 rounded-xl bg-emerald-700 px-3 text-sm font-bold text-white">{ar ? 'اشترك أو جدّد Pro' : 'Subscribe or renew Pro'}</button>}
+        </div>
+      </div>
+  </>;
   return (
     <section className="space-y-5 pb-8" aria-labelledby="subscription-page-title">
       <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-emerald-700">
@@ -82,31 +107,9 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
           <p className="text-sm leading-7 text-slate-700">{subscription.hasAppliedAffiliateCode ? (ar ? 'حسابك مرتبط بكود مسوّق؛ يظهر سعر الخصم في تفاصيل الاشتراك.' : 'Your account has a marketer code; the discounted price appears in subscription details.') : (ar ? 'يمكن استخدام كود مسوّق للحصول على خصم الاشتراك، دون بدء تجربة جديدة بعد انتهائها.' : 'A marketer code can provide a subscription discount without starting another trial after expiry.')}</p>
           <button type="button" onClick={onSubscription} className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-black text-white hover:bg-emerald-800">{ar ? 'الانتقال إلى صفحة الاشتراك' : 'Go to subscription'}</button>
         </> : <>
-          <p className="text-sm leading-7 text-slate-600">{ar ? 'اختر الخطة المناسبة لك. جميع بياناتك المالية محفوظة عند تغيير الخطة.' : 'Choose the plan that suits you. Your financial records remain saved when you change plans.'}</p>
-          {subscription && <AffiliateCodeSection subscription={subscription} lang={lang} onUpdateSubscription={onUpdateSubscription} />}
-          {guest && <button type="button" className="min-h-11 rounded-xl bg-emerald-700 px-3 font-bold text-white" onClick={onSignIn}>{ar ? 'ابدأ بحساب Google' : 'Get started with Google'}</button>}
-          {!grant && stage === 'basic-free' && <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm font-bold text-sky-900">{ar ? `Basic مجانية حتى اليوم ${getTrialDurations().basicDays}. المتبقي: ` : `Basic remains free until day ${getTrialDurations().basicDays}. Days remaining: `}{days}</p>}
-          {stage === 'expired' && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">{ar ? 'انتهت الفترة المجانية. اختر خطة اشتراك لمتابعة استخدام التطبيق.' : 'Your introductory period ended. Choose a subscription plan to continue.'}</p>}
-          {start && <p className="text-xs text-slate-500">{ar ? `تاريخ تسجيلك: ${start}` : `Registration date: ${start}`}</p>}
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4">
-              <h2 className="text-lg font-black text-slate-900">Basic</h2>
-              <p className="text-2xl font-black text-slate-900">{subscription?.hasAppliedAffiliateCode ? BASIC_MARKETER_PRICE_EGP : BASIC_PRICE_EGP} <span className="text-sm font-semibold">{ar ? 'جنيه / شهر' : 'EGP / month'}</span></p>
-              <p className="text-sm leading-7 text-slate-600">{ar ? 'الخطة الأساسية؛ مميزاتها وحدودها قيد الاختبار.' : 'The essential plan; features and limits are being tested.'}</p>
-              <p className="mt-auto rounded-xl bg-slate-100 px-3 py-2 text-center text-sm font-bold text-slate-700">{basicDays === null
-                ? (ar ? 'تجربة مجانية عند التسجيل' : 'Free trial when you sign up')
-                : ar ? `مجانية لأول ${new Intl.NumberFormat('ar-EG').format(basicDays)} يومًا` : `Free for the first ${basicDays} days`}</p>
-              {!guest && onNavigate && <button type="button" onClick={() => choosePlan('basic')} className="min-h-11 rounded-xl bg-emerald-700 px-3 text-sm font-bold text-white">{ar ? 'اشترك أو جدّد Basic' : 'Subscribe or renew Basic'}</button>}
-            </div>
-            <div ref={proPlan} className="flex flex-col gap-3 rounded-2xl border-2 border-emerald-600 p-4">
-              <h2 className="text-lg font-black text-slate-900">Pro</h2>
-              <p className="text-2xl font-black text-slate-900">{subscription?.hasAppliedAffiliateCode ? PRO_MARKETER_PRICE_EGP : PRO_PRICE_EGP} <span className="text-sm font-semibold">{ar ? 'جنيه / شهر' : 'EGP / month'}</span></p>
-              <p className="text-sm leading-7 text-slate-600">{ar ? 'الخطة المتقدمة؛ الفرق في المميزات سيحدد بعد تجارب الأصدقاء.' : 'Advanced features will be finalized after usability tests.'}</p>
-              <p className="text-sm text-emerald-800">{subscription?.hasAppliedAffiliateCode ? (ar ? 'خصم المسوّق محفوظ بدون تمديد الفترة المجانية.' : 'Marketer discount saved; no extra trial days.') : (ar ? 'بكود مسوّق صالح: 120 جنيه شهريًا.' : 'With a valid marketer code: EGP 120/month.')}</p>
-              {!guest && onNavigate && <button type="button" onClick={() => choosePlan('pro')} className="mt-auto min-h-11 rounded-xl bg-emerald-700 px-3 text-sm font-bold text-white">{ar ? 'اشترك أو جدّد Pro' : 'Subscribe or renew Pro'}</button>}
-            </div>
-          </div>
-          {!guest && onNavigate && <SubscriptionPayment lang={lang} plan={null} onClose={closeCheckout} />}
+          {guest || !onNavigate ? planOptions : <SubscriptionPayment lang={lang} plan={null} onClose={closeCheckout}>
+            {planOptions}
+          </SubscriptionPayment>}
         </>}
       </div>
     </section>

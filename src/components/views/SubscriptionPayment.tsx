@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useAppConfirm } from '../AppConfirmDialog';
 import { INSTA_PAY_LINK } from '../../config/instaPay';
 import { isReceiptImageAllowed } from '../../utils/adCheckout';
@@ -33,8 +33,8 @@ function PaymentTimes({ payment, lang }: { payment: Payment; lang: Language }) {
   </>;
 }
 
-export function SubscriptionPayment({ lang, plan, onClose }: {
-  lang: Language; plan: Plan | null; onClose: () => void;
+export function SubscriptionPayment({ lang, plan, onClose, children }: {
+  lang: Language; plan: Plan | null; onClose: () => void; children?: ReactNode;
 }) {
   const ar = lang === 'ar';
   const [latest, setLatest] = useState<Payment | null>(null);
@@ -131,7 +131,7 @@ export function SubscriptionPayment({ lang, plan, onClose }: {
   return <div className="space-y-4">
     {latest && (!plan || latest.status === 'pending') && <section className={box}>
       <div className="flex items-center justify-between gap-3">
-        <h2 className="font-bold">{ar ? 'آخر طلب اشتراك' : 'Latest subscription request'} · {planLabel(latest.plan)}</h2>
+        <h2 className="font-bold">{latest.status === 'pending' ? (ar ? 'تم إرسال طلب الاشتراك' : 'Subscription request sent') : (ar ? 'آخر طلب اشتراك' : 'Latest subscription request')} · {planLabel(latest.plan)}</h2>
         <button type="button" onClick={() => setRefresh(value => value + 1)} className="text-sm underline">{ar ? 'تحديث الحالة' : 'Refresh status'}</button>
       </div>
       <p role="status">{latest.status === 'pending' ? (ar ? 'قيد المراجعة' : 'Under review') : latest.status === 'correction' ? (ar ? 'مطلوب تصحيح' : 'Correction requested') : (ar ? 'تم التفعيل' : 'Activated')}</p>
@@ -141,7 +141,8 @@ export function SubscriptionPayment({ lang, plan, onClose }: {
       {latest.receiptUrl && <a className="text-sm underline" href={latest.receiptUrl} target="_blank" rel="noreferrer">{ar ? 'عرض الإيصال' : 'View receipt'}</a>}
     </section>}
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-900">{error} <button type="button" className="underline" disabled={sending} onClick={() => setRefresh(value => value + 1)}>{ar ? 'تحديث الحالة' : 'Refresh status'}</button></p>}
-    {!loaded && plan && !error && <p role="status" className="text-sm">{ar ? 'جارٍ تحميل الدفع…' : 'Loading payment…'}</p>}
+    {loaded && !plan && latest?.status !== 'pending' && children}
+    {!loaded && !error && <p role="status" className="text-sm">{ar ? 'جارٍ تحميل حالة الاشتراك…' : 'Loading subscription status…'}</p>}
     {loaded && plan && latest?.status !== 'pending' && <form onSubmit={submit} className={box}>
       <h2 className="text-lg font-bold">{ar ? 'دفع الاشتراك بإنستاباي' : 'Pay with InstaPay'} · {planLabel(plan)}</h2>
       {quote?.plan === plan ? <>

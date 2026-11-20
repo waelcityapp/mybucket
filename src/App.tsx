@@ -291,7 +291,8 @@ export default function App() {
   const openOffers = () => navigateOffer('/offers');
   const openAccountSettings = () => { window.history.pushState({ accounts: true }, '', '/accounts'); setActiveTab('accounts'); };
   const openSubscriptionPage = (page: 'trial-details' | 'subscription') => {
-    window.history.pushState({ subscriptionPage: page, offerBack: window.location.pathname }, '', window.location.pathname === '/try' ? '/try/subscription' : page === 'trial-details' ? '/trial' : '/subscription');
+    if (window.location.pathname === '/try') { navigateOffer('/try/subscription'); return; }
+    window.history.pushState({ subscriptionPage: page }, '', page === 'trial-details' ? '/trial' : '/subscription');
     setActiveTab(page);
   };
   // Helper to migrate legacy 'acc_savings_usd' / 'مدخرات دولار' to 'acc_wallet' / 'محافظ إلكترونية' and ensure unique account IDs
@@ -2012,7 +2013,7 @@ export default function App() {
         ))}
 
         {(activeTab === 'trial-details' || activeTab === 'subscription' || (guestDemo && window.location.pathname === '/try/subscription')) && (
-          <TrialSubscriptionPages lang={lang} guest={guestDemo} onSignIn={() => navigateOffer('/')} subscription={guestDemo ? null : userSubscription} error={subscriptionError ? (lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn) : null} page={guestDemo ? 'subscription' : (activeTab as 'trial-details' | 'subscription')} onBack={() => { if (guestDemo) { backFromOffer('/try'); setActiveTab('home'); return; } window.history.pushState({}, '', activeTab === 'subscription' ? '/trial' : '/'); setActiveTab(activeTab === 'subscription' ? 'trial-details' : 'home'); }} onSubscription={() => openSubscriptionPage('subscription')} onUpdateSubscription={async updated => { if (!authUser) return; const saved = await saveUserSubscriptionToFirestore(authUser.uid, updated); setUserSubscription(saved); }} />
+          <TrialSubscriptionPages lang={lang} guest={guestDemo} onSignIn={() => navigateOffer('/')} subscription={guestDemo ? null : userSubscription} error={subscriptionError ? (lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn) : null} page={guestDemo ? 'subscription' : (activeTab as 'trial-details' | 'subscription')} onBack={() => { if (guestDemo) { backFromOffer('/try'); return; } window.history.pushState({}, '', activeTab === 'subscription' ? '/trial' : '/'); setActiveTab(activeTab === 'subscription' ? 'trial-details' : 'home'); }} onSubscription={() => openSubscriptionPage('subscription')} onUpdateSubscription={async updated => { if (!authUser) return; const saved = await saveUserSubscriptionToFirestore(authUser.uid, updated); setUserSubscription(saved); }} />
         )}
 
         {activeTab === 'settings' && (

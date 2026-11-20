@@ -457,3 +457,23 @@ export async function deleteSelectedFinancialTransaction(
     return 'deleted';
   });
 }
+
+export async function resetFinancialStart(userId: string): Promise<void> {
+  requireFinancialWriteAccess();
+  if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
+  const [accounts, transactions] = await Promise.all([
+    getDocsFromServer(collection(db, 'users', userId, 'accounts')),
+    getDocsFromServer(collection(db, 'users', userId, 'transactions')),
+  ]);
+  const records = [...accounts.docs, ...transactions.docs];
+  if (records.length > 500) throw new Error('reset-too-large');
+
+  await runTransaction(db, async transaction => {
+    const current = await Promise.all(records.map(record => transaction.get(record.ref)));
+    requireFinancialWriteAccess();
+    if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
+    for (const record of current) {
+      if (record.exists()) transaction.delete(record.ref);
+    }
+  });
+}

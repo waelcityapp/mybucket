@@ -26,6 +26,7 @@ interface SettingsViewProps {
   appLockStatus?: LockStatus | null;
   onAppLockChange?: (status: LockStatus) => void;
   onSetLanguage: (lang: Language) => void;
+  onResetFinancialStart: () => Promise<void>;
   onOpenDeleteTransactions: () => void;
   onZeroAllBalances?: () => Promise<boolean>;
   user: AuthUser | null;
@@ -46,6 +47,7 @@ export function SettingsView({
   onAppLockChange,
   onSetLanguage,
   onOpenDeleteTransactions,
+  onResetFinancialStart,
   onZeroAllBalances,
   user,
   subscription,
@@ -59,6 +61,7 @@ export function SettingsView({
   onOpenFavoriteAds,
 }: SettingsViewProps) {
   const t = translations[lang];
+  const [resettingStart, setResettingStart] = useState(false);
   const ar = lang === 'ar';
   const Chevron = ar ? ChevronLeft : ChevronRight;
   const [zeroConfirmed, setZeroConfirmed] = useState(false);
@@ -295,6 +298,12 @@ export function SettingsView({
           {user && <button type="button" onClick={onOpenDeleteTransactions}
             className="w-full min-h-10 rounded-xl border border-rose-200 bg-rose-50 px-4 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
             {ar ? 'حذف العمليات' : 'Delete transactions'}
+          </button>}
+          {user && <button type="button" disabled={resettingStart} onClick={async () => {
+            setResettingStart(true);
+            try { await onResetFinancialStart(); } finally { setResettingStart(false); }
+          }} className="w-full min-h-10 rounded-xl border border-rose-200 bg-rose-50 px-4 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
+            {resettingStart ? (ar ? 'جارٍ إعادة ضبط البداية…' : 'Resetting…') : (ar ? 'إعادة ضبط البداية' : 'Reset financial setup')}
           </button>}
 
         </div>

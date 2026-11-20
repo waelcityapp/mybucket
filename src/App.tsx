@@ -97,6 +97,7 @@ import {
   saveAccountToFirestore,
   saveAllAccountsToFirestore,
   zeroAccountBalances,
+  resetFinancialStart,
   updateFinancialTransaction,
   deleteTransactionFromFirestore,
   deleteUnusedAccountFromFirestore,
@@ -1488,6 +1489,37 @@ export default function App() {
     }
   };
 
+  const handleResetFinancialStart = async () => {
+    const uid = authUser?.uid;
+    if (!uid) return;
+    const ar = lang === 'ar';
+    const approved = await confirmAction({
+      lang,
+      title: ar ? 'إعادة ضبط البداية؟' : 'Reset financial setup?',
+      description: ar
+        ? 'سيتم حذف جميع حساباتك المالية والعمليات المسجلة نهائيًا. بعدها ستبدأ بإعداد الحسابات الأربعة من جديد. سيظل حساب Google والاشتراك كما هما.'
+        : 'This permanently deletes all financial accounts and recorded transactions. You will set up the four starter accounts again. Your Google account and subscription will be kept.',
+      confirmLabel: ar ? 'حذف البيانات وإعادة البداية' : 'Delete data and start over',
+      cancelLabel: ar ? 'إلغاء' : 'Cancel',
+      tone: 'danger',
+    });
+    if (!approved) return;
+    try {
+      await resetFinancialStart(uid);
+      if (auth.currentUser?.uid !== uid) return;
+      initialSetupAttempt.current = null;
+      setOnboardingSetupUid(uid);
+      setActiveTab('home');
+      window.history.replaceState({ myBucketTab: 'home' }, '', '/');
+      window.scrollTo(0, 0);
+    } catch (error) {
+      if (auth.currentUser?.uid !== uid) return;
+      setToastMessage(error instanceof Error && error.message === 'reset-too-large'
+        ? (ar ? 'عدد الحسابات والعمليات يتجاوز ٥٠٠. احذف بعض العمليات من إدارة البيانات ثم حاول مجددًا.' : 'There are more than 500 accounts and transactions. Delete some transactions and try again.')
+        : (ar ? 'تعذّر تأكيد إعادة ضبط البداية. راجع بياناتك واتصالك ثم حاول مجددًا.' : 'Could not confirm the reset. Check your data and connection, then try again.'));
+    }
+  };
+
   const t = translations[lang];
 
   // Dynamic greeting based on current time and user name
@@ -2104,6 +2136,7 @@ export default function App() {
 
             onSetLanguage={(newLang) => setLang(newLang)}
             onZeroAllBalances={handleZeroAllBalances}
+            onResetFinancialStart={handleResetFinancialStart}
             onOpenDeleteTransactions={() => {
               window.history.pushState({ myBucketTab: 'settings', fromAccountSettings: true }, '', '/settings/delete-transactions');
               setOfferLocation('/settings/delete-transactions');

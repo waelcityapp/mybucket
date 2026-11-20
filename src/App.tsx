@@ -2009,7 +2009,7 @@ export default function App() {
             accounts={accounts}
             categories={categories}
             lang={lang}
-            loadState={transactionReadError ? 'error' : financialLoaded.transactions ? 'ready' : 'loading'}
+            loadState={guestDemo ? 'ready' : transactionReadError ? 'error' : financialLoaded.transactions ? 'ready' : 'loading'}
             onOpenAddModal={() => handleOpenAddModal('expense')}
             onDeleteTransaction={handleDeleteTransaction}
           />

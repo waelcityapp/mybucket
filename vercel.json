@@ -23,6 +23,22 @@
   },
   "rewrites": [
     {
+      "source": "/s/en/:id/i",
+      "destination": "/api/gateway?offerShare=:id&lang=en&format=image&compact=1"
+    },
+    {
+      "source": "/s/en/:id",
+      "destination": "/api/gateway?offerShare=:id&lang=en&compact=1"
+    },
+    {
+      "source": "/s/:id/i",
+      "destination": "/api/gateway?offerShare=:id&lang=ar&format=image&compact=1"
+    },
+    {
+      "source": "/s/:id",
+      "destination": "/api/gateway?offerShare=:id&lang=ar&compact=1"
+    },
+    {
       "source": "/offers/share/:lang/:id/image",
       "destination": "/api/gateway?offerShare=:id&lang=:lang&format=image"
     },

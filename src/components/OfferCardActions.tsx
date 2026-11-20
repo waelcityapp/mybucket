@@ -1,3 +1,4 @@
+import { offerSharePath } from '../utils/offerShare';
 import { Heart, Share2, ThumbsUp } from 'lucide-react';
 import { useState } from 'react';
 import type { OfferEngagement, OfferReaction, OfferReactionState } from '../data/offerAds';
@@ -27,7 +28,7 @@ export function OfferCardActions({ id, isAr, state, engagement, onReact }: {
   const buttonClass = 'inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-emerald-600 dark:hover:bg-slate-800';
 
   async function share() {
-    const url = new URL(`/offers/share/${isAr ? 'ar' : 'en'}/${encodeURIComponent(id)}`, window.location.origin).href;
+    const url = new URL(offerSharePath(id, isAr ? 'ar' : 'en'), window.location.origin).href;
     const text = `${isAr ? 'شوف العرض' : 'View the offer'}\n${url}`;
     setShareMessage('');
     try {

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { DEMO_ADS } from '../src/data/demoAds.js';
-import { offerShareExcerpt } from '../src/utils/offerShare.js';
+import { offerShareExcerpt, offerSharePath } from '../src/utils/offerShare.js';
 import { getAppIdentity } from './appIdentity.js';
 import { readPublicOfferAds } from './offerAds.js';
 
@@ -97,11 +97,11 @@ export async function renderOfferShare(id: string, language: string, origin: str
     catch { return brandedOfferImage(null, await imageBytes(defaultIcon)); }
   }
   const destination = new URL(`/offers/ad/${encodeURIComponent(id)}`, origin).href;
-  const url = new URL(`/offers/share/${lang}/${encodeURIComponent(id)}`, origin).href;
+  const url = new URL(offerSharePath(id, lang), origin).href;
   return offerShareHtml({
     url, destination, lang, app,
     title: offer ? (lang === 'ar' ? `${offer.merchant} · ${offer.title}` : `${offer.title} · ${offer.merchant}`) : app,
     description: offer ? `${app} · ${offerShareExcerpt(offer.description)}` : app,
-    image: offer ? `${url}/image` : new URL(`/${defaultIcon}`, origin).href,
+    image: offer ? `${url}/i` : new URL(`/${defaultIcon}`, origin).href,
   });
 }

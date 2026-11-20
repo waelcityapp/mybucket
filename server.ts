@@ -29,12 +29,16 @@ async function startServer() {
     res.json({ status: 'ok', time: new Date().toISOString() });
   });
 
-  app.get(['/offers/share/:lang/:id', '/offers/share/:lang/:id/image'], async (req, res) => {
+  app.get(['/offers/share/:lang/:id', '/offers/share/:lang/:id/image', '/s/:id', '/s/:id/i', '/s/en/:id', '/s/en/:id/i'], async (req, res) => {
     const { renderOfferShare } = await import('./server/offerShare.js');
-    if (typeof req.params.id !== 'string' || typeof req.params.lang !== 'string') return res.sendStatus(404);
-    const image = req.path.endsWith('/image');
+    if (typeof req.params.id !== 'string') return res.sendStatus(404);
+    const compact = req.path.startsWith('/s/');
+    const image = req.path.endsWith('/image') || req.path.endsWith('/i');
+    const lang = compact ? (req.path.startsWith('/s/en/') ? 'en' : 'ar') : String(req.params.lang ?? 'ar');
+    const id = compact ? (await import('./src/utils/offerShare.js')).expandOfferId(req.params.id) : req.params.id;
+    if (!id) return res.sendStatus(404);
     try {
-      const body = await renderOfferShare(req.params.id, req.params.lang, `${req.protocol}://${req.get('host')}`, image);
+      const body = await renderOfferShare(id, lang, `${req.protocol}://${req.get('host')}`, image);
       return res.status(body === null ? 404 : 200).type(image ? 'image/jpeg' : 'html').send(body ?? '');
     } catch {
       return res.status(503).json({ ok: false, error: 'offer_preview_unavailable' });

@@ -19,7 +19,10 @@ type VercelResponse = {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
-    const id = req.query?.offerShare;
+    const code = req.query?.offerShare;
+    const id = typeof code === 'string' && req.query?.compact === '1'
+      ? (await import('../src/utils/offerShare.js')).expandOfferId(code)
+      : code;
     if (typeof id === 'string' && /^[a-z0-9-]{1,80}$/.test(id) && res.setHeader && res.send) {
       const { renderOfferShare, offerShareOrigin } = await import('../server/offerShare.js');
       const image = req.query?.format === 'image';

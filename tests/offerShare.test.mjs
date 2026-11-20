@@ -28,3 +28,15 @@ test('preview images have the same dimensions for photos and text-only ads', asy
     assert.deepEqual([result.width, result.height, result.format], [1200, 630, 'jpeg']);
   }
 });
+
+test('short share paths round-trip without changing the ad identifier', async () => {
+  const { compactOfferId, expandOfferId, offerSharePath } = await import('../src/utils/offerShare.ts');
+  const id = '6710ba5a-fed2-4b34-84ad-55b1c0faebda';
+  const compact = compactOfferId(id);
+  assert.equal(compact.length, 22);
+  assert.equal(expandOfferId(compact), id);
+  assert.equal(offerSharePath(id, 'ar'), '/s/' + compact);
+  assert.equal(offerSharePath(id, 'en'), '/s/en/' + compact);
+  assert.equal(expandOfferId('demo-restaurant-1'), 'demo-restaurant-1');
+  assert.equal(expandOfferId('bad-code'), null);
+});

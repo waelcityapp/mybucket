@@ -283,8 +283,8 @@ export function HomeFinancialOverview({
       {/* Compact cards, in the same right-to-left order as the reference. */}
       <div className="grid grid-cols-2 gap-1.5">
         <button type="button" onClick={() => onViewTransactions?.('today', primaryCurrency)}
-          className="min-w-0 rounded-[16px] border border-amber-100 bg-gradient-to-br from-[#FFF9EE] via-white to-[#FFF9EC] px-2.5 py-1.5 text-start @min-[490px]:flex @min-[490px]:flex-row-reverse @min-[490px]:items-center @min-[490px]:gap-3 hover:border-amber-300 focus-visible:outline-2 focus-visible:outline-amber-500">
-          <div className="flex min-w-0 items-start gap-2 @min-[490px]:flex-1 @min-[490px]:flex-row-reverse">
+          className="min-w-0 rounded-[16px] border border-amber-100 bg-gradient-to-br from-[#FFF9EE] via-white to-[#FFF9EC] px-2.5 py-1.5 text-start @min-[490px]:md:pointer-fine:flex @min-[490px]:md:pointer-fine:flex-row-reverse @min-[490px]:md:pointer-fine:items-center @min-[490px]:md:pointer-fine:gap-3 hover:border-amber-300 focus-visible:outline-2 focus-visible:outline-amber-500">
+          <div className="flex min-w-0 items-start gap-2 @min-[490px]:md:pointer-fine:flex-1 @min-[490px]:md:pointer-fine:flex-row-reverse">
             <span className="shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-amber-100 text-amber-600"><CalendarDays size={17}/></span>
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center justify-between gap-2">
@@ -300,15 +300,15 @@ export function HomeFinancialOverview({
                 : (isAr ? `عدد العمليات: ${formatNumber(todayCount)}` : `Transactions: ${formatNumber(todayCount)}`)}</span>
             </div>
           </div>
-          {spendingSparklines.daily.length > 0 && <div className="mt-1 flex items-end justify-between gap-2 @min-[490px]:mt-0 @min-[490px]:w-[30%] @min-[490px]:shrink-0 @min-[490px]:items-center @min-[490px]:border-s @min-[490px]:border-slate-200 @min-[490px]:ps-3">
+          {spendingSparklines.daily.length > 0 && <div className="hidden items-center @min-[490px]:md:pointer-fine:flex @min-[490px]:md:pointer-fine:w-[30%] @min-[490px]:md:pointer-fine:shrink-0 @min-[490px]:md:pointer-fine:border-s @min-[490px]:md:pointer-fine:border-slate-200 @min-[490px]:md:pointer-fine:ps-3">
             <div className="flex h-6 items-end gap-[3px]" aria-label={isAr ? 'مبالغ العمليات اليوم' : 'Today transaction amounts'}>
               {spendingSparklines.daily.map((amount,i)=><span key={i} className="w-2.5 rounded-t-full bg-amber-200/90" style={{height: (isBalanceHidden ? 3 : amount > 0 ? 5 + 18 * amount / todayBarsMax : 3) + 'px'}} />)}
             </div>
           </div>}
         </button>
         <button type="button" onClick={() => onViewTransactions?.('month', primaryCurrency)}
-          className="min-w-0 rounded-[16px] border border-rose-100 bg-gradient-to-br from-[#FFF5F6] via-white to-[#FFF6F7] px-2.5 py-1.5 text-start @min-[490px]:flex @min-[490px]:flex-row-reverse @min-[490px]:items-center @min-[490px]:gap-3 hover:border-rose-300 focus-visible:outline-2 focus-visible:outline-rose-400">
-          <div className="flex min-w-0 items-start gap-2 @min-[490px]:flex-1 @min-[490px]:flex-row-reverse">
+          className="min-w-0 rounded-[16px] border border-rose-100 bg-gradient-to-br from-[#FFF5F6] via-white to-[#FFF6F7] px-2.5 py-1.5 text-start @min-[490px]:md:pointer-fine:flex @min-[490px]:md:pointer-fine:flex-row-reverse @min-[490px]:md:pointer-fine:items-center @min-[490px]:md:pointer-fine:gap-3 hover:border-rose-300 focus-visible:outline-2 focus-visible:outline-rose-400">
+          <div className="flex min-w-0 items-start gap-2 @min-[490px]:md:pointer-fine:flex-1 @min-[490px]:md:pointer-fine:flex-row-reverse">
             <span className="shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-rose-100 text-rose-500"><CalendarDays size={17}/></span>
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center justify-between gap-2">
@@ -322,7 +322,7 @@ export function HomeFinancialOverview({
               <span className="mt-0.5 block text-[10px] text-slate-500">{currentMonthLabel}</span>
             </div>
           </div>
-          <div className="mt-1 flex items-end justify-between gap-2 @min-[490px]:mt-0 @min-[490px]:w-[30%] @min-[490px]:shrink-0 @min-[490px]:items-center @min-[490px]:border-s @min-[490px]:border-slate-200 @min-[490px]:ps-3">
+          <div className="hidden items-center @min-[490px]:md:pointer-fine:flex @min-[490px]:md:pointer-fine:w-[30%] @min-[490px]:md:pointer-fine:shrink-0 @min-[490px]:md:pointer-fine:border-s @min-[490px]:md:pointer-fine:border-slate-200 @min-[490px]:md:pointer-fine:ps-3">
             <div className="flex h-6 items-end gap-[3px]" aria-label={isAr ? 'المصروفات في آخر 7 أيام' : 'Expenses during the last 7 days'}>
               {spendingSparklines.weekly.map((amount,i)=><span key={i} className="w-2.5 rounded-t-full bg-rose-200/90" style={{height: (isBalanceHidden ? 3 : amount > 0 ? 5 + 18 * amount / monthBarsMax : 3) + 'px'}} />)}
             </div>

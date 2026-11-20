@@ -632,3 +632,5 @@ Landing-page VIP cards link to their category above the advertiser. Offer detail
 Each ad tier has a Benefits and Pricing dialog in the creation form. Pricing is read from the checkout constants and free frequency follows the account policy.
 
 Free and paid advertisement submission confirmations link to both My Ads and the app home screen.
+
+The sign-in screen explains the financial workflow, offers a three-entry in-memory guest demo and public deals, and keeps Google as the real account entry point. Affiliate messaging reflects the Pro discount policy.

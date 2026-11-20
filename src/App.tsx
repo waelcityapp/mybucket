@@ -1069,7 +1069,7 @@ export default function App() {
       lang,
       title: lang === 'ar' ? 'حذف العملية؟' : 'Delete transaction?',
       description: lang === 'ar'
-        ? 'هيتم حذف العملية وتحديث أرصدة الحسابات المرتبطة بيها.'
+        ? 'سوف يتم حذف العملية وتحديث أرصدة الحسابات المرتبطة بها.'
         : 'This will delete the transaction and update the related account balances.',
       confirmLabel: lang === 'ar' ? 'تأكيد الحذف' : 'Confirm deletion',
       cancelLabel: lang === 'ar' ? 'إلغاء' : 'Cancel',

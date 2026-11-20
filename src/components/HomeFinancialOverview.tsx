@@ -295,14 +295,16 @@ export function HomeFinancialOverview({
                 <strong dir="ltr" style={amountSize(isBalanceHidden ? '••••' : formatNumber(todayExpenses), 'clamp(13px, 2.4cqw, 19px)')} className="whitespace-nowrap leading-tight font-black text-slate-950 tabular-nums">{isBalanceHidden ? '••••' : formatNumber(todayExpenses)}</strong>
                 <span className="text-[10px] text-slate-600">{currencyLabel}</span>
               </div>
-              <span className="mt-0.5 inline-flex rounded-full bg-white border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700">{todayCount} {isAr ? 'عمليات' : 'transactions'}</span>
+              <span className="mt-0.5 inline-flex rounded-full bg-white border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700">{todayCount === 0
+                ? (isAr ? 'لا توجد عمليات صرف اليوم' : 'No expenses today')
+                : (isAr ? `عدد العمليات: ${formatNumber(todayCount)}` : `Transactions: ${formatNumber(todayCount)}`)}</span>
             </div>
           </div>
-          <div className="mt-1 flex items-end justify-between gap-2 @min-[490px]:mt-0 @min-[490px]:w-[30%] @min-[490px]:shrink-0 @min-[490px]:items-center @min-[490px]:border-s @min-[490px]:border-slate-200 @min-[490px]:ps-3">
+          {spendingSparklines.daily.length > 0 && <div className="mt-1 flex items-end justify-between gap-2 @min-[490px]:mt-0 @min-[490px]:w-[30%] @min-[490px]:shrink-0 @min-[490px]:items-center @min-[490px]:border-s @min-[490px]:border-slate-200 @min-[490px]:ps-3">
             <div className="flex h-6 items-end gap-[3px]" aria-label={isAr ? 'مبالغ العمليات اليوم' : 'Today transaction amounts'}>
-              {(spendingSparklines.daily.length ? spendingSparklines.daily : [0,0,0,0,0]).map((amount,i)=><span key={i} className="w-2.5 rounded-t-full bg-amber-200/90" style={{height: (isBalanceHidden ? 3 : amount > 0 ? 5 + 18 * amount / todayBarsMax : 3) + 'px'}} />)}
+              {spendingSparklines.daily.map((amount,i)=><span key={i} className="w-2.5 rounded-t-full bg-amber-200/90" style={{height: (isBalanceHidden ? 3 : amount > 0 ? 5 + 18 * amount / todayBarsMax : 3) + 'px'}} />)}
             </div>
-          </div>
+          </div>}
         </button>
         <button type="button" onClick={() => onViewTransactions?.('month', primaryCurrency)}
           className="min-w-0 rounded-[16px] border border-rose-100 bg-gradient-to-br from-[#FFF5F6] via-white to-[#FFF6F7] px-2.5 py-1.5 text-start @min-[490px]:flex @min-[490px]:flex-row-reverse @min-[490px]:items-center @min-[490px]:gap-3 hover:border-rose-300 focus-visible:outline-2 focus-visible:outline-rose-400">

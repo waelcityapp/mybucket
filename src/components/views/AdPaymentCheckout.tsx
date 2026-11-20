@@ -176,7 +176,10 @@ export function AdPaymentCheckout({
     <section role="status" className="mx-auto max-w-xl space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950">
       <h1 className="flex items-center gap-2 text-lg font-extrabold"><Check className="size-5" aria-hidden="true" />{ar ? `مبروك! تم إرسال إعلانك ${tierLabel} والإيصال للإدارة بنجاح.` : `Your ${tierLabel} ad and receipt were sent successfully.`}</h1>
       <p className="text-sm">{ar ? 'تتم المراجعة والرد خلال ٢٤ ساعة تقريبًا. تقدر تتابع من الملف الشخصي في «إعلاناتي».' : 'Review usually takes around 24 hours. Track the status in My ads in your profile.'}</p>
-      <a href="/settings/ads" onClick={event => followInternalLink(event, onNavigate)} className="inline-flex min-h-11 items-center font-bold underline">{ar ? 'متابعة الإعلان' : 'Track ad'}</a>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+        <a href="/settings/ads" onClick={event => followInternalLink(event, onNavigate)} className="inline-flex min-h-11 items-center font-bold underline">{ar ? 'متابعة الإعلان' : 'Track ad'}</a>
+        <a href="/" onClick={event => followInternalLink(event, onNavigate)} className="inline-flex min-h-11 items-center font-bold underline">{ar ? 'الصفحة الرئيسية' : 'Home'}</a>
+      </div>
     </section>
   </main>;
 

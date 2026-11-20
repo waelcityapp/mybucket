@@ -630,3 +630,5 @@ Admin review previews payment receipts inline next to the expected amount, using
 Landing-page VIP cards link to their category above the advertiser. Offer details link to all ads in their own category.
 
 Each ad tier has a Benefits and Pricing dialog in the creation form. Pricing is read from the checkout constants and free frequency follows the account policy.
+
+Free and paid advertisement submission confirmations link to both My Ads and the app home screen.

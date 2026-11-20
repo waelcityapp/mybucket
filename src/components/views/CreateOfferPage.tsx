@@ -347,7 +347,10 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
           <section role="status" className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950">
             <h2 className="flex items-center gap-2 font-extrabold"><CheckCircle2 className="size-5" />{ar ? 'مبروك! تم إرسال إعلانك للإدارة بنجاح.' : 'Your ad was sent successfully.'}</h2>
             <p className="text-sm">{ar ? 'تتم المراجعة والرد خلال ٢٤ ساعة تقريبًا. تقدر تتابع حالة إعلانك من ملفك الشخصي في قسم «إعلاناتي».' : 'Review usually takes around 24 hours. Follow your ad’s status in My ads in your profile.'}</p>
-            <a className="inline-flex min-h-11 items-center font-bold underline" href="/settings/ads" onClick={event => followInternalLink(event, onNavigate)}>{ar ? 'متابعة الإعلان' : 'Track ad'}</a>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+              <a className="inline-flex min-h-11 items-center font-bold underline" href="/settings/ads" onClick={event => followInternalLink(event, onNavigate)}>{ar ? 'متابعة الإعلان' : 'Track ad'}</a>
+              <a href="/" onClick={event => followInternalLink(event, onNavigate)} className="inline-flex min-h-11 items-center font-bold underline">{ar ? 'الصفحة الرئيسية' : 'Home'}</a>
+            </div>
           </section>
         ) : preview ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-4">

@@ -2,16 +2,17 @@ import { PromoBannerData, PerkDealItem } from '../types/deals';
 
 // Editable configuration for the Bottom Home Sponsor Banner
 export const INITIAL_PROMO_BANNER: PromoBannerData = {
-  id: 'banner_partner_1',
-  titleAr: 'عروض حصرية لعملاء My Bucket 🔥',
-  titleEn: 'Exclusive Deals for My Bucket Users 🔥',
-  subtitleAr: 'وفر حتى 30% مع شركائنا في المطاعم والسوبرماركت والتسوق',
-  subtitleEn: 'Save up to 30% with our partner stores, dining & groceries',
+  id: 'banner_cityeve',
+  titleAr: 'CityEve',
+  titleEn: 'CityEve',
+  subtitleAr: 'اكتشف الحفلات والرحلات والفعاليات في مصر.',
+  subtitleEn: 'Discover concerts, trips, and events across Egypt.',
   badgeAr: 'إعلان شريك',
   badgeEn: 'Sponsored',
-  targetUrl: 'https://waelcityapp.com', // Link to advertiser
-  ctaTextAr: 'استكشف العروض',
-  ctaTextEn: 'Explore Deals',
+  targetUrl: 'https://cityeve.online/',
+  imageUrl: '/cityeve-partner.webp',
+  ctaTextAr: 'تصفّح CityEve',
+  ctaTextEn: 'Explore CityEve',
   isActive: true,
 };
 

@@ -1,67 +1,44 @@
-import React from 'react';
-import { ExternalLink, Tag } from 'lucide-react';
-import { PromoBannerData } from '../types/deals';
-import { Language } from '../types';
+import { ArrowUpRight } from 'lucide-react';
+import type { PromoBannerData } from '../types/deals';
+import type { Language } from '../types';
 
 interface PromoBannerProps {
   banner: PromoBannerData;
   lang: Language;
 }
 
-export const PromoBanner: React.FC<PromoBannerProps> = ({
-  banner,
-  lang,
-}) => {
+export function PromoBanner({ banner, lang }: PromoBannerProps) {
   if (!banner.isActive) return null;
 
-  const title = lang === 'ar' ? banner.titleAr : banner.titleEn;
-  const subtitle = lang === 'ar' ? banner.subtitleAr : banner.subtitleEn;
-  const badge = lang === 'ar' ? banner.badgeAr : banner.badgeEn;
-  const ctaText = lang === 'ar' ? banner.ctaTextAr : banner.ctaTextEn;
+  const ar = lang === 'ar';
+  const title = ar ? banner.titleAr : banner.titleEn;
+  const subtitle = ar ? banner.subtitleAr : banner.subtitleEn;
+  const badge = ar ? banner.badgeAr : banner.badgeEn;
 
   return (
-    <div className="w-full mt-4 mb-2">
-      {/* Primary Advertiser Sponsored Banner */}
-      <div 
-        id="sponsored-advertiser-banner"
-        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-700/60 p-3.5 sm:p-4 text-white shadow-sm"
+    <div id="sponsored-advertiser-banner" className="my-4">
+      <a
+        id="sponsored-advertiser-link"
+        href={banner.targetUrl}
+        className="group grid min-h-32 grid-cols-[1fr_28%] overflow-hidden rounded-2xl border border-fuchsia-300/20 bg-gradient-to-br from-[#311034] to-[#180c27] text-white shadow-sm transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-fuchsia-600 sm:grid-cols-[1fr_34%]"
       >
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-start gap-3 flex-1 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-400">
-              <Tag className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                {badge && (
-                  <span className="text-[9px] font-black  uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded-md">
-                    {badge}
-                  </span>
-                )}
-                <h4 className="text-xs sm:text-sm font-black text-slate-100 truncate">
-                  {title}
-                </h4>
-              </div>
-              <p className="text-[11px] text-slate-300 mt-0.5 line-clamp-1">
-                {subtitle}
-              </p>
-            </div>
+        <div className="min-w-0 space-y-2 p-3.5 sm:p-5">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h2 className="text-lg font-black tracking-wide sm:text-xl"><bdi>{title}</bdi></h2>
+            {badge && <span className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] font-bold text-fuchsia-100">{badge}</span>}
           </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            <a
-              id="sponsored-advertiser-link"
-              href={banner.targetUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full sm:w-auto text-center flex items-center justify-center gap-1.5 text-xs font-bold text-slate-900 bg-amber-400 hover:bg-amber-300 px-3.5 py-1.5 rounded-xl shadow-xs transition-colors cursor-pointer"
-            >
-              <span>{ctaText}</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          </div>
+          <p className="text-xs leading-relaxed text-fuchsia-100 sm:text-sm">{subtitle}</p>
+          <span className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-amber-200 px-3 text-xs font-extrabold text-[#301332] transition-colors group-hover:bg-amber-100">
+            {ar ? banner.ctaTextAr : banner.ctaTextEn}
+            <ArrowUpRight className="size-4 shrink-0" aria-hidden="true" />
+          </span>
         </div>
-      </div>
+        {banner.imageUrl && (
+          <div className="relative min-w-0 overflow-hidden bg-[#46183f]">
+            <img src={banner.imageUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover transition-transform group-hover:scale-105 motion-reduce:transition-none" />
+          </div>
+        )}
+      </a>
     </div>
   );
-};
+}

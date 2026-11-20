@@ -110,6 +110,7 @@ import {
 import { aiLearnedMemory } from './services/ai/aiLearnedMemory';
 import { isNonNegativeBalance } from './utils/formatBalance';
 import { recordTabNavigation, tabFromHistory } from './utils/navigationHistory';
+import { referencesAccount } from './utils/accountDetails';
 import { validateBalance } from './utils/accountLinking';
 
 import { saveUserSubscriptionToFirestore, subscribeUserSubscription, type SubscriptionReadIssue } from './services/prototypeSubscriptionClient';
@@ -1223,10 +1224,17 @@ export default function App() {
   // Open Edit Balance Modal
   const accountEditId = window.location.pathname.match(/^\/accounts\/([A-Za-z0-9_-]+)\/edit$/)?.[1];
   const editingAccount = accounts.find(account => account.id === accountEditId);
+  const canChangeAccountDetails = Boolean(editingAccount && financialLoaded.accounts && financialLoaded.transactions &&
+    !transactionReadError && !transactions.some(tx => referencesAccount(tx, editingAccount.id)) &&
+    !accounts.some(account => account.linkedBankId === editingAccount.id));
   const closeAccountEdit = () => backFromOffer(window.history.state?.offerBack || '/accounts');
 
   const saveEditedAccount = async (expected: FinancialAccount, updated: FinancialAccount) => {
     if (!editingAccount || !authUser || updated.id !== editingAccount.id) return false;
+    if (!canAddAccounts && updated.type !== expected.type && (updated.type === 'card' || updated.type === 'credit')) {
+      setToastMessage(lang === 'ar' ? 'يجب الترقية إلى خطة Pro لاختيار نوع البطاقة.' : 'Upgrade to Pro to choose this card type.');
+      return false;
+    }
     try {
       await updateAccountDetails(authUser.uid, expected, updated);
       return true;
@@ -2048,6 +2056,7 @@ export default function App() {
           <Fragment key={editingAccount?.id ?? 'list'}>
           <AccountsView
             editingAccount={editingAccount}
+            canChangeAccountDetails={canChangeAccountDetails}
             onSaveAccount={saveEditedAccount}
             onCloseEdit={closeAccountEdit}
             accounts={accounts}

@@ -2,6 +2,7 @@ import React, { useState, FormEvent } from 'react';
 import { ArrowLeft, ArrowRight, Plus, CreditCard, Banknote, Building2, PiggyBank, Smartphone, ArrowLeftRight, FolderKanban, ShieldCheck, X, Pencil, Trash2 } from 'lucide-react';
 import { FinancialAccount, CurrencyCode, AccountType, Language, SUPPORTED_CURRENCIES, currencyName } from '../../types';
 import { translations } from '../../data/translations';
+import { isProtectedCashAccount } from '../../utils/accountDetails';
 import { formatAccountBalance } from '../../utils/formatBalance';
 
 interface AccountsViewProps {
@@ -11,14 +12,16 @@ interface AccountsViewProps {
   onOpenProPlan: () => void;
   onAddAccount: (acc: Omit<FinancialAccount, 'id'>) => Promise<boolean>;
   editingAccount?: FinancialAccount;
+  canChangeAccountDetails: boolean;
   onSaveAccount: (expected: FinancialAccount, account: FinancialAccount) => Promise<boolean>;
   onCloseEdit: () => void;
   onDeleteAccount: (accountId: string) => Promise<boolean>;
   onEditBalance?: (accId: string | null) => void;
 }
 
-export function AccountsView({ accounts, lang, canAddAccounts, onOpenProPlan, onAddAccount, editingAccount, onSaveAccount, onCloseEdit, onDeleteAccount, onEditBalance }: AccountsViewProps) {
+export function AccountsView({ accounts, lang, canAddAccounts, onOpenProPlan, onAddAccount, editingAccount, canChangeAccountDetails, onSaveAccount, onCloseEdit, onDeleteAccount, onEditBalance }: AccountsViewProps) {
   const t = translations[lang];
+  const lockDetails = Boolean(editingAccount) && !canChangeAccountDetails;
   const [originalAccount] = useState(editingAccount);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [lockedCard, setLockedCard] = useState<string | null>(null);
@@ -86,7 +89,7 @@ export function AccountsView({ accounts, lang, canAddAccounts, onOpenProPlan, on
     const draft = { name: name.trim(), nameAr: name.trim(), type, balance: linked ? 0 : type === 'credit' ? -amount : amount, currency: bank?.currency || currency, ...(bank ? { linkedBankId: bank.id } : {}), ...(type === 'credit' ? { creditLimit: limit } : {}) };
     const unchangedName = originalAccount && name.trim() === (lang === 'ar' ? originalAccount.nameAr : originalAccount.name);
     const ok = originalAccount
-      ? await onSaveAccount(originalAccount, { ...originalAccount, ...draft,
+      ? await onSaveAccount(originalAccount, { ...originalAccount, ...draft, linkedBankId: bank?.id, creditLimit: type === 'credit' ? limit : undefined,
           ...(unchangedName ? { name: originalAccount.name, nameAr: originalAccount.nameAr } : {}),
         })
       : await onAddAccount(draft);
@@ -213,7 +216,7 @@ export function AccountsView({ accounts, lang, canAddAccounts, onOpenProPlan, on
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
                 )}
-                {acc.type !== 'cash' && (
+                {!isProtectedCashAccount(acc) && (
                 <button
                   type="button"
                   disabled={deletingId !== null}
@@ -228,7 +231,7 @@ export function AccountsView({ accounts, lang, canAddAccounts, onOpenProPlan, on
               </div>
             </div>
 
-            {acc.type !== 'cash' && confirmDeleteId === acc.id && (
+            {!isProtectedCashAccount(acc) && confirmDeleteId === acc.id && (
               <div className="mt-3 w-full rounded-xl border border-rose-200 bg-rose-50 p-3 text-start">
                 <p className="text-xs font-bold text-rose-900">
                   {lang === 'ar' ? `هل تريد مسح حساب «${acc.nameAr}»؟ لن يتم حذف أي عمليات مالية، ولا يُسمح بمسح حساب له رصيد أو عمليات أو حسابات مرتبطة.` : `Delete “${acc.name}”? Transactions are never deleted; accounts with balances, transactions or linked methods cannot be removed.`}
@@ -320,14 +323,14 @@ export function AccountsView({ accounts, lang, canAddAccounts, onOpenProPlan, on
                   </label>
                   <select
                     value={type}
-                    disabled={Boolean(editingAccount)}
+                    disabled={lockDetails}
                     onChange={(e) => setType(e.target.value as AccountType)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold"
                   >
                     <option value="cash">{lang === 'ar' ? 'كاش' : 'Cash'}</option>
                     <option value="bank">{lang === 'ar' ? 'بنك' : 'Bank'}</option>
-                    <option value="credit">{lang === 'ar' ? 'بطاقة ائتمان' : 'Credit card'}</option>
-                    <option value="card">{lang === 'ar' ? 'بطاقة خصم مباشر / فيزا' : 'Debit card'}</option>
+                    <option value="credit" disabled={Boolean(editingAccount) && !canAddAccounts && editingAccount?.type !== 'credit'}>{lang === 'ar' ? 'بطاقة ائتمان' : 'Credit card'}</option>
+                    <option value="card" disabled={Boolean(editingAccount) && !canAddAccounts && editingAccount?.type !== 'card'}>{lang === 'ar' ? 'بطاقة خصم مباشر / فيزا' : 'Debit card'}</option>
                     <option value="wallet">{lang === 'ar' ? 'إنستاباي / محفظة إلكترونية' : 'InstaPay / wallet'}</option>
                     <option value="other">{lang === 'ar' ? 'وسائل دفع واستلام أخرى' : 'Other Methods'}</option>
                     <option value="custom">{lang === 'ar' ? 'حسابات أخرى' : 'Other Accounts'}</option>
@@ -341,7 +344,7 @@ export function AccountsView({ accounts, lang, canAddAccounts, onOpenProPlan, on
                   </label>
                   <select
                     value={((type === 'card' || type === 'wallet') && linkMode === 'linked' && linkedBankId) ? (accounts.find(a => a.id === linkedBankId)?.currency || currency) : currency}
-                    disabled={Boolean(editingAccount) || ((type === 'card' || type === 'wallet') && linkMode === 'linked')}
+                    disabled={lockDetails || ((type === 'card' || type === 'wallet') && linkMode === 'linked')}
                     onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold font-mono"
                   >
@@ -352,10 +355,10 @@ export function AccountsView({ accounts, lang, canAddAccounts, onOpenProPlan, on
 
               {(type === 'card' || type === 'wallet') && <div className="space-y-2">
                 <label className="block text-xs font-bold text-slate-700">{lang === 'ar' ? 'طريقة الحساب' : 'Account setup'}</label>
-                <select required disabled={Boolean(editingAccount)} value={linkMode} onChange={e => setLinkMode(e.target.value as '' | 'independent' | 'linked')} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold">
+                <select required disabled={lockDetails} value={linkMode} onChange={e => setLinkMode(e.target.value as '' | 'independent' | 'linked')} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold">
                   <option value="">{lang === 'ar' ? 'اختر نوع الحساب' : 'Choose account setup'}</option><option value="independent">{lang === 'ar' ? 'مستقلة برصيد خاص' : 'Independent balance'}</option><option value="linked">{lang === 'ar' ? 'مرتبطة بحساب بنكي' : 'Linked to a bank account'}</option>
                 </select>
-                {linkMode === 'linked' && <select disabled={Boolean(editingAccount)} value={linkedBankId} onChange={e => setLinkedBankId(e.target.value)} required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold"><option value="">{lang === 'ar' ? 'اختر الحساب البنكي' : 'Choose a bank account'}</option>{accounts.filter(a => a.type === 'bank').map(a => <option key={a.id} value={a.id}>{a.nameAr} ({a.currency})</option>)}</select>}
+                {linkMode === 'linked' && <select disabled={lockDetails} value={linkedBankId} onChange={e => setLinkedBankId(e.target.value)} required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold"><option value="">{lang === 'ar' ? 'اختر الحساب البنكي' : 'Choose a bank account'}</option>{accounts.filter(a => a.type === 'bank' && a.id !== editingAccount?.id).map(a => <option key={a.id} value={a.id}>{a.nameAr} ({a.currency})</option>)}</select>}
               </div>}
               {(type === 'card' || type === 'wallet') && linkMode === 'linked' && <p className="text-xs text-slate-500">{lang === 'ar' ? 'تستخدم الوسيلة رصيد البنك وعملته، ولا يُحسب رصيدها مرة أخرى في الإجمالي.' : 'This method uses the bank account balance and currency.'}</p>}
               {type === 'credit' && <div><label className="block text-xs font-bold text-slate-700 mb-1">{lang === 'ar' ? 'الحد الائتماني' : 'Credit limit'}</label><input type="number" min="0.01" step="any" required value={creditLimit} onChange={e => setCreditLimit(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2" /></div>}

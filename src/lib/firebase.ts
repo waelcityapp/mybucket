@@ -18,9 +18,11 @@ import {
   runTransaction,
   getDocFromServer,
   getDocsFromServer,
+  deleteField,
 } from 'firebase/firestore';
 import { FinancialAccount, Transaction, Category } from '../types';
 import firebaseConfig from './firebaseConfig';
+import { isProtectedCashAccount, referencesAccount } from '../utils/accountDetails';
 import { isNonNegativeBalance } from '../utils/formatBalance';
 import { bindMovement, movementDeltas, validateBalance, type LinkedAccount } from '../utils/accountLinking';
 
@@ -240,7 +242,7 @@ export async function deleteUnusedAccountFromFirestore(userId: string, accountId
   if (!accountSnapshot) throw new Error('account-missing');
 
   const account = accountSnapshot.data() as FinancialAccount;
-  if (account.type === 'cash') throw new Error('protected-cash-account');
+  if (isProtectedCashAccount({ ...account, id: accountId })) throw new Error('protected-cash-account');
   if (account.balance !== 0) throw new Error('nonzero-balance');
   if (accountDocs.some(item => item.id !== accountId && (item.data() as FinancialAccount).linkedBankId === accountId)) {
     throw new Error('linked-account');
@@ -259,7 +261,7 @@ export async function deleteUnusedAccountFromFirestore(userId: string, accountId
     const current = await transaction.get(accountRef);
     if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
     if (!current.exists()) throw new Error('account-missing');
-    if ((current.data() as FinancialAccount).type === 'cash') throw new Error('protected-cash-account');
+    if (isProtectedCashAccount({ ...(current.data() as FinancialAccount), id: accountId })) throw new Error('protected-cash-account');
     if ((current.data() as FinancialAccount).balance !== 0) throw new Error('nonzero-balance');
     transaction.delete(accountRef);
   });
@@ -485,6 +487,18 @@ export async function updateAccountDetails(userId: string, expected: FinancialAc
   requireFinancialWriteAccess();
   if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
   if (!updated.name.trim() || updated.name.length > 40 || updated.nameAr.length > 40) throw new Error('invalid-account-name');
+  const changesStructure = expected.type !== updated.type || expected.currency !== updated.currency ||
+    expected.linkedBankId !== updated.linkedBankId;
+  if (changesStructure) {
+    const [accounts, transactions] = await Promise.all([
+      getDocsFromServer(collection(db, 'users', userId, 'accounts')),
+      getDocsFromServer(collection(db, 'users', userId, 'transactions')),
+    ]);
+    if (transactions.docs.some(record => referencesAccount(record.data() as Transaction, expected.id)) ||
+        accounts.docs.some(record => record.data().linkedBankId === expected.id)) {
+      throw new Error('account-changed');
+    }
+  }
   const ref = doc(db, 'users', userId, 'accounts', expected.id);
   await runTransaction(db, async transaction => {
     const snapshot = await transaction.get(ref);
@@ -496,9 +510,21 @@ export async function updateAccountDetails(userId: string, expected: FinancialAc
         current.linkedBankId !== expected.linkedBankId || current.creditLimit !== expected.creditLimit) {
       throw new Error('account-changed');
     }
-    const balance = current.linkedBankId ? current.balance : updated.balance;
-    const credit = current.type === 'credit' ? { creditLimit: updated.creditLimit } : {};
-    validateBalance({ ...current, ...credit }, balance);
-    transaction.update(ref, { name: updated.name, nameAr: updated.nameAr, balance, ...credit });
+    if (changesStructure && updated.linkedBankId) {
+      if (updated.linkedBankId === expected.id || !['card', 'wallet'].includes(updated.type)) throw new Error('invalid-link');
+      const bank = (await transaction.get(doc(db, 'users', userId, 'accounts', updated.linkedBankId))).data();
+      if (!bank || bank.type !== 'bank' || bank.currency !== updated.currency) throw new Error('invalid-link');
+      if (!current.linkedBankId && current.balance !== 0) throw new Error('nonzero-balance');
+    }
+    const balance = updated.linkedBankId ? 0 : updated.balance;
+    validateBalance(updated, balance);
+    transaction.update(ref, {
+      name: updated.name, nameAr: updated.nameAr, balance,
+      ...(changesStructure ? {
+        type: updated.type, currency: updated.currency, linkedBankId: updated.linkedBankId ?? deleteField(),
+      } : {}),
+      ...(updated.type === 'credit' ? { creditLimit: updated.creditLimit } :
+        current.type === 'credit' ? { creditLimit: deleteField() } : {}),
+    });
   });
 }

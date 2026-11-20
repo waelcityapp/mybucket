@@ -25,7 +25,7 @@ test('preview images have the same dimensions for photos and text-only ads', asy
   const photo = await readFile('public/demo-ads/food.jpg');
   for (const image of [photo, null]) {
     const result = await sharp(await brandedOfferImage(image, logo)).metadata();
-    assert.deepEqual([result.width, result.height, result.format], [1200, 630, 'jpeg']);
+    assert.deepEqual([result.width, result.height, result.format], [1080, 1080, 'jpeg']);
   }
 });
 

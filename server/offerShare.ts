@@ -7,8 +7,9 @@ import { getAppIdentity } from './appIdentity.js';
 import { readPublicOfferAds } from './offerAds.js';
 
 const defaultIcon = 'icons/mybucket-512.png';
-const width = 1200;
-const height = 630;
+const width = 1080;
+const height = 1080;
+const logoInset = 36;
 const escape = (value: string) => value.replace(/[&<>"']/g, char =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
 
@@ -63,7 +64,7 @@ export async function brandedOfferImage(photo: Buffer | null, icon: Buffer) {
     .flatten({ background: '#ffffff' }).png().toBuffer();
   const canvas = background ? sharp(background) : sharp({ create: { width, height, channels: 3, background: '#064e3b' } });
   return canvas
-    .composite([{ input: logo, left: background ? 782 : (width - size) / 2, top: background ? 477 : (height - size) / 2 }])
+    .composite([{ input: logo, left: background ? width - size - logoInset : (width - size) / 2, top: background ? height - size - logoInset : (height - size) / 2 }])
     .jpeg({ quality: 75 }).toBuffer();
 }
 
@@ -101,7 +102,7 @@ export async function renderOfferShare(id: string, language: string, origin: str
   return offerShareHtml({
     url, destination, lang, app,
     title: offer ? (lang === 'ar' ? `${offer.merchant} · ${offer.title}` : `${offer.title} · ${offer.merchant}`) : app,
-    description: offer ? `${app} · ${offerShareExcerpt(offer.description)}` : app,
+    description: offer ? `${app} · ${offerShareExcerpt(offer.description, 85)}` : app,
     image: offer ? `${url}/i` : new URL(`/${defaultIcon}`, origin).href,
   });
 }

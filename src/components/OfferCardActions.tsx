@@ -28,20 +28,21 @@ export function OfferCardActions({ id, isAr, state, engagement, onReact }: {
 
   async function share() {
     const url = new URL(`/offers/share/${isAr ? 'ar' : 'en'}/${encodeURIComponent(id)}`, window.location.origin).href;
+    const text = `${isAr ? 'شوف العرض' : 'View the offer'}\n${url}`;
     setShareMessage('');
     try {
       if (navigator.share) {
-        await navigator.share({ url });
+        await navigator.share({ text });
         return;
       }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') return;
     }
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(text);
       setShareMessage(isAr ? 'اتنسخ رابط الإعلان' : 'Ad link copied');
     } catch {
-      setShareMessage(url);
+      setShareMessage(text);
     }
   }
 

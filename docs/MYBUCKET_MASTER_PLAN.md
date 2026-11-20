@@ -634,3 +634,5 @@ Each ad tier has a Benefits and Pricing dialog in the creation form. Pricing is 
 Free and paid advertisement submission confirmations link to both My Ads and the app home screen.
 
 The sign-in screen explains the financial workflow, offers a three-entry in-memory guest demo and public deals, and keeps Google as the real account entry point. Affiliate messaging reflects the Pro discount policy.
+
+The public Try button opens the existing sample dashboard at /try, with local-only sample transactions and accounts. Guest controls return to sign-in and never start the signed-in account setup or admin simulation.

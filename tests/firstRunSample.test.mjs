@@ -18,9 +18,9 @@ test('samples stay in UI memory without paid calls or Firebase writes', () => {
   assert.doesNotMatch(sample, /saveAllAccountsToFirestore|createFinancialTransaction|localStorage\.setItem|\/api\/gateway/);
 });
 test('admin simulator follows the same sample-first sequence', () => {
-  assert.match(sample, /realOnboarding \? 'dashboard' : 'login'/);
+  assert.match(sample, /\(realOnboarding \|\| guestPreview\) \? 'dashboard' : 'login'/);
   assert.match(sample, /onSimulatedSignIn=\{\(\) => setStage\('dashboard'\)\}/);
-  assert.match(sample, /realOnboarding \? onStartReal : \(\) => setStage\('setup'\)/);
+  assert.match(sample, /realOnboarding \|\| guestPreview \? onStartReal : \(\) => setStage\('setup'\)/);
 });
 test('home example exposes sample data, edit controls, and explicit opt-in', () => {
   assert.match(sample, /ابدأ ببياناتي الحقيقية/);
@@ -28,4 +28,9 @@ test('home example exposes sample data, edit controls, and explicit opt-in', () 
   assert.match(sample, /<QuickActions/);
   assert.match(sample, /<MoneySources/);
   assert.match(sample, /<TransactionsView/);
+});
+
+test('guest demo opens the sample dashboard before login', () => {
+  assert.match(app, /if \(!authUser\) \{\s*if \(window.location.pathname === '\/try'\)/);
+  assert.match(app, /guestPreview\s*onExit=\{returnToSignIn\} onStartReal=\{returnToSignIn\}/);
 });

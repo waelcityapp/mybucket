@@ -10,22 +10,20 @@ interface AuthPageProps {
   onSuccess: (appliedCode?: string | null, signedInUid?: string) => Promise<void>;
   onToggleLanguage?: () => void;
   onOpenOffers: () => void;
+  onOpenDemo?: () => void;
   simulation?: boolean;
   onSimulatedSignIn?: () => void;
   identity?: AppIdentity;
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({ lang, onSuccess, onToggleLanguage, onOpenOffers, simulation = false, onSimulatedSignIn, identity }) => {
+export const AuthPage: React.FC<AuthPageProps> = ({ lang, onSuccess, onToggleLanguage, onOpenOffers, onOpenDemo, simulation = false, onSimulatedSignIn, identity }) => {
   const [affiliateCode, setAffiliateCode] = useState('');
   const [codeValidStatus, setCodeValidStatus] = useState<'idle' | 'valid' | 'invalid'>('idle');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const isAr = lang === 'ar';
-  const [showDemo, setShowDemo] = useState(false);
-  const [demoCount, setDemoCount] = useState(0);
   const appName = (isAr ? identity?.appNameAr : identity?.appNameEn) || 'My Bucket';
-  const currency = new Intl.NumberFormat(isAr ? 'ar-EG' : 'en-EG', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 });
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.trim().toUpperCase();
@@ -77,17 +75,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ lang, onSuccess, onToggleLan
             <h1 className="text-2xl font-black leading-tight sm:text-4xl">{isAr ? 'نظّم فلوسك بسهولة' : 'Make sense of your money'}</h1>
             <p className="text-sm leading-7 text-emerald-100">{isAr ? 'سجّل دخلك ومصروفاتك واعرف رصيدك وفلوسك بتروح فين.' : 'Record income and expenses, check your balance, and see where your money goes.'}</p>
           </div>
-          {showDemo ? <div id="auth-guest-demo" className="space-y-3 rounded-2xl border border-emerald-700 bg-emerald-900 p-4">
-            <p className="text-sm font-bold">{isAr ? 'رصيد تجريبي' : 'Sample balance'}</p>
-            <p className="text-2xl font-extrabold" role="status">{currency.format(2500 - demoCount * 150)}</p>
-            <p className="text-xs leading-6 text-emerald-100">{isAr ? 'دي بيانات نموذجية في الصفحة بس، وبتتمسح عند التحديث.' : 'Sample data stays on this page and resets when you refresh.'}</p>
-            <button type="button" disabled={demoCount >= 3} onClick={() => setDemoCount(count => Math.min(3, count + 1))}
-              className="min-h-11 w-full rounded-xl bg-emerald-100 px-3 font-bold text-emerald-950 disabled:opacity-60">
-              {isAr ? `جرّب تسجيل مصروف بـ${currency.format(150)}` : `Try recording a ${currency.format(150)} expense`}
-            </button>
-            {demoCount >= 3 && <p className="text-xs text-emerald-100" role="status">{isAr ? 'كملت ٣ عمليات تجريبية. ابدأ بحساب Google عشان تسجّل عملياتك.' : 'You tried three sample entries. Continue with Google to record your own.'}</p>}
-            <button type="button" onClick={() => setShowDemo(false)} className="min-h-11 text-xs font-bold underline">{isAr ? 'إغلاق التجربة' : 'Close demo'}</button>
-          </div> : !simulation && <button type="button" onClick={() => setShowDemo(true)}
+          {onOpenDemo && <button type="button" onClick={onOpenDemo}
             className="min-h-11 w-full rounded-xl bg-emerald-100 px-4 text-sm font-extrabold text-emerald-950 sm:w-auto">
             {isAr ? 'جرّب التطبيق بدون تسجيل' : 'Try without signing in'}
           </button>}

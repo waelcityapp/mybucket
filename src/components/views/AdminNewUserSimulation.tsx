@@ -42,14 +42,15 @@ interface Props {
   lang: Language;
   onExit: () => void;
   realOnboarding?: boolean;
+  guestPreview?: boolean;
   onStartReal?: () => void;
   trialDaysRemaining?: number | null;
   identity?: AppIdentity;
 }
 
-export function AdminNewUserSimulation({ lang, onExit, realOnboarding = false, onStartReal, trialDaysRemaining, identity }: Props) {
+export function AdminNewUserSimulation({ lang, onExit, realOnboarding = false, guestPreview = false, onStartReal, trialDaysRemaining, identity }: Props) {
   const ar = lang === 'ar';
-  const [stage, setStage] = useState<Stage>(() => realOnboarding ? 'dashboard' : 'login');
+  const [stage, setStage] = useState<Stage>(() => (realOnboarding || guestPreview) ? 'dashboard' : 'login');
   const [page, setPage] = useState<DashboardPage>('overview');
   const [accounts, setAccounts] = useState<FinancialAccount[]>(exampleAccounts);
   const [transactions, setTransactions] = useState<Transaction[]>(exampleTransactions);
@@ -138,11 +139,11 @@ export function AdminNewUserSimulation({ lang, onExit, realOnboarding = false, o
       {!realOnboarding && <div className="sticky top-0 z-50 bg-amber-50 border-b border-amber-200 px-3 py-2 shadow-sm">
         <div className="max-w-xl mx-auto flex flex-wrap items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-amber-800 shrink-0" />
-          <span className="text-xs font-extrabold text-amber-950 flex-1">{ar ? 'وضع محاكاة المستخدم الجديد — بلا حفظ أو تسجيل حقيقي' : 'New user simulation — no real sign-in or saved data'}</span>
-          <button type="button" onClick={restart} className="text-xs font-bold text-amber-800 underline underline-offset-2">{ar ? 'من البداية' : 'Restart'}</button>
+          <span className="text-xs font-extrabold text-amber-950 flex-1">{guestPreview ? (ar ? 'تجربة بدون تسجيل' : 'Guest demo') : ar ? 'وضع محاكاة المستخدم الجديد — بلا حفظ أو تسجيل حقيقي' : 'New user simulation — no real sign-in or saved data'}</span>
+          <button type="button" onClick={guestPreview ? resetSamples : restart} className="text-xs font-bold text-amber-800 underline underline-offset-2">{ar ? 'من البداية' : 'Restart'}</button>
           <button type="button" onClick={onExit} className="rounded-lg bg-slate-900 text-white px-2.5 py-1.5 flex items-center gap-1 text-xs font-bold">
             {ar ? <ArrowRight className="w-3.5 h-3.5" /> : <ArrowLeft className="w-3.5 h-3.5" />}
-            {ar ? 'إنهاء المحاكاة' : 'Exit'}
+            {guestPreview ? (ar ? 'العودة لصفحة الدخول' : 'Back to sign-in') : (ar ? 'إنهاء المحاكاة' : 'Exit')}
           </button>
         </div>
       </div>}
@@ -203,14 +204,16 @@ export function AdminNewUserSimulation({ lang, onExit, realOnboarding = false, o
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-2">
             <p className="font-extrabold text-sm text-amber-950">{ar ? (sampleMode ? 'هذه مجرد بيانات تجريبية يمكنك تعديلها' : 'أنت تجرب حسابًا افتراضيًا فارغًا') : (sampleMode ? 'These are editable sample records' : 'You are testing an empty sample account')}</p>
             <p className="text-xs text-amber-900 leading-relaxed">
-              {realOnboarding
+              {guestPreview
+                ? (ar ? 'جرّب تسجيل دخل أو مصروف وشوف تأثيره على الرصيد. البيانات هنا وهمية وبترجع لأصلها عند تحديث الصفحة.' : 'Try recording income or an expense and see the balance change. These records reset when you refresh.')
+                : realOnboarding
                 ? (ar ? 'جرّب تعديل الأرصدة وتسجيل دخل ومصروف. هذه بيانات للشرح فقط، ولن تُحفظ في حسابك، وتعود لأصلها عند تحديث الصفحة. تبدأ مدة تجربتك من تسجيل Google.' : 'Try balances, income and expenses. These are sample records, not saved to your account; a page refresh resets them. Your trial starts when you register with Google.')
                 : (ar ? 'كل التعديلات هنا مؤقتة في ذاكرة الصفحة فقط، ولا تؤثر على حساب الإدارة أو Firebase أو فترة اشتراكك.' : 'All changes stay in this page memory only; nothing affects your admin account, Firebase, or subscription.')}
             </p>
-            {(sampleMode || realOnboarding) && (
-              <button type="button" onClick={realOnboarding ? onStartReal : () => setStage('setup')}
+            {(sampleMode || realOnboarding || guestPreview) && (
+              <button type="button" onClick={realOnboarding || guestPreview ? onStartReal : () => setStage('setup')}
                 className="w-full rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white py-3 px-3 text-sm font-extrabold">
-                {ar ? 'ابدأ ببياناتي الحقيقية' : 'Start with my own data'}
+                {guestPreview ? (ar ? 'ابدأ بحساب Google' : 'Get started with Google') : (ar ? 'ابدأ ببياناتي الحقيقية' : 'Start with my own data')}
               </button>
             )}
             {realOnboarding && <p className="text-[11px] text-amber-800">
@@ -305,7 +308,7 @@ export function AdminNewUserSimulation({ lang, onExit, realOnboarding = false, o
             <button type="submit" className="w-full rounded-xl bg-emerald-700 py-3 text-sm font-extrabold text-white hover:bg-emerald-800">{ar ? 'أضف العملية التجريبية' : 'Add sample transaction'}</button>
           </form>
           <p className="text-center text-xs text-slate-500">
-            {realOnboarding ? (ar ? 'أنت مسجّل بـ Google بالفعل. العمليات التجريبية لا تستهلك Gemini ولا تُحفظ في Firebase.' : 'You are signed in with Google. Sample entries use no Gemini and are not saved to Firebase.')
+            {guestPreview ? (ar ? 'العمليات التجريبية بتفضل في الصفحة فقط.' : 'Sample entries stay in this page only.') : realOnboarding ? (ar ? 'أنت مسجّل بـ Google بالفعل. العمليات التجريبية لا تستهلك Gemini ولا تُحفظ في Firebase.' : 'You are signed in with Google. Sample entries use no Gemini and are not saved to Firebase.')
               : (ar ? 'المحاكاة لا تنشئ مستخدمًا ولا تستهلك Gemini أو Firestore.' : 'The simulator creates no user and uses no Gemini or Firestore writes.')}
           </p>
         </main>

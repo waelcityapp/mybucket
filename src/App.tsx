@@ -1491,12 +1491,18 @@ export default function App() {
 
   // 2. Dedicated Full-Page Auth & Registration (No popups / No modals)
   if (!authUser) {
+    if (window.location.pathname === '/try') {
+      const returnToSignIn = () => backFromOffer('/');
+      return <AdminNewUserSimulation lang={lang} identity={appIdentity} guestPreview
+        onExit={returnToSignIn} onStartReal={returnToSignIn} />;
+    }
     return (
       <AuthPage
         lang={lang}
         identity={appIdentity}
         onSuccess={handleAuthGateSuccess}
         onToggleLanguage={handleToggleLanguage}
+        onOpenDemo={() => navigateOffer('/try')}
         onOpenOffers={openOffers}
       />
     );

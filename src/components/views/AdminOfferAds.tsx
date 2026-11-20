@@ -13,11 +13,24 @@ type UploadStats = {
   uploadsPaused: boolean;
 };
 
+const hiddenAdsKey = 'mybucket.admin.offerAds.hidden';
+
+function readHiddenAds(): Set<string> {
+  try {
+    const ids: unknown = JSON.parse(localStorage.getItem(hiddenAdsKey) ?? '[]');
+    return new Set(Array.isArray(ids) ? ids.filter(id => typeof id === 'string') : []);
+  } catch {
+    return new Set();
+  }
+}
+
 export function AdminOfferAds({ lang }: { lang: Language }) {
   const ar = lang === 'ar';
   const [receiptErrors, setReceiptErrors] = useState<Record<string, boolean>>({});
   const [status, setStatus] = useState<OfferAdStatus>('pending');
   const [ads, setAds] = useState<ReviewOfferAd[] | null>(null);
+  const [hiddenAds, setHiddenAds] = useState(readHiddenAds);
+  const [showHidden, setShowHidden] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -111,6 +124,23 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
   const labels = { pending: ar ? 'بانتظار الموافقة' : 'Pending', approved: ar ? 'المقبولة' : 'Approved', rejected: ar ? 'المرفوضة' : 'Rejected' };
   const date = (value: number) => new Date(value).toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: 'Africa/Cairo' });
   const button = 'min-h-11 rounded-xl px-3 text-sm font-bold disabled:opacity-50';
+  const reviewed = status !== 'pending';
+  const hasHiddenAds = reviewed && Boolean(ads?.some(ad => hiddenAds.has(ad.id)));
+  const visibleAds = ads?.filter(ad => !reviewed || showHidden || !hiddenAds.has(ad.id));
+
+  const toggleHidden = (id: string) => {
+    const next = readHiddenAds();
+    if (hiddenAds.has(id)) next.delete(id);
+    else next.add(id);
+    try {
+      localStorage.setItem(hiddenAdsKey, JSON.stringify([...next]));
+      setHiddenAds(next);
+      setNotice('');
+    } catch {
+      setNotice(ar ? 'تعذّر حفظ التغيير في المتصفح.' : 'Could not save the change in this browser.');
+    }
+  };
+
   return <div className="space-y-4">
     <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -152,19 +182,31 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
     </form>
     <div className="flex flex-wrap gap-2" aria-label={ar ? 'حالة الإعلان' : 'Ad status'}>
       {(['pending', 'approved', 'rejected'] as const).map(value => <button type="button" key={value} disabled={busy}
-        aria-pressed={status === value} onClick={() => { if (status !== value) { setAds(null); setStatus(value); setDecision(null); setNotice(''); } }}
+        aria-pressed={status === value} onClick={() => { if (status !== value) { setAds(null); setStatus(value); setShowHidden(false); setDecision(null); setNotice(''); } }}
         className={`${button} ${status === value ? 'bg-emerald-700 text-white' : 'bg-white border border-slate-200 text-slate-800'}`}>{labels[value]}</button>)}
+      {hasHiddenAds && <button type="button" aria-pressed={showHidden} onClick={() => setShowHidden(value => !value)} className={`${button} bg-slate-100 text-slate-700`}>
+        {ar ? 'عرض الإعلانات المخفية' : 'Show hidden ads'}
+      </button>}
       <button type="button" disabled={busy} onClick={() => setRefresh(value => value + 1)} className={`${button} bg-slate-100 text-slate-700`}>{ar ? 'تحديث' : 'Refresh'}</button>
     </div>
     {notice && <p role="status" className="text-sm font-semibold text-emerald-800">{notice}</p>}
     {error && <p role="alert" className="text-sm font-semibold text-red-700">{error}</p>}
     {ads === null && !error && <p role="status" className="text-sm text-slate-600">{ar ? 'جاري تحميل الإعلانات...' : 'Loading ads…'}</p>}
     {ads?.length === 0 && <p className="rounded-xl border bg-white p-4 text-sm text-slate-600">{ar ? 'مفيش إعلانات بالحالة دي حاليًا.' : 'There are no ads with this status.'}</p>}
+    {hasHiddenAds && visibleAds?.length === 0 && <p className="rounded-xl border bg-white p-4 text-sm text-slate-600">{ar ? 'كل الإعلانات في القائمة دي مخفية.' : 'All ads in this list are hidden.'}</p>}
     <div className="grid gap-4 lg:grid-cols-2">
-      {ads?.map(ad => <div key={ad.id} className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-white p-3">
+      {visibleAds?.map(ad => <div key={ad.id} className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-white p-3">
+        <div className="flex flex-wrap items-center gap-2">
         <span className={`inline-block rounded-full px-3 py-1 text-xs font-extrabold ${ad.payment ? 'bg-amber-100 text-amber-900' : 'bg-slate-100 text-slate-700'}`}>
           {ad.tier === 'vip' ? 'VIP' : ad.payment ? (ar ? 'إعلان مميز' : 'Featured ad') : (ar ? 'إعلان مجاني' : 'Free ad')}
         </span>
+          {reviewed && <button type="button"
+            className="min-h-11 rounded-lg px-2 text-xs font-bold text-slate-700 hover:bg-slate-100"
+            aria-label={hiddenAds.has(ad.id) ? (ar ? `إظهار ${ad.title} في لوحة الإدارة` : `Restore ${ad.title} in admin`) : (ar ? `إخفاء ${ad.title} من لوحة الإدارة` : `Hide ${ad.title} from admin`)}
+            onClick={() => toggleHidden(ad.id)}>
+            {hiddenAds.has(ad.id) ? (ar ? 'إظهار' : 'Restore') : (ar ? 'إخفاء' : 'Hide')}
+          </button>}
+        </div>
         <AdCreativeCard lang={lang} title={ad.title} description={ad.description} merchant={ad.merchant} contact={ad.contact}
           mediaUrl={ad.media?.url} mediaType={ad.media?.type} poster={ad.media?.poster} />
         <dl className="space-y-1 text-xs text-slate-600">

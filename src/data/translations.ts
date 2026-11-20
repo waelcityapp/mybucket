@@ -152,7 +152,6 @@ export const translations = {
     langEnglish: 'English',
     dataManagement: 'إدارة البيانات',
     resetDemoData: 'استعادة البيانات التجريبية الافتراضية',
-    resetNotice: 'سيتم استعادة الحسابات والعمليات النموذجية.',
     
     // Technical drawer (kept outside normal UI)
     devDiagnostics: 'معلومات تقنية للمطورين (مخفية)',
@@ -334,7 +333,6 @@ export const translations = {
     langEnglish: 'English',
     dataManagement: 'Data Management',
     resetDemoData: 'Reset Demo Data',
-    resetNotice: 'Restores the default demo accounts and transactions.',
     
     // Technical drawer (kept outside normal UI)
     devDiagnostics: 'Developer Diagnostics (Hidden / Technical)',

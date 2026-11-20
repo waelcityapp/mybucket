@@ -26,6 +26,7 @@ interface SettingsViewProps {
   appLockStatus?: LockStatus | null;
   onAppLockChange?: (status: LockStatus) => void;
   onSetLanguage: (lang: Language) => void;
+  onOpenDeleteTransactions: () => void;
   onZeroAllBalances?: () => Promise<boolean>;
   user: AuthUser | null;
   subscription?: UserSubscription | null;
@@ -44,6 +45,7 @@ export function SettingsView({
   appLockStatus,
   onAppLockChange,
   onSetLanguage,
+  onOpenDeleteTransactions,
   onZeroAllBalances,
   user,
   subscription,
@@ -280,7 +282,6 @@ export function SettingsView({
           <RotateCcw className="w-4 h-4 text-slate-600" />
           <span>{t.dataManagement}</span>
         </div>
-        <p className="text-xs text-slate-500">{t.resetNotice}</p>
 
         <div className="flex flex-col gap-2 pt-1">
           <button
@@ -291,6 +292,10 @@ export function SettingsView({
             <RotateCcw className="w-3.5 h-3.5" />
             <span>{t.zeroAllBalances}</span>
           </button>
+          {user && <button type="button" onClick={onOpenDeleteTransactions}
+            className="w-full min-h-10 rounded-xl border border-rose-200 bg-rose-50 px-4 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
+            {ar ? 'حذف العمليات' : 'Delete transactions'}
+          </button>}
 
         </div>
 

@@ -1593,6 +1593,19 @@ export default function App() {
     return <AdminNewUserSimulation lang={lang} identity={appIdentity} onExit={backToAdminSections} />;
   }
 
+  if (window.location.pathname === '/settings/delete-transactions' && authUser) {
+    return <DeleteTransactionsPage lang={lang} uid={authUser.uid} accounts={accounts} transactions={transactions}
+      ready={financialLoaded.accounts && financialLoaded.transactions && !transactionReadError}
+      onBack={() => {
+        if (window.history.state?.fromAccountSettings) window.history.back();
+        else {
+          window.history.replaceState({ myBucketTab: 'settings' }, '', '/');
+          setOfferLocation('/');
+          setActiveTab('settings');
+        }
+      }} />;
+  }
+
   if (window.location.pathname === '/settings/favorites' && authUser) {
     return <OffersPage lang={lang} favoritesPage showViewCounts={isAdmin} authChecking={isAuthChecking}
       viewerId={authUser.uid} onSignIn={loginWithGoogle} onNavigate={navigateOffer} onBack={() => {
@@ -2102,6 +2115,11 @@ export default function App() {
 
             onSetLanguage={(newLang) => setLang(newLang)}
             onZeroAllBalances={handleZeroAllBalances}
+            onOpenDeleteTransactions={() => {
+              window.history.pushState({ myBucketTab: 'settings', fromAccountSettings: true }, '', '/settings/delete-transactions');
+              setOfferLocation('/settings/delete-transactions');
+              window.scrollTo(0, 0);
+            }}
             user={authUser}
             subscription={userSubscription}
             subscriptionUnavailable={!!subscriptionError}

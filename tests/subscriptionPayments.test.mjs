@@ -5,8 +5,8 @@ import { subscriptionPayment } from '../server/subscriptionPayments.ts';
 const id = '11111111-1111-4111-8111-111111111111';
 const otherId = '22222222-2222-4222-8222-222222222222';
 const admin = { uid: 'admin', email: 'waelvts@gmail.com' };
-const approve = (requestId, db, actor = admin) =>
-  subscriptionPayment('admin.subscriptionPayment.review', actor, { id: requestId, decision: 'approve' }, db);
+const approve = (requestId, db, actor = admin, reference) =>
+  subscriptionPayment('admin.subscriptionPayment.review', actor, { id: requestId, decision: 'approve', reference }, db);
 
 function fixture() {
   const requests = 'subscriptionPaymentRequests/';
@@ -54,4 +54,14 @@ test('a regular user cannot approve a payment', async () => {
   const { db, records, requests } = fixture();
   await assert.rejects(approve(id, db, { uid: 'member', email: 'member@example.com' }), { code: 'admin_only' });
   assert.equal(records.get(requests + id).status, 'pending');
+});
+
+
+test('receipt-only requests can be approved once the administrator records the reference', async () => {
+  const { db, records, requests } = fixture();
+  delete records.get(requests + id).reference;
+  await assert.rejects(approve(id, db), { code: 'invalid_transfer_reference' });
+  assert.equal((await approve(id, db, admin, '١٢٣٤٥٦')).status, 'approved');
+  assert.equal(records.get(requests + id).reference, '123456');
+  await assert.rejects(approve(otherId, db, admin, '123456'), { code: 'reference_already_used' });
 });

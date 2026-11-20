@@ -25,7 +25,6 @@ export function SubscriptionPayment({ lang, plan, onPickPlan, onClose }: {
   const [refresh, setRefresh] = useState(0);
   const [quote, setQuote] = useState<{ plan: Plan; amount: number } | null>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [reference, setReference] = useState('');
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
   const uploaded = useRef<{ file: File; media: UploadedAdMedia } | null>(null);
@@ -36,7 +35,6 @@ export function SubscriptionPayment({ lang, plan, onPickPlan, onClose }: {
     if (code === 'payment_already_pending') return ar ? 'عندك طلب قيد المراجعة بالفعل.' : 'A request is already under review.';
     if (code === 'payment_price_changed') return ar ? 'المبلغ المعروض اتغير. تواصل مع الإدارة لو التحويل تم بالفعل.' : 'The price changed. Contact support if you already transferred.';
     if (code === 'active_other_plan') return ar ? 'انتظر انتهاء اشتراكك المدفوع الحالي قبل شراء خطة مختلفة.' : 'Wait until your current paid term ends before buying another plan.';
-    if (code === 'invalid_transfer_reference') return ar ? 'راجع الرقم المرجعي للتحويل.' : 'Check the transfer reference.';
     return ar ? 'تعذّر إكمال الطلب. راجع الاتصال وحاول مرة أخرى.' : 'Unable to complete the request. Check your connection and retry.';
   };
 
@@ -68,10 +66,6 @@ export function SubscriptionPayment({ lang, plan, onPickPlan, onClose }: {
       setError(ar ? 'اختر صورة JPG أو PNG أو WebP حتى ٥ ميجابايت.' : 'Choose a JPG, PNG or WebP image up to 5 MB.');
       return;
     }
-    if (!/^[A-Z0-9-]{5,48}$/.test(reference.trim().replace(/\s+/g, '').toUpperCase())) {
-      setError(ar ? 'راجع الرقم المرجعي للتحويل.' : 'Check the transfer reference.');
-      return;
-    }
     setSending(true);
     setError('');
     try {
@@ -79,9 +73,8 @@ export function SubscriptionPayment({ lang, plan, onPickPlan, onClose }: {
         const signed = await offerAdsRequest<SignedAdUpload>('subscriptionPayment.prepare', { plan, bytes: file.size }, true);
         uploaded.current = { file, media: await uploadAdMedia(file, signed, () => {}) };
       }
-      await offerAdsRequest('subscriptionPayment.submit', { ...uploaded.current.media, plan, reference, quotedAmount: quote.amount }, true);
+      await offerAdsRequest('subscriptionPayment.submit', { ...uploaded.current.media, plan, quotedAmount: quote.amount }, true);
       setFile(null);
-      setReference('');
       uploaded.current = null;
       setRefresh(value => value + 1);
       onClose();
@@ -111,9 +104,8 @@ export function SubscriptionPayment({ lang, plan, onPickPlan, onClose }: {
       <h2 className="text-lg font-bold">{ar ? 'دفع الاشتراك بإنستاباي' : 'Pay with InstaPay'} · {planLabel(plan)}</h2>
       {quote?.plan === plan ? <>
         <p className="font-bold">{quote.amount} {ar ? 'جنيه مصري' : 'EGP'}</p>
-        <p className="text-sm">{ar ? 'حوّل المبلغ، ثم أدخل الرقم المرجعي وأرفق صورة الإيصال. التفعيل بعد مراجعة التحويل.' : 'Transfer the shown amount, then enter the reference and attach your receipt. Activation follows review.'}</p>
+        <p className="text-sm">{ar ? 'حوّل المبلغ، ثم أرفق صورة الإيصال. التفعيل بعد مراجعة التحويل.' : 'Transfer the shown amount, then attach your receipt. Activation follows review.'}</p>
         <a href={INSTA_PAY_LINK} target="_blank" rel="noreferrer" className={button}>{ar ? 'فتح إنستاباي' : 'Open InstaPay'}</a>
-        <label className="block text-sm font-bold">{ar ? 'الرقم المرجعي للتحويل' : 'Transfer reference'}<input required dir="ltr" maxLength={48} value={reference} onChange={event => setReference(event.target.value)} className={input} /></label>
         <label className="block text-sm font-bold">{ar ? 'صورة الإيصال' : 'Receipt image'}<input required type="file" accept="image/jpeg,image/png,image/webp" onChange={event => setFile(event.target.files?.[0] ?? null)} className={input} /></label>
         <button type="submit" disabled={sending} className={button}>{sending ? (ar ? 'جارٍ الإرسال…' : 'Sending…') : (ar ? 'إرسال للمراجعة' : 'Submit for review')}</button>
       </> : !error && <p role="status">{ar ? 'جارٍ تحميل المبلغ…' : 'Loading amount…'}</p>}
@@ -129,6 +121,7 @@ export function AdminSubscriptionPayments({ lang }: { lang: Language }) {
   const [payments, setPayments] = useState<Payment[] | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [references, setReferences] = useState<Record<string, string>>({});
   const [reason, setReason] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   useEffect(() => {
@@ -143,19 +136,20 @@ export function AdminSubscriptionPayments({ lang }: { lang: Language }) {
 
   async function review(payment: Payment, decision: 'approve' | 'correction') {
     if (busy) return;
+    const reference = (references[payment.id] ?? payment.reference ?? '').trim();
     if (decision === 'approve' && !await confirmAction({
       lang, title: ar ? 'تأكيد وصول التحويل' : 'Confirm transfer received',
-      description: ar ? `هل طابقت تحويل ${payment.amount} جنيه والرقم المرجعي ${payment.reference} في حسابك؟` : `Did you match the EGP ${payment.amount} transfer and reference ${payment.reference} in your account?`,
+      description: ar ? `هل طابقت تحويل ${payment.amount} جنيه والرقم المرجعي ${reference} في حسابك؟` : `Did you match the EGP ${payment.amount} transfer and reference ${reference} in your account?`,
       confirmLabel: ar ? 'تأكيد الدفع والتفعيل' : 'Confirm payment and activate', cancelLabel: ar ? 'إلغاء' : 'Cancel',
     })) return;
     setBusy(true);
     setError('');
     try {
-      await offerAdsRequest('admin.subscriptionPayment.review', { id: payment.id, decision, reason: reason[payment.id] ?? '' }, true);
+      await offerAdsRequest('admin.subscriptionPayment.review', { id: payment.id, decision, reference, reason: reason[payment.id] ?? '' }, true);
       setRefresh(value => value + 1);
     } catch (error) {
       const code = error instanceof Error ? error.message : '';
-      setError(code === 'reference_already_used' ? (ar ? 'الرقم المرجعي مُعتمد في طلب آخر.' : 'This reference was already approved.') : (ar ? 'تعذّر حفظ قرار المراجعة.' : 'Could not save the review.'));
+      setError(code === 'reference_already_used' ? (ar ? 'الرقم المرجعي مُعتمد في طلب آخر.' : 'This reference was already approved.') : code === 'invalid_transfer_reference' ? (ar ? 'راجع الرقم المرجعي الموجود في الإيصال.' : 'Check the reference shown on the receipt.') : (ar ? 'تعذّر حفظ قرار المراجعة.' : 'Could not save the review.'));
     } finally {
       setBusy(false);
     }
@@ -173,13 +167,17 @@ export function AdminSubscriptionPayments({ lang }: { lang: Language }) {
     {payments?.map(payment => <article key={payment.id} className="space-y-2 rounded-xl border border-slate-200 p-4 text-sm">
       <p className="font-bold">{planLabel(payment.plan)} · {payment.amount} {ar ? 'جنيه' : 'EGP'}</p>
       <p className="break-all">{payment.email}</p>
-      <p>{ar ? 'الرقم المرجعي' : 'Reference'} <bdi>{payment.reference}</bdi></p>
+      {payment.status !== 'pending' && payment.reference && <p>{ar ? 'الرقم المرجعي' : 'Reference'} <bdi>{payment.reference}</bdi></p>}
       {payment.receiptUrl && <a className="block underline" href={payment.receiptUrl} target="_blank" rel="noreferrer">{ar ? 'عرض الإيصال' : 'View receipt'}</a>}
       {payment.code && <p>{ar ? 'كود المسوّق' : 'Marketer code'} <bdi>{payment.code}</bdi></p>}
       {payment.reason && <p>{payment.reason}</p>}
       {payment.commission !== undefined && <p>{ar ? 'عمولة المسوّق' : 'Marketer commission'} {payment.commission} {ar ? 'جنيه' : 'EGP'}</p>}
       {payment.status === 'pending' && <>
-        <button type="button" disabled={busy} className={button} onClick={() => void review(payment, 'approve')}>{ar ? 'تأكيد الدفع وتفعيل الاشتراك' : 'Confirm payment and activate'}</button>
+        <label className="block font-bold">{ar ? 'الرقم المرجعي من الإيصال' : 'Reference from receipt'}
+          <input dir="ltr" maxLength={48} className={input} value={references[payment.id] ?? payment.reference ?? ''}
+            onChange={event => setReferences(current => ({ ...current, [payment.id]: event.target.value }))} />
+        </label>
+        <button type="button" disabled={busy || !(references[payment.id] ?? payment.reference)?.trim()} className={button} onClick={() => void review(payment, 'approve')}>{ar ? 'تأكيد الدفع وتفعيل الاشتراك' : 'Confirm payment and activate'}</button>
         <label className="block">{ar ? 'سبب طلب التصحيح' : 'Correction reason'}<textarea maxLength={300} className={input} value={reason[payment.id] ?? ''} onChange={event => setReason(current => ({ ...current, [payment.id]: event.target.value }))} /></label>
         <button type="button" className="min-h-11 font-bold underline disabled:opacity-50" disabled={busy || !reason[payment.id]?.trim()} onClick={() => void review(payment, 'correction')}>{ar ? 'طلب تصحيح' : 'Request correction'}</button>
       </>}

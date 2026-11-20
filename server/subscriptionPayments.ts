@@ -10,7 +10,7 @@ type Plan = 'basic' | 'pro';
 type Status = 'pending' | 'correction' | 'approved';
 type Payment = {
   uid: string; email: string | null; id: string; plan: Plan; amount: number; code: string | null;
-  status: Status; reference: string; createdAt: string; reason?: string; paidExpiresAt?: string;
+  status: Status; reference?: string; createdAt: string; reason?: string; paidExpiresAt?: string;
   receipt: { publicId: string; format: string };
 };
 
@@ -54,7 +54,11 @@ export async function subscriptionPayment(action: string, user: { uid: string; e
       }
       const billing = db.doc(`users/${payment.uid}/billing/subscription`);
       const access = db.doc(`users/${payment.uid}/billing/access`);
-      const used = db.doc(`subscriptionPaymentReferences/${createHash('sha256').update(payment.reference).digest('hex')}`);
+      const supplied = typeof payload.reference === 'string' ? payload.reference : payment.reference ?? '';
+      const reference = supplied.trim().replace(/[٠-٩۰-۹]/g, digit => String(digit.charCodeAt(0) & 15))
+        .replace(/\s+/g, '').toUpperCase();
+      if (!/^[A-Z0-9-]{5,48}$/.test(reference)) fail('invalid_transfer_reference');
+      const used = db.doc(`subscriptionPaymentReferences/${createHash('sha256').update(reference).digest('hex')}`);
       const [current, permission, duplicate] = await Promise.all([tx.get(billing), tx.get(access), tx.get(used)]);
       if (duplicate.exists) fail('reference_already_used', 409);
       if (!current.exists || !permission.exists) fail('access_record_missing', 409);
@@ -74,7 +78,7 @@ export async function subscriptionPayment(action: string, user: { uid: string; e
         monthlyPriceEgp: payment.amount, manualPaymentsApproved: approvedBefore + 1, updatedAt: reviewed.reviewedAt,
       });
       tx.update(access, { paidUntil: Timestamp.fromDate(expiry) });
-      tx.update(ref, { ...reviewed, status: 'approved', paidExpiresAt, commission });
+      tx.update(ref, { ...reviewed, status: 'approved', reference, paidExpiresAt, commission });
       return { status: 'approved', paidExpiresAt };
     });
   }
@@ -115,8 +119,6 @@ export async function subscriptionPayment(action: string, user: { uid: string; e
   }
 
   if (payload.quotedAmount !== amount) fail('payment_price_changed', 409);
-  const reference = typeof payload.reference === 'string' ? payload.reference.trim().replace(/\s+/g, '').toUpperCase() : '';
-  if (!/^[A-Z0-9-]{5,48}$/.test(reference)) fail('invalid_transfer_reference');
   const verified = await confirmAdminAdTestUpload(user.uid, { ...payload, resourceType: 'image' }, undefined, fetch, 'subscription-receipts');
   const id = verified.publicId.split('/').at(-1)!;
   const ref = requests.doc(id);
@@ -126,7 +128,7 @@ export async function subscriptionPayment(action: string, user: { uid: string; e
     const currentId = current.get('id');
     if (currentId && (await tx.get(requests.doc(currentId))).get('status') === 'pending') fail('payment_already_pending', 409);
     tx.create(ref, {
-      uid: user.uid, email: user.email, id, plan, amount, code, reference, status: 'pending',
+      uid: user.uid, email: user.email, id, plan, amount, code, status: 'pending',
       createdAt: new Date().toISOString(), receipt: { publicId: verified.publicId, format: verified.format },
     } satisfies Payment);
     tx.set(latest, { id });

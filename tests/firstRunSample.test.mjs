@@ -9,7 +9,7 @@ test('new Google accounts see sample home before real account setup', () => {
   assert.match(app, /needsInitialSetup && financialLoaded\.accounts && financialLoaded\.transactions && transactions\.length === 0/);
   assert.ok(app.indexOf('return <AdminNewUserSimulation lang={lang} realOnboarding') < app.indexOf('if (authUser && needsInitialSetup && financialLoaded.accounts) {'));
   assert.match(app, /onStartReal=\{\(\) => setOnboardingSetupUid\(authUser\.uid\)\}/);
-  assert.match(app, /onBack=\{\(\) => setOnboardingSetupUid\(null\)\}/);
+  assert.match(app, /onBack: \(\) => setOnboardingSetupUid\(null\)/);
 });
 test('samples stay in UI memory without paid calls or Firebase writes', () => {
   assert.match(sample, /useState<FinancialAccount\[\]>/);

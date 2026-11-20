@@ -1510,7 +1510,8 @@ export default function App() {
       initialSetupAttempt.current = null;
       setOnboardingSetupUid(uid);
       setActiveTab('home');
-      window.history.replaceState({ myBucketTab: 'home' }, '', '/');
+      window.history.replaceState({ myBucketTab: 'home' }, '', '/accounts/setup');
+      setOfferLocation('/accounts/setup');
       window.scrollTo(0, 0);
     } catch (error) {
       if (auth.currentUser?.uid !== uid) return;
@@ -1672,7 +1673,8 @@ export default function App() {
       </section>
     </div>;
   }
-  if (authUser && needsInitialSetup && financialLoaded.accounts && financialLoaded.transactions && transactions.length === 0 && onboardingSetupUid !== authUser.uid) {
+  const restartingFinancialSetup = window.location.pathname === '/accounts/setup';
+  if (authUser && needsInitialSetup && financialLoaded.accounts && financialLoaded.transactions && transactions.length === 0 && !restartingFinancialSetup && onboardingSetupUid !== authUser.uid) {
     const trialDaysRemaining = userSubscription ? stageFor(userSubscription) === 'pro-trial'
       ? Math.max(0, Math.ceil((Date.parse(userSubscription.trialStartedAt) + getTrialDurations().proDays * 86400000 - Date.now()) / 86400000))
       : calculateRemainingTrialDays(userSubscription) : null;
@@ -1691,7 +1693,10 @@ export default function App() {
       setActiveTab('home');
     };
     return <InitialSetupView lang={lang} canAddAccounts={canAddAccounts}
-      onBack={() => setOnboardingSetupUid(null)} backLabel={lang === 'ar' ? 'العودة للبيانات التجريبية' : 'Back to sample data'}
+      {...(!restartingFinancialSetup && {
+        onBack: () => setOnboardingSetupUid(null),
+        backLabel: lang === 'ar' ? 'العودة للبيانات التجريبية' : 'Back to sample data',
+      })}
       onCancel={leaveInitialSetup} onSave={async draft => {
       if (!auth.currentUser || auth.currentUser.uid !== authUser.uid) throw new Error('auth-changed');
       if (!trialSettingsReady) throw new Error('trial-access-not-ready');
@@ -1703,6 +1708,10 @@ export default function App() {
         initialSetupAttempt.current = { signature, accounts: draft.map((account, index) => ({ ...account, id: index === 0 ? 'setup_cash' : `acc_${crypto.randomUUID()}` })) };
       }
       await saveAllAccountsToFirestore(authUser.uid, initialSetupAttempt.current.accounts);
+      if (restartingFinancialSetup && auth.currentUser?.uid === authUser.uid) {
+        window.history.replaceState({ myBucketTab: 'home' }, '', '/');
+        setOfferLocation('/');
+      }
     }} />;
   }
 

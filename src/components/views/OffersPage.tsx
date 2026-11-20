@@ -9,10 +9,12 @@ import { Language } from '../../types';
 import type { OfferEngagement, OfferReaction, OfferReactionState, PublicOfferAd } from '../../data/offerAds';
 import { offerAdsRequest } from '../../services/offerAdsClient';
 import { DEMO_ADS } from '../../data/demoAds';
+import { offerShareExcerpt } from '../../utils/offerShare';
 import { OfferCardActions } from '../OfferCardActions';
 
 interface OffersPageProps {
   lang: Language;
+  appName?: string;
   showViewCounts: boolean;
   authChecking: boolean;
   favoritesPage?: boolean;
@@ -45,18 +47,6 @@ const CATEGORIES: OfferCategory[] = [
 ];
 
 
-function previewDescription(description: string) {
-  const text = description.trim().replace(/\s+/gu, ' ');
-  const characters = Array.from(text);
-  if (characters.length <= 120) return text;
-  const prefix = characters.slice(0, 119).join('').trimEnd();
-  const lastSpace = prefix.lastIndexOf(' ');
-  const completeWords = characters[119] === ' ' || characters[118] === ' ' || lastSpace < 0
-    ? prefix
-    : prefix.slice(0, lastSpace);
-  return completeWords + '…';
-}
-
 type OfferCard = PublicOfferAd & { viewCount?: number };
 const viewedAdIds = new Set<string>();
 let memorySessionId: string | undefined;
@@ -74,7 +64,7 @@ function viewSessionId() {
   }
 }
 
-export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySlug, onNavigate, showViewCounts, authChecking, viewerId, onSignIn, favoritesPage = false }) => {
+export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySlug, onNavigate, showViewCounts, authChecking, viewerId, onSignIn, appName = 'My Bucket', favoritesPage = false }) => {
   const isAr = lang === 'ar';
   const BackIcon = isAr ? ArrowRight : ArrowLeft;
   const ForwardIcon = isAr ? ArrowLeft : ArrowRight;
@@ -313,7 +303,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                                 <Store className="size-4 shrink-0 text-emerald-700 dark:text-emerald-400" aria-hidden="true" /><span className="min-w-0 break-words">{merchant}</span>
                               </p>
                               <h2 className="break-words text-lg font-extrabold leading-snug">{adTitle}</h2>
-                              <p className="line-clamp-2 break-words text-sm text-slate-600 dark:text-slate-300">{previewDescription(description)}</p>
+                              <p className="line-clamp-2 break-words text-sm text-slate-600 dark:text-slate-300">{offerShareExcerpt(description)}</p>
                               <div className="mt-auto flex flex-wrap items-center justify-end gap-2 pt-1">
                                 {showViewCounts && typeof viewCount === 'number' && (
                                   <span className="me-auto inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
@@ -326,7 +316,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                                   {isAr ? 'مزيد من التفاصيل' : 'More details'} <ForwardIcon className="size-4" aria-hidden="true" />
                                 </a>
                               </div>
-                              <OfferCardActions id={ad.id} title={adTitle} isAr={isAr} state={reactions?.[ad.id]}
+                              <OfferCardActions id={ad.id} title={adTitle} merchant={merchant} description={description} appName={appName} isAr={isAr} state={reactions?.[ad.id]}
                                 engagement={demo ? demoEngagement[ad.id] : 'engagement' in ad ? ad.engagement : undefined}
                                 onReact={reaction => reactToAd(ad.id, demo, reaction)} />
                             </div>

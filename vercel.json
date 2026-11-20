@@ -16,7 +16,20 @@
       ]
     }
   ],
+  "functions": {
+    "api/gateway.ts": {
+      "includeFiles": "public/{icons/mybucket-512.png,demo-ads/*.jpg}"
+    }
+  },
   "rewrites": [
+    {
+      "source": "/offers/share/:lang/:id/image",
+      "destination": "/api/gateway?offerShare=:id&lang=:lang&format=image"
+    },
+    {
+      "source": "/offers/share/:lang/:id",
+      "destination": "/api/gateway?offerShare=:id&lang=:lang"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"

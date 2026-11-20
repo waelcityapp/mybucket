@@ -1,10 +1,14 @@
 import { Heart, Share2, ThumbsUp } from 'lucide-react';
+import { offerShareExcerpt } from '../utils/offerShare';
 import { useState } from 'react';
 import type { OfferEngagement, OfferReaction, OfferReactionState } from '../data/offerAds';
 
-export function OfferCardActions({ id, title, isAr, state, engagement, onReact }: {
+export function OfferCardActions({ id, title, merchant, description, appName, isAr, state, engagement, onReact }: {
   id: string;
   title: string;
+  merchant: string;
+  description: string;
+  appName: string;
   isAr: boolean;
   state?: OfferReactionState;
   engagement?: OfferEngagement;
@@ -28,21 +32,22 @@ export function OfferCardActions({ id, title, isAr, state, engagement, onReact }
   const buttonClass = 'inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-emerald-600 dark:hover:bg-slate-800';
 
   async function share() {
-    const url = new URL(`/offers/ad/${encodeURIComponent(id)}`, window.location.origin).href;
+    const url = new URL(`/offers/share/${isAr ? 'ar' : 'en'}/${encodeURIComponent(id)}`, window.location.origin).href;
+    const text = [title, merchant, offerShareExcerpt(description), appName, url].filter(Boolean).join('\n');
     setShareMessage('');
     try {
       if (navigator.share) {
-        await navigator.share({ title, url });
+        await navigator.share({ text });
         return;
       }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') return;
     }
     try {
-      await navigator.clipboard.writeText(url);
-      setShareMessage(isAr ? 'اتنسخ رابط الإعلان' : 'Ad link copied');
+      await navigator.clipboard.writeText(text);
+      setShareMessage(isAr ? 'اتنسخت تفاصيل الإعلان والرابط' : 'Ad details and link copied');
     } catch {
-      setShareMessage(url);
+      setShareMessage(text);
     }
   }
 
@@ -61,7 +66,7 @@ export function OfferCardActions({ id, title, isAr, state, engagement, onReact }
         {isAr ? 'مشاركة' : 'Share'}
       </button>
       {reactionError && <p role="alert" className="w-full px-2 pb-2 text-xs">{isAr ? 'تعذّر حفظ التفاعل. حاول تاني.' : 'Could not save the reaction. Try again.'}</p>}
-      {shareMessage && <p role="status" className="w-full select-text break-all px-2 pb-2 text-xs">{shareMessage}</p>}
+      {shareMessage && <p role="status" className="w-full select-text whitespace-pre-line break-words px-2 pb-2 text-xs">{shareMessage}</p>}
     </div>
   );
 }

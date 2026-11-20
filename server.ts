@@ -29,6 +29,18 @@ async function startServer() {
     res.json({ status: 'ok', time: new Date().toISOString() });
   });
 
+  app.get(['/offers/share/:lang/:id', '/offers/share/:lang/:id/image'], async (req, res) => {
+    const { renderOfferShare } = await import('./server/offerShare.js');
+    if (typeof req.params.id !== 'string' || typeof req.params.lang !== 'string') return res.sendStatus(404);
+    const image = req.path.endsWith('/image');
+    try {
+      const body = await renderOfferShare(req.params.id, req.params.lang, `${req.protocol}://${req.get('host')}`, image);
+      return res.status(body === null ? 404 : 200).type(image ? 'image/jpeg' : 'html').send(body ?? '');
+    } catch {
+      return res.status(503).json({ ok: false, error: 'offer_preview_unavailable' });
+    }
+  });
+
   // Unified authenticated backend gateway for all product operations.
   app.post('/api/gateway', async (req, res) => {
     try {

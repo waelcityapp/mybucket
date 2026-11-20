@@ -3,6 +3,7 @@ import type { Request } from 'express';
 type VercelRequest = {
   method?: string;
   headers: Record<string, string | string[] | undefined>;
+  query?: Record<string, string | string[] | undefined>;
   body?: {
     action?: unknown;
     payload?: Record<string, unknown>;
@@ -12,10 +13,28 @@ type VercelRequest = {
 type VercelResponse = {
   status(code: number): VercelResponse;
   json(body: unknown): void;
+  setHeader?(name: string, value: string): void;
+  send?(body: string | Buffer): void;
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
+    const id = req.query?.offerShare;
+    if (typeof id === 'string' && /^[a-z0-9-]{1,80}$/.test(id) && res.setHeader && res.send) {
+      const { renderOfferShare, offerShareOrigin } = await import('../server/offerShare.js');
+      const image = req.query?.format === 'image';
+      try {
+        const body = await renderOfferShare(id, typeof req.query?.lang === 'string' ? req.query.lang : 'ar',
+          offerShareOrigin(typeof req.headers.host === 'string' ? req.headers.host : undefined), image);
+        res.setHeader('Content-Type', image ? 'image/jpeg' : 'text/html; charset=utf-8');
+        res.setHeader('Cache-Control', body === null ? 'no-store' : 'public, max-age=0, s-maxage=60');
+        res.setHeader('X-Robots-Tag', 'noindex');
+        res.status(body === null ? 404 : 200);
+        return res.send(body ?? '');
+      } catch {
+        return res.status(503).json({ ok: false, error: 'offer_preview_unavailable' });
+      }
+    }
     const secret = process.env.CRON_SECRET;
     if (!secret || req.headers.authorization !== `Bearer ${secret}`) return res.status(401).json({ ok: false });
     try {

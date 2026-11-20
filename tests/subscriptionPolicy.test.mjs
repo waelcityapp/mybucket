@@ -65,3 +65,15 @@ test('a paid membership displays its actual remaining term independent of the tr
   assert.equal(calculateRemainingPaidDays(sub, moment(40)), 0);
   assert.equal(calculateRemainingPaidDays({ ...sub, paidExpiresAt: 'invalid' }, moment(11)), 0);
 });
+
+test('paid expiry falls back to Basic until its original end, then expires', async () => {
+  const { nextAccessChange, accessEndedLabel } = await import('../src/config/subscriptionPolicy.ts');
+  const paid = { ...trial, isPaid: true, paidExpiresAt: addDays(start, 30) };
+  assert.equal(nextAccessChange(paid, moment(29)), moment(30));
+  assert.equal(stageFor(paid, moment(30)), 'basic-free');
+  assert.equal(nextAccessChange(paid, moment(30)), moment(75));
+  assert.equal(stageFor(paid, moment(75)), 'expired');
+  assert.equal(accessEndedLabel(paid, false), 'Your free period has ended');
+  assert.equal(accessEndedLabel({ ...paid, paidExpiresAt: addDays(start, 90) }, false), 'Your subscription has ended');
+  assert.equal(nextAccessChange(paid, moment(75)), null);
+});

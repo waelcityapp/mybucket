@@ -72,7 +72,7 @@ import { AuthPage } from './components/views/AuthPage';
 import { InitialSetupView } from './components/views/InitialSetupView';
 import { UsageGuideView } from './components/views/UsageGuideView';
 import { UserSubscription, UserDailyUsage } from './types/prototypeSubscription';
-import { stageFor, getTrialDurations, setTrialDurations } from './config/subscriptionPolicy';
+import { accessEndedLabel, nextAccessChange, stageFor, getTrialDurations, setTrialDurations } from './config/subscriptionPolicy';
 import {
   createInitialSubscription,
   applyAffiliateCodeToExistingSubscription,
@@ -819,8 +819,8 @@ export default function App() {
     }, setSubscriptionError);
   }, [authUser?.uid, subscriptionRetry, trialSettingsReady]);
 
-  // Reflect an expired subscription in the current user's financial controls.
-  // The database rules are the remaining enforcement boundary (not shipped in this phase).
+  const [accessClock, setAccessClock] = useState(0);
+  const expiryLabel = accessEndedLabel(userSubscription, lang === 'ar');
   const currentTrialExpired = Boolean(trialSettingsReady && userSubscription && stageFor(userSubscription) === 'expired');
   useEffect(() => {
     setFinancialWriteBlocked(currentTrialExpired);
@@ -828,13 +828,20 @@ export default function App() {
   }, [currentTrialExpired, authUser?.uid]);
 
   useEffect(() => {
-    const grant = userSubscription?.grant;
-    if (!grant) return;
-    const remaining = Date.parse(grant.endsAt) - Date.now();
-    if (!Number.isFinite(remaining) || remaining <= 0) return;
-    const timer = window.setTimeout(() => setSubscriptionRetry(n => n + 1), Math.min(remaining + 50, 2147483647));
-    return () => window.clearTimeout(timer);
-  }, [userSubscription?.grant?.endsAt]);
+    if (!trialSettingsReady || !userSubscription) return;
+    const refresh = () => setAccessClock(clock => clock + 1);
+    const now = Date.now();
+    const boundary = nextAccessChange(userSubscription, now);
+    const timer = boundary === null ? undefined :
+      window.setTimeout(refresh, Math.min(boundary - now + 20, 2147483647));
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [userSubscription, trialSettingsReady, accessClock]);
 
   // Google Login Handler
   const handleGoogleLogin = async () => {
@@ -1018,7 +1025,7 @@ export default function App() {
       window.setTimeout(() => setToastMessage(null), 3500);
       return { ok: true };
     }
-    if (currentTrialExpired) { showExpiredNotice(); return { ok: false, message: lang === 'ar' ? 'انتهت الفترة المجانية. اختر خطتك للاستمرار.' : 'Your free trial ended. Choose your plan to continue.' }; }
+    if (currentTrialExpired) { showExpiredNotice(); return { ok: false, message: lang === 'ar' ? `${expiryLabel}. اختر خطتك للاستمرار.` : `${expiryLabel}. Choose your plan to continue.` }; }
     if (saveInFlight.current) return { ok: false };
     if (!authUser || !financialLoaded.accounts || !financialLoaded.transactions) {
       const message = lang === 'ar' ? 'انتظر تحميل بيانات حسابك وتأكد من الاتصال.' : 'Wait for your account data and check your connection.';
@@ -1776,7 +1783,7 @@ export default function App() {
       {expiredNoticeOpen && <div role="presentation" className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4">
         <div role="alertdialog" aria-modal="true" aria-labelledby="expired-access-heading" aria-describedby="expired-access-description" className="w-full max-w-sm rounded-3xl border border-amber-200 bg-white px-5 py-6 shadow-2xl space-y-4 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700"><Clock className="h-6 w-6" /></div>
-          <h2 id="expired-access-heading" className="text-lg font-black text-slate-900">{lang === 'ar' ? 'انتهت الفترة المجانية' : 'Your free period has ended'}</h2>
+          <h2 id="expired-access-heading" className="text-lg font-black text-slate-900">{expiryLabel}</h2>
           <p id="expired-access-description" className="text-sm leading-7 text-slate-700">{lang === 'ar' ? 'اختر خطة للاشتراك قبل تسجيل أي عملية جديدة، سواء يدويًا أو بالكتابة أو بالصوت. جميع عملياتك السابقة وأرصدتك ما زالت محفوظة ويمكنك الاطلاع عليها.' : 'Choose a subscription plan before recording new transactions by hand, text or voice. Your existing records and balances are still safe and visible.'}</p>
           <button type="button" onClick={() => { setExpiredNoticeOpen(false); openSubscriptionPage('subscription'); }} className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-800">{lang === 'ar' ? 'عرض خطط الاشتراك' : 'View subscription plans'}</button>
           <button type="button" onClick={() => setExpiredNoticeOpen(false)} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">{lang === 'ar' ? 'إغلاق' : 'Close'}</button>
@@ -1826,7 +1833,7 @@ export default function App() {
                     : !registeredAt
                     ? (lang === 'ar' ? 'تاريخ التسجيل غير متاح' : 'Registration date unavailable')
                     : isExpired
-                    ? (lang === 'ar' ? 'انتهت الفترة المجانية' : 'Free trial ended')
+                    ? expiryLabel
                     : (lang === 'ar' ? `أنت الآن على خطة ${plan}` : `You are on the ${plan} plan`);
                   const detail = subscriptionError
                     ? (lang === 'ar' ? 'اضغط لإعادة المحاولة' : 'Tap to retry')
@@ -1860,7 +1867,7 @@ export default function App() {
                   </button>;
                 })()}
               </div>
-              {currentTrialExpired && <div role="status" className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs font-bold text-amber-900 flex items-center justify-between gap-2"><span>{lang === 'ar' ? 'انتهت الفترة المجانية: يمكنك مشاهدة بياناتك، لكن تسجيل العمليات متوقف.' : 'Your free period ended: records remain visible; new transactions are disabled.'}</span><button type="button" onClick={() => openSubscriptionPage('subscription')} className="shrink-0 underline">{lang === 'ar' ? 'اختر خطتك' : 'Choose plan'}</button></div>}
+              {currentTrialExpired && <div role="status" className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs font-bold text-amber-900 flex items-center justify-between gap-2"><span>{lang === 'ar' ? `${expiryLabel}. بياناتك متاحة للقراءة.` : `${expiryLabel}. You can still view your records.`}</span><button type="button" onClick={() => openSubscriptionPage('subscription')} className="shrink-0 underline">{lang === 'ar' ? 'اختر خطتك' : 'Choose plan'}</button></div>}
               {subscriptionError && (
                 <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950 space-y-1 break-words">
                   <p>{lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn}</p>

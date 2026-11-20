@@ -3,7 +3,7 @@ import { ArrowRight, CalendarDays, Tag, ShieldCheck } from 'lucide-react';
 import type { Language } from '../../types';
 import type { UserSubscription } from '../../types/prototypeSubscription';
 import { calculateRemainingPaidDays, calculateRemainingTrialDays } from '../../utils/subscriptionUtils';
-import { getTrialDurations, BASIC_PRICE_EGP, BASIC_MARKETER_PRICE_EGP, PRO_PRICE_EGP, PRO_MARKETER_PRICE_EGP, stageFor } from '../../config/subscriptionPolicy';
+import { accessEndedLabel, getTrialDurations, BASIC_PRICE_EGP, BASIC_MARKETER_PRICE_EGP, PRO_PRICE_EGP, PRO_MARKETER_PRICE_EGP, stageFor } from '../../config/subscriptionPolicy';
 import { activeGrant } from '../../config/grantPolicy';
 import { SubscriptionPayment } from './SubscriptionPayment';
 import { AffiliateCodeSection } from '../AffiliateCodeSection';
@@ -37,6 +37,7 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
   const paidEnd = paidDays > 0 && subscription?.paidExpiresAt
     ? new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'long', timeZone: 'Africa/Cairo' }).format(new Date(subscription.paidExpiresAt))
     : null;
+  const expiryLabel = accessEndedLabel(subscription, ar);
   const stage = subscription ? stageFor(subscription) : null;
   const checkout = new URLSearchParams(window.location.search).get('checkout');
   const plan = checkout === 'basic' || checkout === 'pro' ? checkout : null;
@@ -68,7 +69,7 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
       {subscription && <AffiliateCodeSection subscription={subscription} lang={lang} onUpdateSubscription={onUpdateSubscription} />}
       {guest && <button type="button" className="min-h-11 rounded-xl bg-emerald-700 px-3 font-bold text-white" onClick={onSignIn}>{ar ? 'ابدأ بحساب Google' : 'Get started with Google'}</button>}
       {!grant && stage === 'basic-free' && <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm font-bold text-sky-900">{ar ? `Basic مجانية حتى اليوم ${getTrialDurations().basicDays}. المتبقي: ` : `Basic remains free until day ${getTrialDurations().basicDays}. Days remaining: `}{days}</p>}
-      {stage === 'expired' && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">{ar ? 'انتهت الفترة المجانية. اختر خطة اشتراك لمتابعة استخدام التطبيق.' : 'Your introductory period ended. Choose a subscription plan to continue.'}</p>}
+      {stage === 'expired' && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">{ar ? `${expiryLabel}. اختر خطة اشتراك لمتابعة الاستخدام.` : `${expiryLabel}. Choose a subscription plan to continue.`}</p>}
       {start && <p className="text-xs text-slate-500">{ar ? `تاريخ تسجيلك: ${start}` : `Registration date: ${start}`}</p>}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4">
@@ -109,7 +110,7 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
           <button type="button" onClick={onSubscription} className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white">{ar ? 'عرض الاشتراكات والتجديد' : 'View plans and renewal'}</button>
         </> : page === 'trial-details' ? <>
           <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 space-y-3 text-sm text-slate-700">
-            <p className="font-black text-slate-900">{grant ? (ar ? 'منحة مجانية نشطة' : 'Active free grant') : (stage === 'paid' || stage === 'paid-basic') ? (ar ? 'اشتراك نشط' : 'Subscription active') : stage === 'pro-trial' ? (ar ? 'تجربة Pro نشطة' : 'Pro trial active') : stage === 'basic-free' ? (ar ? 'فترة Basic المجانية' : 'Basic introductory period') : (ar ? 'انتهت الفترة المجانية' : 'Introductory period ended')}</p>
+            <p className="font-black text-slate-900">{grant ? (ar ? 'منحة مجانية نشطة' : 'Active free grant') : (stage === 'paid' || stage === 'paid-basic') ? (ar ? 'اشتراك نشط' : 'Subscription active') : stage === 'pro-trial' ? (ar ? 'تجربة Pro نشطة' : 'Pro trial active') : stage === 'basic-free' ? (ar ? 'فترة Basic المجانية' : 'Basic introductory period') : expiryLabel}</p>
             <p>{ar ? `Basic مجانية حتى اليوم ${getTrialDurations().basicDays} من التسجيل.` : `Basic is free until day ${getTrialDurations().basicDays} after signup.`}</p>
             <p>{grant ? (ar ? 'الأيام المتبقية للتجربة الأصلية: ' : 'Original trial days remaining: ') : (ar ? 'الأيام المجانية المتبقية: ' : 'Introductory days remaining: ')}{days}</p>
             {start && <p>{ar ? `تاريخ تسجيلك: ${start}` : `Registration date: ${start}`}</p>}

@@ -29,3 +29,33 @@ export function stageFor(sub: { trialStartedAt: string; isPaid: boolean; paidPla
   if (now < start + durations.basicDays*86400000) return 'basic-free';
   return 'expired';
 }
+
+type AccessDates = {
+  trialStartedAt: string;
+  isPaid: boolean;
+  paidExpiresAt?: string | null;
+  grant?: FreeGrant | null;
+};
+
+export function nextAccessChange(sub: AccessDates, now: number, durations = currentDurations): number | null {
+  const boundaries = [
+    Date.parse(sub.trialStartedAt) + durations.basicDays * 86400000,
+    sub.isPaid ? Date.parse(sub.paidExpiresAt ?? '') : NaN,
+    Date.parse(sub.grant?.startsAt ?? ''),
+    Date.parse(sub.grant?.endsAt ?? ''),
+  ].filter(time => Number.isFinite(time) && time > now);
+  return boundaries.length ? Math.min(...boundaries) : null;
+}
+
+export function accessEndedLabel(sub: AccessDates | null, ar: boolean, durations = currentDurations): string {
+  const trialEnd = Date.parse(sub?.trialStartedAt ?? '') + durations.basicDays * 86400000;
+  const paidEnd = Date.parse(sub?.paidExpiresAt ?? '');
+  const grantEnd = Date.parse(sub?.grant?.endsAt ?? '');
+  if (Number.isFinite(grantEnd) && grantEnd > (paidEnd || 0) && grantEnd > (trialEnd || 0)) {
+    return ar ? 'انتهت مدة المنحة' : 'Your grant has ended';
+  }
+  if (Number.isFinite(paidEnd) && paidEnd >= (trialEnd || 0)) {
+    return ar ? 'انتهت مدة الاشتراك' : 'Your subscription has ended';
+  }
+  return ar ? 'انتهت الفترة المجانية' : 'Your free period has ended';
+}

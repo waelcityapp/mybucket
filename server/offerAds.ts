@@ -1,4 +1,5 @@
 import { paidAdDailyPrice, adRunDays, normalizePaymentContactPhone } from '../src/utils/adCheckout.js';
+import { FieldValue } from 'firebase-admin/firestore';
 import { createHash } from 'node:crypto';
 import { getAdminFirestore } from './firebaseAdmin.js';
 import { confirmAdminAdTestUpload, deleteAdminAdTestUpload, signAdminAdTestUpload } from './adminAdTestUpload.js';
@@ -15,6 +16,7 @@ type Payload = Record<string, unknown>;
 type AdFields = Omit<PublicOfferAd, 'id' | 'media'>;
 type StoredMedia = Pick<Awaited<ReturnType<typeof confirmAdminAdTestUpload>>, 'publicId' | 'resourceType' | 'version' | 'format'>;
 type StoredAd = AdFields & {
+  viewCount?: number;
   ownerId: string;
   status: OfferAdStatus | 'draft' | 'cancelled' | 'deleting';
   mediaType: StoredMedia['resourceType'] | null;
@@ -100,11 +102,27 @@ export async function readPublicOfferAds(action: string, payload: Payload, db = 
     if (ad && (ad.status === 'approved' || ad.status === 'deleting') && ad.endsAt <= now) return { expired: true };
     return null;
   }
+  return readPublishedOffers(false, db, now);
+}
+
+export async function readPublishedOffers(includeViews: boolean, db = getAdminFirestore(), now = Date.now()) {
   const snapshot = await db.collection('offerAds').where('publishedUntil', '>', now).get();
   return snapshot.docs.flatMap(doc => {
     const ad = doc.data() as StoredAd;
-    return isPublicOffer(ad, now) ? [offerView(doc.id, ad)] : [];
+    if (!isPublicOffer(ad, now)) return [];
+    const offer = offerView(doc.id, ad);
+    return [includeViews ? { ...offer, viewCount: ad.viewCount ?? 0 } : offer];
   }).sort((a, b) => b.startsAt - a.startsAt);
+}
+
+export async function recordOfferCardView(payload: Payload, db = getAdminFirestore()) {
+  const ref = db.collection('offerAds').doc(adId(payload.id));
+  await db.runTransaction(async tx => {
+    const ad = (await tx.get(ref)).data() as StoredAd | undefined;
+    if (ad && isPublicOffer(ad, Date.now())) {
+      tx.update(ref, { viewCount: FieldValue.increment(1) });
+    }
+  });
 }
 
 export async function readMyOfferAds(uid: string, db = getAdminFirestore()): Promise<MyOfferAd[]> {

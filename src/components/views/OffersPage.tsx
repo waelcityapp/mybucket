@@ -1,9 +1,9 @@
 import { followInternalLink } from '../../utils/navigationHistory';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft, ArrowRight, Search, Plus, Landmark, UtensilsCrossed, ShoppingBasket,
   Shirt, Plane, Dumbbell, Car, HeartPulse, House, GraduationCap,
-  Gift, Smartphone, Store, Play, type LucideIcon
+  Gift, Smartphone, Store, Play, Eye, type LucideIcon
 } from 'lucide-react';
 import { Language } from '../../types';
 import type { PublicOfferAd } from '../../data/offerAds';
@@ -12,6 +12,7 @@ import { DEMO_ADS } from '../../data/demoAds';
 
 interface OffersPageProps {
   lang: Language;
+  showViewCounts: boolean;
   onBack: () => void;
   categorySlug?: string | null;
   onNavigate: (path: string) => void;
@@ -51,22 +52,26 @@ function previewDescription(description: string) {
   return completeWords + '…';
 }
 
-export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySlug, onNavigate }) => {
+type OfferCard = PublicOfferAd & { viewCount?: number };
+const viewedAdIds = new Set<string>();
+
+export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySlug, onNavigate, showViewCounts }) => {
   const isAr = lang === 'ar';
   const BackIcon = isAr ? ArrowRight : ArrowLeft;
   const ForwardIcon = isAr ? ArrowLeft : ArrowRight;
   const [search, setSearch] = useState('');
-  const [published, setPublished] = useState<PublicOfferAd[] | null>(null);
+  const [published, setPublished] = useState<OfferCard[] | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const [loadError, setLoadError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let active = true;
     setLoadError(false);
-    offerAdsRequest<PublicOfferAd[]>('ads.list')
+    offerAdsRequest<OfferCard[]>(showViewCounts ? 'admin.ads.listWithViews' : 'ads.list', {}, showViewCounts)
       .then(ads => { if (active) setPublished(ads); })
       .catch(() => { if (active) setLoadError(true); });
     return () => { active = false; };
-  }, [attempt]);
+  }, [attempt, showViewCounts]);
   const category = CATEGORIES.find(item => item.slug === categorySlug);
   const list = useMemo(() => CATEGORIES.filter(item =>
     `${item.ar} ${item.en}`.toLowerCase().includes(search.trim().toLowerCase())
@@ -90,6 +95,46 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
     : realAds.length ? realAds : demoAds;
   const showingDemos = !showVip && realAds.length === 0;
   const [vipLimit, setVipLimit] = useState(9);
+  useEffect(() => {
+    const grid = gridRef.current;
+    if (!grid || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        if (entry.intersectionRatio < 0.5 || document.visibilityState !== 'visible') continue;
+        const id = entry.target.getAttribute('data-offer-id');
+        if (!id) continue;
+        observer.unobserve(entry.target);
+        const sessionKey = `offer-view:${id}`;
+        if (viewedAdIds.has(id)) continue;
+        try {
+          if (sessionStorage.getItem(sessionKey)) continue;
+        } catch {
+          // In-memory tracking also works when browser storage is unavailable.
+        }
+        viewedAdIds.add(id);
+        void offerAdsRequest('ads.view', { id }).then(() => {
+          try { sessionStorage.setItem(sessionKey, '1'); } catch { /* Use in-memory tracking. */ }
+          if (!showViewCounts) return;
+          setPublished(ads => ads?.map(ad =>
+            ad.id === id && ad.viewCount !== undefined ? { ...ad, viewCount: ad.viewCount + 1 } : ad
+          ) ?? null);
+        }).catch(() => viewedAdIds.delete(id));
+      }
+    }, { threshold: 0.5 });
+    const observeCards = () => {
+      observer.disconnect();
+      if (document.visibilityState === 'visible') {
+        grid.querySelectorAll('[data-offer-id]').forEach(card => observer.observe(card));
+      }
+    };
+    observeCards();
+    document.addEventListener('visibilitychange', observeCards);
+    return () => {
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', observeCards);
+    };
+  }, [published, categorySlug, showVip, vipLimit, rotation, showViewCounts]);
+
   const title = category ? (isAr ? category.ar : category.en) : (isAr ? 'وفّر مع My Bucket' : 'Save with My Bucket');
 
   return (
@@ -134,16 +179,17 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                 {visibleAds.length > 0 ? (
                   <div className="space-y-4">
                     {showingDemos && <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-semibold text-amber-900">{isAr ? 'الإعلانات دي أمثلة تجريبية، والعروض وأسماء المعلنين غير حقيقية.' : 'These are demonstration ads with fictional offers and advertisers.'}</p>}
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <div ref={gridRef} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {(showVip ? visibleAds.slice(0, vipLimit) : visibleAds).map(ad => {
                         const tier = 'tier' in ad ? ad.tier : undefined;
                         const badge = showingDemos ? (isAr ? 'إعلان تجريبي' : 'Demo ad')
                           : tier === 'vip' ? 'VIP' : tier === 'featured' ? (isAr ? 'مميز' : 'Featured') : null;
                         const { title: adTitle, description, merchant, media } = ad;
                         const cardCategory = showVip ? CATEGORIES.find(item => item.slug === ad.categorySlug) : undefined;
+                        const viewCount = 'viewCount' in ad ? ad.viewCount : undefined;
                         const hasVideo = media?.type === 'video';
                         return (
-                          <article key={ad.id} className="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                          <article key={ad.id} data-offer-id={showingDemos ? undefined : ad.id} className="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                             {media?.type === 'image' && <img src={media.url} alt="" loading="lazy" className="aspect-video w-full bg-slate-100 object-cover dark:bg-slate-800" />}
                             {hasVideo && <a href={`/offers/ad/${ad.id}`} onClick={event => followInternalLink(event, onNavigate)}
                               aria-label={`${isAr ? 'شوف الفيديو' : 'View video'} · ${adTitle}`}
@@ -168,7 +214,13 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                               </p>
                               <h2 className="break-words text-lg font-extrabold leading-snug">{adTitle}</h2>
                               <p className="line-clamp-2 break-words text-sm text-slate-600 dark:text-slate-300">{previewDescription(description)}</p>
-                              <div className="mt-auto flex justify-end pt-1">
+                              <div className="mt-auto flex flex-wrap items-center justify-end gap-2 pt-1">
+                                {showViewCounts && typeof viewCount === 'number' && (
+                                  <span className="me-auto inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                    <Eye className="size-4" aria-hidden="true" />
+                                    {isAr ? 'المشاهدات' : 'Views'} {viewCount.toLocaleString(isAr ? 'ar-EG' : 'en')}
+                                  </span>
+                                )}
                                 <a href={`/offers/ad/${ad.id}`} onClick={event => followInternalLink(event, onNavigate)} aria-label={`${isAr ? 'مزيد من التفاصيل' : 'More details'} · ${adTitle}`}
                                   className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-50 px-3 text-sm font-bold text-emerald-900 hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-emerald-600 dark:bg-emerald-950 dark:text-emerald-200 dark:hover:bg-emerald-900">
                                   {isAr ? 'مزيد من التفاصيل' : 'More details'} <ForwardIcon className="size-4" aria-hidden="true" />

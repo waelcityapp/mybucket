@@ -1520,6 +1520,7 @@ export default function App() {
       : null;
     return <OffersPage
       lang={lang}
+      showViewCounts={isAdmin}
       categorySlug={categorySlug}
       onNavigate={navigateOffer}
       onBack={() => {

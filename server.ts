@@ -41,6 +41,11 @@ async function startServer() {
         const { basicDays } = await readTrialSettings();
         return res.status(200).json({ ok: true, data: { basicDays } });
       }
+      if (req.body?.action === 'ads.view') {
+        const { recordOfferCardView } = await import('./server/offerAds.js');
+        await recordOfferCardView(req.body.payload || {});
+        return res.json({ ok: true });
+      }
       if (req.body?.action === 'ads.list' || req.body?.action === 'ads.detail') {
         const { readPublicOfferAds } = await import('./server/offerAds.js');
         return res.json({ ok: true, data: await readPublicOfferAds(req.body.action, req.body.payload || {}) });
@@ -58,6 +63,11 @@ async function startServer() {
         const { signBrandIconUpload, saveAppIdentity } = await import('./server/appIdentity.js');
         const data = action === 'admin.identity.signUpload' ? signBrandIconUpload(payload) : await saveAppIdentity(payload, user.uid);
         return res.json({ ok: true, data });
+      }
+      if (action === 'admin.ads.listWithViews') {
+        if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+        const { readPublishedOffers } = await import('./server/offerAds.js');
+        return res.json({ ok: true, data: await readPublishedOffers(true) });
       }
       if (action === 'ads.mine') {
         const { readMyOfferAds } = await import('./server/offerAds.js');

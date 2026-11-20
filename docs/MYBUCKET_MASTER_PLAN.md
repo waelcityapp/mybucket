@@ -640,3 +640,7 @@ The public Try button opens the existing sample dashboard at /try, with local-on
 The guest demo now renders the real application home and navigation with isolated sample balances and transactions. Its voice/text analysis uses the local interpreter; guest plans are informational and public offers stay reachable.
 
 The guest dashboard and plans show the admin-configured Basic free period through a public read-only gateway action. The trial button starts Google sign-in.
+
+### Ad card views
+
+Published ad cards record a view when at least half of the card is visible in an active tab, once per browser tab session. The approved administrator sees each count on its card while browsing offers. The public list omits counts until public display is approved.

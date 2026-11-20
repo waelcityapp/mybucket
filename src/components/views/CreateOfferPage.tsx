@@ -1,6 +1,6 @@
-import { FeaturedAdInfoPage } from './FeaturedAdInfoPage';
+import { AdTierInfoDialog } from './FeaturedAdInfoPage';
 import { followInternalLink } from '../../utils/navigationHistory';
-import type { PublicOfferAd } from '../../data/offerAds';
+import type { OfferTier, PublicOfferAd } from '../../data/offerAds';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, ArrowLeft, ImagePlus, Megaphone, CheckCircle2, LoaderCircle, Video, X } from 'lucide-react';
 import type { Language } from '../../types';
@@ -103,18 +103,18 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   const preparation = useRef<AbortController | null>(null);
   useEffect(() => () => preparation.current?.abort(), []);
   const [preview, setPreview] = useState(false);
-  const [featuredInfoOpen, setFeaturedInfoOpen] = useState(() => window.location.pathname === '/offers/new/featured');
-  const featuredInfoHref = '/offers/new/featured' + window.location.search;
-  const openFeaturedInfo = (path: string) => {
-    window.history.pushState({ myBucketTab: 'offers', featuredInfo: true }, '', path);
-    setFeaturedInfoOpen(true);
-    window.scrollTo(0, 0);
+  const [infoTier, setInfoTier] = useState<OfferTier | null>(() => window.location.pathname === '/offers/new/featured' ? 'featured' : null);
+  const closeTierInfo = () => {
+    if (window.location.pathname === '/offers/new/featured') {
+      window.history.replaceState({ myBucketTab: 'offers' }, '', '/offers/new' + window.location.search);
+    }
+    setInfoTier(null);
   };
   const [checkoutOpen, setCheckoutOpen] = useState(() => window.location.pathname === '/offers/new/payment');
   useEffect(() => {
     const syncCheckoutRoute = () => {
       setCheckoutOpen(window.location.pathname === '/offers/new/payment');
-      setFeaturedInfoOpen(window.location.pathname === '/offers/new/featured');
+      setInfoTier(window.location.pathname === '/offers/new/featured' ? 'featured' : null);
     };
     window.addEventListener('popstate', syncCheckoutRoute);
     return () => window.removeEventListener('popstate', syncCheckoutRoute);
@@ -294,14 +294,6 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     }
     setCheckoutOpen(false);
   };
-  if (featuredInfoOpen) return <FeaturedAdInfoPage lang={lang} onBack={() => {
-    if (window.history.state?.featuredInfo) window.history.back();
-    else {
-      window.history.replaceState({ myBucketTab: 'offers' }, '', '/offers/new' + window.location.search);
-      setFeaturedInfoOpen(false);
-    }
-  }} />;
-
   if (checkoutOpen) {
     const start = adScheduleDate(startsAt);
     const end = adScheduleDate(endsAt);
@@ -342,6 +334,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
           </div>
         </div>
       </header>
+      {infoTier && <AdTierInfoDialog lang={lang} tier={infoTier} freeDays={freeDays} onClose={closeTierInfo} />}
       <main className="max-w-xl mx-auto px-4 py-5 pb-20 space-y-5">
         {renewState !== 'ready' ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -412,10 +405,10 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                   {value !== 'free' && <span className="text-xs text-slate-600">
                     {ar ? (value === 'vip' ? '٢٠٠ جنيه / يوم' : '١٠٠ جنيه / يوم') : (value === 'vip' ? 'EGP 200 / day' : 'EGP 100 / day')}
                   </span>}
-                  {value === 'featured' && <a href={featuredInfoHref} onClick={event => followInternalLink(event, openFeaturedInfo)}
+                  <button type="button" aria-haspopup="dialog" onClick={() => setInfoTier(value)}
                     className="inline-flex min-h-11 items-center px-1 text-xs font-bold text-emerald-800 underline underline-offset-2">
-                    {ar ? 'مميزات الإعلان المدفوع والأسعار' : 'Paid ad benefits and pricing'}
-                  </a>}
+                    {ar ? 'المميزات والأسعار' : 'Benefits and pricing'}
+                  </button>
                   </div>
                 ))}
               </div>

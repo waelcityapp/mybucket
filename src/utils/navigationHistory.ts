@@ -8,7 +8,7 @@ export function tabFromHistory(location: Location, state: unknown): ActiveTab {
   if (path === '/trial') return 'trial-details';
   if (path === '/subscription' || path === '/try/subscription') return 'subscription';
   if (path.startsWith('/reminders/')) return 'reminders';
-  if (path === '/accounts' || path === '/accounts/new') return 'accounts';
+  if (path === '/accounts' || path === '/accounts/new' || /^\/accounts\/[^/]+\/edit$/.test(path)) return 'accounts';
   if (path === '/categories' || path.startsWith('/categories/')) return 'categories';
   if (path === '/guide') return 'guide';
   if (path === '/settings/ads' || path === '/settings/favorites' || path === '/settings/delete-transactions') return 'settings';

@@ -101,6 +101,7 @@ import {
   updateFinancialTransaction,
   deleteTransactionFromFirestore,
   deleteUnusedAccountFromFirestore,
+  updateAccountDetails,
   saveAllCategoriesToFirestore,
   saveLearnedMemoryToFirestore,
   subscribeLearnedMemory,
@@ -261,7 +262,7 @@ export default function App() {
   }, []);
   useEffect(() => { applyAppIdentity(appIdentity, lang); }, [appIdentity, lang]);
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname.startsWith('/admin') ? 'admin-pin' : window.location.pathname === '/trial' ? 'trial-details' : (window.location.pathname === '/subscription' || window.location.pathname === '/try/subscription') ? 'subscription' : window.location.pathname.startsWith('/reminders/') ? 'reminders' : (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : window.location.pathname.startsWith('/categories/') ? 'categories' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/') || window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment') ? 'offers' : 'home');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname.startsWith('/admin') ? 'admin-pin' : window.location.pathname === '/trial' ? 'trial-details' : (window.location.pathname === '/subscription' || window.location.pathname === '/try/subscription') ? 'subscription' : window.location.pathname.startsWith('/reminders/') ? 'reminders' : (tabFromHistory(window.location, window.history.state) === 'accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : window.location.pathname.startsWith('/categories/') ? 'categories' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/') || window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment') ? 'offers' : 'home');
   // Keep in-app tab changes in browser history so the device Back button can restore them.
   const [transactionQuickFilter, setTransactionQuickFilter] = useState<{ period: 'today' | 'month'; currency: string } | null>(null);
   const navigateTab = (tab: ActiveTab, quickFilter: { period: 'today' | 'month'; currency: string } | null = null) => {
@@ -634,7 +635,7 @@ export default function App() {
         setIsExpenseCategoriesModalOpen(false);
         setIsCategoryDetailPageOpen(Boolean(firebaseUser) && window.location.pathname.startsWith('/categories/'));
         setSelectedCategoryForDetail(null);
-        setActiveTab((window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/') || window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment') ? 'offers' : firebaseUser && window.location.pathname.startsWith('/admin') ? 'admin-pin': firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && window.location.pathname.startsWith('/reminders/') ? 'reminders' : firebaseUser && (window.location.pathname === '/accounts/new' || window.location.pathname === '/accounts') ? 'accounts' : firebaseUser && window.location.pathname.startsWith('/categories/') ? 'categories' : 'home');
+        setActiveTab((window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/') || window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment') ? 'offers' : firebaseUser && window.location.pathname.startsWith('/admin') ? 'admin-pin': firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && window.location.pathname.startsWith('/reminders/') ? 'reminders' : firebaseUser && (tabFromHistory(window.location, window.history.state) === 'accounts') ? 'accounts' : firebaseUser && window.location.pathname.startsWith('/categories/') ? 'categories' : 'home');
         setToastMessage(null);
         aiLearnedMemory.clear();
       }
@@ -1180,6 +1181,7 @@ export default function App() {
         'nonzero-balance': ['لا يمكن مسح حساب برصيد غير صفري. راجع الرصيد أولًا.', 'Account balance must be zero before deletion.'],
         'linked-account': ['لا يمكن مسح حساب مرتبط بحساب أو بطاقة أخرى.', 'This account has linked payment methods.'],
         'account-missing': ['الحساب غير موجود بالفعل؛ حدّث الصفحة.', 'Account no longer exists. Refresh the page.'],
+        'protected-cash-account': ['حساب الكاش لا يمكن حذفه.', 'The cash account cannot be deleted.'],
         'last-account': ['يجب الاحتفاظ بحساب واحد على الأقل.', 'Keep at least one account.'],
       };
       const message = messages[reason];
@@ -1219,29 +1221,26 @@ export default function App() {
   };
 
   // Open Edit Balance Modal
+  const accountEditId = window.location.pathname.match(/^\/accounts\/([A-Za-z0-9_-]+)\/edit$/)?.[1];
+  const editingAccount = accounts.find(account => account.id === accountEditId);
+  const closeAccountEdit = () => backFromOffer(window.history.state?.offerBack || '/accounts');
+
+  const saveEditedAccount = async (expected: FinancialAccount, updated: FinancialAccount) => {
+    if (!editingAccount || !authUser || updated.id !== editingAccount.id) return false;
+    try {
+      await updateAccountDetails(authUser.uid, expected, updated);
+      return true;
+    } catch (error) {
+      setToastMessage(error instanceof Error && error.message === 'account-changed'
+        ? (lang === 'ar' ? 'تغيّر الحساب أثناء التعديل. افتحه مجددًا.' : 'This account changed while editing. Reopen it.')
+        : (lang === 'ar' ? 'تعذّر حفظ الحساب.' : 'Could not save account.'));
+      return false;
+    }
+  };
+
   const handleOpenEditBalance = (accId: string | null = null) => {
-    const target = accounts.find((a) => a.id === accId);
-    if (target?.linkedBankId && target.type === 'card') { handleOpenCardAccountModal(accId); return; }
-    if (target?.linkedBankId) { setToastMessage(lang === 'ar' ? 'هذه الوسيلة مرتبطة بالبنك؛ عدّل رصيد البنك نفسه.' : 'Edit the linked bank balance instead.'); return; }
-    if (target?.type === 'credit') { setToastMessage(lang === 'ar' ? 'يتم تحديث مستحقات بطاقة الائتمان من العمليات والسداد.' : 'The credit balance changes through transactions and payments.'); return; }
-    if (target?.type === 'bank' || target?.id === 'acc_bank') {
-      handleOpenBankAccountModal(accId);
-      return;
-    }
-    if (target?.type === 'card' || target?.id === 'acc_card') {
-      handleOpenCardAccountModal(accId);
-      return;
-    }
-    if (target?.type === 'wallet' || target?.id === 'acc_wallet') {
-      handleOpenWalletAccountModal(accId);
-      return;
-    }
-    if (target?.type === 'other' || target?.id === 'acc_other') {
-      handleOpenOtherAccountModal(accId);
-      return;
-    }
-    if (target?.type === 'custom' || target?.id === 'acc_extra') {
-      handleOpenExtraAccountModal(accId);
+    if (accId && authUser) {
+      navigateOffer(`/accounts/${accId}/edit`);
       return;
     }
     setSelectedAccountForBalance(accId);
@@ -2007,24 +2006,7 @@ export default function App() {
               onViewAll={() => navigateTab('accounts')}
               onAddAccountClick={() => navigateTab('accounts')}
               onOpenExpenseCategories={() => setIsExpenseCategoriesModalOpen(true)}
-              onSelectAccount={(accId) => {
-                const target = accounts.find((a) => a.id === accId);
-                if (target?.type === 'cash' || target?.id === 'acc_cash') {
-                  handleOpenEditBalance(accId);
-                } else if (target?.type === 'bank' || target?.id === 'acc_bank') {
-                  handleOpenBankAccountModal(accId);
-                } else if (target?.type === 'card' || target?.id === 'acc_card') {
-                  handleOpenCardAccountModal(accId);
-                } else if (target?.type === 'wallet' || target?.id === 'acc_wallet') {
-                  handleOpenWalletAccountModal(accId);
-                } else if (target?.type === 'other' || target?.id === 'acc_other') {
-                  handleOpenOtherAccountModal(accId);
-                } else if (target?.type === 'custom' || target?.id === 'acc_extra') {
-                  handleOpenExtraAccountModal(accId);
-                } else {
-                  navigateTab('transactions');
-                }
-              }}
+              onSelectAccount={handleOpenEditBalance}
               onEditBalance={handleOpenEditBalance}
             />
 
@@ -2063,7 +2045,11 @@ export default function App() {
         )}
 
         {activeTab === 'accounts' && (
+          <Fragment key={editingAccount?.id ?? 'list'}>
           <AccountsView
+            editingAccount={editingAccount}
+            onSaveAccount={saveEditedAccount}
+            onCloseEdit={closeAccountEdit}
             accounts={accounts}
             lang={lang}
             canAddAccounts={canAddAccounts}
@@ -2072,6 +2058,7 @@ export default function App() {
             onDeleteAccount={handleDeleteAccount}
             onEditBalance={handleOpenEditBalance}
           />
+          </Fragment>
         )}
 
         {activeTab === 'search' && (

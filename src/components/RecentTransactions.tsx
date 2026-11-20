@@ -139,7 +139,7 @@ export function RecentTransactions({
             return (
               <div
                 key={tx.id}
-                className="px-3 py-2.5 sm:px-3.5 sm:py-3 flex items-center justify-between gap-2 hover:bg-slate-50/50 transition-colors group"
+                className="px-3 py-2.5 sm:px-3.5 sm:py-3 flex items-center justify-between gap-2 hover:bg-slate-50/50 transition-colors"
               >
                 {/* Right/Start: Icon + Title & Account Subtitle */}
                 <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -179,10 +179,11 @@ export function RecentTransactions({
                     <button
                       type="button"
                       onClick={() => onDeleteTransaction(tx.id)}
-                      className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-all cursor-pointer"
-                      title="حذف"
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-rose-700 transition-colors hover:bg-rose-100 focus-visible:bg-rose-100 focus-visible:outline-2 focus-visible:outline-rose-700 cursor-pointer"
+                      aria-label={lang === 'ar' ? 'حذف العملية' : 'Delete transaction'}
+                      title={lang === 'ar' ? 'حذف العملية' : 'Delete transaction'}
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="size-4" aria-hidden="true" />
                     </button>
                   )}
                 </div>

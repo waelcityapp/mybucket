@@ -16,13 +16,26 @@ export function DeleteTransactionsPage({ lang, uid, accounts, transactions, read
 }) {
   const ar = lang === 'ar';
   const [kind, setKind] = useState<Kind>('all');
+  const [limited, setLimited] = useState(false);
+  const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'custom' | ''>('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [adjust, setAdjust] = useState(false);
   const [review, setReview] = useState<Transaction[] | null>(null);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState('');
-  const selected = useMemo(() => selectTransactionsForDeletion(transactions, kind, from, to), [transactions, kind, from, to]);
+  const today = new Date();
+  const dateKey = (date: Date) => [
+    date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0'),
+  ].join('-');
+  const start = new Date(today);
+  if (period === 'week') start.setDate(today.getDate() - (today.getDay() + 1) % 7);
+  if (period === 'month') start.setDate(1);
+  const rangeFrom = limited ? (period === 'custom' ? from : dateKey(start)) : '';
+  const rangeTo = limited ? (period === 'custom' ? to : dateKey(today)) : '';
+  const periodReady = !limited || (period !== '' && Boolean(rangeFrom && rangeTo && rangeFrom <= rangeTo));
+  const selected = useMemo(() => periodReady ? selectTransactionsForDeletion(transactions, kind, rangeFrom, rangeTo) : [],
+    [transactions, kind, rangeFrom, rangeTo, periodReady]);
   const impacts = useMemo(() => {
     const sums = new Map<string, number>();
     for (const tx of review ?? selected) {
@@ -73,18 +86,33 @@ export function DeleteTransactionsPage({ lang, uid, accounts, transactions, read
           <option value="all">{ar ? 'كل العمليات' : 'All transactions'}</option><option value="income">{ar ? 'الدخل' : 'Income'}</option><option value="expense">{ar ? 'الصرف' : 'Expenses'}</option><option value="transfer">{ar ? 'التحويلات' : 'Transfers'}</option>
         </select>
       </label>
+      <fieldset className="space-y-3">
+        <legend className="mb-2 text-sm font-bold">{ar ? 'الفترة' : 'Date range'}</legend>
+        <label className="flex items-center gap-2 text-sm"><input type="radio" name="deletion-range" checked={!limited} onChange={() => setLimited(false)} />{ar ? 'جميع الفترات' : 'All dates'}</label>
+        <label className="flex items-center gap-2 text-sm"><input type="radio" name="deletion-range" checked={limited} onChange={() => setLimited(true)} />{ar ? 'تحديد فترة محددة' : 'Choose a date range'}</label>
+        {limited && <div className="space-y-3">
+          <select aria-label={ar ? 'اختيار الفترة المحددة' : 'Specific date range'} value={period} onChange={event => setPeriod(event.target.value as typeof period)} className="w-full rounded-xl border border-slate-300 bg-transparent p-3">
+            <option value="" disabled>{ar ? 'اختر الفترة' : 'Select a range'}</option>
+            <option value="today">{ar ? 'هذا اليوم' : 'Today'}</option>
+            <option value="week">{ar ? 'هذا الأسبوع' : 'This week'}</option>
+            <option value="month">{ar ? 'هذا الشهر' : 'This month'}</option>
+            <option value="custom">{ar ? 'الفترة من وإلى' : 'Custom range'}</option>
+          </select>
+          {period === 'custom' && <>
       <div className="grid grid-cols-2 gap-3">
         <label className="space-y-2 text-sm font-bold">{ar ? 'من تاريخ' : 'From'}<input type="date" value={from} onChange={event => setFrom(event.target.value)} className="block w-full rounded-xl border border-slate-300 bg-transparent p-3" /></label>
         <label className="space-y-2 text-sm font-bold">{ar ? 'إلى تاريخ' : 'To'}<input type="date" value={to} onChange={event => setTo(event.target.value)} className="block w-full rounded-xl border border-slate-300 bg-transparent p-3" /></label>
       </div>
-      <p className="text-xs text-slate-500">{ar ? 'اترك التاريخين فارغين لاختيار كل الفترات.' : 'Leave both dates empty for all dates.'}</p>
-      {from && to && from > to && <p role="alert" className="text-sm text-red-700">{ar ? 'تاريخ البداية يجب أن يسبق تاريخ النهاية.' : 'The start date must be before the end date.'}</p>}
+            {from && to && from > to && <p role="alert" className="text-sm text-red-700">{ar ? 'تاريخ البداية يجب أن يسبق تاريخ النهاية.' : 'The start date must be before the end date.'}</p>}
+          </>}
+        </div>}
+      </fieldset>
       <fieldset className="space-y-3"><legend className="mb-2 text-sm font-bold">{ar ? 'الأرصدة بعد الحذف' : 'Balances after deletion'}</legend>
         <label className="flex gap-2 text-sm"><input type="radio" name="balance" checked={!adjust} onChange={() => setAdjust(false)} />{ar ? 'الاحتفاظ بالأرصدة الحالية' : 'Keep current balances'}</label>
         <label className="flex gap-2 text-sm"><input type="radio" name="balance" checked={adjust} onChange={() => setAdjust(true)} />{ar ? 'تعديل الأرصدة بإلغاء أثر العمليات' : 'Reverse the effect on balances'}</label>
       </fieldset>
-      <p className="text-sm font-bold">{ready ? (ar ? `العمليات المطابقة: ${number(selected.length)}` : `Matching transactions: ${selected.length}`) : (ar ? 'جاري تحميل العمليات...' : 'Loading transactions…')}</p>
-      <button disabled={!ready || !selected.length || Boolean(from && to && from > to)} onClick={() => { setResult(''); setReview([...selected]); }} className="min-h-12 w-full rounded-xl bg-emerald-700 px-4 font-bold text-white disabled:opacity-40">{ar ? 'معاينة الحذف' : 'Review deletion'}</button>
+      <p className="text-sm font-bold">{!periodReady ? '' : ready ? (ar ? `العمليات المطابقة: ${number(selected.length)}` : `Matching transactions: ${selected.length}`) : (ar ? 'جاري تحميل العمليات...' : 'Loading transactions…')}</p>
+      <button disabled={!ready || !periodReady || !selected.length} onClick={() => { setResult(''); setReview([...selected]); }} className="min-h-12 w-full rounded-xl bg-emerald-700 px-4 font-bold text-white disabled:opacity-40">{ar ? 'معاينة الحذف' : 'Review deletion'}</button>
     </section> : <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
       <h2 className="font-extrabold">{ar ? 'راجع اختيارك' : 'Review your selection'}</h2>
       <p className="text-sm">{ar ? `سيتم حذف ${number(review.length)} عملية.` : `${review.length} transactions will be deleted.`}</p>

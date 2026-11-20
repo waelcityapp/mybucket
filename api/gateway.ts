@@ -71,6 +71,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ ok: false, error: 'invalid_gateway_action', message: 'A valid gateway action is required.' });
     }
 
+    if (action.startsWith('subscriptionPayment.') || action.startsWith('admin.subscriptionPayment.')) {
+      const { subscriptionPayment } = await import('../server/subscriptionPayments.js');
+      return res.status(200).json({ ok: true, data: await subscriptionPayment(action, user, payload) });
+    }
+
     if (action === 'admin.identity.signUpload' || action === 'admin.identity.save') {
       if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
       const { signBrandIconUpload, saveAppIdentity } = await import('../server/appIdentity.js');

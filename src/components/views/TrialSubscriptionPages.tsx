@@ -3,8 +3,9 @@ import { ArrowRight, CalendarDays, Tag, ShieldCheck } from 'lucide-react';
 import type { Language } from '../../types';
 import type { UserSubscription } from '../../types/prototypeSubscription';
 import { calculateRemainingTrialDays } from '../../utils/subscriptionUtils';
-import { getTrialDurations, BASIC_PRICE_EGP, stageFor } from '../../config/subscriptionPolicy';
+import { getTrialDurations, BASIC_PRICE_EGP, BASIC_MARKETER_PRICE_EGP, PRO_PRICE_EGP, PRO_MARKETER_PRICE_EGP, stageFor } from '../../config/subscriptionPolicy';
 import { activeGrant } from '../../config/grantPolicy';
+import { SubscriptionPayment } from './SubscriptionPayment';
 import { AffiliateCodeSection } from '../AffiliateCodeSection';
 
 interface Props {
@@ -16,11 +17,12 @@ interface Props {
   error: string | null;
   page: 'trial-details' | 'subscription';
   onBack: () => void;
+  onNavigate?: (path: string, replace?: boolean) => void;
   onSubscription: () => void;
   onUpdateSubscription: (sub: UserSubscription) => Promise<void>;
 }
 
-export function TrialSubscriptionPages({ lang, subscription, guest = false, guestBasicDays = null, onSignIn, error, page, onBack, onSubscription, onUpdateSubscription }: Props) {
+export function TrialSubscriptionPages({ lang, subscription, guest = false, guestBasicDays = null, onSignIn, error, page, onBack, onNavigate, onSubscription, onUpdateSubscription }: Props) {
   const proPlan = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (page === 'subscription' && new URLSearchParams(window.location.search).get('plan') === 'pro') {
@@ -31,7 +33,9 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
   const basicDays = guest ? guestBasicDays : getTrialDurations().basicDays;
   const days = subscription ? calculateRemainingTrialDays(subscription) : null;
   const stage = subscription ? stageFor(subscription) : null;
-  const grant = stage !== 'paid' ? activeGrant(subscription?.grant) : null;
+  const checkout = new URLSearchParams(window.location.search).get('checkout');
+  const plan = checkout === 'basic' || checkout === 'pro' ? checkout : null;
+  const grant = stage !== 'paid' && stage !== 'paid-basic' ? activeGrant(subscription?.grant) : null;
   const grantEnd = grant ? new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'long', timeZone: 'Africa/Cairo' }).format(new Date(Date.parse(grant.endsAt) - 1)) : null;
   const start = subscription && Number.isFinite(Date.parse(subscription.trialStartedAt))
     ? new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'long' }).format(new Date(subscription.trialStartedAt)) : null;
@@ -50,7 +54,7 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
         {grant && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-900">{ar ? `أنت تستخدم خطة ${grant.plan === 'pro' ? 'Pro' : 'Basic'} بمنحة مجانية حتى ${grantEnd}.` : `Your free ${grant.plan === 'pro' ? 'Pro' : 'Basic'} grant runs through ${grantEnd}.`}</p>}
         {error ? <p role="alert" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{error}</p> : !subscription && !guest ? <p className="text-sm text-slate-600">{ar ? 'جارٍ قراءة بيانات الاشتراك...' : 'Loading subscription details...'}</p> : page === 'trial-details' ? <>
           <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 space-y-3 text-sm text-slate-700">
-            <p className="font-black text-slate-900">{grant ? (ar ? 'منحة مجانية نشطة' : 'Active free grant') : stage === 'paid' ? (ar ? 'اشتراك نشط' : 'Subscription active') : stage === 'pro-trial' ? (ar ? 'تجربة Pro نشطة' : 'Pro trial active') : stage === 'basic-free' ? (ar ? 'فترة Basic المجانية' : 'Basic introductory period') : (ar ? 'انتهت الفترة المجانية' : 'Introductory period ended')}</p>
+            <p className="font-black text-slate-900">{grant ? (ar ? 'منحة مجانية نشطة' : 'Active free grant') : (stage === 'paid' || stage === 'paid-basic') ? (ar ? 'اشتراك نشط' : 'Subscription active') : stage === 'pro-trial' ? (ar ? 'تجربة Pro نشطة' : 'Pro trial active') : stage === 'basic-free' ? (ar ? 'فترة Basic المجانية' : 'Basic introductory period') : (ar ? 'انتهت الفترة المجانية' : 'Introductory period ended')}</p>
             <p>{ar ? `Basic مجانية حتى اليوم ${getTrialDurations().basicDays} من التسجيل.` : `Basic is free until day ${getTrialDurations().basicDays} after signup.`}</p>
             <p>{grant ? (ar ? 'الأيام المتبقية للتجربة الأصلية: ' : 'Original trial days remaining: ') : (ar ? 'الأيام المجانية المتبقية: ' : 'Introductory days remaining: ')}{days}</p>
             {start && <p>{ar ? `تاريخ تسجيلك: ${start}` : `Registration date: ${start}`}</p>}
@@ -65,12 +69,12 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
           {subscription && <AffiliateCodeSection subscription={subscription} lang={lang} onUpdateSubscription={onUpdateSubscription} />}
           {guest && <button type="button" className="min-h-11 rounded-xl bg-emerald-700 px-3 font-bold text-white" onClick={onSignIn}>{ar ? 'ابدأ بحساب Google' : 'Get started with Google'}</button>}
           {!grant && stage === 'basic-free' && <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm font-bold text-sky-900">{ar ? `Basic مجانية حتى اليوم ${getTrialDurations().basicDays}. المتبقي: ` : `Basic remains free until day ${getTrialDurations().basicDays}. Days remaining: `}{days}</p>}
-          {stage === 'expired' && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">{ar ? 'انتهت الفترة المجانية — اختر خطتك. الدفع قيد التجهيز، وبياناتك المالية محفوظة.' : 'Your introductory period has ended — choose your plan. Payments are not enabled yet; your records are safe.'}</p>}
+          {stage === 'expired' && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">{ar ? 'انتهت الفترة المجانية. اختر خطة اشتراك لمتابعة استخدام التطبيق.' : 'Your introductory period ended. Choose a subscription plan to continue.'}</p>}
           {start && <p className="text-xs text-slate-500">{ar ? `تاريخ تسجيلك: ${start}` : `Registration date: ${start}`}</p>}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4">
               <h2 className="text-lg font-black text-slate-900">Basic</h2>
-              <p className="text-2xl font-black text-slate-900">{BASIC_PRICE_EGP === null ? (ar ? 'السعر قيد التحديد' : 'Price to be decided') : BASIC_PRICE_EGP}</p>
+              <p className="text-2xl font-black text-slate-900">{subscription?.hasAppliedAffiliateCode ? BASIC_MARKETER_PRICE_EGP : BASIC_PRICE_EGP} <span className="text-sm font-semibold">{ar ? 'جنيه / شهر' : 'EGP / month'}</span></p>
               <p className="text-sm leading-7 text-slate-600">{ar ? 'الخطة الأساسية؛ مميزاتها وحدودها قيد الاختبار.' : 'The essential plan; features and limits are being tested.'}</p>
               <p className="mt-auto rounded-xl bg-slate-100 px-3 py-2 text-center text-sm font-bold text-slate-700">{basicDays === null
                 ? (ar ? 'تجربة مجانية عند التسجيل' : 'Free trial when you sign up')
@@ -78,13 +82,14 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
             </div>
             <div ref={proPlan} className="flex flex-col gap-3 rounded-2xl border-2 border-emerald-600 p-4">
               <h2 className="text-lg font-black text-slate-900">Pro</h2>
-              <p className="text-2xl font-black text-slate-900">{subscription?.hasAppliedAffiliateCode ? '120' : '180'} <span className="text-sm font-semibold">{ar ? 'جنيه / شهر' : 'EGP / month'}</span></p>
+              <p className="text-2xl font-black text-slate-900">{subscription?.hasAppliedAffiliateCode ? PRO_MARKETER_PRICE_EGP : PRO_PRICE_EGP} <span className="text-sm font-semibold">{ar ? 'جنيه / شهر' : 'EGP / month'}</span></p>
               <p className="text-sm leading-7 text-slate-600">{ar ? 'الخطة المتقدمة؛ الفرق في المميزات سيحدد بعد تجارب الأصدقاء.' : 'Advanced features will be finalized after usability tests.'}</p>
               <p className="text-sm text-emerald-800">{subscription?.hasAppliedAffiliateCode ? (ar ? 'خصم المسوّق محفوظ بدون تمديد الفترة المجانية.' : 'Marketer discount saved; no extra trial days.') : (ar ? 'بكود مسوّق صالح: 120 جنيه شهريًا.' : 'With a valid marketer code: EGP 120/month.')}</p>
-              <p className="mt-auto rounded-xl bg-emerald-50 px-3 py-2 text-center text-sm font-bold text-emerald-800">{ar ? 'الاشتراك والدفع قيد التجهيز' : 'Payment activation coming later'}</p>
             </div>
           </div>
-          <div className="flex gap-2 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-700"><ShieldCheck className="h-5 w-5 shrink-0 text-emerald-700" /><p>{ar ? 'هذه صفحة عرض الخطط فقط. لا يتم تحصيل أي مبلغ أو تغيير خطتك من هذه الصفحة حاليًا.' : 'This page only shows plans. No payment is collected and your plan is not changed here yet.'}</p></div>
+          {!guest && onNavigate && <SubscriptionPayment lang={lang} plan={plan}
+            onPickPlan={selected => onNavigate(`/subscription?checkout=${selected}`)}
+            onClose={() => onNavigate('/subscription', true)} />}
         </>}
       </div>
     </section>

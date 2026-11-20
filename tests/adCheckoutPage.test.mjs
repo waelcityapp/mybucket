@@ -36,7 +36,7 @@ test('ad checkout uses a real route and uses InstaPay and submits a private rece
   assert.match(create, /offerPaymentPreview/);
   assert.match(create, /<AdPaymentCheckout/);
   assert.match(checkout, /Invoice Summary/);
-  assert.match(checkout, /https:\/\/ipn\.eg\/S\//);
+  assert.match(readFileSync('src/config/instaPay.ts', 'utf8'), /https:\/\/ipn\.eg\/S\//);
   assert.doesNotMatch(checkout, /InstaPay recipient number/);
   assert.doesNotMatch(checkout, /Vodafone Cash|Copy transfer number/);
   assert.match(checkout, /href=\{INSTA_PAY_LINK\}/);

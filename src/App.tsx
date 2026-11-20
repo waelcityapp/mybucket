@@ -1816,7 +1816,7 @@ export default function App() {
                     : null;
                   const remaining = grant ? Math.max(0, Math.ceil((Date.parse(grant.endsAt) - Date.now()) / 86400000)) : phase === 'basic-free' ? basicRemaining : null;
                   const paidExpiresAt = userSubscription?.paidExpiresAt ? Date.parse(userSubscription.paidExpiresAt) : NaN;
-                  const renewalRemaining = phase === 'paid' && Number.isFinite(paidExpiresAt)
+                  const renewalRemaining = (phase === 'paid' || phase === 'paid-basic') && Number.isFinite(paidExpiresAt)
                     ? Math.max(0, Math.ceil((paidExpiresAt - Date.now()) / 86400000))
                     : null;
                   const isUrgent = remaining !== null && remaining <= 3;
@@ -1834,7 +1834,7 @@ export default function App() {
                     ? (lang === 'ar' ? 'راجع تفاصيل اشتراكك' : 'Review subscription details')
                     : grant
                     ? (lang === 'ar' ? `منحة مجانية · المتبقي ${remaining} يوم` : `Free grant · ${remaining} days remaining`)
-                    : phase === 'paid'
+                    : (phase === 'paid' || phase === 'paid-basic')
                     ? renewalRemaining === null
                       ? (lang === 'ar' ? 'اشتراك مدفوع نشط' : 'Active paid subscription')
                       : (lang === 'ar' ? `التجديد خلال: ${renewalRemaining} ${renewalRemaining === 1 ? 'يوم' : 'أيام'}` : `Renewal in: ${renewalRemaining} ${renewalRemaining === 1 ? 'day' : 'days'}`)
@@ -2116,7 +2116,7 @@ export default function App() {
         ))}
 
         {(activeTab === 'trial-details' || activeTab === 'subscription' || (guestDemo && window.location.pathname === '/try/subscription')) && (
-          <TrialSubscriptionPages lang={lang} guest={guestDemo} guestBasicDays={guestBasicDays} onSignIn={handleGoogleLogin} subscription={guestDemo ? null : userSubscription} error={subscriptionError ? (lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn) : null} page={guestDemo ? 'subscription' : (activeTab as 'trial-details' | 'subscription')} onBack={() => { if (guestDemo) { backFromOffer('/try'); return; } if (window.history.state?.offerBack && new URLSearchParams(window.location.search).get('plan') === 'pro') { window.history.back(); return; } window.history.pushState({}, '', activeTab === 'subscription' ? '/trial' : '/'); setActiveTab(activeTab === 'subscription' ? 'trial-details' : 'home'); }} onSubscription={() => openSubscriptionPage('subscription')} onUpdateSubscription={async updated => { if (!authUser) return; const saved = await saveUserSubscriptionToFirestore(authUser.uid, updated); setUserSubscription(saved); }} />
+          <TrialSubscriptionPages lang={lang} guest={guestDemo} guestBasicDays={guestBasicDays} onSignIn={handleGoogleLogin} subscription={guestDemo ? null : userSubscription} error={subscriptionError ? (lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn) : null} page={guestDemo ? 'subscription' : (activeTab as 'trial-details' | 'subscription')} onBack={() => { if (guestDemo) { backFromOffer('/try'); return; } if (window.history.state?.offerBack && new URLSearchParams(window.location.search).get('plan') === 'pro') { window.history.back(); return; } window.history.pushState({}, '', activeTab === 'subscription' ? '/trial' : '/'); setActiveTab(activeTab === 'subscription' ? 'trial-details' : 'home'); }} onNavigate={navigateOffer} onSubscription={() => openSubscriptionPage('subscription')} onUpdateSubscription={async updated => { if (!authUser) return; const saved = await saveUserSubscriptionToFirestore(authUser.uid, updated); setUserSubscription(saved); }} />
         )}
 
         {activeTab === 'settings' && (

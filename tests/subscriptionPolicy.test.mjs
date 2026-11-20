@@ -21,7 +21,7 @@ test('Basic applies from signup until the configured expiry', () => {
 test('introductory periods are independent of discount codes', () => {
   assert.equal(PRO_PRICE_EGP, 180);
   assert.equal(PRO_MARKETER_PRICE_EGP, 120);
-  assert.equal(BASIC_PRICE_EGP, null);
+  assert.equal(BASIC_PRICE_EGP, 100);
   assert.equal(stageFor({ ...trial, affiliateCode: 'WAEL2026' }, moment(15)), 'basic-free');
   assert.equal(addDays(start, 75), '2027-01-15T00:00:00.000Z');
 });
@@ -46,4 +46,13 @@ test('only an active Pro grant gives a non-paying account Pro access', () => {
   assert.equal(stageFor({ ...trial, grant }, moment(1)), 'basic-free');
   assert.equal(stageFor({ ...trial, grant }, moment(2)), 'pro-trial');
   assert.equal(stageFor({ ...trial, grant }, moment(5)), 'basic-free');
+});
+
+
+test('a paid Basic account stays Basic and retains an active Pro grant', () => {
+  const basic = { ...trial, isPaid: true, paidPlan: 'basic', paidExpiresAt: addDays(start, 90) };
+  assert.equal(stageFor(basic, moment(80)), 'paid-basic');
+  const grant = { plan: 'pro', startsAt: addDays(start, 80), endsAt: addDays(start, 85) };
+  assert.equal(stageFor({ ...basic, grant }, moment(81)), 'pro-trial');
+  assert.equal(stageFor({ ...basic, grant }, moment(85)), 'paid-basic');
 });

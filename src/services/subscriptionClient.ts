@@ -50,10 +50,11 @@ function normalizeSubscription(raw: LegacySubscription): UserSubscription | null
   const totalDays = getTrialDurations().basicDays;
   const isPaid = source.isPaid === true;
   const paidExpiresAt = dateString(source.paidExpiresAt);
-  const phase = stageFor({ trialStartedAt, isPaid, paidExpiresAt });
+  const paidPlan = source.paidPlan === 'basic' ? 'basic' : 'pro';
+  const phase = stageFor({ trialStartedAt, isPaid, paidPlan, paidExpiresAt });
 
   return {
-    status: phase === 'paid' ? 'paid' : phase === 'expired' ? 'expired' : 'trial',
+    status: (phase === 'paid' || phase === 'paid-basic') ? 'paid' : phase === 'expired' ? 'expired' : 'trial',
     trialStartedAt,
     trialExpiresAt: expiry,
     totalTrialDays: totalDays,
@@ -62,6 +63,7 @@ function normalizeSubscription(raw: LegacySubscription): UserSubscription | null
     hasAppliedAffiliateCode: Boolean(code),
     isPaid,
     paidExpiresAt,
+    paidPlan,
     monthlyPriceEgp: typeof source.monthlyPriceEgp === 'number'
       ? source.monthlyPriceEgp
       : typeof source.discountPricePerMonth === 'number' ? source.discountPricePerMonth : code ? 120 : 180,

@@ -17,7 +17,7 @@ function resource(value: unknown): ResourceType {
 }
 
 /** Owner-only test: gateway must authenticate and authorize before calling. No Firebase writes. */
-export function signAdminAdTestUpload(uid: string, payload: Record<string, unknown>, cfg = config(), now = Date.now(), id: string = randomUUID(), folder: 'test' | 'submissions' | 'receipts' = 'test') {
+export function signAdminAdTestUpload(uid: string, payload: Record<string, unknown>, cfg = config(), now = Date.now(), id: string = randomUUID(), folder: 'test' | 'submissions' | 'receipts' | 'subscription-receipts' = 'test') {
   owner(uid);
   const resourceType = resource(payload.resourceType);
   const limit = (resourceType === 'image' ? 5 : 25) * 1024 * 1024;
@@ -29,7 +29,7 @@ export function signAdminAdTestUpload(uid: string, payload: Record<string, unkno
   return { cloudName: cfg.cloudName, apiKey: cfg.apiKey, uploadPreset: cfg.uploadPreset, publicId, timestamp, signature, resourceType, deliveryType: 'authenticated' as const };
 }
 
-export async function confirmAdminAdTestUpload(uid: string, payload: Record<string, unknown>, cfg = config(), getResource = fetch, folder: 'test' | 'submissions' | 'receipts' = 'test') {
+export async function confirmAdminAdTestUpload(uid: string, payload: Record<string, unknown>, cfg = config(), getResource = fetch, folder: 'test' | 'submissions' | 'receipts' | 'subscription-receipts' = 'test') {
   owner(uid);
   const resourceType = resource(payload.resourceType);
   const publicId = payload.publicId;
@@ -64,7 +64,7 @@ export async function confirmAdminAdTestUpload(uid: string, payload: Record<stri
 }
 
 /** Delete only the authenticated test asset in the current administrator's folder. */
-export async function deleteAdminAdTestUpload(uid: string, payload: Record<string, unknown>, cfg = config(), destroy = fetch, folder: 'test' | 'submissions' | 'receipts' = 'test') {
+export async function deleteAdminAdTestUpload(uid: string, payload: Record<string, unknown>, cfg = config(), destroy = fetch, folder: 'test' | 'submissions' | 'receipts' | 'subscription-receipts' = 'test') {
   owner(uid);
   const resourceType = resource(payload.resourceType);
   const publicId = payload.publicId;

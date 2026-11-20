@@ -72,7 +72,7 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
           {grant
             ? (isAr ? `منحة ${grant.plan === 'pro' ? 'Pro' : 'Basic'} مجانية (${grantDays} يوم)` : `Free ${grant.plan} grant (${grantDays} days)`)
             : subscription.isPaid
-            ? (isAr ? 'مشترك مُميز (Pro)' : 'Pro Member')
+            ? (isAr ? `اشتراك ${subscription.paidPlan === 'basic' ? 'Basic' : 'Pro'} نشط` : `Active ${subscription.paidPlan === 'basic' ? 'Basic' : 'Pro'} subscription`)
             : remainingDays > 0
             ? (isAr ? `تجربة مجانية (${remainingDays} يوم متبقي)` : `Trial (${remainingDays} days left)`)
             : (isAr ? 'انتهت التجربة' : 'Trial Expired')}

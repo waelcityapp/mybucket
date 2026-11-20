@@ -10,14 +10,15 @@ function toPrototype(sub: StoredSubscription): UserSubscription {
   const phase = stageFor(sub);
   return {
     grant: sub.grant || null,
-    tier: phase === 'basic-free' ? 'basic' : phase === 'pro-trial' ? 'trial' : phase === 'paid' ? 'pro' : 'expired',
+    tier: (phase === 'basic-free' || phase === 'paid-basic') ? 'basic' : phase === 'pro-trial' ? 'trial' : phase === 'paid' ? 'pro' : 'expired',
     trialDatesStored: sub.trialDatesStored === true,
     affiliateCode: sub.affiliateCode,
     hasAppliedAffiliateCode: sub.hasAppliedAffiliateCode,
     totalTrialDays: sub.totalTrialDays,
     trialStartedAt: sub.trialStartedAt,
     trialExpiresAt: sub.trialExpiresAt,
-    isPaid: phase === 'paid',
+    isPaid: Boolean(sub.isPaid && sub.paidExpiresAt && Date.parse(sub.paidExpiresAt) > Date.now()),
+    paidPlan: sub.paidPlan,
     paidExpiresAt: sub.paidExpiresAt,
     dailyExpenseAiLimit: sub.dailyAiEntryLimit,
     dailyInquiryAiLimit: sub.dailyAiInquiryLimit,

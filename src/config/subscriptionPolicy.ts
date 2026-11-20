@@ -13,13 +13,17 @@ export function setTrialDurations(value: TrialDurations): void {
 }
 export const PRO_PRICE_EGP = 180;
 export const PRO_MARKETER_PRICE_EGP = 120;
-export const BASIC_PRICE_EGP: number | null = null; // Pending approval.
-export type TrialStage = 'pro-trial' | 'basic-free' | 'paid' | 'expired';
+export const BASIC_PRICE_EGP = 100;
+export const BASIC_MARKETER_PRICE_EGP = 80;
+export type TrialStage = 'pro-trial' | 'basic-free' | 'paid-basic' | 'paid' | 'expired';
 export function addDays(start: string, days: number) { const time = Date.parse(start); if (!Number.isFinite(time)) throw new Error('Invalid trial start'); return new Date(time + days * 86400000).toISOString(); }
-export function stageFor(sub: { trialStartedAt: string; isPaid: boolean; paidExpiresAt?: string | null; grant?: FreeGrant | null }, now=Date.now(), durations: TrialDurations = currentDurations): TrialStage {
-  if (sub.isPaid && sub.paidExpiresAt && Date.parse(sub.paidExpiresAt)>now) return 'paid';
+export function stageFor(sub: { trialStartedAt: string; isPaid: boolean; paidPlan?: 'basic' | 'pro'; paidExpiresAt?: string | null; grant?: FreeGrant | null }, now=Date.now(), durations: TrialDurations = currentDurations): TrialStage {
+  const paid = sub.isPaid && sub.paidExpiresAt && Date.parse(sub.paidExpiresAt) > now;
+  if (paid && sub.paidPlan !== 'basic') return 'paid';
   const grant = activeGrant(sub.grant, now);
-  if (grant) return grant.plan === 'pro' ? 'pro-trial' : 'basic-free';
+  if (grant?.plan === 'pro') return 'pro-trial';
+  if (paid) return 'paid-basic';
+  if (grant) return 'basic-free';
   const start = Date.parse(sub.trialStartedAt);
   if (!Number.isFinite(start)) return 'expired';
   if (now < start + durations.basicDays*86400000) return 'basic-free';

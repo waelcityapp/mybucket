@@ -95,7 +95,7 @@ function createBaseSubscription(nowIso: string, basicDays = BASE_TRIAL_DAYS): Us
 
 function withComputedStatus(subscription: UserSubscription, durations: TrialDurations): UserSubscription {
   const phase = stageFor(subscription, Date.now(), durations);
-  return { ...subscription, status: phase === 'paid' ? 'paid' : phase === 'expired' ? 'expired' : 'trial' };
+  return { ...subscription, status: (phase === 'paid' || phase === 'paid-basic') ? 'paid' : phase === 'expired' ? 'expired' : 'trial' };
 }
 
 export async function getOrCreateSubscription(uid: string, knownDurations?: TrialDurations, requireAccess = false): Promise<UserSubscription> {

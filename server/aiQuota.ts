@@ -113,7 +113,7 @@ export async function readOwnAiQuota(uid: string, deps?: { db: ReturnType<typeof
   const registered = billing.exists ? '' : await (deps?.getRegistration || (async id => (await getAdminAuth().getUser(id)).metadata.creationTime))(uid);
   const sub = billing.exists ? billing.data() || {} : { trialStartedAt: registered, isPaid: false };
   if (typeof sub.trialStartedAt !== 'string' || !Number.isFinite(Date.parse(sub.trialStartedAt))) throw new SubscriptionError(503, 'invalid_subscription_dates', 'Unable to verify the subscription start.');
-  const phase = stageFor({ trialStartedAt: sub.trialStartedAt, isPaid: sub.isPaid === true, paidExpiresAt: typeof sub.paidExpiresAt === 'string' ? sub.paidExpiresAt : null, grant: grantFromAccess(access.data() || null) }, now, trials);
+  const phase = stageFor({ trialStartedAt: sub.trialStartedAt, isPaid: sub.isPaid === true, paidPlan: sub.paidPlan === 'basic' ? 'basic' : 'pro', paidExpiresAt: typeof sub.paidExpiresAt === 'string' ? sub.paidExpiresAt : null, grant: grantFromAccess(access.data() || null) }, now, trials);
   const plan = phase === 'expired' ? 'expired' : phase === 'paid' || phase === 'pro-trial' ? 'pro' : 'basic';
   const data = counter.exists ? counter.data() || {} : {};
   const bucket = (key: keyof AiDailyLimits) => {

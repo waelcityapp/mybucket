@@ -7,6 +7,7 @@ import {
 import type { AuthUser, Language } from '../../types';
 import { AdminAiUsageCard } from '../AdminAiUsageCard';
 import { AdminAppUsersView } from './AdminAppUsersView';
+import { AdminSubscriptionPayments } from './SubscriptionPayment';
 import { AdminTrialSettingsView } from './AdminTrialSettingsView';
 import { AdminAiQuotaSettings } from './AdminAiQuotaSettings';
 
@@ -131,7 +132,7 @@ export function AdminView({
           )}
 
           {selected === 'users' && <AdminAppUsersView lang={lang} onOpenGrant={onOpenGrant} />}
-          {selected === 'subscriptions' && <><AdminTrialSettingsView lang={lang} /><AdminAiQuotaSettings lang={lang} /></>}
+          {selected === 'subscriptions' && <><AdminSubscriptionPayments lang={lang} /><AdminTrialSettingsView lang={lang} /><AdminAiQuotaSettings lang={lang} /></>}
           {selected === 'ai' && <AdminAiUsageCard lang={lang} />}
 
         </section>

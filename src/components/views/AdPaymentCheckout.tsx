@@ -10,7 +10,7 @@ import type { Language } from '../../types';
 import { offerAdsRequest } from '../../services/offerAdsClient';
 import { paidAdDailyPrice, normalizePaymentContactPhone, adRunDays, isPaymentContactPhoneValid, isReceiptImageAllowed } from '../../utils/adCheckout';
 
-const INSTA_PAY_LINK = 'https://ipn.eg/S/wael1011/instapay/2dvaYQ';
+import { INSTA_PAY_LINK } from '../../config/instaPay';
 type PaidPreparation = { submitted: boolean; signed: SignedAdUpload | null; receiptSigned?: SignedAdUpload };
 
 interface Props {

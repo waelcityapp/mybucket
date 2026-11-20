@@ -11,6 +11,7 @@ export interface UserSubscription {
   trialStartedAt: string; // ISO string date
   trialExpiresAt: string; // ISO string date
   isPaid: boolean;
+  paidPlan?: 'basic' | 'pro';
   paidExpiresAt?: string | null;
   dailyExpenseAiLimit: number; // 15 per day
   dailyInquiryAiLimit: number; // 5 per day

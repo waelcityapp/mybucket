@@ -11,6 +11,7 @@ export interface UserSubscription {
   affiliateAppliedAt: string | null;
   hasAppliedAffiliateCode: boolean;
   isPaid: boolean;
+  paidPlan?: 'basic' | 'pro';
   paidExpiresAt: string | null;
   monthlyPriceEgp: number | null;
   dailyAiEntryLimit: number;

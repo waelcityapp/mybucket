@@ -15,6 +15,7 @@ type SubscriptionInfo = {
   status?: string;
   trialStartedAt?: string;
   trialExpiresAt?: string;
+  paidPlan?: 'basic' | 'pro';
   paidExpiresAt?: string | null;
   planId?: string;
   planName?: string;
@@ -28,7 +29,8 @@ function mustBeOwner(actor: AdminActor) {
 }
 function subscriptionLabel(record: SubscriptionInfo | undefined, durations: TrialDurations, registrationDate: string | null) {
   if (!record && !registrationDate) return { tier: 'unknown', plan: 'Registration date unavailable' };
-  const phase = stageFor({ trialStartedAt: record?.trialStartedAt || registrationDate || '', isPaid: record?.isPaid === true, paidExpiresAt: record?.paidExpiresAt }, Date.now(), durations);
+  const phase = stageFor({ trialStartedAt: record?.trialStartedAt || registrationDate || '', isPaid: record?.isPaid === true, paidPlan: record?.paidPlan, paidExpiresAt: record?.paidExpiresAt }, Date.now(), durations);
+  if (phase === 'paid-basic') return { tier: 'paid', plan: 'Basic' };
   if (phase === 'paid') return { tier: 'paid', plan: record?.planName || record?.planId || record?.plan || 'Pro' };
   if (phase === 'basic-free') return { tier: 'trial', trialPlan: 'basic' as const, plan: 'Basic introductory (until day ' + durations.basicDays + ')' };
   return { tier: 'free', plan: 'Introductory period ended' };

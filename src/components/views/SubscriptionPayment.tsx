@@ -1,3 +1,4 @@
+import { ChevronDown } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useAppConfirm } from '../AppConfirmDialog';
 import { INSTA_PAY_LINK } from '../../config/instaPay';
@@ -129,17 +130,24 @@ export function SubscriptionPayment({ lang, plan, onClose, children }: {
   }
 
   return <div className="space-y-4">
-    {latest && (!plan || latest.status === 'pending') && <section className={box}>
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="font-bold">{latest.status === 'pending' ? (ar ? 'تم إرسال طلب الاشتراك' : 'Subscription request sent') : (ar ? 'آخر طلب اشتراك' : 'Latest subscription request')} · {planLabel(latest.plan)}</h2>
-        <button type="button" onClick={() => setRefresh(value => value + 1)} className="text-sm underline">{ar ? 'تحديث الحالة' : 'Refresh status'}</button>
+    {latest && (!plan || latest.status === 'pending') && <details className={`${box} group`}>
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-emerald-600 [&::-webkit-details-marker]:hidden">
+        <span className="space-y-1">
+          <span className="block font-bold">{latest.status === 'pending' ? (ar ? 'تم إرسال طلب الاشتراك' : 'Subscription request sent') : (ar ? 'آخر طلب اشتراك' : 'Latest subscription request')} · {planLabel(latest.plan)}</span>
+          <span className="block text-sm text-slate-600 dark:text-slate-300" role="status">{latest.status === 'pending' ? (ar ? 'قيد المراجعة' : 'Under review') : latest.status === 'correction' ? (ar ? 'مطلوب تصحيح' : 'Correction requested') : (ar ? 'تم التفعيل' : 'Activated')}</span>
+        </span>
+        <ChevronDown aria-hidden="true" className="size-5 shrink-0 transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-700">
+        <PaymentTimes payment={latest} lang={lang} />
+        {latest.reason && <p>{latest.reason}</p>}
+        {latest.paidExpiresAt && <p>{ar ? 'ينتهي في' : 'Ends on'} {new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'long', timeZone: 'Africa/Cairo' }).format(new Date(latest.paidExpiresAt))}</p>}
+        <div className="flex flex-wrap items-center gap-4 text-sm">
+          {latest.receiptUrl && <a className="underline" href={latest.receiptUrl} target="_blank" rel="noreferrer">{ar ? 'عرض الإيصال' : 'View receipt'}</a>}
+          <button type="button" onClick={() => setRefresh(value => value + 1)} className="underline">{ar ? 'تحديث الحالة' : 'Refresh status'}</button>
+        </div>
       </div>
-      <p role="status">{latest.status === 'pending' ? (ar ? 'قيد المراجعة' : 'Under review') : latest.status === 'correction' ? (ar ? 'مطلوب تصحيح' : 'Correction requested') : (ar ? 'تم التفعيل' : 'Activated')}</p>
-      <PaymentTimes payment={latest} lang={lang} />
-      {latest.reason && <p>{latest.reason}</p>}
-      {latest.paidExpiresAt && <p>{ar ? 'ينتهي في' : 'Ends on'} {new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'long', timeZone: 'Africa/Cairo' }).format(new Date(latest.paidExpiresAt))}</p>}
-      {latest.receiptUrl && <a className="text-sm underline" href={latest.receiptUrl} target="_blank" rel="noreferrer">{ar ? 'عرض الإيصال' : 'View receipt'}</a>}
-    </section>}
+    </details>}
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-900">{error} <button type="button" className="underline" disabled={sending} onClick={() => setRefresh(value => value + 1)}>{ar ? 'تحديث الحالة' : 'Refresh status'}</button></p>}
     {loaded && !plan && latest?.status !== 'pending' && children}
     {!loaded && !error && <p role="status" className="text-sm">{ar ? 'جارٍ تحميل حالة الاشتراك…' : 'Loading subscription status…'}</p>}

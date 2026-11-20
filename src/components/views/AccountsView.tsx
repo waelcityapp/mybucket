@@ -7,15 +7,18 @@ import { formatAccountBalance } from '../../utils/formatBalance';
 interface AccountsViewProps {
   accounts: FinancialAccount[];
   lang: Language;
+  canAddAccounts: boolean;
   onAddAccount: (acc: Omit<FinancialAccount, 'id'>) => Promise<boolean>;
   onDeleteAccount: (accountId: string) => Promise<boolean>;
   onEditBalance?: (accId: string | null) => void;
 }
 
-export function AccountsView({ accounts, lang, onAddAccount, onDeleteAccount, onEditBalance }: AccountsViewProps) {
+export function AccountsView({ accounts, lang, canAddAccounts, onAddAccount, onDeleteAccount, onEditBalance }: AccountsViewProps) {
   const t = translations[lang];
-  const [showAddModal, setShowAddModal] = useState(() => window.location.pathname === '/accounts/new');
-  const openAdd = () => { window.history.pushState({ accountCreate: true }, '', '/accounts/new'); setShowAddModal(true); };
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [addRequested, setShowAddModal] = useState(() => window.location.pathname === '/accounts/new');
+  const showAddModal = canAddAccounts && addRequested;
+  const openAdd = () => { if (!canAddAccounts) { setShowUpgrade(true); return; } window.history.pushState({ accountCreate: true }, '', '/accounts/new'); setShowAddModal(true); };
   const closeAdd = () => { setShowAddModal(false); if (window.location.pathname === '/accounts/new') window.history.replaceState({}, '', '/'); };
   React.useEffect(() => { const onBack = () => setShowAddModal(window.location.pathname === '/accounts/new'); window.addEventListener('popstate', onBack); return () => window.removeEventListener('popstate', onBack); }, []);
   const [name, setName] = useState('');
@@ -114,6 +117,9 @@ export function AccountsView({ accounts, lang, onAddAccount, onDeleteAccount, on
         </div>
       </div>
 
+      {!canAddAccounts && (showUpgrade || addRequested) && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+        {lang === 'ar' ? 'يجب الترقية إلى خطة Pro لإضافة حساب آخر.' : 'Upgrade to Pro to add another account.'}
+      </p>}
       {/* Balances by currency badge banner */}
       <div className={showAddModal ? "hidden" : "bg-slate-900 text-white p-5 rounded-3xl space-y-2"}>
         <div className="flex items-center gap-2 text-xs font-bold text-slate-300">

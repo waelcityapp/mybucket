@@ -1138,8 +1138,13 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  const accountPlanStage = userSubscription ? stageFor(userSubscription) : null;
+  const accountPlanGrant = activeGrant(userSubscription?.grant);
+  const canAddAccounts = trialSettingsReady && (accountPlanStage === 'paid' ||
+    (accountPlanGrant ? accountPlanGrant.plan === 'pro' : accountPlanStage === 'pro-trial'));
+
   const handleAddAccount = async (accData: Omit<FinancialAccount, 'id'>): Promise<boolean> => {
-    if (!authUser) return false;
+    if (!authUser || !canAddAccounts) return false;
     try {
       validateBalance({ ...accData, id: 'new' }, accData.balance);
       if (accData.linkedBankId) {
@@ -1653,7 +1658,7 @@ export default function App() {
       window.history.replaceState({ myBucketTab: 'home' }, '', '/');
       setActiveTab('home');
     };
-    return <InitialSetupView lang={lang}
+    return <InitialSetupView lang={lang} canAddAccounts={canAddAccounts}
       onBack={() => setOnboardingSetupUid(null)} backLabel={lang === 'ar' ? 'العودة للبيانات التجريبية' : 'Back to sample data'}
       onCancel={leaveInitialSetup} onSave={async draft => {
       if (!auth.currentUser || auth.currentUser.uid !== authUser.uid) throw new Error('auth-changed');
@@ -2033,6 +2038,7 @@ export default function App() {
           <AccountsView
             accounts={accounts}
             lang={lang}
+            canAddAccounts={canAddAccounts}
             onAddAccount={handleAddAccount}
             onDeleteAccount={handleDeleteAccount}
             onEditBalance={handleOpenEditBalance}

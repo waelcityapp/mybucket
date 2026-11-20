@@ -436,8 +436,8 @@ export function VoiceNaturalInput({
               <span className="flex items-center gap-1 text-emerald-700 font-semibold">
                 <Sparkles className="w-3 h-3 shrink-0" />
                 {isAr
-                  ? 'عدّل النص لو محتاج، ثم اضغط سهم الإرسال لتحليله مرة واحدة وفتح حقول العملية.'
-                  : 'Edit the transcript if needed, then tap Send to analyze once and review the fields.'}
+                  ? 'عدّل النص لو محتاج، ثم اضغط سهم الإرسال لتحليله مرة واحدة وفتح حقول العملية وحفظها.'
+                  : 'Edit the transcript if needed, then tap Send to analyze it once, open the transaction fields, and save it.'}
               </span>
             ) : (
               <span className="flex items-center gap-1 text-slate-400">
@@ -457,11 +457,12 @@ export function VoiceNaturalInput({
           {inputText.trim().length > 0 && !isProcessingAI && !isRecording && (
             <button
               type="submit"
-              className="w-10 h-10 rounded-full bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center transition-transform active:scale-95 cursor-pointer shadow-xs"
-              aria-label={pendingVoiceReview ? (isAr ? 'تحليل النص بعد مراجعته' : 'Analyze reviewed transcript') : (isAr ? 'إرسال' : 'Send')}
-              title={pendingVoiceReview ? (isAr ? 'تحليل النص بعد مراجعته' : 'Analyze reviewed transcript') : (isAr ? 'إرسال' : 'Send')}
+              className="flex w-16 cursor-pointer flex-col items-center gap-1 rounded-lg text-center text-[10px] font-bold leading-tight text-slate-700 focus-visible:outline-2 focus-visible:outline-emerald-600 sm:w-20"
             >
-              <Send className="w-4 h-4" />
+              <span className="flex size-10 items-center justify-center rounded-full bg-slate-900 text-white shadow-xs transition-transform hover:bg-slate-800 active:scale-95">
+                <Send className="size-4" aria-hidden="true" />
+              </span>
+              <span>{isAr ? 'إرسال للمراجعة والحفظ' : 'Send for review and save'}</span>
             </button>
           )}
 

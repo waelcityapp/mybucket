@@ -1,5 +1,5 @@
 import React, { useState, FormEvent } from 'react';
-import { Plus, CreditCard, Banknote, Building2, PiggyBank, Smartphone, ArrowLeftRight, FolderKanban, ShieldCheck, X, Pencil, RotateCcw, Trash2 } from 'lucide-react';
+import { Plus, CreditCard, Banknote, Building2, PiggyBank, Smartphone, ArrowLeftRight, FolderKanban, ShieldCheck, X, Pencil, Trash2 } from 'lucide-react';
 import { FinancialAccount, CurrencyCode, AccountType, Language, SUPPORTED_CURRENCIES, currencyName } from '../../types';
 import { translations } from '../../data/translations';
 import { formatAccountBalance } from '../../utils/formatBalance';
@@ -10,10 +10,9 @@ interface AccountsViewProps {
   onAddAccount: (acc: Omit<FinancialAccount, 'id'>) => Promise<boolean>;
   onDeleteAccount: (accountId: string) => Promise<boolean>;
   onEditBalance?: (accId: string | null) => void;
-  onZeroAllBalances: () => Promise<boolean>;
 }
 
-export function AccountsView({ accounts, lang, onAddAccount, onDeleteAccount, onEditBalance, onZeroAllBalances }: AccountsViewProps) {
+export function AccountsView({ accounts, lang, onAddAccount, onDeleteAccount, onEditBalance }: AccountsViewProps) {
   const t = translations[lang];
   const [showAddModal, setShowAddModal] = useState(() => window.location.pathname === '/accounts/new');
   const openAdd = () => { window.history.pushState({ accountCreate: true }, '', '/accounts/new'); setShowAddModal(true); };
@@ -27,7 +26,6 @@ export function AccountsView({ accounts, lang, onAddAccount, onDeleteAccount, on
   const [linkedBankId, setLinkedBankId] = useState('');
   const [creditLimit, setCreditLimit] = useState('');
   const [saving, setSaving] = useState(false);
-  const [resetting, setResetting] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -115,12 +113,6 @@ export function AccountsView({ accounts, lang, onAddAccount, onDeleteAccount, on
           </button>
         </div>
       </div>
-
-      {!showAddModal && <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2">
-        <h2 className="text-sm font-bold text-slate-800">{lang === 'ar' ? 'إدارة الحسابات' : 'Manage accounts'}</h2>
-        <p className="text-xs leading-5 text-slate-600">{lang === 'ar' ? 'يمكنك إضافة حساب وتعديل أرصدته من هذه الصفحة. تصفير الأرصدة لا يحذف الحسابات أو العمليات المسجلة.' : 'Add accounts and edit their balances here. Resetting balances does not delete accounts or transaction history.'}</p>
-        <button type="button" disabled={resetting} onClick={async () => { if (resetting) return; setResetting(true); try { await onZeroAllBalances(); } finally { setResetting(false); } }} className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-800 disabled:opacity-50"><RotateCcw className="h-4 w-4" />{resetting ? (lang === 'ar' ? 'جارٍ التصفير...' : 'Resetting...') : (lang === 'ar' ? 'تصفير جميع أرصدة الحسابات' : 'Reset all account balances')}</button>
-      </section>}
 
       {/* Balances by currency badge banner */}
       <div className={showAddModal ? "hidden" : "bg-slate-900 text-white p-5 rounded-3xl space-y-2"}>

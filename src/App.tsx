@@ -15,7 +15,7 @@ import {
   TransactionType,
   AuthUser,
 } from './types';
-import { INITIAL_ACCOUNTS, INITIAL_CATEGORIES, INITIAL_TRANSACTIONS } from './data/initialData';
+import { INITIAL_ACCOUNTS, INITIAL_CATEGORIES } from './data/initialData';
 import { INITIAL_PROMO_BANNER, INITIAL_PERK_DEALS } from './data/dealsData';
 import { PromoBannerData, PerkDealItem } from './types/deals';
 import { PromoBanner } from './components/PromoBanner';
@@ -398,7 +398,6 @@ export default function App() {
   const transactions = guestDemo ? guestTransactions : cloudTransactions;
   const categories = guestDemo ? guestCategories : cloudCategories;
   const setAccounts = guestDemo ? setGuestAccounts : setCloudAccounts;
-  const setTransactions = guestDemo ? setGuestTransactions : setCloudTransactions;
   const setCategories = guestDemo ? setGuestCategories : setCloudCategories;
 
 
@@ -469,7 +468,7 @@ export default function App() {
     if (!isAdmin || pin !== '2233') return false;
     setAdminPinVerified(true);
     const currentPath = window.location.pathname;
-    const safeTarget = /^\/admin\/(users|subscriptions|marketers|ads|ai|system|branding|simulate-new-user)$/.test(currentPath) || /^\/admin\/users\/[A-Za-z0-9_-]{1,128}\/grant$/.test(currentPath) ? currentPath : '/admin';
+    const safeTarget = /^\/admin\/(users|subscriptions|marketers|ads|ai|branding|simulate-new-user)$/.test(currentPath) || /^\/admin\/users\/[A-Za-z0-9_-]{1,128}\/grant$/.test(currentPath) ? currentPath : '/admin';
     window.history.replaceState({ myBucketTab: 'admin' }, '', safeTarget);
     setAdminRoute(safeTarget);
     setActiveTab('admin');
@@ -497,7 +496,7 @@ export default function App() {
   }, [adminPinVerified, categories]);
 
   const adminSectionFromPath = (): SectionId | null => {
-    const section = adminRoute.match(/^\/admin\/(users|subscriptions|marketers|ads|ai|system|branding)(?:\/new)?$/)?.[1];
+    const section = adminRoute.match(/^\/admin\/(users|subscriptions|marketers|ads|ai|branding)(?:\/new)?$/)?.[1];
     return section ? section as SectionId : null;
   };
   const openAdminSection = (section: SectionId) => {
@@ -1484,21 +1483,6 @@ export default function App() {
     }
   };
 
-  // Reset Demo Data Handler
-  const handleResetDemoData = async () => {
-    setAccounts(INITIAL_ACCOUNTS);
-    setCategories(INITIAL_CATEGORIES);
-    setTransactions(INITIAL_TRANSACTIONS);
-    localStorage.removeItem(`${STORAGE_KEY_PREFIX}accounts`);
-    localStorage.removeItem(`${STORAGE_KEY_PREFIX}categories`);
-    localStorage.removeItem(`${STORAGE_KEY_PREFIX}transactions`);
-
-    if (authUser) {
-      await saveAllAccountsToFirestore(authUser.uid, INITIAL_ACCOUNTS);
-      await saveAllCategoriesToFirestore(authUser.uid, INITIAL_CATEGORIES);
-    }
-  };
-
   const t = translations[lang];
 
   // Dynamic greeting based on current time and user name
@@ -2052,7 +2036,6 @@ export default function App() {
             onAddAccount={handleAddAccount}
             onDeleteAccount={handleDeleteAccount}
             onEditBalance={handleOpenEditBalance}
-            onZeroAllBalances={handleZeroAllBalances}
           />
         )}
 
@@ -2150,21 +2133,13 @@ export default function App() {
           <AdminPinView lang={lang} onBack={() => navigateTab('home')} onVerify={verifyAdminPin} />
         )}
         {activeTab === 'admin' && isAdmin && adminPinVerified && authUser && (
-          adminRoute === '/admin/system/delete-transactions'
-            ? <DeleteTransactionsPage lang={lang} uid={authUser.uid} accounts={accounts} transactions={transactions}
-                ready={financialLoaded.accounts && financialLoaded.transactions && !transactionReadError}
-                onBack={() => openAdminSection('system')} />
-            : adminRoute === '/admin/analyzer-feedback'
+          adminRoute === '/admin/analyzer-feedback'
             ? <AnalyzerFeedbackAdmin lang={lang} onBack={closeFeedbackAdmin} />
             : adminRoute === '/admin/branding'
             ? <AdminAppIdentityView lang={lang} identity={appIdentity} identityReady={identityReady} onSaved={(updated) => setAppIdentity(updated)} onBack={backToAdminSections} />
             : /^\/admin\/users\/[A-Za-z0-9_-]{1,128}\/grant$/.test(adminRoute)
             ? <AdminUserGrantView uid={adminRoute.split('/')[3]} lang={lang} onBack={() => openAdminSection('users')} />
-            : <AdminView lang={lang} user={authUser} onBack={() => navigateTab('home')} onResetDemoData={handleResetDemoData} onZeroAllBalances={handleZeroAllBalances} onOpenDeleteTransactions={() => {
-              window.history.pushState({ myBucketTab: 'admin' }, '', '/admin/system/delete-transactions');
-              setAdminRoute('/admin/system/delete-transactions');
-              window.scrollTo(0, 0);
-            }} onOpenFeedbackAdmin={openFeedbackAdmin} sectionId={adminSectionFromPath()} onOpenSection={openAdminSection} onBackToSections={backToAdminSections} onOpenGrant={openUserGrant} onOpenNewUserSimulation={openNewUserSimulation} />
+            : <AdminView lang={lang} user={authUser} onBack={() => navigateTab('home')} onOpenFeedbackAdmin={openFeedbackAdmin} sectionId={adminSectionFromPath()} onOpenSection={openAdminSection} onBackToSections={backToAdminSections} onOpenGrant={openUserGrant} onOpenNewUserSimulation={openNewUserSimulation} />
         )}
       </main>
 

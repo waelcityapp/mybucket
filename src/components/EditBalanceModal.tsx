@@ -232,10 +232,10 @@ export function EditBalanceModal({
               <button
                 type="button"
                 onClick={handleResetAllToZero}
-                className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                className="text-xs font-bold text-slate-700 hover:text-slate-900 flex items-center gap-1 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>{lang === 'ar' ? 'تصفير الكل (0)' : 'Reset All to 0'}</span>
+                <span>{lang === 'ar' ? 'صفّر القيم المدخلة' : 'Zero the entered values'}</span>
               </button>
             </div>
 

@@ -1,12 +1,10 @@
 import { AdminOfferAds } from './AdminOfferAds';
-import { useState } from 'react';
 import {
-  ArrowLeft, ArrowRight, CheckCircle2, Database, RotateCcw, ShieldCheck,
-  MessageSquareText, Users, CreditCard, Megaphone, BrainCircuit, Settings2,
+  ArrowLeft, ArrowRight, ShieldCheck,
+  MessageSquareText, Users, CreditCard, Megaphone, BrainCircuit,
   ChevronUp, Clock3, PanelsTopLeft, PlayCircle, Palette,
 } from 'lucide-react';
 import type { AuthUser, Language } from '../../types';
-import { translations } from '../../data/translations';
 import { AdminAiUsageCard } from '../AdminAiUsageCard';
 import { AdminAppUsersView } from './AdminAppUsersView';
 import { AdminTrialSettingsView } from './AdminTrialSettingsView';
@@ -16,9 +14,6 @@ interface AdminViewProps {
   lang: Language;
   user: AuthUser;
   onBack: () => void;
-  onResetDemoData: () => void;
-  onZeroAllBalances: () => Promise<boolean>;
-  onOpenDeleteTransactions: () => void;
   onOpenFeedbackAdmin: () => void;
   sectionId?: SectionId | null;
   onOpenSection: (section: SectionId) => void;
@@ -27,16 +22,14 @@ interface AdminViewProps {
   onOpenNewUserSimulation: () => void;
 }
 
-export type SectionId = 'users' | 'subscriptions' | 'marketers' | 'reports' | 'ai' | 'system' | 'ads' | 'branding';
+export type SectionId = 'users' | 'subscriptions' | 'marketers' | 'reports' | 'ai' | 'ads' | 'branding';
 
 export function AdminView({
-  lang, user, onBack, onResetDemoData, onZeroAllBalances, onOpenDeleteTransactions, onOpenFeedbackAdmin,
+  lang, user, onBack, onOpenFeedbackAdmin,
   sectionId = null, onOpenSection, onBackToSections, onOpenGrant, onOpenNewUserSimulation,
 }: AdminViewProps) {
-  const t = translations[lang];
   const ar = lang === 'ar';
   const selected = sectionId;
-  const [confirmation, setConfirmation] = useState<'zero' | 'reset' | null>(null);
 
   const sections = [
     { id: 'users' as const, icon: Users, title: ar ? 'مستخدمى التطبيق' : 'App users', desc: ar ? 'التسجيل والتثبيت والاشتراكات والتحكم بالحسابات' : 'Registrations, installs, plans and account controls', ready: true },
@@ -46,20 +39,7 @@ export function AdminView({
     { id: 'reports' as const, icon: MessageSquareText, title: ar ? 'البلاغات' : 'Reports', desc: ar ? 'تقييمات المحلل المحلي والتحكم فيها' : 'Local analyzer feedback and controls', ready: true },
     { id: 'ai' as const, icon: BrainCircuit, title: ar ? 'الذكاء الاصطناعي' : 'Artificial intelligence', desc: ar ? 'Gemini والاستهلاك واختيار النموذج' : 'Gemini, usage and model selection', ready: true },
     { id: 'branding' as const, icon: Palette, title: ar ? 'التحكم في هوية التطبيق' : 'App identity', desc: ar ? 'تغيير الاسم والأيقونة عبر Cloudinary' : 'Edit the name and Cloudinary icon', ready: true },
-    { id: 'system' as const, icon: Settings2, title: ar ? 'إعدادات النظام' : 'System settings', desc: ar ? 'التشخيص والأدوات الحالية' : 'Diagnostics and existing tools', ready: true },
   ];
-
-  const showConfirmation = (type: 'zero' | 'reset') => {
-    setConfirmation(type);
-    window.setTimeout(() => setConfirmation(null), 3000);
-  };
-  const handleZeroBalances = async () => {
-    if (await onZeroAllBalances()) showConfirmation('zero');
-  };
-  const handleReset = () => {
-    onResetDemoData();
-    showConfirmation('reset');
-  };
 
   const activeSection = sections.find(section => section.id === selected);
   return (
@@ -154,56 +134,6 @@ export function AdminView({
           {selected === 'subscriptions' && <><AdminTrialSettingsView lang={lang} /><AdminAiQuotaSettings lang={lang} /></>}
           {selected === 'ai' && <AdminAiUsageCard lang={lang} />}
 
-          {selected === 'system' && (
-            <>
-              <section className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
-                <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
-                  <RotateCcw className="w-4 h-4 text-slate-600" />
-                  <span>{t.dataManagement}</span>
-                </div>
-                <p className="text-xs text-slate-500">
-                  {ar ? 'ملاحظة: الأدوات التالية تخص بيانات حسابك الحالي، ولا تعدل حسابات بقية المستخدمين.' : 'Note: These controls affect only your current account, not other users.'}
-                </p>
-
-                <div className="flex flex-col gap-2">
-                  <button type="button" onClick={handleZeroBalances}
-                    className="w-full py-2.5 px-4 rounded-xl border border-rose-200 bg-rose-50/50 hover:bg-rose-50 text-rose-700 text-xs font-bold flex items-center justify-center gap-2">
-                    <RotateCcw className="w-3.5 h-3.5" />{t.zeroAllBalances}
-                  </button>
-                  <button type="button" onClick={onOpenDeleteTransactions}
-                    className="w-full py-2.5 px-4 rounded-xl border border-rose-200 bg-rose-50/50 hover:bg-rose-50 text-rose-700 text-xs font-bold flex items-center justify-center gap-2">
-                    <Database className="w-3.5 h-3.5" />{ar ? 'حذف العمليات' : 'Delete transactions'}
-                  </button>
-                  <button type="button" onClick={handleReset}
-                    className="w-full py-2.5 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center gap-2">
-                    <RotateCcw className="w-3.5 h-3.5" />{t.resetDemoData}
-                  </button>
-                </div>
-                {confirmation && (
-                  <div role="status" className="p-2.5 bg-emerald-50 text-emerald-800 text-xs font-bold rounded-xl flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    {confirmation === 'zero'
-                      ? (ar ? 'تم تصفير جميع الأرصدة بنجاح' : 'All balances set to zero successfully')
-                      : (ar ? 'تمت استعادة البيانات الافتراضية بنجاح' : 'Demo data reset successfully')}
-                  </div>
-                )}
-              </section>
-              <section className="bg-slate-100/70 border border-slate-200/60 rounded-2xl p-4 space-y-3">
-                <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                  <Database className="w-4 h-4 text-slate-500" />{t.devDiagnostics}
-                </div>
-                <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-medium flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />{t.storageEnforcementBadge}
-                </div>
-                <div className="space-y-1 bg-white p-3 rounded-xl border border-slate-200 font-mono text-[11px] text-slate-600" dir="ltr">
-                  <div>Active Auth: <strong>Admin ({user.email})</strong></div>
-                  <div>Firestore Database: <strong>ai-studio-mybucket-8e5dde08...</strong></div>
-                  <div>Storage Mode: Structured Firestore Documents Only</div>
-                </div>
-                <p className="text-[11px] text-slate-400">{t.devNote}</p>
-              </section>
-            </>
-          )}
         </section>
       )}
     </div>

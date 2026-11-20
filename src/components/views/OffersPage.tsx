@@ -9,6 +9,7 @@ import { Language } from '../../types';
 import type { PublicOfferAd } from '../../data/offerAds';
 import { offerAdsRequest } from '../../services/offerAdsClient';
 import { DEMO_ADS } from '../../data/demoAds';
+import { OfferCardActions, readOfferPreference, saveOfferPreference } from '../OfferCardActions';
 
 interface OffersPageProps {
   lang: Language;
@@ -64,11 +65,28 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
   const gridRef = useRef<HTMLDivElement>(null);
   const [loadError, setLoadError] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [viewsUnavailable, setViewsUnavailable] = useState(false);
+  const [demoViews, setDemoViews] = useState<Record<string, number>>({});
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    try {
+      const saved: unknown = JSON.parse(readOfferPreference('offer-favorites') ?? '[]');
+      return Array.isArray(saved) ? saved.filter(id => typeof id === 'string') : [];
+    } catch {
+      return [];
+    }
+  });
   useEffect(() => {
     let active = true;
     setLoadError(false);
-    offerAdsRequest<OfferCard[]>(showViewCounts ? 'admin.ads.listWithViews' : 'ads.list', {}, showViewCounts)
-      .then(ads => { if (active) setPublished(ads); })
+    setViewsUnavailable(false);
+    const request = showViewCounts
+      ? offerAdsRequest<OfferCard[]>('admin.ads.listWithViews', {}, true).catch(() => {
+          if (active) setViewsUnavailable(true);
+          return offerAdsRequest<OfferCard[]>('ads.list');
+        })
+      : offerAdsRequest<OfferCard[]>('ads.list');
+    request.then(ads => { if (active) setPublished(ads); })
       .catch(() => { if (active) setLoadError(true); });
     return () => { active = false; };
   }, [attempt, showViewCounts]);
@@ -78,7 +96,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
   ), [search]);
 
   const categoryCount = (slug: string) => published?.filter(offer => offer.categorySlug === slug).length;
-  const demoAds = DEMO_ADS.filter(ad => ad.categorySlug === categorySlug).map(ad => {
+  const allDemoAds = DEMO_ADS.map(ad => {
     const [title, description, merchant] = isAr ? ad.ar : ad.en;
     const media = 'video' in ad ? { type: 'video' as const, poster: `/demo-ads/${ad.poster}`, url: `/demo-ads/${ad.video}` }
       : 'image' in ad ? { type: 'image' as const, url: `/demo-ads/${ad.image}` } : undefined;
@@ -91,9 +109,17 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
   const rank = { vip: 0, featured: 1, free: 2 };
   const realAds = published?.filter(ad => ad.categorySlug === categorySlug)
     .sort((a, b) => rank[a.tier ?? 'free'] - rank[b.tier ?? 'free']) ?? [];
-  const visibleAds = showVip ? [...vipAds.slice(rotation), ...vipAds.slice(0, rotation)]
+  const demoAds = allDemoAds.filter(ad => ad.categorySlug === categorySlug);
+  const visibleAds = favoritesOnly
+    ? [...(published ?? []), ...allDemoAds].filter(ad => favorites.includes(ad.id))
+    : showVip ? [...vipAds.slice(rotation), ...vipAds.slice(0, rotation)]
     : realAds.length ? realAds : demoAds;
-  const showingDemos = !showVip && realAds.length === 0;
+  const showingDemos = !favoritesOnly && !showVip && realAds.length === 0;
+  const toggleFavorite = (id: string) => {
+    const next = favorites.includes(id) ? favorites.filter(item => item !== id) : [...favorites, id];
+    setFavorites(next);
+    saveOfferPreference('offer-favorites', JSON.stringify(next));
+  };
   const [vipLimit, setVipLimit] = useState(9);
   useEffect(() => {
     const grid = gridRef.current;
@@ -101,7 +127,8 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
     const observer = new IntersectionObserver(entries => {
       for (const entry of entries) {
         if (entry.intersectionRatio < 0.5 || document.visibilityState !== 'visible') continue;
-        const id = entry.target.getAttribute('data-offer-id');
+        const card = entry.target as HTMLElement;
+        const id = card.dataset.offerId;
         if (!id) continue;
         observer.unobserve(entry.target);
         const sessionKey = `offer-view:${id}`;
@@ -112,6 +139,14 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
           // In-memory tracking also works when browser storage is unavailable.
         }
         viewedAdIds.add(id);
+        if (card.dataset.demo === 'true') {
+          const countKey = `demo-offer-views:${id}`;
+          const count = Number(readOfferPreference(countKey) ?? 0) + 1;
+          saveOfferPreference(countKey, String(count));
+          try { sessionStorage.setItem(sessionKey, '1'); } catch { /* Use in-memory tracking. */ }
+          setDemoViews(views => ({ ...views, [id]: count }));
+          continue;
+        }
         void offerAdsRequest('ads.view', { id }).then(() => {
           try { sessionStorage.setItem(sessionKey, '1'); } catch { /* Use in-memory tracking. */ }
           if (!showViewCounts) return;
@@ -133,7 +168,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
       observer.disconnect();
       document.removeEventListener('visibilitychange', observeCards);
     };
-  }, [published, categorySlug, showVip, vipLimit, rotation, showViewCounts]);
+  }, [published, categorySlug, showVip, vipLimit, rotation, showViewCounts, favoritesOnly, favorites]);
 
   const title = category ? (isAr ? category.ar : category.en) : (isAr ? 'وفّر مع My Bucket' : 'Save with My Bucket');
 
@@ -165,11 +200,19 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
           {isAr ? 'تعذّر تحميل العروض المنشورة.' : 'Could not load published ads.'}{' '}
           <button type="button" className="font-bold underline" onClick={() => setAttempt(value => value + 1)}>{isAr ? 'حاول تاني' : 'Retry'}</button>
         </p> : published === null && <p role="status" className="mb-4 text-sm text-slate-600">{isAr ? 'جاري تحميل العروض المنشورة...' : 'Loading published ads…'}</p>}
-        {categorySlug || showVip ? (
+        <button type="button" aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly(value => !value)}
+          className="mb-4 min-h-11 rounded-xl border border-emerald-200 px-4 text-sm font-bold text-emerald-800 dark:text-emerald-300">
+          {favoritesOnly ? (isAr ? 'رجوع للإعلانات' : 'Back to offers') : (isAr ? 'إعلاناتي المفضلة' : 'Favorite ads')}
+        </button>
+        {showViewCounts && viewsUnavailable && <p role="status" className="mb-4 text-sm text-amber-800 dark:text-amber-300">
+          {isAr ? 'تعذّر تحميل عدادات المشاهدات.' : 'Could not load view counts.'}{' '}
+          <button type="button" className="font-bold underline" onClick={() => setAttempt(value => value + 1)}>{isAr ? 'حاول تاني' : 'Retry'}</button>
+        </p>}
+        {categorySlug || showVip || favoritesOnly ? (
           <section className="space-y-4">
-            {category || showVip ? (
+            {category || showVip || favoritesOnly ? (
               <>
-                {showVip && <div className="flex flex-wrap items-center justify-between gap-3">
+                {showVip && !favoritesOnly && <div className="flex flex-wrap items-center justify-between gap-3">
                   <h2 className="text-lg font-extrabold">{isAr ? 'عروض VIP' : 'VIP offers'}</h2>
                   <a href="/offers?view=categories" onClick={event => followInternalLink(event, onNavigate)}
                     className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white">
@@ -180,16 +223,19 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                   <div className="space-y-4">
                     {showingDemos && <p className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-semibold text-amber-900">{isAr ? 'الإعلانات دي أمثلة تجريبية، والعروض وأسماء المعلنين غير حقيقية.' : 'These are demonstration ads with fictional offers and advertisers.'}</p>}
                     <div ref={gridRef} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {(showVip ? visibleAds.slice(0, vipLimit) : visibleAds).map(ad => {
+                      {(showVip && !favoritesOnly ? visibleAds.slice(0, vipLimit) : visibleAds).map(ad => {
                         const tier = 'tier' in ad ? ad.tier : undefined;
-                        const badge = showingDemos ? (isAr ? 'إعلان تجريبي' : 'Demo ad')
+                        const demo = DEMO_ADS.some(example => example.id === ad.id);
+                        const badge = demo ? (isAr ? 'إعلان تجريبي' : 'Demo ad')
                           : tier === 'vip' ? 'VIP' : tier === 'featured' ? (isAr ? 'مميز' : 'Featured') : null;
                         const { title: adTitle, description, merchant, media } = ad;
                         const cardCategory = showVip ? CATEGORIES.find(item => item.slug === ad.categorySlug) : undefined;
-                        const viewCount = 'viewCount' in ad ? ad.viewCount : undefined;
+                        const viewCount = demo
+                          ? demoViews[ad.id] ?? Number(readOfferPreference(`demo-offer-views:${ad.id}`) ?? 0)
+                          : 'viewCount' in ad ? ad.viewCount : undefined;
                         const hasVideo = media?.type === 'video';
                         return (
-                          <article key={ad.id} data-offer-id={showingDemos ? undefined : ad.id} className="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                          <article key={ad.id} data-offer-id={ad.id} data-demo={demo} className="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                             {media?.type === 'image' && <img src={media.url} alt="" loading="lazy" className="aspect-video w-full bg-slate-100 object-cover dark:bg-slate-800" />}
                             {hasVideo && <a href={`/offers/ad/${ad.id}`} onClick={event => followInternalLink(event, onNavigate)}
                               aria-label={`${isAr ? 'شوف الفيديو' : 'View video'} · ${adTitle}`}
@@ -226,20 +272,21 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                                   {isAr ? 'مزيد من التفاصيل' : 'More details'} <ForwardIcon className="size-4" aria-hidden="true" />
                                 </a>
                               </div>
+                              <OfferCardActions id={ad.id} title={adTitle} isAr={isAr} saved={favorites.includes(ad.id)} onToggleSaved={() => toggleFavorite(ad.id)} />
                             </div>
                           </article>
                         );
                       })}
                     </div>
-                    {showVip && vipLimit < visibleAds.length && <button type="button" onClick={() => setVipLimit(value => value + 9)}
+                    {showVip && !favoritesOnly && vipLimit < visibleAds.length && <button type="button" onClick={() => setVipLimit(value => value + 9)}
                       className="min-h-11 rounded-xl border border-emerald-200 px-4 text-sm font-bold text-emerald-800 dark:text-emerald-300">
                       {isAr ? 'عرض المزيد' : 'Show more'}
                     </button>}
                   </div>
                 ) : published !== null && <div className="bg-white border border-slate-200 rounded-2xl p-9 text-center">
                   <Gift className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                  <h2 className="text-base font-bold">{isAr ? 'لا توجد عروض منشورة في هذا القسم حاليًا' : 'No published offers in this category yet'}</h2>
-                  <p className="text-sm text-slate-500 mt-2">{isAr ? 'عند إضافة عروض حقيقية، هتظهر هنا.' : 'Published offers will appear here once available.'}</p>
+                  <h2 className="text-base font-bold">{favoritesOnly ? (isAr ? 'لسه مفيش إعلانات في المفضلة' : 'No favorite ads yet') : (isAr ? 'لا توجد عروض منشورة في هذا القسم حاليًا' : 'No published offers in this category yet')}</h2>
+                  {!favoritesOnly && <p className="text-sm text-slate-500 mt-2">{isAr ? 'عند إضافة عروض حقيقية، هتظهر هنا.' : 'Published offers will appear here once available.'}</p>}
                 </div>}
               </>
             ) : (

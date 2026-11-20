@@ -1062,8 +1062,31 @@ export default function App() {
 
   // Reverse and delete as one confirmed server operation; never overwrite other balances.
   const handleDeleteTransaction = async (txId: string) => {
-    if (!authUser || deleteInFlight.current.has(txId)) return;
-    const uid = authUser.uid;
+    const transaction = transactions.find(item => item.id === txId);
+    if (!transaction || (!authUser && !guestDemo) || deleteInFlight.current.has(txId)) return;
+    const uid = authUser?.uid;
+    const approved = await confirmAction({
+      lang,
+      title: lang === 'ar' ? 'حذف العملية؟' : 'Delete transaction?',
+      description: lang === 'ar'
+        ? 'هيتم حذف العملية وتحديث أرصدة الحسابات المرتبطة بيها.'
+        : 'This will delete the transaction and update the related account balances.',
+      confirmLabel: lang === 'ar' ? 'تأكيد الحذف' : 'Confirm deletion',
+      cancelLabel: lang === 'ar' ? 'إلغاء' : 'Cancel',
+      tone: 'danger',
+    });
+    if (!approved || deleteInFlight.current.has(txId)) return;
+    if (guestDemo && !auth.currentUser) {
+      const { accountId, toAccountId, amount, type } = transaction;
+      setGuestAccounts(previous => previous.map(account => {
+        const adjustment = account.id === accountId ? (type === 'income' ? -amount : amount)
+          : type === 'transfer' && account.id === toAccountId ? -amount : 0;
+        return adjustment ? { ...account, balance: Math.round((account.balance + adjustment) * 100) / 100 } : account;
+      }));
+      setGuestTransactions(previous => previous.filter(item => item.id !== txId));
+      return;
+    }
+    if (!uid || auth.currentUser?.uid !== uid) return;
     deleteInFlight.current.add(txId);
     try {
       const result = await deleteTransactionFromFirestore(uid, txId);

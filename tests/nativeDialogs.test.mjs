@@ -51,10 +51,20 @@ test('shared branded confirmation is mounted at the application root', () => {
 test('financial deletion, reset, and unsaved setup require app-branded confirmation', () => {
   for (const file of [
     'App.tsx',
-    'components/CategoryDetailModal.tsx',
     'components/ExpenseCategoriesModal.tsx',
     'components/views/InitialSetupView.tsx',
   ]) {
     assert.match(fs.readFileSync(path.join(srcDir, file), 'utf8'), /await confirmAction\(/, file + ' must await approval');
   }
+});
+
+test('all transaction lists use the shared confirmation before deletion', () => {
+  const app = fs.readFileSync(path.join(srcDir, 'App.tsx'), 'utf8');
+  for (const view of ['RecentTransactions', 'TransactionsView', 'CategoryDetailPage']) {
+    const start = app.indexOf("<" + view + "\n");
+    assert.ok(start >= 0, view);
+    assert.ok(app.slice(start, app.indexOf("/>", start)).includes("onDeleteTransaction={handleDeleteTransaction}"), view);
+  }
+  const handler = app.slice(app.indexOf('const handleDeleteTransaction ='), app.indexOf('const handleEditTransaction ='));
+  assert.match(handler, /await confirmAction\([\s\S]*if \(!approved[^\n]*\) return;[\s\S]*await deleteTransactionFromFirestore/);
 });

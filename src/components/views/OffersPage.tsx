@@ -9,11 +9,12 @@ import { Language } from '../../types';
 import type { OfferEngagement, OfferReaction, OfferReactionState, PublicOfferAd } from '../../data/offerAds';
 import { offerAdsRequest } from '../../services/offerAdsClient';
 import { DEMO_ADS } from '../../data/demoAds';
-import { OfferCardActions, readOfferPreference, saveOfferPreference } from '../OfferCardActions';
+import { OfferCardActions } from '../OfferCardActions';
 
 interface OffersPageProps {
   lang: Language;
   showViewCounts: boolean;
+  authChecking: boolean;
   viewerId?: string;
   onSignIn: () => Promise<{ uid: string }>;
   onBack: () => void;
@@ -57,8 +58,22 @@ function previewDescription(description: string) {
 
 type OfferCard = PublicOfferAd & { viewCount?: number };
 const viewedAdIds = new Set<string>();
+let memorySessionId: string | undefined;
 
-export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySlug, onNavigate, showViewCounts, viewerId, onSignIn }) => {
+function viewSessionId() {
+  try {
+    const key = 'mybucket:offer-view-session';
+    const existing = sessionStorage.getItem(key);
+    if (existing) return existing;
+    const id = crypto.randomUUID();
+    sessionStorage.setItem(key, id);
+    return id;
+  } catch {
+    return memorySessionId ??= crypto.randomUUID();
+  }
+}
+
+export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySlug, onNavigate, showViewCounts, authChecking, viewerId, onSignIn }) => {
   const isAr = lang === 'ar';
   const BackIcon = isAr ? ArrowRight : ArrowLeft;
   const ForwardIcon = isAr ? ArrowLeft : ArrowRight;
@@ -68,7 +83,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
   const [loadError, setLoadError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [viewsUnavailable, setViewsUnavailable] = useState(false);
-  const [demoViews, setDemoViews] = useState<Record<string, number>>({});
+  const [confirmedViews, setConfirmedViews] = useState<Record<string, number>>({});
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   type Reactions = Record<string, OfferReactionState>;
   const [accountReactions, setAccountReactions] = useState<Record<string, Reactions>>({});
@@ -130,13 +145,23 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
     if (!hasDemoCards) return;
     let active = true;
     const revision = reactionRevision.current;
-    offerAdsRequest<Record<string, OfferEngagement>>('ads.demoEngagement').then(result => {
+    const action = showViewCounts ? 'admin.ads.demoEngagement' : 'ads.demoEngagement';
+    offerAdsRequest<Record<string, OfferEngagement & { viewCount?: number }>>(action, {}, showViewCounts).then(result => {
+      if (active && showViewCounts) {
+        setConfirmedViews(current => {
+          const next = { ...current };
+          for (const [id, stats] of Object.entries(result)) {
+            if (stats.viewCount !== undefined) next[id] = Math.max(current[id] ?? 0, stats.viewCount);
+          }
+          return next;
+        });
+      }
       if (active) {
         setDemoEngagement(current => revision === reactionRevision.current ? result : { ...result, ...current });
       }
     }).catch(() => {});
     return () => { active = false; };
-  }, [hasDemoCards, attempt]);
+  }, [hasDemoCards, attempt, showViewCounts]);
 
   async function reactToAd(id: string, demo: boolean, reaction: OfferReaction) {
     const uid = viewerId ?? (await onSignIn()).uid;
@@ -152,7 +177,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
   const [vipLimit, setVipLimit] = useState(9);
   useEffect(() => {
     const grid = gridRef.current;
-    if (!grid || typeof IntersectionObserver === 'undefined') return;
+    if (authChecking || !grid || typeof IntersectionObserver === 'undefined') return;
     const observer = new IntersectionObserver(entries => {
       for (const entry of entries) {
         if (entry.intersectionRatio < 0.5 || document.visibilityState !== 'visible') continue;
@@ -160,28 +185,15 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
         const id = card.dataset.offerId;
         if (!id) continue;
         observer.unobserve(entry.target);
-        const sessionKey = `offer-view:${id}`;
         if (viewedAdIds.has(id)) continue;
-        try {
-          if (sessionStorage.getItem(sessionKey)) continue;
-        } catch {
-          // In-memory tracking also works when browser storage is unavailable.
-        }
         viewedAdIds.add(id);
-        if (card.dataset.demo === 'true') {
-          const countKey = `demo-offer-views:${id}`;
-          const count = Number(readOfferPreference(countKey) ?? 0) + 1;
-          saveOfferPreference(countKey, String(count));
-          try { sessionStorage.setItem(sessionKey, '1'); } catch { /* Use in-memory tracking. */ }
-          setDemoViews(views => ({ ...views, [id]: count }));
-          continue;
-        }
-        void offerAdsRequest('ads.view', { id }).then(() => {
-          try { sessionStorage.setItem(sessionKey, '1'); } catch { /* Use in-memory tracking. */ }
-          if (!showViewCounts) return;
-          setPublished(ads => ads?.map(ad =>
-            ad.id === id && ad.viewCount !== undefined ? { ...ad, viewCount: ad.viewCount + 1 } : ad
-          ) ?? null);
+        const action = showViewCounts ? 'admin.ads.view' : 'ads.view';
+        const payload = { id, sessionId: viewSessionId() };
+        const record = () => offerAdsRequest<number | null>(action, payload, showViewCounts);
+        void record().catch(record).then(total => {
+          if (typeof total === 'number') {
+            setConfirmedViews(current => ({ ...current, [id]: Math.max(current[id] ?? 0, total) }));
+          }
         }).catch(() => viewedAdIds.delete(id));
       }
     }, { threshold: 0.5 });
@@ -197,7 +209,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
       observer.disconnect();
       document.removeEventListener('visibilitychange', observeCards);
     };
-  }, [published, categorySlug, showVip, vipLimit, rotation, showViewCounts, favoritesOnly, reactions]);
+  }, [published, categorySlug, showVip, vipLimit, rotation, showViewCounts, authChecking, favoritesOnly, reactions]);
 
   const title = category ? (isAr ? category.ar : category.en) : (isAr ? 'وفّر مع My Bucket' : 'Save with My Bucket');
 
@@ -262,12 +274,12 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                           : tier === 'vip' ? 'VIP' : tier === 'featured' ? (isAr ? 'مميز' : 'Featured') : null;
                         const { title: adTitle, description, merchant, media } = ad;
                         const cardCategory = showVip ? CATEGORIES.find(item => item.slug === ad.categorySlug) : undefined;
-                        const viewCount = demo
-                          ? demoViews[ad.id] ?? Number(readOfferPreference(`demo-offer-views:${ad.id}`) ?? 0)
-                          : 'viewCount' in ad ? ad.viewCount : undefined;
+                        const listedViews = 'viewCount' in ad && typeof ad.viewCount === 'number' ? ad.viewCount : undefined;
+                        const confirmed = confirmedViews[ad.id];
+                        const viewCount = confirmed === undefined ? listedViews : Math.max(listedViews ?? 0, confirmed);
                         const hasVideo = media?.type === 'video';
                         return (
-                          <article key={ad.id} data-offer-id={ad.id} data-demo={demo} className="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                          <article key={ad.id} data-offer-id={ad.id} className="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                             {media?.type === 'image' && <img src={media.url} alt="" loading="lazy" className="aspect-video w-full bg-slate-100 object-cover dark:bg-slate-800" />}
                             {hasVideo && <a href={`/offers/ad/${ad.id}`} onClick={event => followInternalLink(event, onNavigate)}
                               aria-label={`${isAr ? 'شوف الفيديو' : 'View video'} · ${adTitle}`}

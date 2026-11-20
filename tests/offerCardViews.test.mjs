@@ -9,16 +9,21 @@ const activeAd = { status: 'approved', startsAt: now - 60000, endsAt: now + 6000
 
 function offerDatabase(ad) {
   const snapshot = { id, data: () => ad };
-  const reference = { get: async () => snapshot };
+  const sessions = new Set();
+  const reference = { get: async () => snapshot, collection: () => ({ doc: key => key }) };
   const updates = [];
+  let count = ad?.viewCount ?? 0;
   const db = {
     collection: () => ({
       where: () => ({ get: async () => ({ docs: [snapshot] }) }),
       doc: () => reference,
     }),
     runTransaction: async callback => callback({
-      get: async () => snapshot,
-      update: (ref, fields) => updates.push({ ref, fields }),
+      get: async ref => ref === reference
+        ? { data: () => ad && { ...ad, viewCount: count } }
+        : { exists: sessions.has(ref) },
+      set: (_ref, fields) => { count = fields.viewCount; updates.push(fields); },
+      create: ref => sessions.add(ref),
     }),
   };
   return { db, updates };
@@ -37,17 +42,20 @@ test('only the administrator list includes views and older ads start at zero', a
   assert.equal(olderAd.viewCount, 0);
 });
 
-test('only currently published ads can record a card view', async () => {
+test('a view is counted once per tab session and only while the offer is published', async () => {
   const { db, updates } = offerDatabase(activeAd);
-  await recordOfferCardView({ id }, db);
-  assert.equal(updates.length, 1);
-  assert.equal(updates[0].fields.viewCount.operand, 1);
+  const sessionId = '00000000-0000-4000-8000-000000000002';
+  assert.equal(await recordOfferCardView({ id, sessionId }, db), 8);
+  assert.equal(await recordOfferCardView({ id, sessionId }, db), 8);
+  assert.equal(await recordOfferCardView({ id, sessionId: '00000000-0000-4000-8000-000000000003' }, db), 9);
+  assert.deepEqual(updates, [{ viewCount: 8 }, { viewCount: 9 }]);
   for (const ad of [undefined, { ...activeAd, status: 'pending' }, { ...activeAd, endsAt: now }, { ...activeAd, startsAt: now + 60000 }]) {
     const inactive = offerDatabase(ad);
-    await recordOfferCardView({ id }, inactive.db);
+    assert.equal(await recordOfferCardView({ id, sessionId }, inactive.db), null);
     assert.equal(inactive.updates.length, 0);
   }
-  await assert.rejects(recordOfferCardView({ id: 'demo' }, db), { code: 'invalid_ad_id' });
+  await assert.rejects(recordOfferCardView({ id: 'demo', sessionId }, db), { code: 'invalid_ad_id' });
+  await assert.rejects(recordOfferCardView({ id, sessionId: 'invalid' }, db), { code: 'invalid_ad_view_session' });
 });
 
 test('the counts endpoint requires authentication', async () => {

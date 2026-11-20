@@ -1,5 +1,4 @@
 import { paidAdDailyPrice, adRunDays, normalizePaymentContactPhone } from '../src/utils/adCheckout.js';
-import { FieldValue } from 'firebase-admin/firestore';
 import { createHash } from 'node:crypto';
 import { getAdminFirestore } from './firebaseAdmin.js';
 import { confirmAdminAdTestUpload, deleteAdminAdTestUpload, signAdminAdTestUpload } from './adminAdTestUpload.js';
@@ -125,10 +124,14 @@ function engagementOf(data?: Partial<OfferEngagement>): OfferEngagement {
 const reactionsFor = (db: ReturnType<typeof getAdminFirestore>, uid: string) =>
   db.collection('offerAdReactions').doc(uid).collection('ads');
 
-export async function readDemoOfferEngagement(db = getAdminFirestore()) {
+export async function readDemoOfferEngagement(includeViews = false, db = getAdminFirestore()) {
   const refs = DEMO_ADS.map(ad => db.collection('demoOfferEngagement').doc(ad.id));
   const docs = await db.getAll(...refs);
-  return Object.fromEntries(docs.map(doc => [doc.id, engagementOf(doc.data())]));
+  return Object.fromEntries(docs.map(doc => {
+    const data = doc.data();
+    const engagement = engagementOf(data);
+    return [doc.id, includeViews ? { ...engagement, viewCount: data?.viewCount ?? 0 } : engagement];
+  }));
 }
 
 export async function readMyOfferReactions(uid: string, db = getAdminFirestore()) {
@@ -164,12 +167,22 @@ export async function setOfferReaction(uid: string, payload: Payload, db = getAd
 }
 
 export async function recordOfferCardView(payload: Payload, db = getAdminFirestore()) {
-  const ref = db.collection('offerAds').doc(adId(payload.id));
-  await db.runTransaction(async tx => {
-    const ad = (await tx.get(ref)).data() as StoredAd | undefined;
-    if (ad && isPublicOffer(ad, Date.now())) {
-      tx.update(ref, { viewCount: FieldValue.increment(1) });
-    }
+  const { sessionId } = payload;
+  if (typeof sessionId !== 'string' || !uuid.test(sessionId)) return fail('invalid_ad_view_session');
+  const demo = DEMO_ADS.some(ad => ad.id === payload.id);
+  const id = demo ? payload.id as string : adId(payload.id);
+  const ref = db.collection(demo ? 'demoOfferEngagement' : 'offerAds').doc(id);
+  const session = ref.collection('viewSessions').doc(sessionId);
+  return db.runTransaction(async tx => {
+    const [adSnapshot, sessionSnapshot] = await Promise.all([tx.get(ref), tx.get(session)]);
+    const ad = adSnapshot.data() as StoredAd | undefined;
+    if (!demo && (!ad || !isPublicOffer(ad, Date.now()))) return null;
+    const previous = ad?.viewCount ?? 0;
+    if (sessionSnapshot.exists) return previous;
+    const viewCount = previous + 1;
+    tx.set(ref, { viewCount }, { merge: true });
+    tx.create(session, { viewedAt: Date.now() });
+    return viewCount;
   });
 }
 
@@ -250,7 +263,7 @@ export async function removeExpiredOffer(uid: string, id: string, db = getAdminF
   }
   if (asset.receipt) await destroy(uid, { publicId: asset.receipt.publicId, resourceType: 'image' }, undefined, undefined, 'receipts');
   // Delete the document only after Cloudinary confirms removal. The scheduled job can retry failed removals.
-  await ref.delete();
+  await db.recursiveDelete(ref);
   return { removed: true };
 }
 

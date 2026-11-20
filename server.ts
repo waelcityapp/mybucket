@@ -68,6 +68,12 @@ async function startServer() {
         const data = action === 'admin.identity.signUpload' ? signBrandIconUpload(payload) : await saveAppIdentity(payload, user.uid);
         return res.json({ ok: true, data });
       }
+      if (action === 'admin.ads.view' || action === 'admin.ads.demoEngagement') {
+        if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+        const { recordOfferCardView, readDemoOfferEngagement } = await import('./server/offerAds.js');
+        const data = action === 'admin.ads.view' ? await recordOfferCardView(payload) : await readDemoOfferEngagement(true);
+        return res.json({ ok: true, data });
+      }
       if (action === 'admin.ads.listWithViews') {
         if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
         const { readPublishedOffers } = await import('./server/offerAds.js');

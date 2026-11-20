@@ -2,22 +2,6 @@ import { Heart, Share2, ThumbsUp } from 'lucide-react';
 import { useState } from 'react';
 import type { OfferEngagement, OfferReaction, OfferReactionState } from '../data/offerAds';
 
-export function readOfferPreference(key: string) {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-export function saveOfferPreference(key: string, value: string) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // The controls remain usable in memory when browser storage is unavailable.
-  }
-}
-
 export function OfferCardActions({ id, title, isAr, state, engagement, onReact }: {
   id: string;
   title: string;

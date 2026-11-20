@@ -150,7 +150,7 @@ export function AdminNewUserSimulation({ lang, onExit, realOnboarding = false, g
 
       {stage === 'login' && (
         <AuthPage lang={lang} identity={identity} simulation onSimulatedSignIn={() => setStage('dashboard')}
-          onSuccess={async () => {}} onOpenOffers={() => setStage('offers')} />
+          onOpenOffers={() => setStage('offers')} />
       )}
 
       {stage === 'offers' && (

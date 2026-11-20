@@ -369,8 +369,9 @@ export default function App() {
   const [guestTransactions, setGuestTransactions] = useState(exampleTransactions);
   const [guestCategories, setGuestCategories] = useState(INITIAL_CATEGORIES);
   const [guestBasicDays, setGuestBasicDays] = useState<number | null>(null);
+  const showPublicBasicTrial = !authUser && activeTab !== 'offers';
   useEffect(() => {
-    if (!guestDemo) return;
+    if (!showPublicBasicTrial) return;
     const controller = new AbortController();
     const readDuration = async () => {
       try {
@@ -391,7 +392,7 @@ export default function App() {
     };
     void readDuration();
     return () => controller.abort();
-  }, [guestDemo]);
+  }, [showPublicBasicTrial]);
   const accounts = guestDemo ? guestAccounts : cloudAccounts;
   const transactions = guestDemo ? guestTransactions : cloudTransactions;
   const categories = guestDemo ? guestCategories : cloudCategories;
@@ -1486,16 +1487,6 @@ export default function App() {
   const greetingText = `${greetingPrefix} ${userName} 👋${authUser?.email?.toLowerCase() === 'waelvts@gmail.com' ? ' ' + APP_REVISION : ''}`;
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
-  const handleAuthGateSuccess = async (appliedCode?: string | null, signedInUid?: string) => {
-    if (!signedInUid || !appliedCode) return;
-    try {
-      await saveUserSubscriptionToFirestore(signedInUid, { affiliateCode: appliedCode });
-    } catch (error) {
-      setToastMessage(error instanceof Error ? error.message : 'تعذر حفظ الكود');
-      throw error;
-    }
-  };
-
   const offerPath = window.location.pathname.match(/^\/offers\/ad\/([^/]+)\/?$/);
   if (offerPath) return <OfferDetailPage lang={lang} offerId={offerPath[1]} onBack={backFromOffer} />;
 
@@ -1556,7 +1547,7 @@ export default function App() {
       <AuthPage
         lang={lang}
         identity={appIdentity}
-        onSuccess={handleAuthGateSuccess}
+        basicTrialDays={guestBasicDays}
         onToggleLanguage={handleToggleLanguage}
         onOpenDemo={() => {
           setGuestAccounts(exampleAccounts());

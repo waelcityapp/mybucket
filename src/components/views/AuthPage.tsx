@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { AlertCircle, Gift, ShieldCheck, Wallet } from 'lucide-react';
-import { VALID_AFFILIATE_CODES } from '../../utils/subscriptionUtils';
 import { loginWithGoogle } from '../../lib/firebase';
 import { Language } from '../../types';
 import type { AppIdentity } from '../../services/appIdentityClient';
 
 interface AuthPageProps {
   lang: Language;
-  onSuccess: (appliedCode?: string | null, signedInUid?: string) => Promise<void>;
+  basicTrialDays?: number | null;
   onToggleLanguage?: () => void;
   onOpenOffers: () => void;
   onOpenDemo?: () => void;
@@ -16,34 +15,19 @@ interface AuthPageProps {
   identity?: AppIdentity;
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({ lang, onSuccess, onToggleLanguage, onOpenOffers, onOpenDemo, simulation = false, onSimulatedSignIn, identity }) => {
-  const [affiliateCode, setAffiliateCode] = useState('');
-  const [codeValidStatus, setCodeValidStatus] = useState<'idle' | 'valid' | 'invalid'>('idle');
+export const AuthPage: React.FC<AuthPageProps> = ({ lang, basicTrialDays = null, onToggleLanguage, onOpenOffers, onOpenDemo, simulation = false, onSimulatedSignIn, identity }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const isAr = lang === 'ar';
   const appName = (isAr ? identity?.appNameAr : identity?.appNameEn) || 'My Bucket';
 
-  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.trim().toUpperCase();
-    setAffiliateCode(val);
-    if (!val) {
-      setCodeValidStatus('idle');
-    } else if (VALID_AFFILIATE_CODES[val]) {
-      setCodeValidStatus('valid');
-    } else {
-      setCodeValidStatus('invalid');
-    }
-  };
-
   const handleGoogleSignIn = async () => {
     if (simulation) { onSimulatedSignIn?.(); return; }
     setErrorMsg(null);
     setIsLoading(true);
     try {
-      const user = await loginWithGoogle();
-      await onSuccess(codeValidStatus === 'valid' ? affiliateCode : null, user.uid);
+      await loginWithGoogle();
     } catch (err: any) {
       console.error('Google Sign-in error:', err);
       if (err.code !== 'auth/popup-closed-by-user') {
@@ -88,13 +72,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({ lang, onSuccess, onToggleLan
         <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
           <h2 className="text-xl font-black">{isAr ? 'ابدأ بحسابك' : 'Get started with your account'}</h2>
           <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">{isAr ? 'ادخل بحساب Google عشان تسجّل عملياتك وتتابعها من أجهزتك.' : 'Sign in with Google to record your own transactions and access them across your devices.'}</p>
-          <details className="rounded-xl border border-slate-200 px-3 dark:border-slate-700">
-            <summary className="min-h-11 cursor-pointer py-3 text-xs font-bold">{isAr ? 'عندك كود مسوّق أو هدية؟' : 'Have an affiliate or promo code?'}</summary>
-            <label htmlFor="auth-page-affiliate-code" className="block text-xs font-bold">{isAr ? 'الكود (اختياري)' : 'Code (optional)'}</label>
-            <input id="auth-page-affiliate-code" type="text" value={affiliateCode} onChange={handleCodeChange} dir="ltr"
-              className="my-2 min-h-11 w-full rounded-lg border border-slate-300 bg-transparent px-3 font-mono text-sm dark:border-slate-700" />
-            <p className="mb-3 text-xs text-slate-600 dark:text-slate-300">{isAr ? 'كود المسوّق الصالح يطبّق خصمًا على Pro.' : 'A valid affiliate code applies a Pro discount.'}</p>
-          </details>
+          <p className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold leading-6 text-emerald-950 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">
+            <Gift className="mt-1 size-4 shrink-0" aria-hidden="true" />
+            {basicTrialDays === null
+              ? (isAr ? 'لديك هدية! جرّب خطة Basic مجانًا بعد التسجيل.' : 'A gift for you! Try Basic for free when you sign up.')
+              : isAr
+                ? `لديك هدية! استخدم خطة Basic مجانًا لمدة ${new Intl.NumberFormat('ar-EG').format(basicTrialDays)} يومًا من التسجيل.`
+                : `A gift for you! Use Basic for free for ${basicTrialDays} days after signing up.`}
+          </p>
           {errorMsg && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-800">{errorMsg}</p>}
           <button id="btn-auth-page-google" type="button" onClick={handleGoogleSignIn} disabled={isLoading}
             className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl bg-emerald-700 px-4 text-sm font-extrabold text-white hover:bg-emerald-800 disabled:opacity-60">

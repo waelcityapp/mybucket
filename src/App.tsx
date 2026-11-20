@@ -1511,7 +1511,7 @@ export default function App() {
 
   // The authentication callback passes the signed-in UID directly, avoiding stale React state.
   const offerPath = window.location.pathname.match(/^\/offers\/ad\/([^/]+)\/?$/);
-  if (offerPath) return <OfferDetailPage lang={lang} offerId={offerPath[1]} onBack={backFromOffer} />;
+  if (offerPath) return <OfferDetailPage lang={lang} offerId={offerPath[1]} onBack={fallback => backFromOffer(window.history.state?.offerBack === '/settings/favorites' ? '/settings/favorites' : fallback)} />;
 
   // Public offers are browsable without financial account sign-in.
   if (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/')) {
@@ -1590,6 +1590,18 @@ export default function App() {
 
   if (isAdmin && adminPinVerified && activeTab === 'admin' && adminRoute === '/admin/simulate-new-user') {
     return <AdminNewUserSimulation lang={lang} identity={appIdentity} onExit={backToAdminSections} />;
+  }
+
+  if (window.location.pathname === '/settings/favorites' && authUser) {
+    return <OffersPage lang={lang} favoritesPage showViewCounts={isAdmin} authChecking={isAuthChecking}
+      viewerId={authUser.uid} onSignIn={loginWithGoogle} onNavigate={navigateOffer} onBack={() => {
+        if (window.history.state?.favoriteAds) window.history.back();
+        else {
+          window.history.replaceState({ myBucketTab: 'settings' }, '', '/');
+          setActiveTab('settings');
+          setOfferLocation('/');
+        }
+      }} />;
   }
 
   if (window.location.pathname === '/settings/ads') {
@@ -2102,6 +2114,11 @@ export default function App() {
             onLogin={handleGoogleLogin}
             onLogout={handleGoogleLogout}
             onOpenMobileLink={() => setIsMobileModalOpen(true)}
+            onOpenFavoriteAds={() => {
+              window.history.pushState({ myBucketTab: 'settings', favoriteAds: true }, '', '/settings/favorites');
+              setOfferLocation('/settings/favorites');
+              window.scrollTo(0, 0);
+            }}
             onOpenMyAds={() => {
               window.history.pushState({ myBucketTab: 'settings', myAds: true }, '', '/settings/ads');
               setActiveTab('settings');

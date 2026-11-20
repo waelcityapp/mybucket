@@ -15,6 +15,7 @@ interface OffersPageProps {
   lang: Language;
   showViewCounts: boolean;
   authChecking: boolean;
+  favoritesPage?: boolean;
   viewerId?: string;
   onSignIn: () => Promise<{ uid: string }>;
   onBack: () => void;
@@ -73,7 +74,7 @@ function viewSessionId() {
   }
 }
 
-export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySlug, onNavigate, showViewCounts, authChecking, viewerId, onSignIn }) => {
+export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySlug, onNavigate, showViewCounts, authChecking, viewerId, onSignIn, favoritesPage = false }) => {
   const isAr = lang === 'ar';
   const BackIcon = isAr ? ArrowRight : ArrowLeft;
   const ForwardIcon = isAr ? ArrowLeft : ArrowRight;
@@ -84,7 +85,9 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
   const [attempt, setAttempt] = useState(0);
   const [viewsUnavailable, setViewsUnavailable] = useState(false);
   const [confirmedViews, setConfirmedViews] = useState<Record<string, number>>({});
-  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [favoritesFilter, setFavoritesOnly] = useState(false);
+  const favoritesOnly = favoritesPage || favoritesFilter;
+  const [reactionsError, setReactionsError] = useState(false);
   type Reactions = Record<string, OfferReactionState>;
   const [accountReactions, setAccountReactions] = useState<Record<string, Reactions>>({});
   const reactions = viewerId ? accountReactions[viewerId] : undefined;
@@ -93,12 +96,13 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
   useEffect(() => {
     if (!viewerId) return;
     let active = true;
+    setReactionsError(false);
     const revision = reactionRevision.current;
     offerAdsRequest<Reactions>('ads.reactions', {}, true).then(result => {
       if (active && revision === reactionRevision.current) {
         setAccountReactions(current => ({ ...current, [viewerId]: result }));
       }
-    }).catch(() => {});
+    }).catch(() => { if (active) setReactionsError(true); });
     return () => { active = false; };
   }, [viewerId, attempt]);
   useEffect(() => {
@@ -211,7 +215,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
     };
   }, [published, categorySlug, showVip, vipLimit, rotation, showViewCounts, authChecking, favoritesOnly, reactions]);
 
-  const title = category ? (isAr ? category.ar : category.en) : (isAr ? 'وفّر مع My Bucket' : 'Save with My Bucket');
+  const title = favoritesPage ? (isAr ? 'إعلاناتي المفضلة' : 'Favorite ads') : category ? (isAr ? category.ar : category.en) : (isAr ? 'وفّر مع My Bucket' : 'Save with My Bucket');
 
   return (
     <div dir={isAr ? 'rtl' : 'ltr'} className="min-h-screen bg-[#F8FAFC] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
@@ -225,7 +229,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
             <h1 className="text-lg font-extrabold leading-snug">{title}</h1>
             <p className="text-xs text-slate-500">My Bucket</p>
           </div>
-          {!categorySlug && (
+          {!categorySlug && !favoritesPage && (
             <button type="button" onClick={() => onNavigate('/offers/new')}
               aria-label={isAr ? 'إضافة إعلان جديد' : 'Add new advertisement'}
               title={isAr ? 'إضافة إعلان جديد' : 'Add new advertisement'}
@@ -241,13 +245,19 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
           {isAr ? 'تعذّر تحميل العروض المنشورة.' : 'Could not load published ads.'}{' '}
           <button type="button" className="font-bold underline" onClick={() => setAttempt(value => value + 1)}>{isAr ? 'حاول تاني' : 'Retry'}</button>
         </p> : published === null && <p role="status" className="mb-4 text-sm text-slate-600">{isAr ? 'جاري تحميل العروض المنشورة...' : 'Loading published ads…'}</p>}
-        <button type="button" aria-pressed={favoritesOnly} onClick={() => {
+        {!favoritesPage && <button type="button" aria-pressed={favoritesOnly} onClick={() => {
           if (favoritesOnly || viewerId) setFavoritesOnly(value => !value);
           else void onSignIn().then(() => setFavoritesOnly(true)).catch(() => {});
         }}
           className="mb-4 min-h-11 rounded-xl border border-emerald-200 px-4 text-sm font-bold text-emerald-800 dark:text-emerald-300">
           {favoritesOnly ? (isAr ? 'رجوع للإعلانات' : 'Back to offers') : (isAr ? 'إعلاناتي المفضلة' : 'Favorite ads')}
-        </button>
+        </button>}
+        {favoritesOnly && (reactionsError ? <p role="alert" className="mb-4 text-sm text-red-700 dark:text-red-300">
+          {isAr ? 'تعذّر تحميل المفضلة.' : 'Could not load favorites.'}{' '}
+          <button type="button" className="font-bold underline" onClick={() => setAttempt(value => value + 1)}>{isAr ? 'حاول تاني' : 'Retry'}</button>
+        </p> : !reactions && <p role="status" className="mb-4 text-sm text-slate-600 dark:text-slate-300">
+          {isAr ? 'جاري تحميل المفضلة…' : 'Loading favorites…'}
+        </p>)}
         {showViewCounts && viewsUnavailable && <p role="status" className="mb-4 text-sm text-amber-800 dark:text-amber-300">
           {isAr ? 'تعذّر تحميل عدادات المشاهدات.' : 'Could not load view counts.'}{' '}
           <button type="button" className="font-bold underline" onClick={() => setAttempt(value => value + 1)}>{isAr ? 'حاول تاني' : 'Retry'}</button>
@@ -329,7 +339,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                       {isAr ? 'عرض المزيد' : 'Show more'}
                     </button>}
                   </div>
-                ) : published !== null && <div className="bg-white border border-slate-200 rounded-2xl p-9 text-center">
+                ) : published !== null && (!favoritesOnly || (reactions && !loadError && !reactionsError)) && <div className="bg-white border border-slate-200 rounded-2xl p-9 text-center dark:bg-slate-900 dark:border-slate-800">
                   <Gift className="w-10 h-10 text-slate-300 mx-auto mb-3" />
                   <h2 className="text-base font-bold">{favoritesOnly ? (isAr ? 'لسه مفيش إعلانات في المفضلة' : 'No favorite ads yet') : (isAr ? 'لا توجد عروض منشورة في هذا القسم حاليًا' : 'No published offers in this category yet')}</h2>
                   {!favoritesOnly && <p className="text-sm text-slate-500 mt-2">{isAr ? 'عند إضافة عروض حقيقية، هتظهر هنا.' : 'Published offers will appear here once available.'}</p>}

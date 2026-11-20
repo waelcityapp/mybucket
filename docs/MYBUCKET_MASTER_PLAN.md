@@ -650,3 +650,5 @@ Ad cards include per-browser likes and favorites, a filter for saved ads, and di
 Public ad cards now show shared like and favorite totals. Signed-in Google accounts can set or remove each reaction once per ad, and favorites follow the account across browsers. Previous browser-only reactions are excluded from shared totals. View counts retain administrator-only visibility.
 
 Views for published and demo cards are recorded on the server. A given ad and browser tab session can increment the count once, including after reload or request retry. The administrator UI displays the confirmed server count.
+
+The profile activity section links to /settings/favorites, using the same account-backed saved offer cards as the offers page. The detail page returns to the saved list when opened from it.

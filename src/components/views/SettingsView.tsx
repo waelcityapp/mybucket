@@ -12,6 +12,7 @@ import {
   ExternalLink,
   MessageSquareText,
   Megaphone,
+  Heart,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -35,6 +36,7 @@ interface SettingsViewProps {
   onLogout: () => void;
   onOpenMobileLink: () => void;
   onOpenMyAds: () => void;
+  onOpenFavoriteAds: () => void;
 }
 
 export function SettingsView({
@@ -52,6 +54,7 @@ export function SettingsView({
   onLogout,
   onOpenMobileLink,
   onOpenMyAds,
+  onOpenFavoriteAds,
 }: SettingsViewProps) {
   const t = translations[lang];
   const ar = lang === 'ar';
@@ -182,6 +185,19 @@ export function SettingsView({
           </span>
           <span className="min-w-0 flex-1 text-sm font-bold text-slate-900 dark:text-slate-100">
             {ar ? 'إعلاناتي' : 'My ads'}
+          </span>
+          <Chevron className="size-4 shrink-0 text-slate-500 dark:text-slate-300" aria-hidden="true" />
+        </a>
+        <a href="/settings/favorites" onClick={event => {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          onOpenFavoriteAds();
+        }} className="flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-start hover:border-emerald-300 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-emerald-600 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+            <Heart className="size-4" aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1 text-sm font-bold text-slate-900 dark:text-slate-100">
+            {ar ? 'إعلاناتي المفضلة' : 'Favorite ads'}
           </span>
           <Chevron className="size-4 shrink-0 text-slate-500 dark:text-slate-300" aria-hidden="true" />
         </a>

@@ -1557,7 +1557,6 @@ export default function App() {
       ? decodeURIComponent(window.location.pathname.slice('/offers/category/'.length))
       : null;
     return <OffersPage
-      appName={lang === 'ar' ? appIdentity.appNameAr : appIdentity.appNameEn}
       lang={lang}
       showViewCounts={isAdmin}
       authChecking={isAuthChecking}
@@ -1645,7 +1644,7 @@ export default function App() {
   }
 
   if (window.location.pathname === '/settings/favorites' && authUser) {
-    return <OffersPage lang={lang} appName={lang === 'ar' ? appIdentity.appNameAr : appIdentity.appNameEn} favoritesPage showViewCounts={isAdmin} authChecking={isAuthChecking}
+    return <OffersPage lang={lang} favoritesPage showViewCounts={isAdmin} authChecking={isAuthChecking}
       viewerId={authUser.uid} onSignIn={loginWithGoogle} onNavigate={navigateOffer} onBack={() => {
         if (window.history.state?.favoriteAds) window.history.back();
         else {

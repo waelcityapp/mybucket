@@ -100,7 +100,7 @@ export async function renderOfferShare(id: string, language: string, origin: str
   const url = new URL(`/offers/share/${lang}/${encodeURIComponent(id)}`, origin).href;
   return offerShareHtml({
     url, destination, lang, app,
-    title: offer ? `${offer.title} · ${offer.merchant}` : app,
+    title: offer ? (lang === 'ar' ? `${offer.merchant} · ${offer.title}` : `${offer.title} · ${offer.merchant}`) : app,
     description: offer ? `${app} · ${offerShareExcerpt(offer.description)}` : app,
     image: offer ? `${url}/image` : new URL(`/${defaultIcon}`, origin).href,
   });

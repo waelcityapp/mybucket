@@ -14,7 +14,6 @@ import { OfferCardActions } from '../OfferCardActions';
 
 interface OffersPageProps {
   lang: Language;
-  appName?: string;
   showViewCounts: boolean;
   authChecking: boolean;
   favoritesPage?: boolean;
@@ -64,7 +63,7 @@ function viewSessionId() {
   }
 }
 
-export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySlug, onNavigate, showViewCounts, authChecking, viewerId, onSignIn, appName = 'My Bucket', favoritesPage = false }) => {
+export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySlug, onNavigate, showViewCounts, authChecking, viewerId, onSignIn, favoritesPage = false }) => {
   const isAr = lang === 'ar';
   const BackIcon = isAr ? ArrowRight : ArrowLeft;
   const ForwardIcon = isAr ? ArrowLeft : ArrowRight;
@@ -316,7 +315,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                                   {isAr ? 'مزيد من التفاصيل' : 'More details'} <ForwardIcon className="size-4" aria-hidden="true" />
                                 </a>
                               </div>
-                              <OfferCardActions id={ad.id} title={adTitle} merchant={merchant} description={description} appName={appName} isAr={isAr} state={reactions?.[ad.id]}
+                              <OfferCardActions id={ad.id} isAr={isAr} state={reactions?.[ad.id]}
                                 engagement={demo ? demoEngagement[ad.id] : 'engagement' in ad ? ad.engagement : undefined}
                                 onReact={reaction => reactToAd(ad.id, demo, reaction)} />
                             </div>

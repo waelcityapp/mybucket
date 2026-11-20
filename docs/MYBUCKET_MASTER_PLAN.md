@@ -638,3 +638,5 @@ The sign-in screen explains the financial workflow, offers a three-entry in-memo
 The public Try button opens the existing sample dashboard at /try, with local-only sample transactions and accounts. Guest controls return to sign-in and never start the signed-in account setup or admin simulation.
 
 The guest demo now renders the real application home and navigation with isolated sample balances and transactions. Its voice/text analysis uses the local interpreter; guest plans are informational and public offers stay reachable.
+
+The guest dashboard and plans show the admin-configured Basic free period through a public read-only gateway action. The trial button starts Google sign-in.

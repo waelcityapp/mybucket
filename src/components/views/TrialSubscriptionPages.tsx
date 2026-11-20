@@ -10,6 +10,7 @@ interface Props {
   lang: Language;
   subscription: UserSubscription | null;
   guest?: boolean;
+  guestBasicDays?: number | null;
   onSignIn?: () => void;
   error: string | null;
   page: 'trial-details' | 'subscription';
@@ -18,8 +19,9 @@ interface Props {
   onUpdateSubscription: (sub: UserSubscription) => Promise<void>;
 }
 
-export function TrialSubscriptionPages({ lang, subscription, guest = false, onSignIn, error, page, onBack, onSubscription, onUpdateSubscription }: Props) {
+export function TrialSubscriptionPages({ lang, subscription, guest = false, guestBasicDays = null, onSignIn, error, page, onBack, onSubscription, onUpdateSubscription }: Props) {
   const ar = lang === 'ar';
+  const basicDays = guest ? guestBasicDays : getTrialDurations().basicDays;
   const days = subscription ? calculateRemainingTrialDays(subscription) : null;
   const stage = subscription ? stageFor(subscription) : null;
   const grant = stage !== 'paid' ? activeGrant(subscription?.grant) : null;
@@ -64,7 +66,9 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, onSi
               <h2 className="text-lg font-black text-slate-900">Basic</h2>
               <p className="text-2xl font-black text-slate-900">{BASIC_PRICE_EGP === null ? (ar ? 'السعر قيد التحديد' : 'Price to be decided') : BASIC_PRICE_EGP}</p>
               <p className="text-sm leading-7 text-slate-600">{ar ? 'الخطة الأساسية؛ مميزاتها وحدودها قيد الاختبار.' : 'The essential plan; features and limits are being tested.'}</p>
-              <p className="mt-auto rounded-xl bg-slate-100 px-3 py-2 text-center text-sm font-bold text-slate-700">{ar ? `مجانية لأول ${getTrialDurations().basicDays} يومًا فقط` : `Free for the first ${getTrialDurations().basicDays} days only`}</p>
+              <p className="mt-auto rounded-xl bg-slate-100 px-3 py-2 text-center text-sm font-bold text-slate-700">{basicDays === null
+                ? (ar ? 'تجربة مجانية عند التسجيل' : 'Free trial when you sign up')
+                : ar ? `مجانية لأول ${new Intl.NumberFormat('ar-EG').format(basicDays)} يومًا` : `Free for the first ${basicDays} days`}</p>
             </div>
             <div className="flex flex-col gap-3 rounded-2xl border-2 border-emerald-600 p-4">
               <h2 className="text-lg font-black text-slate-900">Pro</h2>

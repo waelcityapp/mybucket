@@ -368,6 +368,30 @@ export default function App() {
   const [guestAccounts, setGuestAccounts] = useState(exampleAccounts);
   const [guestTransactions, setGuestTransactions] = useState(exampleTransactions);
   const [guestCategories, setGuestCategories] = useState(INITIAL_CATEGORIES);
+  const [guestBasicDays, setGuestBasicDays] = useState<number | null>(null);
+  useEffect(() => {
+    if (!guestDemo) return;
+    const controller = new AbortController();
+    const readDuration = async () => {
+      try {
+        const response = await fetch('/api/gateway', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'subscription.publicBasicTrial' }),
+          signal: controller.signal,
+        });
+        const result = await response.json();
+        const days = result.data?.basicDays;
+        if (!controller.signal.aborted) {
+          setGuestBasicDays(response.ok && result.ok && Number.isInteger(days) && days >= 1 && days <= 365 ? days : null);
+        }
+      } catch {
+        if (!controller.signal.aborted) setGuestBasicDays(null);
+      }
+    };
+    void readDuration();
+    return () => controller.abort();
+  }, [guestDemo]);
   const accounts = guestDemo ? guestAccounts : cloudAccounts;
   const transactions = guestDemo ? guestTransactions : cloudTransactions;
   const categories = guestDemo ? guestCategories : cloudCategories;
@@ -1705,6 +1729,25 @@ export default function App() {
       <main className={`flex-1 ${isCategoryDetailPageOpen && activeTab === 'categories' ? 'max-w-5xl' : 'max-w-md sm:max-w-xl'} w-full mx-auto p-4 ${showBottomNavigation ? 'pb-32' : 'pb-8'}`}>
         {activeTab === 'home' && window.location.pathname !== '/try/subscription' && (
           <div className="space-y-4">
+            {guestDemo && (
+              <section className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-sm font-extrabold text-emerald-950">
+                    {lang === 'ar' ? 'جرّب خطة Basic مجانًا' : 'Try Basic for free'}
+                  </h2>
+                  <p className="mt-1 text-sm leading-relaxed text-emerald-800">
+                    {guestBasicDays !== null
+                      ? lang === 'ar'
+                        ? `خطة Basic متاحة مجانًا خلال أول ${new Intl.NumberFormat('ar-EG').format(guestBasicDays)} يومًا من التسجيل.`
+                        : `Basic is free during your first ${guestBasicDays} days after signing up.`
+                      : lang === 'ar' ? 'سجّل بحساب Google لبدء تجربتك المجانية.' : 'Sign in with Google to start your free trial.'}
+                  </p>
+                </div>
+                <button type="button" onClick={handleGoogleLogin} className="min-h-11 shrink-0 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800">
+                  {lang === 'ar' ? 'ابدأ التجربة بحساب Google' : 'Start trial with Google'}
+                </button>
+              </section>
+            )}
             {/* Quick Mobile & Google Account Banner (if not logged in) */}
             {!authUser && (
               <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200/80 rounded-2xl p-3 shadow-2xs flex items-center justify-between gap-2.5 animate-in fade-in">
@@ -2013,7 +2056,7 @@ export default function App() {
         ))}
 
         {(activeTab === 'trial-details' || activeTab === 'subscription' || (guestDemo && window.location.pathname === '/try/subscription')) && (
-          <TrialSubscriptionPages lang={lang} guest={guestDemo} onSignIn={() => navigateOffer('/')} subscription={guestDemo ? null : userSubscription} error={subscriptionError ? (lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn) : null} page={guestDemo ? 'subscription' : (activeTab as 'trial-details' | 'subscription')} onBack={() => { if (guestDemo) { backFromOffer('/try'); return; } window.history.pushState({}, '', activeTab === 'subscription' ? '/trial' : '/'); setActiveTab(activeTab === 'subscription' ? 'trial-details' : 'home'); }} onSubscription={() => openSubscriptionPage('subscription')} onUpdateSubscription={async updated => { if (!authUser) return; const saved = await saveUserSubscriptionToFirestore(authUser.uid, updated); setUserSubscription(saved); }} />
+          <TrialSubscriptionPages lang={lang} guest={guestDemo} guestBasicDays={guestBasicDays} onSignIn={handleGoogleLogin} subscription={guestDemo ? null : userSubscription} error={subscriptionError ? (lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn) : null} page={guestDemo ? 'subscription' : (activeTab as 'trial-details' | 'subscription')} onBack={() => { if (guestDemo) { backFromOffer('/try'); return; } window.history.pushState({}, '', activeTab === 'subscription' ? '/trial' : '/'); setActiveTab(activeTab === 'subscription' ? 'trial-details' : 'home'); }} onSubscription={() => openSubscriptionPage('subscription')} onUpdateSubscription={async updated => { if (!authUser) return; const saved = await saveUserSubscriptionToFirestore(authUser.uid, updated); setUserSubscription(saved); }} />
         )}
 
         {activeTab === 'settings' && (

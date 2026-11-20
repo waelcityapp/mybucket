@@ -36,6 +36,11 @@ async function startServer() {
         const { getAppIdentity } = await import('./server/appIdentity.js');
         return res.json({ ok: true, data: await getAppIdentity() });
       }
+      if (req.body?.action === 'subscription.publicBasicTrial') {
+        const { readTrialSettings } = await import('./server/trialSettings.js');
+        const { basicDays } = await readTrialSettings();
+        return res.status(200).json({ ok: true, data: { basicDays } });
+      }
       if (req.body?.action === 'ads.list' || req.body?.action === 'ads.detail') {
         const { readPublicOfferAds } = await import('./server/offerAds.js');
         return res.json({ ok: true, data: await readPublicOfferAds(req.body.action, req.body.payload || {}) });

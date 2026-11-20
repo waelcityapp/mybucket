@@ -1668,6 +1668,12 @@ export default function App() {
     }
   };
 
+  const guestSessionLinks = guestDemo && (
+    <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-emerald-900">
+      <span>{lang === 'ar' ? 'تجربة بدون تسجيل · بيانات نموذجية' : 'Guest demo · sample data'}</span>
+      <button type="button" onClick={() => navigateOffer('/')} className="min-h-11 underline">{lang === 'ar' ? 'العودة لصفحة الدخول' : 'Back to sign-in'}</button>
+    </div>
+  );
   const showBottomNavigation = (
     ['home', 'transactions', 'search', 'categories', 'settings', 'accounts'].includes(activeTab)
     && window.location.pathname !== '/accounts/new'
@@ -1722,71 +1728,10 @@ export default function App() {
       />
 
       {/* Main Content Area - Mobile First proportions matching reference */}
-      {guestDemo && <div className="mx-auto flex w-full max-w-xl flex-wrap items-center justify-between gap-2 px-4 pt-3 text-xs font-bold text-emerald-900">
-        <span>{lang === 'ar' ? 'تجربة بدون تسجيل · بيانات نموذجية' : 'Guest demo · sample data'}</span>
-        <button type="button" onClick={() => navigateOffer('/')} className="min-h-11 underline">{lang === 'ar' ? 'العودة لصفحة الدخول' : 'Back to sign-in'}</button>
-      </div>}
       <main className={`flex-1 ${isCategoryDetailPageOpen && activeTab === 'categories' ? 'max-w-5xl' : 'max-w-md sm:max-w-xl'} w-full mx-auto p-4 ${showBottomNavigation ? 'pb-32' : 'pb-8'}`}>
+        {activeTab !== 'home' && guestSessionLinks}
         {activeTab === 'home' && window.location.pathname !== '/try/subscription' && (
           <div className="space-y-4">
-            {guestDemo && (
-              <section className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h2 className="text-sm font-extrabold text-emerald-950">
-                    {lang === 'ar' ? 'جرّب خطة Basic مجانًا' : 'Try Basic for free'}
-                  </h2>
-                  <p className="mt-1 text-sm leading-relaxed text-emerald-800">
-                    {guestBasicDays !== null
-                      ? lang === 'ar'
-                        ? `خطة Basic متاحة مجانًا خلال أول ${new Intl.NumberFormat('ar-EG').format(guestBasicDays)} يومًا من التسجيل.`
-                        : `Basic is free during your first ${guestBasicDays} days after signing up.`
-                      : lang === 'ar' ? 'سجّل بحساب Google لبدء تجربتك المجانية.' : 'Sign in with Google to start your free trial.'}
-                  </p>
-                </div>
-                <button type="button" onClick={handleGoogleLogin} className="min-h-11 shrink-0 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800">
-                  {lang === 'ar' ? 'ابدأ التجربة بحساب Google' : 'Start trial with Google'}
-                </button>
-              </section>
-            )}
-            {/* Quick Mobile & Google Account Banner (if not logged in) */}
-            {!authUser && (
-              <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200/80 rounded-2xl p-3 shadow-2xs flex items-center justify-between gap-2.5 animate-in fade-in">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
-                    <Smartphone className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold text-emerald-950 truncate">
-                      {lang === 'ar' ? 'تابع محفظتك من الموبايل 📱' : 'Track on your phone 📱'}
-                    </div>
-                    <div className="text-[11px] text-emerald-700 truncate">
-                      {lang === 'ar'
-                        ? 'سجّل بحساب Google لمزامنة فورية على جميع أجهزتك'
-                        : 'Sign in with Google to sync across all your devices'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={handleGoogleLogin}
-                    className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs transition-colors cursor-pointer"
-                  >
-                    {lang === 'ar' ? 'دخول بجوجل' : 'Sign in'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsMobileModalOpen(true)}
-                    className="p-1.5 rounded-xl bg-white border border-emerald-200 hover:bg-emerald-50 text-emerald-800 transition-colors cursor-pointer"
-                    title={t.mobileLinkTitle}
-                  >
-                    <Smartphone className="w-4 h-4 text-emerald-600" />
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* Compact home header */}
             <section className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm space-y-2">
               <div className="flex items-center justify-between gap-3">
@@ -1860,6 +1805,65 @@ export default function App() {
                 </div>
               )}
             </section>
+            {guestSessionLinks}
+            {guestDemo && (
+              <section className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-sm font-extrabold text-emerald-950">
+                    {lang === 'ar' ? 'جرّب خطة Basic مجانًا' : 'Try Basic for free'}
+                  </h2>
+                  <p className="mt-1 text-sm leading-relaxed text-emerald-800">
+                    {guestBasicDays !== null
+                      ? lang === 'ar'
+                        ? `خطة Basic متاحة مجانًا خلال أول ${new Intl.NumberFormat('ar-EG').format(guestBasicDays)} يومًا من التسجيل.`
+                        : `Basic is free during your first ${guestBasicDays} days after signing up.`
+                      : lang === 'ar' ? 'سجّل بحساب Google لبدء تجربتك المجانية.' : 'Sign in with Google to start your free trial.'}
+                  </p>
+                </div>
+                <button type="button" onClick={handleGoogleLogin} className="min-h-11 shrink-0 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800">
+                  {lang === 'ar' ? 'ابدأ التجربة بحساب Google' : 'Start trial with Google'}
+                </button>
+              </section>
+            )}
+            {/* Quick Mobile & Google Account Banner (if not logged in) */}
+            {!authUser && (
+              <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200/80 rounded-2xl p-3 shadow-2xs flex items-center justify-between gap-2.5 animate-in fade-in">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Smartphone className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-emerald-950 truncate">
+                      {lang === 'ar' ? 'تابع محفظتك من الموبايل 📱' : 'Track on your phone 📱'}
+                    </div>
+                    <div className="text-[11px] text-emerald-700 truncate">
+                      {lang === 'ar'
+                        ? 'سجّل بحساب Google لمزامنة فورية على جميع أجهزتك'
+                        : 'Sign in with Google to sync across all your devices'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleGoogleLogin}
+                    className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+                  >
+                    {lang === 'ar' ? 'دخول بجوجل' : 'Sign in'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileModalOpen(true)}
+                    className="p-1.5 rounded-xl bg-white border border-emerald-200 hover:bg-emerald-50 text-emerald-800 transition-colors cursor-pointer"
+                    title={t.mobileLinkTitle}
+                  >
+                    <Smartphone className="w-4 h-4 text-emerald-600" />
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Compact access shortcuts: subscriptions, guide, and savings offers. */}
             <div className="grid min-w-0 grid-cols-3 gap-1.5 sm:gap-2">
               <button type="button" onClick={() => openSubscriptionPage('subscription')}

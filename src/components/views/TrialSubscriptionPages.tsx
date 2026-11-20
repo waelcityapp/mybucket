@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { ArrowRight, CalendarDays, Tag, ShieldCheck } from 'lucide-react';
 import type { Language } from '../../types';
 import type { UserSubscription } from '../../types/prototypeSubscription';
@@ -20,6 +21,12 @@ interface Props {
 }
 
 export function TrialSubscriptionPages({ lang, subscription, guest = false, guestBasicDays = null, onSignIn, error, page, onBack, onSubscription, onUpdateSubscription }: Props) {
+  const proPlan = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (page === 'subscription' && new URLSearchParams(window.location.search).get('plan') === 'pro') {
+      proPlan.current?.scrollIntoView({ block: 'center' });
+    }
+  }, [page]);
   const ar = lang === 'ar';
   const basicDays = guest ? guestBasicDays : getTrialDurations().basicDays;
   const days = subscription ? calculateRemainingTrialDays(subscription) : null;
@@ -70,7 +77,7 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
                 ? (ar ? 'تجربة مجانية عند التسجيل' : 'Free trial when you sign up')
                 : ar ? `مجانية لأول ${new Intl.NumberFormat('ar-EG').format(basicDays)} يومًا` : `Free for the first ${basicDays} days`}</p>
             </div>
-            <div className="flex flex-col gap-3 rounded-2xl border-2 border-emerald-600 p-4">
+            <div ref={proPlan} className="flex flex-col gap-3 rounded-2xl border-2 border-emerald-600 p-4">
               <h2 className="text-lg font-black text-slate-900">Pro</h2>
               <p className="text-2xl font-black text-slate-900">{subscription?.hasAppliedAffiliateCode ? '120' : '180'} <span className="text-sm font-semibold">{ar ? 'جنيه / شهر' : 'EGP / month'}</span></p>
               <p className="text-sm leading-7 text-slate-600">{ar ? 'الخطة المتقدمة؛ الفرق في المميزات سيحدد بعد تجارب الأصدقاء.' : 'Advanced features will be finalized after usability tests.'}</p>

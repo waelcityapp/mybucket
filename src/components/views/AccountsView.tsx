@@ -1,5 +1,5 @@
 import React, { useState, FormEvent } from 'react';
-import { Plus, CreditCard, Banknote, Building2, PiggyBank, Smartphone, ArrowLeftRight, FolderKanban, ShieldCheck, X, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plus, CreditCard, Banknote, Building2, PiggyBank, Smartphone, ArrowLeftRight, FolderKanban, ShieldCheck, X, Pencil, Trash2 } from 'lucide-react';
 import { FinancialAccount, CurrencyCode, AccountType, Language, SUPPORTED_CURRENCIES, currencyName } from '../../types';
 import { translations } from '../../data/translations';
 import { formatAccountBalance } from '../../utils/formatBalance';
@@ -8,12 +8,13 @@ interface AccountsViewProps {
   accounts: FinancialAccount[];
   lang: Language;
   canAddAccounts: boolean;
+  onOpenProPlan: () => void;
   onAddAccount: (acc: Omit<FinancialAccount, 'id'>) => Promise<boolean>;
   onDeleteAccount: (accountId: string) => Promise<boolean>;
   onEditBalance?: (accId: string | null) => void;
 }
 
-export function AccountsView({ accounts, lang, canAddAccounts, onAddAccount, onDeleteAccount, onEditBalance }: AccountsViewProps) {
+export function AccountsView({ accounts, lang, canAddAccounts, onOpenProPlan, onAddAccount, onDeleteAccount, onEditBalance }: AccountsViewProps) {
   const t = translations[lang];
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [lockedCard, setLockedCard] = useState<string | null>(null);
@@ -255,9 +256,14 @@ export function AccountsView({ accounts, lang, canAddAccounts, onAddAccount, onD
               <span className="min-w-0 flex-1 text-sm font-bold">{label}</span>
               <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-900">Pro</span>
             </button>
-            {lockedCard === id && <p role="status" className="mx-3 mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900">
-              {lang === 'ar' ? 'يجب الترقية إلى الخطة برو.' : 'Upgrade to the Pro plan.'}
-            </p>}
+            {lockedCard === id && <div className="mx-3 mb-3 flex items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 text-xs font-bold text-amber-900">
+              <span role="status">
+              {lang === 'ar' ? 'يجب الترقية إلى الخطة برو.' : 'Upgrade to the Pro plan.'}</span>
+              <button type="button" onClick={onOpenProPlan} aria-label={lang === 'ar' ? 'عرض اشتراك Pro' : 'View Pro plan'}
+                className="grid size-11 shrink-0 place-items-center rounded-lg hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-emerald-600">
+                {lang === 'ar' ? <ArrowLeft className="size-4" /> : <ArrowRight className="size-4" />}
+              </button>
+            </div>}
           </div>
         ))}
 

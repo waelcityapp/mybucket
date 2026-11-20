@@ -2067,6 +2067,7 @@ export default function App() {
             accounts={accounts}
             lang={lang}
             canAddAccounts={canAddAccounts}
+            onOpenProPlan={() => navigateOffer('/subscription?plan=pro')}
             onAddAccount={handleAddAccount}
             onDeleteAccount={handleDeleteAccount}
             onEditBalance={handleOpenEditBalance}
@@ -2121,7 +2122,7 @@ export default function App() {
         ))}
 
         {(activeTab === 'trial-details' || activeTab === 'subscription' || (guestDemo && window.location.pathname === '/try/subscription')) && (
-          <TrialSubscriptionPages lang={lang} guest={guestDemo} guestBasicDays={guestBasicDays} onSignIn={handleGoogleLogin} subscription={guestDemo ? null : userSubscription} error={subscriptionError ? (lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn) : null} page={guestDemo ? 'subscription' : (activeTab as 'trial-details' | 'subscription')} onBack={() => { if (guestDemo) { backFromOffer('/try'); return; } window.history.pushState({}, '', activeTab === 'subscription' ? '/trial' : '/'); setActiveTab(activeTab === 'subscription' ? 'trial-details' : 'home'); }} onSubscription={() => openSubscriptionPage('subscription')} onUpdateSubscription={async updated => { if (!authUser) return; const saved = await saveUserSubscriptionToFirestore(authUser.uid, updated); setUserSubscription(saved); }} />
+          <TrialSubscriptionPages lang={lang} guest={guestDemo} guestBasicDays={guestBasicDays} onSignIn={handleGoogleLogin} subscription={guestDemo ? null : userSubscription} error={subscriptionError ? (lang === 'ar' ? subscriptionError.messageAr : subscriptionError.messageEn) : null} page={guestDemo ? 'subscription' : (activeTab as 'trial-details' | 'subscription')} onBack={() => { if (guestDemo) { backFromOffer('/try'); return; } if (window.history.state?.offerBack && new URLSearchParams(window.location.search).get('plan') === 'pro') { window.history.back(); return; } window.history.pushState({}, '', activeTab === 'subscription' ? '/trial' : '/'); setActiveTab(activeTab === 'subscription' ? 'trial-details' : 'home'); }} onSubscription={() => openSubscriptionPage('subscription')} onUpdateSubscription={async updated => { if (!authUser) return; const saved = await saveUserSubscriptionToFirestore(authUser.uid, updated); setUserSubscription(saved); }} />
         )}
 
         {activeTab === 'settings' && (

@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { ArrowRight, CalendarDays, Tag, ShieldCheck } from 'lucide-react';
 import type { Language } from '../../types';
 import type { UserSubscription } from '../../types/prototypeSubscription';
-import { calculateRemainingTrialDays } from '../../utils/subscriptionUtils';
+import { calculateRemainingPaidDays, calculateRemainingTrialDays } from '../../utils/subscriptionUtils';
 import { getTrialDurations, BASIC_PRICE_EGP, BASIC_MARKETER_PRICE_EGP, PRO_PRICE_EGP, PRO_MARKETER_PRICE_EGP, stageFor } from '../../config/subscriptionPolicy';
 import { activeGrant } from '../../config/grantPolicy';
 import { SubscriptionPayment } from './SubscriptionPayment';
@@ -31,6 +31,12 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
   const ar = lang === 'ar';
   const basicDays = guest ? guestBasicDays : getTrialDurations().basicDays;
   const days = subscription ? calculateRemainingTrialDays(subscription) : null;
+  const paidDays = subscription ? calculateRemainingPaidDays(subscription) : 0;
+  const paidName = subscription?.paidPlan === 'basic' ? 'Basic' : 'Pro';
+  const number = new Intl.NumberFormat(ar ? 'ar-EG' : 'en-GB');
+  const paidEnd = paidDays > 0 && subscription?.paidExpiresAt
+    ? new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'long', timeZone: 'Africa/Cairo' }).format(new Date(subscription.paidExpiresAt))
+    : null;
   const stage = subscription ? stageFor(subscription) : null;
   const checkout = new URLSearchParams(window.location.search).get('checkout');
   const plan = checkout === 'basic' || checkout === 'pro' ? checkout : null;
@@ -69,9 +75,9 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
           <h2 className="text-lg font-black text-slate-900">Basic</h2>
           <p className="text-2xl font-black text-slate-900">{subscription?.hasAppliedAffiliateCode ? BASIC_MARKETER_PRICE_EGP : BASIC_PRICE_EGP} <span className="text-sm font-semibold">{ar ? 'جنيه / شهر' : 'EGP / month'}</span></p>
           <p className="text-sm leading-7 text-slate-600">{ar ? 'الخطة الأساسية؛ مميزاتها وحدودها قيد الاختبار.' : 'The essential plan; features and limits are being tested.'}</p>
-          <p className="mt-auto rounded-xl bg-slate-100 px-3 py-2 text-center text-sm font-bold text-slate-700">{basicDays === null
+          {!paidEnd && <p className="mt-auto rounded-xl bg-slate-100 px-3 py-2 text-center text-sm font-bold text-slate-700">{basicDays === null
             ? (ar ? 'تجربة مجانية عند التسجيل' : 'Free trial when you sign up')
-            : ar ? `مجانية لأول ${new Intl.NumberFormat('ar-EG').format(basicDays)} يومًا` : `Free for the first ${basicDays} days`}</p>
+            : ar ? `مجانية لأول ${new Intl.NumberFormat('ar-EG').format(basicDays)} يومًا` : `Free for the first ${basicDays} days`}</p>}
           {!guest && onNavigate && <button type="button" onClick={() => choosePlan('basic')} className="min-h-11 rounded-xl bg-emerald-700 px-3 text-sm font-bold text-white">{ar ? 'اشترك أو جدّد Basic' : 'Subscribe or renew Basic'}</button>}
         </div>
         <div ref={proPlan} className="flex flex-col gap-3 rounded-2xl border-2 border-emerald-600 p-4">
@@ -91,10 +97,17 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
       <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-7 shadow-sm space-y-5">
         <div className="space-y-2">
           <div className="inline-flex rounded-full bg-emerald-50 p-3 text-emerald-700"><CalendarDays className="h-6 w-6" /></div>
-          <h1 id="subscription-page-title" className="text-xl sm:text-2xl font-black text-slate-900">{page === 'trial-details' ? (ar ? 'تفاصيل تجربتك' : 'Your trial details') : (ar ? 'الاشتراك الشهري' : 'Monthly subscription')}</h1>
+          <h1 id="subscription-page-title" className="text-xl sm:text-2xl font-black text-slate-900">{page === 'trial-details' ? (paidEnd ? (ar ? 'تفاصيل اشتراكك' : 'Your subscription details') : (ar ? 'تفاصيل تجربتك' : 'Your trial details')) : (ar ? 'الاشتراك الشهري' : 'Monthly subscription')}</h1>
         </div>
         {grant && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-900">{ar ? `أنت تستخدم خطة ${grant.plan === 'pro' ? 'Pro' : 'Basic'} بمنحة مجانية حتى ${grantEnd}.` : `Your free ${grant.plan === 'pro' ? 'Pro' : 'Basic'} grant runs through ${grantEnd}.`}</p>}
-        {error ? <p role="alert" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{error}</p> : !subscription && !guest ? <p className="text-sm text-slate-600">{ar ? 'جارٍ قراءة بيانات الاشتراك...' : 'Loading subscription details...'}</p> : page === 'trial-details' ? <>
+        {error ? <p role="alert" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{error}</p> : !subscription && !guest ? <p className="text-sm text-slate-600">{ar ? 'جارٍ قراءة بيانات الاشتراك...' : 'Loading subscription details...'}</p> : page === 'trial-details' && paidEnd ? <>
+          <div className="space-y-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-950">
+            <p className="font-extrabold">{ar ? `اشتراك ${paidName} نشط` : `Active ${paidName} subscription`}</p>
+            <p>{ar ? 'تاريخ انتهاء الاشتراك' : 'Subscription ends'} <strong>{paidEnd}</strong></p>
+            <p>{ar ? 'الأيام المتبقية' : 'Days remaining'} <strong>{number.format(paidDays)}</strong></p>
+          </div>
+          <button type="button" onClick={onSubscription} className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white">{ar ? 'عرض الاشتراكات والتجديد' : 'View plans and renewal'}</button>
+        </> : page === 'trial-details' ? <>
           <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 space-y-3 text-sm text-slate-700">
             <p className="font-black text-slate-900">{grant ? (ar ? 'منحة مجانية نشطة' : 'Active free grant') : (stage === 'paid' || stage === 'paid-basic') ? (ar ? 'اشتراك نشط' : 'Subscription active') : stage === 'pro-trial' ? (ar ? 'تجربة Pro نشطة' : 'Pro trial active') : stage === 'basic-free' ? (ar ? 'فترة Basic المجانية' : 'Basic introductory period') : (ar ? 'انتهت الفترة المجانية' : 'Introductory period ended')}</p>
             <p>{ar ? `Basic مجانية حتى اليوم ${getTrialDurations().basicDays} من التسجيل.` : `Basic is free until day ${getTrialDurations().basicDays} after signup.`}</p>

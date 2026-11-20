@@ -56,3 +56,12 @@ test('a paid Basic account stays Basic and retains an active Pro grant', () => {
   assert.equal(stageFor({ ...basic, grant }, moment(81)), 'pro-trial');
   assert.equal(stageFor({ ...basic, grant }, moment(85)), 'paid-basic');
 });
+
+test('a paid membership displays its actual remaining term independent of the trial', async () => {
+  const { calculateRemainingPaidDays, calculateRemainingTrialDays } = await import('../src/utils/subscriptionUtils.ts');
+  const sub = { isPaid: true, trialExpiresAt: addDays(start, 75), paidExpiresAt: addDays(start, 40) };
+  assert.equal(calculateRemainingPaidDays(sub, moment(11)), 29);
+  assert.equal(calculateRemainingTrialDays(sub, moment(11)), 64);
+  assert.equal(calculateRemainingPaidDays(sub, moment(40)), 0);
+  assert.equal(calculateRemainingPaidDays({ ...sub, paidExpiresAt: 'invalid' }, moment(11)), 0);
+});

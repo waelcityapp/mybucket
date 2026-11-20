@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Clock, Zap } from 'lucide-react';
 import { UserSubscription } from '../types/prototypeSubscription';
-import { calculateRemainingTrialDays } from '../utils/subscriptionUtils';
+import { calculateRemainingPaidDays, calculateRemainingTrialDays } from '../utils/subscriptionUtils';
 import { Language } from '../types';
 import { activeGrant } from '../config/grantPolicy';
 import { stageFor } from '../config/subscriptionPolicy';
@@ -48,6 +48,7 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   const isAr = lang === 'ar';
   if (!subscription) return null;
 
+  const paidDays = calculateRemainingPaidDays(subscription);
   const remainingDays = calculateRemainingTrialDays(subscription);
   const grant = stageFor(subscription) !== 'paid' ? activeGrant(subscription.grant) : null;
   const grantDays = grant ? Math.max(0, Math.ceil((Date.parse(grant.endsAt) - Date.now()) / 86400000)) : null;
@@ -84,10 +85,10 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
         <div className="flex items-center justify-between text-xs">
           <span className="text-slate-600 font-medium flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5 text-slate-400" />
-            <span>{isAr ? 'إجمالي مدة التجربة:' : 'Total Trial Duration:'}</span>
+            <span>{paidDays > 0 ? (isAr ? 'الأيام المتبقية للاشتراك' : 'Subscription days remaining') : (isAr ? 'إجمالي مدة التجربة' : 'Total trial duration')}</span>
           </span>
           <span className="font-bold text-slate-900">
-            {subscription.totalTrialDays} {isAr ? 'يوماً' : 'days'}
+            {new Intl.NumberFormat(isAr ? 'ar-EG' : 'en-GB').format(paidDays || subscription.totalTrialDays)} {isAr ? 'يوماً' : 'days'}
           </span>
         </div>
 

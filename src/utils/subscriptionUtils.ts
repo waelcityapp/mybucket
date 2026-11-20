@@ -72,14 +72,17 @@ export function isAllowedEmailDomain(email: string): boolean {
   return ALLOWED_EMAIL_DOMAINS.includes(domain);
 }
 
-// Calculate remaining trial days safely
-export function calculateRemainingTrialDays(subscription: UserSubscription): number {
-  if (subscription.isPaid) return 999;
-  const now = new Date().getTime();
-  const expiresAt = new Date(subscription.trialExpiresAt).getTime();
-  const diffMs = expiresAt - now;
-  if (diffMs <= 0) return 0;
-  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+function remainingDaysUntil(expiry: string | null | undefined, now: number): number {
+  const timestamp = expiry ? Date.parse(expiry) : NaN;
+  return Number.isFinite(timestamp) ? Math.max(0, Math.ceil((timestamp - now) / 86400000)) : 0;
+}
+
+export function calculateRemainingTrialDays(subscription: UserSubscription, now = Date.now()): number {
+  return remainingDaysUntil(subscription.trialExpiresAt, now);
+}
+
+export function calculateRemainingPaidDays(subscription: UserSubscription, now = Date.now()): number {
+  return subscription.isPaid ? remainingDaysUntil(subscription.paidExpiresAt, now) : 0;
 }
 
 // Introductory access is Basic. Codes affect price only.

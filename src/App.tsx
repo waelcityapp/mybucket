@@ -62,6 +62,7 @@ import {
 } from './services/ai/deterministicQueryEngine';
 import { FinancialQueryResultCard } from './components/FinancialQueryResultCard';
 import { HomeFinancialOverview } from './components/HomeFinancialOverview';
+import { DeleteTransactionsPage } from './components/views/DeleteTransactionsPage';
 import { AdminView, type SectionId } from './components/views/AdminView';
 import { AdminNewUserSimulation, exampleAccounts, exampleTransactions } from './components/views/AdminNewUserSimulation';
 import { AdminUserGrantView } from './components/views/AdminUserGrantView';
@@ -2131,13 +2132,21 @@ export default function App() {
           <AdminPinView lang={lang} onBack={() => navigateTab('home')} onVerify={verifyAdminPin} />
         )}
         {activeTab === 'admin' && isAdmin && adminPinVerified && authUser && (
-          adminRoute === '/admin/analyzer-feedback'
+          adminRoute === '/admin/system/delete-transactions'
+            ? <DeleteTransactionsPage lang={lang} uid={authUser.uid} accounts={accounts} transactions={transactions}
+                ready={financialLoaded.accounts && financialLoaded.transactions && !transactionReadError}
+                onBack={() => openAdminSection('system')} />
+            : adminRoute === '/admin/analyzer-feedback'
             ? <AnalyzerFeedbackAdmin lang={lang} onBack={closeFeedbackAdmin} />
             : adminRoute === '/admin/branding'
             ? <AdminAppIdentityView lang={lang} identity={appIdentity} identityReady={identityReady} onSaved={(updated) => setAppIdentity(updated)} onBack={backToAdminSections} />
             : /^\/admin\/users\/[A-Za-z0-9_-]{1,128}\/grant$/.test(adminRoute)
             ? <AdminUserGrantView uid={adminRoute.split('/')[3]} lang={lang} onBack={() => openAdminSection('users')} />
-            : <AdminView lang={lang} user={authUser} onBack={() => navigateTab('home')} onResetDemoData={handleResetDemoData} onZeroAllBalances={handleZeroAllBalances} onOpenFeedbackAdmin={openFeedbackAdmin} sectionId={adminSectionFromPath()} onOpenSection={openAdminSection} onBackToSections={backToAdminSections} onOpenGrant={openUserGrant} onOpenNewUserSimulation={openNewUserSimulation} />
+            : <AdminView lang={lang} user={authUser} onBack={() => navigateTab('home')} onResetDemoData={handleResetDemoData} onZeroAllBalances={handleZeroAllBalances} onOpenDeleteTransactions={() => {
+              window.history.pushState({ myBucketTab: 'admin' }, '', '/admin/system/delete-transactions');
+              setAdminRoute('/admin/system/delete-transactions');
+              window.scrollTo(0, 0);
+            }} onOpenFeedbackAdmin={openFeedbackAdmin} sectionId={adminSectionFromPath()} onOpenSection={openAdminSection} onBackToSections={backToAdminSections} onOpenGrant={openUserGrant} onOpenNewUserSimulation={openNewUserSimulation} />
         )}
       </main>
 

@@ -18,6 +18,7 @@ interface AdminViewProps {
   onBack: () => void;
   onResetDemoData: () => void;
   onZeroAllBalances: () => Promise<boolean>;
+  onOpenDeleteTransactions: () => void;
   onOpenFeedbackAdmin: () => void;
   sectionId?: SectionId | null;
   onOpenSection: (section: SectionId) => void;
@@ -29,7 +30,7 @@ interface AdminViewProps {
 export type SectionId = 'users' | 'subscriptions' | 'marketers' | 'reports' | 'ai' | 'system' | 'ads' | 'branding';
 
 export function AdminView({
-  lang, user, onBack, onResetDemoData, onZeroAllBalances, onOpenFeedbackAdmin,
+  lang, user, onBack, onResetDemoData, onZeroAllBalances, onOpenDeleteTransactions, onOpenFeedbackAdmin,
   sectionId = null, onOpenSection, onBackToSections, onOpenGrant, onOpenNewUserSimulation,
 }: AdminViewProps) {
   const t = translations[lang];
@@ -163,11 +164,15 @@ export function AdminView({
                 <p className="text-xs text-slate-500">
                   {ar ? 'ملاحظة: الأدوات التالية تخص بيانات حسابك الحالي، ولا تعدل حسابات بقية المستخدمين.' : 'Note: These controls affect only your current account, not other users.'}
                 </p>
-                <p className="text-xs text-slate-500">{t.resetNotice}</p>
+
                 <div className="flex flex-col gap-2">
                   <button type="button" onClick={handleZeroBalances}
                     className="w-full py-2.5 px-4 rounded-xl border border-rose-200 bg-rose-50/50 hover:bg-rose-50 text-rose-700 text-xs font-bold flex items-center justify-center gap-2">
                     <RotateCcw className="w-3.5 h-3.5" />{t.zeroAllBalances}
+                  </button>
+                  <button type="button" onClick={onOpenDeleteTransactions}
+                    className="w-full py-2.5 px-4 rounded-xl border border-rose-200 bg-rose-50/50 hover:bg-rose-50 text-rose-700 text-xs font-bold flex items-center justify-center gap-2">
+                    <Database className="w-3.5 h-3.5" />{ar ? 'حذف العمليات' : 'Delete transactions'}
                   </button>
                   <button type="button" onClick={handleReset}
                     className="w-full py-2.5 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center gap-2">

@@ -431,3 +431,29 @@ export function subscribeLearnedMemory(
   );
 }
 
+
+// Each transaction and its balance changes are committed together. The caller reports
+// completed items if a later operation cannot be committed.
+export async function deleteSelectedFinancialTransaction(
+  userId: string,
+  expected: Transaction,
+  adjustBalances: boolean,
+): Promise<'deleted' | 'already-deleted'> {
+  requireFinancialWriteAccess();
+  if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
+  if (adjustBalances) {
+    const result = await applyFinancialChange(userId, expected, null);
+    return result === 'changed' ? 'deleted' : 'already-deleted';
+  }
+  const ref = doc(db, 'users', userId, 'transactions', expected.id);
+  return runTransaction(db, async transaction => {
+    const saved = await transaction.get(ref);
+    if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
+    if (!saved.exists()) return 'already-deleted';
+    if (!Object.entries(expected).every(([key, value]) => saved.data()[key] === value)) {
+      throw new Error('transaction-changed');
+    }
+    transaction.delete(ref);
+    return 'deleted';
+  });
+}

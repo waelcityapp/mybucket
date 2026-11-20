@@ -30,7 +30,6 @@ function subscriptionLabel(record: SubscriptionInfo | undefined, durations: Tria
   if (!record && !registrationDate) return { tier: 'unknown', plan: 'Registration date unavailable' };
   const phase = stageFor({ trialStartedAt: record?.trialStartedAt || registrationDate || '', isPaid: record?.isPaid === true, paidExpiresAt: record?.paidExpiresAt }, Date.now(), durations);
   if (phase === 'paid') return { tier: 'paid', plan: record?.planName || record?.planId || record?.plan || 'Pro' };
-  if (phase === 'pro-trial') return { tier: 'trial', trialPlan: 'pro' as const, plan: 'Pro trial (first ' + durations.proDays + ' days)' };
   if (phase === 'basic-free') return { tier: 'trial', trialPlan: 'basic' as const, plan: 'Basic introductory (until day ' + durations.basicDays + ')' };
   return { tier: 'free', plan: 'Introductory period ended' };
 }
@@ -121,7 +120,7 @@ export async function countFilteredUsers(actor: AdminActor, payload: Record<stri
       else if (durations) {
         const label = subscriptionLabel(snapshots[index]?.exists ? snapshots[index].data() as SubscriptionInfo : undefined, durations, typeof user.createdAt === 'string' ? user.createdAt : null);
         if (excludeGranted && activeGrant(grantFromAccess(accesses[index]?.exists ? accesses[index].data() || null : null))) return;
-        if (filter === 'trial_pro' ? label.tier === 'trial' && label.trialPlan === 'pro' : filter === 'trial_basic' ? label.tier === 'trial' && label.trialPlan === 'basic' : label.tier === filter) count++;
+        if (filter === 'trial_pro' ? false : filter === 'trial_basic' ? label.tier === 'trial' && label.trialPlan === 'basic' : label.tier === filter) count++;
       }
     });
     nextCursor = page.nextCursor;

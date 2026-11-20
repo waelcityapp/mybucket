@@ -269,7 +269,6 @@ export function AdminAppUsersView({ lang, onOpenGrant }: { lang: Language; onOpe
         <select value={filter} onChange={e => { invalidate(); setFilter(e.target.value as typeof filter); }} className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-700">
           <option value="all">{ar ? 'الكل' : 'All'}</option>
           <option value="paid">{ar ? 'مسجّل كمدفوع' : 'Recorded as paid'}</option>
-          <option value="trial_pro">{ar ? 'فترة Pro التجريبية (حسب المدة)' : 'Pro trial period (by duration)'}</option>
           <option value="trial_basic">{ar ? 'فترة Basic التجريبية (حسب المدة)' : 'Basic trial period (by duration)'}</option>
           <option value="free">{ar ? 'انتهت التجربة' : 'Trial ended'}</option>
           <option value="disabled">{ar ? 'موقوف' : 'Disabled'}</option>

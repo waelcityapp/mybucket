@@ -980,9 +980,10 @@ export default function App() {
 
   // Handle AI Financial Query with Deterministic Math Engine
   const handleFinancialQuery = (query: AIFinancialQuery, questionText: string) => {
-    const isPaid = userSubscription?.isPaid || userSubscription?.tier === 'trial'; // Full Pro trial
+    const phase = userSubscription ? stageFor(userSubscription) : null;
+    const hasProAccess = phase === 'paid' || phase === 'pro-trial';
     // For free/trial users: clamp query history window to max 35 days as per business rule
-    const maxDaysHistory = isPaid ? undefined : (userSubscription?.maxHistoricalQueryDays || 35);
+    const maxDaysHistory = hasProAccess ? undefined : (userSubscription?.maxHistoricalQueryDays || 35);
 
     const result = executeDeterministicQuery(
       query,
@@ -1808,15 +1809,12 @@ export default function App() {
                   const phase = userSubscription ? stageFor(userSubscription) : null;
                   const grant = phase !== 'paid' ? activeGrant(userSubscription?.grant) : null;
                   const trialStart = userSubscription ? Date.parse(userSubscription.trialStartedAt) : NaN;
-                  const proRemaining = Number.isFinite(trialStart)
-                    ? Math.max(0, Math.ceil((trialStart + getTrialDurations().proDays * 86400000 - Date.now()) / 86400000))
-                    : null;
                   const basicRemaining = userSubscription ? calculateRemainingTrialDays(userSubscription) : null;
                   const isExpired = phase === 'expired';
                   const registeredAt = Number.isFinite(trialStart)
                     ? new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'numeric', year: 'numeric' }).format(new Date(trialStart))
                     : null;
-                  const remaining = grant ? Math.max(0, Math.ceil((Date.parse(grant.endsAt) - Date.now()) / 86400000)) : phase === 'pro-trial' ? proRemaining : phase === 'basic-free' ? basicRemaining : null;
+                  const remaining = grant ? Math.max(0, Math.ceil((Date.parse(grant.endsAt) - Date.now()) / 86400000)) : phase === 'basic-free' ? basicRemaining : null;
                   const paidExpiresAt = userSubscription?.paidExpiresAt ? Date.parse(userSubscription.paidExpiresAt) : NaN;
                   const renewalRemaining = phase === 'paid' && Number.isFinite(paidExpiresAt)
                     ? Math.max(0, Math.ceil((paidExpiresAt - Date.now()) / 86400000))

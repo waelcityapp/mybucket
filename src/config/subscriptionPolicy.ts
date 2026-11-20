@@ -22,7 +22,6 @@ export function stageFor(sub: { trialStartedAt: string; isPaid: boolean; paidExp
   if (grant) return grant.plan === 'pro' ? 'pro-trial' : 'basic-free';
   const start = Date.parse(sub.trialStartedAt);
   if (!Number.isFinite(start)) return 'expired';
-  if (now < start + durations.proDays*86400000) return 'pro-trial';
   if (now < start + durations.basicDays*86400000) return 'basic-free';
   return 'expired';
 }

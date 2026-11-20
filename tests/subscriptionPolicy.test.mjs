@@ -6,11 +6,11 @@ const start = '2026-11-01T00:00:00.000Z';
 const moment = (days) => Date.parse(start) + days * 86400000;
 const trial = { trialStartedAt: start, isPaid: false };
 
-test('15-day Pro trial then Basic through day 75', () => {
+test('Basic applies from signup until the configured expiry', () => {
   assert.equal(PRO_TRIAL_DAYS, 15);
   assert.equal(BASIC_FREE_DAYS, 75);
-  assert.equal(stageFor(trial, moment(0)), 'pro-trial');
-  assert.equal(stageFor(trial, moment(14)), 'pro-trial');
+  assert.equal(stageFor(trial, moment(0)), 'basic-free');
+  assert.equal(stageFor(trial, moment(14)), 'basic-free');
   assert.equal(stageFor(trial, moment(15)), 'basic-free');
   assert.equal(stageFor(trial, moment(59)), 'basic-free');
   assert.equal(stageFor(trial, moment(60)), 'basic-free');
@@ -38,4 +38,12 @@ test('global admin policy applies to past accounts without resetting their start
   assert.equal(stageFor(trial, moment(2)), 'basic-free');
   assert.equal(stageFor(trial, moment(31)), 'expired');
   setTrialDurations({ proDays: PRO_TRIAL_DAYS, basicDays: BASIC_FREE_DAYS });
+});
+
+
+test('only an active Pro grant gives a non-paying account Pro access', () => {
+  const grant = { plan: 'pro', startsAt: addDays(start, 2), endsAt: addDays(start, 5) };
+  assert.equal(stageFor({ ...trial, grant }, moment(1)), 'basic-free');
+  assert.equal(stageFor({ ...trial, grant }, moment(2)), 'pro-trial');
+  assert.equal(stageFor({ ...trial, grant }, moment(5)), 'basic-free');
 });

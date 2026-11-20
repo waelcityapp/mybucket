@@ -5,11 +5,10 @@ import { test } from 'node:test';
 const app = readFileSync('src/App.tsx','utf8');
 const sample = readFileSync('src/components/views/AdminNewUserSimulation.tsx','utf8');
 
-test('new Google accounts see sample home before real account setup', () => {
-  assert.match(app, /needsInitialSetup && financialLoaded\.accounts && financialLoaded\.transactions && transactions\.length === 0/);
-  assert.ok(app.indexOf('return <AdminNewUserSimulation lang={lang} realOnboarding') < app.indexOf('if (authUser && needsInitialSetup && financialLoaded.accounts) {'));
-  assert.match(app, /onStartReal=\{\(\) => setOnboardingSetupUid\(authUser\.uid\)\}/);
-  assert.match(app, /onBack: \(\) => setOnboardingSetupUid\(null\)/);
+test('signed-out visitors see sign-in and new accounts go directly to real setup', () => {
+  assert.match(app, /if \(!authUser && !guestDemo\) \{\s+return \(\s+<AuthPage/);
+  assert.match(app, /return <InitialSetupView lang=\{lang\} canAddAccounts/);
+  assert.doesNotMatch(app, /return <AdminNewUserSimulation lang=\{lang\} realOnboarding/);
 });
 test('samples stay in UI memory without paid calls or Firebase writes', () => {
   assert.match(sample, /useState<FinancialAccount\[\]>/);

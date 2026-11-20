@@ -18,10 +18,9 @@ test('leaving after edits confirms unsaved changes', () => {
   assert.match(setup, /await confirmAction\(/);
   assert.match(setup, /if \(!approved\) return/);
 });
-test('real setup returns to samples, while cancel signs out safely', () => {
+test('real setup cancel signs out safely', () => {
   assert.match(app, /const leaveInitialSetup = async \(\) => \{/);
   assert.match(app, /await logoutUser\(\)/);
-  assert.match(app, /onBack: \(\) => setOnboardingSetupUid\(null\)/);
   assert.match(app, /onCancel=\{leaveInitialSetup\}/);
 });
 test('simulated setup returns to samples without Firebase writes', () => {
@@ -31,5 +30,5 @@ test('simulated setup returns to samples without Firebase writes', () => {
 
 test('financial reset opens a dedicated setup route and bypasses the sample screen', () => {
   assert.ok(app.includes("setOfferLocation('/accounts/setup')"));
-  assert.match(app, /transactions.length === 0 && !restartingFinancialSetup/);
+  assert.doesNotMatch(app, /return <AdminNewUserSimulation lang=\{lang\} realOnboarding/);
 });

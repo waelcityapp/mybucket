@@ -356,7 +356,6 @@ export default function App() {
   const [cloudTransactions, setCloudTransactions] = useState<Transaction[]>([]);
   const [financialLoaded, setFinancialLoaded] = useState({ accounts: false, transactions: false });
   const [needsInitialSetup, setNeedsInitialSetup] = useState(false);
-  const [onboardingSetupUid, setOnboardingSetupUid] = useState<string | null>(null);
   const initialSetupAttempt = useRef<{ signature: string; accounts: FinancialAccount[] } | null>(null);
   const [transactionReadError, setTransactionReadError] = useState(false);
   const lastUserId = useRef<string | null>(null);
@@ -620,7 +619,6 @@ export default function App() {
         setCloudTransactions([]);
         setFinancialLoaded({ accounts: false, transactions: false });
         setNeedsInitialSetup(false);
-        setOnboardingSetupUid(null);
         initialSetupAttempt.current = null;
         setTransactionReadError(false);
         setUserSubscription(null);
@@ -878,8 +876,11 @@ export default function App() {
   const handleGoogleLogout = async () => {
     setAdminPinVerified(false);
     try {
-      await closePresenceBeforeSignOut();
+      await closePresenceBeforeSignOut().catch(error => console.warn('Presence sign-out notice:', error));
       await logoutUser();
+      window.history.replaceState({ myBucketTab: 'home' }, '', '/');
+      setOfferLocation('/');
+      setActiveTab('home');
       setToastMessage(lang === 'ar' ? 'تم تسجيل الخروج بنجاح' : 'Signed out successfully');
       setTimeout(() => setToastMessage(null), 3000);
     } catch (err) {
@@ -1508,7 +1509,6 @@ export default function App() {
       await resetFinancialStart(uid);
       if (auth.currentUser?.uid !== uid) return;
       initialSetupAttempt.current = null;
-      setOnboardingSetupUid(uid);
       setActiveTab('home');
       window.history.replaceState({ myBucketTab: 'home' }, '', '/accounts/setup');
       setOfferLocation('/accounts/setup');
@@ -1674,16 +1674,7 @@ export default function App() {
     </div>;
   }
   const restartingFinancialSetup = window.location.pathname === '/accounts/setup';
-  if (authUser && needsInitialSetup && financialLoaded.accounts && financialLoaded.transactions && transactions.length === 0 && !restartingFinancialSetup && onboardingSetupUid !== authUser.uid) {
-    const trialDaysRemaining = userSubscription ? stageFor(userSubscription) === 'pro-trial'
-      ? Math.max(0, Math.ceil((Date.parse(userSubscription.trialStartedAt) + getTrialDurations().proDays * 86400000 - Date.now()) / 86400000))
-      : calculateRemainingTrialDays(userSubscription) : null;
-    return <AdminNewUserSimulation lang={lang} realOnboarding
-      trialDaysRemaining={trialDaysRemaining} onStartReal={() => setOnboardingSetupUid(authUser.uid)}
-      onExit={() => { void handleGoogleLogout(); }} />;
-  }
   if (authUser && needsInitialSetup && financialLoaded.accounts) {
-    // Account setup is now an explicit choice after exploring sample data.
     // Signing out returns to the existing Google sign-in page without resetting the trial.
     const leaveInitialSetup = async () => {
       await closePresenceBeforeSignOut().catch(error => console.warn('Presence sign-out notice:', error));
@@ -1693,10 +1684,6 @@ export default function App() {
       setActiveTab('home');
     };
     return <InitialSetupView lang={lang} canAddAccounts={canAddAccounts}
-      {...(!restartingFinancialSetup && {
-        onBack: () => setOnboardingSetupUid(null),
-        backLabel: lang === 'ar' ? 'العودة للبيانات التجريبية' : 'Back to sample data',
-      })}
       onCancel={leaveInitialSetup} onSave={async draft => {
       if (!auth.currentUser || auth.currentUser.uid !== authUser.uid) throw new Error('auth-changed');
       if (!trialSettingsReady) throw new Error('trial-access-not-ready');

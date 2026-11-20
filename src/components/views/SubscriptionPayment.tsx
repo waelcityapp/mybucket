@@ -43,7 +43,10 @@ export function SubscriptionPayment({ lang, plan, onClose }: {
   const [quote, setQuote] = useState<{ plan: Plan; amount: number } | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState('');
-  const [sending, setSending] = useState(false);
+  const [step, setStep] = useState<'prepare' | 'upload' | 'submit' | null>(null);
+  const [progress, setProgress] = useState(0);
+  const sending = step !== null;
+  const sendLock = useRef(false);
   const uploaded = useRef<{ file: File; media: UploadedAdMedia } | null>(null);
 
   const message = (err: unknown) => {
@@ -59,7 +62,7 @@ export function SubscriptionPayment({ lang, plan, onClose }: {
     let active = true;
     setLoaded(false);
     setError('');
-    offerAdsRequest<Payment | null>('subscriptionPayment.status', {}, true)
+    offerAdsRequest<Payment | null>('subscriptionPayment.status', {}, true, AbortSignal.timeout(15000))
       .then(data => { if (active) { setLatest(data); setLoaded(true); } })
       .catch(err => { if (active) setError(message(err)); });
     return () => { active = false; };
@@ -70,7 +73,7 @@ export function SubscriptionPayment({ lang, plan, onClose }: {
     let active = true;
     setQuote(null);
     setError('');
-    offerAdsRequest<{ amount: number }>('subscriptionPayment.quote', { plan }, true)
+    offerAdsRequest<{ amount: number }>('subscriptionPayment.quote', { plan }, true, AbortSignal.timeout(15000))
       .then(({ amount }) => { if (active) setQuote({ plan, amount }); })
       .catch(err => { if (active) setError(message(err)); });
     return () => { active = false; };
@@ -83,22 +86,45 @@ export function SubscriptionPayment({ lang, plan, onClose }: {
       setError(ar ? 'اختر صورة JPG أو PNG أو WebP حتى ٥ ميجابايت.' : 'Choose a JPG, PNG or WebP image up to 5 MB.');
       return;
     }
-    setSending(true);
+    if (sendLock.current) return;
+    sendLock.current = true;
     setError('');
+    let phase: 'prepare' | 'upload' | 'submit' = 'prepare';
     try {
       if (uploaded.current?.file !== file) {
-        const signed = await offerAdsRequest<SignedAdUpload>('subscriptionPayment.prepare', { plan, bytes: file.size }, true);
-        uploaded.current = { file, media: await uploadAdMedia(file, signed, () => {}) };
+        setStep('prepare');
+        const signed = await offerAdsRequest<SignedAdUpload>('subscriptionPayment.prepare', { plan, bytes: file.size }, true, AbortSignal.timeout(15000));
+        phase = 'upload';
+        setStep(phase);
+        setProgress(0);
+        uploaded.current = { file, media: await uploadAdMedia(file, signed, setProgress, AbortSignal.timeout(60000)) };
       }
-      await offerAdsRequest('subscriptionPayment.submit', { ...uploaded.current.media, plan, quotedAmount: quote.amount }, true);
+      phase = 'submit';
+      setStep(phase);
+      const saved = await offerAdsRequest<{ status: Payment['status'] }>('subscriptionPayment.submit',
+        { ...uploaded.current.media, plan, quotedAmount: quote.amount }, true, AbortSignal.timeout(30000));
+      if (!['pending', 'correction', 'approved'].includes(saved.status)) throw new Error('payment_not_saved');
       setFile(null);
       uploaded.current = null;
       setRefresh(value => value + 1);
       onClose();
     } catch (err) {
-      setError(message(err));
+      if (phase === 'submit') {
+        const latestPayment = await offerAdsRequest<Payment | null>('subscriptionPayment.status', {}, true, AbortSignal.timeout(10000)).catch(() => null);
+        if (latestPayment && latestPayment.id === uploaded.current?.media.publicId.split('/').at(-1)) {
+          setRefresh(value => value + 1);
+          onClose();
+          return;
+        }
+        setError(ar ? `الصورة اترفعت. تعذّر تأكيد إرسال الطلب للمراجعة. ${message(err)}` : `Image uploaded. Could not confirm submission for review. ${message(err)}`);
+      } else if (phase === 'upload') {
+        setError(ar ? 'لم يصل تأكيد برفع الصورة. جرّب إرسالها مرة أخرى.' : 'The image upload could not be confirmed. Try sending again.');
+      } else {
+        setError(ar ? `تعذّر تجهيز رفع الإيصال. ${message(err)}` : `Could not prepare the receipt upload. ${message(err)}`);
+      }
     } finally {
-      setSending(false);
+      sendLock.current = false;
+      setStep(null);
     }
   }
 
@@ -114,7 +140,7 @@ export function SubscriptionPayment({ lang, plan, onClose }: {
       {latest.paidExpiresAt && <p>{ar ? 'ينتهي في' : 'Ends on'} {new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'long', timeZone: 'Africa/Cairo' }).format(new Date(latest.paidExpiresAt))}</p>}
       {latest.receiptUrl && <a className="text-sm underline" href={latest.receiptUrl} target="_blank" rel="noreferrer">{ar ? 'عرض الإيصال' : 'View receipt'}</a>}
     </section>}
-    {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-900">{error} <button type="button" className="underline" onClick={() => setRefresh(value => value + 1)}>{ar ? 'إعادة المحاولة' : 'Retry'}</button></p>}
+    {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-900">{error} <button type="button" className="underline" disabled={sending} onClick={() => setRefresh(value => value + 1)}>{ar ? 'تحديث الحالة' : 'Refresh status'}</button></p>}
     {!loaded && plan && !error && <p role="status" className="text-sm">{ar ? 'جارٍ تحميل الدفع…' : 'Loading payment…'}</p>}
     {loaded && plan && latest?.status !== 'pending' && <form onSubmit={submit} className={box}>
       <h2 className="text-lg font-bold">{ar ? 'دفع الاشتراك بإنستاباي' : 'Pay with InstaPay'} · {planLabel(plan)}</h2>
@@ -122,8 +148,13 @@ export function SubscriptionPayment({ lang, plan, onClose }: {
         <p className="font-bold">{quote.amount} {ar ? 'جنيه مصري' : 'EGP'}</p>
         <p className="text-sm">{ar ? 'حوّل المبلغ، ثم أرفق صورة الإيصال. التفعيل بعد مراجعة التحويل.' : 'Transfer the shown amount, then attach your receipt. Activation follows review.'}</p>
         <a href={INSTA_PAY_LINK} target="_blank" rel="noreferrer" className={button}>{ar ? 'فتح إنستاباي' : 'Open InstaPay'}</a>
-        <label className="block text-sm font-bold">{ar ? 'صورة الإيصال' : 'Receipt image'}<input required type="file" accept="image/jpeg,image/png,image/webp" onChange={event => setFile(event.target.files?.[0] ?? null)} className={input} /></label>
-        <button type="submit" disabled={sending} className={button}>{sending ? (ar ? 'جارٍ الإرسال…' : 'Sending…') : (ar ? 'إرسال للمراجعة' : 'Submit for review')}</button>
+        <label className="block text-sm font-bold">{ar ? 'صورة الإيصال' : 'Receipt image'}<input required disabled={sending} type="file" accept="image/jpeg,image/png,image/webp" onChange={event => setFile(event.target.files?.[0] ?? null)} className={input} /></label>
+        <button type="submit" disabled={sending || !file} className={button}>
+          {step === 'prepare' ? (ar ? 'جارٍ تجهيز الرفع…' : 'Preparing upload…')
+            : step === 'upload' ? (ar ? `جارٍ رفع الصورة… ${progress}٪` : `Uploading image… ${progress}%`)
+            : step === 'submit' ? (ar ? 'تم رفع الصورة، جارٍ إرسال الطلب…' : 'Image uploaded, submitting request…')
+            : (ar ? 'إرسال للمراجعة' : 'Submit for review')}
+        </button>
       </> : !error && <p role="status">{ar ? 'جارٍ تحميل المبلغ…' : 'Loading amount…'}</p>}
     </form>}
   </div>;

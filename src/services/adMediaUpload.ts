@@ -40,7 +40,10 @@ export function uploadAdMedia(file: File | string, signed: SignedAdUpload, onPro
       signal?.removeEventListener('abort', cancel);
       if (error) reject(error); else resolve(result!);
     };
-    const cancel = () => { xhr.abort(); finish(new Error('upload_cancelled')); };
+    const cancel = () => {
+      finish(new Error(signal?.reason?.name === 'TimeoutError' ? 'upload_timeout' : 'upload_cancelled'));
+      xhr.abort();
+    };
     signal?.addEventListener('abort', cancel, { once: true });
     xhr.open('POST', `https://api.cloudinary.com/v1_1/${signed.cloudName}/${signed.resourceType}/upload`);
     xhr.upload.onprogress = event => {

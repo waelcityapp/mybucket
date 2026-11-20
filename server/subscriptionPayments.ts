@@ -120,6 +120,7 @@ export async function subscriptionPayment(action: string, user: { uid: string; e
 
   if (payload.quotedAmount !== amount) fail('payment_price_changed', 409);
   const verified = await confirmAdminAdTestUpload(user.uid, { ...payload, resourceType: 'image' }, undefined, fetch, 'subscription-receipts');
+  console.info('[subscription-payment] receipt verified');
   const id = verified.publicId.split('/').at(-1)!;
   const ref = requests.doc(id);
   await db.runTransaction(async tx => {
@@ -133,5 +134,6 @@ export async function subscriptionPayment(action: string, user: { uid: string; e
     } satisfies Payment);
     tx.set(latest, { id });
   });
+  console.info('[subscription-payment] request saved');
   return { id, status: 'pending', amount };
 }

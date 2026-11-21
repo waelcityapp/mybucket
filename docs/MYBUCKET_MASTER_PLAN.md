@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Saved transactions in subscription settings (#286)
+
+- Show server-confirmed daily saved transaction counts and published allowance by plan. Separate analyzer attempts from saved transactions.
+
 ## Continuous voice capture (#285)
 
 - Ask the browser to recognize speech continuously and preserve the latest visible transcript when a speech session ends. Browser restarts keep earlier text.

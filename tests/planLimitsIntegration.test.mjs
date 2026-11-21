@@ -8,7 +8,7 @@ import { getAdminFirestore } from '../server/firebaseAdmin.ts';
 import { savePlanLimitsDraft, publishPlanLimits, readPublishedPlanLimits } from '../server/planLimits.ts';
 import { saveFinancialTransaction, issueAiEntryTicket } from '../server/financialTransactions.ts';
 import { saveFinancialCollection } from '../server/financialCollections.ts';
-import { reserveAiQuota } from '../server/aiQuota.ts';
+import { readOwnAiQuota, reserveAiQuota } from '../server/aiQuota.ts';
 import { reserveReportExport } from '../server/reportExport.ts';
 import { DEFAULT_PLAN_LIMITS } from '../src/config/planLimits.ts';
 
@@ -82,6 +82,11 @@ test('published limits coordinate the gateway, the Firestore write boundary and 
     await reserveAiQuota('pro', inquiry, false, undefined, inquiryId);
     await reserveAiQuota('pro', inquiry, true, undefined, inquiryId);
     await assert.rejects(reserveAiQuota('pro', inquiry, true, undefined, inquiryId), { code: 'plan_inquiry_limit' });
+    assert.deepEqual((await readOwnAiQuota('basic')).savedEntries.basic, { used: 1, limit: 1, remaining: 0 });
+    assert.deepEqual((await readOwnAiQuota('pro')).savedEntries, {
+      proAi: { used: 1, limit: 1, remaining: 0 },
+      proAdditional: { used: 1, limit: 1, remaining: 0 },
+    });
     await reserveReportExport('pro', 'csv');
     await assert.rejects(reserveReportExport('pro', 'pdf'), { code: 'report_export_limit' });
   } finally {

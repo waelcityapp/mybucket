@@ -124,7 +124,22 @@ export async function readOwnAiQuota(uid: string, deps?: { db: ReturnType<typeof
     const limit = limits[key] as number;
     return { used, limit, remaining: Math.max(0, limit - used) };
   };
-  return { day, plan, ...(plan === 'basic' ? { local: { entries: bucket('basicLocalEntries'), inquiries: bucket('basicLocalInquiries') } } : plan === 'pro' ? { gemini: { entries: bucket('proGeminiEntries'), inquiries: bucket('proGeminiInquiries') }, local: { entries: bucket('proLocalEntries'), inquiries: bucket('proLocalInquiries') } } : {}) };
+  const savedEntries = !deps && plan !== 'expired' ? await (async () => {
+    const [policy, entryCounter] = await Promise.all([
+      db.doc(PUBLISHED_PLAN_LIMITS_PATH).get(),
+      db.doc(`users/${uid}/entryUsage/${day}`).get(),
+    ]);
+    const caps = publishedPlanLimits(policy);
+    const entries = (key: 'basic' | 'proAi' | 'proAdditional', limit?: number) => {
+      const used = entryCounter.get(key) ?? 0;
+      if (!Number.isSafeInteger(used) || used < 0) throw new SubscriptionError(503, 'invalid_entry_counter', 'Unable to verify usage.');
+      return { used, limit: limit ?? null, remaining: limit === undefined ? null : Math.max(0, limit - used) };
+    };
+    return plan === 'basic'
+      ? { basic: entries('basic', caps?.basicEntries) }
+      : { proAi: entries('proAi', caps?.proAiEntries), proAdditional: entries('proAdditional', caps?.proAdditionalEntries) };
+  })() : null;
+  return { day, plan, ...(savedEntries ? { savedEntries } : {}), ...(plan === 'basic' ? { local: { entries: bucket('basicLocalEntries'), inquiries: bucket('basicLocalInquiries') } } : plan === 'pro' ? { gemini: { entries: bucket('proGeminiEntries'), inquiries: bucket('proGeminiInquiries') }, local: { entries: bucket('proLocalEntries'), inquiries: bucket('proLocalInquiries') } } : {}) };
 }
 export async function reserveAiQuota(uid: string, rawText: unknown, forceLocal = false, deps?: QuotaDeps, inquiryRequestId?: unknown): Promise<AiQuotaDecision> {
   if (typeof rawText !== 'string' || !rawText.trim() || rawText.length > 300) {

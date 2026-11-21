@@ -7,7 +7,8 @@ import { activeGrant } from '../config/grantPolicy';
 import { stageFor } from '../config/subscriptionPolicy';
 
 type Bucket = { used: number; limit: number; remaining: number };
-type UsageStatus = { day: string; plan: 'basic' | 'pro' | 'expired'; local?: { entries: Bucket; inquiries: Bucket }; gemini?: { entries: Bucket; inquiries: Bucket } };
+type SavedBucket = { used: number; limit: number | null; remaining: number | null };
+type UsageStatus = { day: string; plan: 'basic' | 'pro' | 'expired'; savedEntries?: Partial<Record<'basic' | 'proAi' | 'proAdditional', SavedBucket>>; local?: { entries: Bucket; inquiries: Bucket }; gemini?: { entries: Bucket; inquiries: Bucket } };
 
 interface SubscriptionCardProps {
   subscription: UserSubscription | null;
@@ -104,12 +105,39 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
           {usageError && <p role="alert">{isAr ? 'تعذر تحميل حدود الاستخدام.' : 'Could not load usage limits.'} <button type="button" onClick={() => setUsageRetry(n => n + 1)} className="font-bold text-emerald-700 underline">{isAr ? 'إعادة المحاولة' : 'Try again'}</button></p>}
           {usage && <>
             <p className="font-bold text-slate-800">{usage.plan === 'expired' ? (isAr ? 'انتهت صلاحية الاستخدام' : 'Access expired') : (isAr ? `الخطة الحالية: ${usage.plan === 'pro' ? 'Pro' : 'Basic'}` : `Current plan: ${usage.plan === 'pro' ? 'Pro' : 'Basic'}`)}</p>
+            {usage.savedEntries && <section className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-950">
+              <h3 className="font-extrabold">{isAr ? 'العمليات المحفوظة اليوم' : 'Transactions saved today'}</h3>
+              <dl className="space-y-1.5">
+                {([
+                  ['basic', isAr ? 'إجمالي الحفظ' : 'Total saved'],
+                  ['proAi', isAr ? 'الحفظ بعد تحليل Gemini' : 'Saved after Gemini analysis'],
+                  ['proAdditional', isAr ? 'العمليات الإضافية' : 'Additional transactions'],
+                ] as const).map(([key, label]) => {
+                  const count = usage.savedEntries?.[key];
+                  if (!count) return null;
+                  return <div key={key} className="flex flex-wrap justify-between gap-x-2">
+                    <dt>{label}</dt>
+                    <dd className="font-bold">{count.limit === null
+                      ? (isAr ? `${count.used} محفوظة` : `${count.used} saved`)
+                      : (isAr ? `${count.used} من ${count.limit} · المتبقي ${count.remaining}` : `${count.used} of ${count.limit} · ${count.remaining} left`)}</dd>
+                  </div>;
+                })}
+              </dl>
+              {(usage.savedEntries.basic ?? usage.savedEntries.proAi)?.limit === null
+                ? <p>{isAr ? 'حد الحفظ في انتظار نشر حدود الخطط.' : 'Saving limits are pending plan publication.'}</p>
+                : (usage.savedEntries.proAi?.remaining ?? 0) > 0 &&
+                  <p>{isAr ? 'الحصة الإضافية تبدأ بعد استنفاد حصة الحفظ بـGemini.' : 'Additional entries unlock when the Gemini save allowance is used.'}</p>}
+            </section>}
+            {usage.plan !== 'expired' && <details className="space-y-2">
+              <summary className="cursor-pointer py-2 font-bold">{isAr ? 'محاولات التحليل اليوم' : 'Analysis attempts today'}</summary>
             {([['gemini', usage.gemini], ['local', usage.local]] as const).map(([engine, counts]) => counts && <div key={engine} className="rounded-lg border border-slate-200 bg-white p-2">
               <p className="font-bold text-slate-700">{engine === 'gemini' ? (isAr ? 'Gemini' : 'Gemini') : usage.plan === 'pro' ? (isAr ? 'المحلل المحلي عند عدم توفر Gemini أو انتهاء حصته' : 'Local analyzer when Gemini is unavailable or exhausted') : (isAr ? 'المحلل المحلي' : 'Local analyzer')}</p>
               <p>{isAr ? `محاولات تحليل العمليات: ${counts.entries.used} من ${counts.entries.limit} · المتبقي ${counts.entries.remaining}` : `Entry analysis attempts: ${counts.entries.used} of ${counts.entries.limit} · ${counts.entries.remaining} left`}</p>
               <p>{isAr ? `محاولات تحليل الاستعلامات: ${counts.inquiries.used} من ${counts.inquiries.limit} · المتبقي ${counts.inquiries.remaining}` : `Inquiry analysis attempts: ${counts.inquiries.used} of ${counts.inquiries.limit} · ${counts.inquiries.remaining} left`}</p>
             </div>)}
-            {usage.plan !== 'expired' && <p className="text-[10px] text-slate-500">{isAr ? 'تُحسب المحاولة عند بدء التحليل، وتتجدد الحدود يوميًا بتوقيت القاهرة.' : 'Attempts count when analysis starts; limits reset daily in Cairo time.'}</p>}
+              <p className="text-[10px] text-slate-500">{isAr ? 'تُحسب المحاولة عند بدء التحليل.' : 'An attempt counts when analysis starts.'}</p>
+            </details>}
+            {usage.plan !== 'expired' && <p className="text-[10px] text-slate-500">{isAr ? 'العدادات تتجدد يوميًا بتوقيت القاهرة.' : 'Counters reset daily in Cairo time.'}</p>}
           </>}
         </div>
 

@@ -65,6 +65,7 @@ import { FinancialQueryResultCard } from './components/FinancialQueryResultCard'
 import { HomeFinancialOverview } from './components/HomeFinancialOverview';
 import { DeleteTransactionsPage } from './components/views/DeleteTransactionsPage';
 import { AdminView, type SectionId } from './components/views/AdminView';
+import { adminSubscriptionPage, type AdminSubscriptionPage } from './components/views/AdminSubscriptionsView';
 import { AdminNewUserSimulation, exampleAccounts, exampleTransactions } from './components/views/AdminNewUserSimulation';
 import { AdminUserGrantView } from './components/views/AdminUserGrantView';
 import { AdminPinView } from './components/views/AdminPinView';
@@ -471,7 +472,7 @@ export default function App() {
     if (!isAdmin || pin !== '2233') return false;
     setAdminPinVerified(true);
     const currentPath = window.location.pathname;
-    const safeTarget = /^\/admin\/(users|subscriptions|marketers|ads|ai|branding|simulate-new-user)$/.test(currentPath) || /^\/admin\/users\/[A-Za-z0-9_-]{1,128}\/grant$/.test(currentPath) ? currentPath : '/admin';
+    const safeTarget = adminSubscriptionPage(currentPath) || /^\/admin\/(users|subscriptions|marketers|ads|ai|branding|simulate-new-user)$/.test(currentPath) || /^\/admin\/users\/[A-Za-z0-9_-]{1,128}\/grant$/.test(currentPath) ? currentPath : '/admin';
     window.history.replaceState({ myBucketTab: 'admin' }, '', safeTarget);
     setAdminRoute(safeTarget);
     setActiveTab('admin');
@@ -499,6 +500,7 @@ export default function App() {
   }, [adminPinVerified, categories]);
 
   const adminSectionFromPath = (): SectionId | null => {
+    if (adminSubscriptionPage(adminRoute)) return 'subscriptions';
     const section = adminRoute.match(/^\/admin\/(users|subscriptions|marketers|ads|ai|branding)(?:\/new)?$/)?.[1];
     return section ? section as SectionId : null;
   };
@@ -507,6 +509,13 @@ export default function App() {
     if (section === 'reports') { openFeedbackAdmin(); return; }
     window.history.pushState({ myBucketTab: 'admin' }, '', `/admin/${section}`);
     setAdminRoute(`/admin/${section}`);
+    setActiveTab('admin');
+  };
+  const openAdminSubscriptionPage = (page: AdminSubscriptionPage) => {
+    if (!isAdmin || !adminPinVerified) return;
+    const path = '/admin/subscriptions/' + page;
+    window.history.pushState({ myBucketTab: 'admin' }, '', path);
+    setAdminRoute(path);
     setActiveTab('admin');
   };
   const openNewUserSimulation = () => {
@@ -2163,7 +2172,7 @@ export default function App() {
             ? <AdminAppIdentityView lang={lang} identity={appIdentity} identityReady={identityReady} onSaved={(updated) => setAppIdentity(updated)} onBack={backToAdminSections} />
             : /^\/admin\/users\/[A-Za-z0-9_-]{1,128}\/grant$/.test(adminRoute)
             ? <AdminUserGrantView uid={adminRoute.split('/')[3]} lang={lang} onBack={() => openAdminSection('users')} />
-            : <AdminView lang={lang} user={authUser} onBack={() => navigateTab('home')} onOpenFeedbackAdmin={openFeedbackAdmin} sectionId={adminSectionFromPath()} onOpenSection={openAdminSection} onBackToSections={backToAdminSections} onOpenGrant={openUserGrant} onOpenNewUserSimulation={openNewUserSimulation} />
+            : <AdminView lang={lang} user={authUser} onBack={() => navigateTab('home')} onOpenFeedbackAdmin={openFeedbackAdmin} sectionId={adminSectionFromPath()} subscriptionPage={adminSubscriptionPage(adminRoute)} onOpenSubscriptionPage={openAdminSubscriptionPage} onOpenSection={openAdminSection} onBackToSections={backToAdminSections} onOpenGrant={openUserGrant} onOpenNewUserSimulation={openNewUserSimulation} />
         )}
       </main>
 

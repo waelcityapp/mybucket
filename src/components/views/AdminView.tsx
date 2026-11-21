@@ -7,9 +7,7 @@ import {
 import type { AuthUser, Language } from '../../types';
 import { AdminAiUsageCard } from '../AdminAiUsageCard';
 import { AdminAppUsersView } from './AdminAppUsersView';
-import { AdminSubscriptionPayments } from './SubscriptionPayment';
-import { AdminTrialSettingsView } from './AdminTrialSettingsView';
-import { AdminAiQuotaSettings } from './AdminAiQuotaSettings';
+import { AdminSubscriptionsView, type AdminSubscriptionPage } from './AdminSubscriptionsView';
 
 interface AdminViewProps {
   lang: Language;
@@ -17,6 +15,8 @@ interface AdminViewProps {
   onBack: () => void;
   onOpenFeedbackAdmin: () => void;
   sectionId?: SectionId | null;
+  subscriptionPage?: AdminSubscriptionPage;
+  onOpenSubscriptionPage: (page: AdminSubscriptionPage) => void;
   onOpenSection: (section: SectionId) => void;
   onBackToSections: () => void;
   onOpenGrant: (uid: string) => void;
@@ -27,14 +27,14 @@ export type SectionId = 'users' | 'subscriptions' | 'marketers' | 'reports' | 'a
 
 export function AdminView({
   lang, user, onBack, onOpenFeedbackAdmin,
-  sectionId = null, onOpenSection, onBackToSections, onOpenGrant, onOpenNewUserSimulation,
+  sectionId = null, subscriptionPage, onOpenSubscriptionPage, onOpenSection, onBackToSections, onOpenGrant, onOpenNewUserSimulation,
 }: AdminViewProps) {
   const ar = lang === 'ar';
   const selected = sectionId;
 
   const sections = [
     { id: 'users' as const, icon: Users, title: ar ? 'مستخدمى التطبيق' : 'App users', desc: ar ? 'التسجيل والتثبيت والاشتراكات والتحكم بالحسابات' : 'Registrations, installs, plans and account controls', ready: true },
-    { id: 'subscriptions' as const, icon: CreditCard, title: ar ? 'الاشتراكات' : 'Subscriptions', desc: ar ? 'التحكم في مدد Pro وBasic لجميع المستخدمين' : 'Global Pro and Basic trial days', ready: true },
+    { id: 'subscriptions' as const, icon: CreditCard, title: ar ? 'الاشتراكات' : 'Subscriptions', desc: ar ? 'طلبات الدفع وإعدادات الخطط ومدة الاستخدام' : 'Payment requests, plan settings and access duration', ready: true },
     { id: 'marketers' as const, icon: Megaphone, title: ar ? 'المسوقون' : 'Marketers', desc: ar ? 'الأكواد والعمولات' : 'Codes and commissions', ready: false },
     { id: 'ads' as const, icon: PanelsTopLeft, title: ar ? 'إدارة الإعلانات' : 'Ads management', desc: ar ? 'مراجعة الإعلانات الواردة والموافقة أو الرفض' : 'Review, approve or reject submitted ads', ready: true },
     { id: 'reports' as const, icon: MessageSquareText, title: ar ? 'البلاغات' : 'Reports', desc: ar ? 'تقييمات المحلل المحلي والتحكم فيها' : 'Local analyzer feedback and controls', ready: true },
@@ -46,8 +46,8 @@ export function AdminView({
   return (
     <div className="space-y-4 pb-24">
       <div className="flex items-start gap-3">
-        <button type="button" onClick={selected ? onBackToSections : onBack}
-          aria-label={selected ? (ar ? 'العودة للأقسام الرئيسية' : 'Back to admin sections') : (ar ? 'العودة للرئيسية' : 'Back to home')}
+        <button type="button" onClick={subscriptionPage ? () => onOpenSection('subscriptions') : selected ? onBackToSections : onBack}
+          aria-label={subscriptionPage ? (ar ? 'رجوع للاشتراكات' : 'Back to subscriptions') : selected ? (ar ? 'العودة للأقسام الرئيسية' : 'Back to admin sections') : (ar ? 'العودة للرئيسية' : 'Back to home')}
           className="mt-0.5 w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center justify-center shrink-0">
           {ar ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
         </button>
@@ -56,7 +56,7 @@ export function AdminView({
             <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
             <h1 className="text-xl font-extrabold text-slate-900">{activeSection?.title || (ar ? 'لوحة الإدارة' : 'Admin dashboard')}</h1>
           </div>
-          <p className="text-xs text-slate-500 mt-1">{selected ? (ar ? 'العودة إلى أقسام الإدارة من زر الرجوع' : 'Use Back to return to admin sections') : (ar ? 'إدارة التطبيق ومتابعة الخدمات من مكان واحد' : 'App administration in one place')}</p>
+          <p className="text-xs text-slate-500 mt-1">{subscriptionPage ? (ar ? 'رجوع للاشتراكات' : 'Back to subscriptions') : selected ? (ar ? 'العودة إلى أقسام الإدارة من زر الرجوع' : 'Use Back to return to admin sections') : (ar ? 'إدارة التطبيق ومتابعة الخدمات من مكان واحد' : 'App administration in one place')}</p>
         </div>
       </div>
 
@@ -98,12 +98,12 @@ export function AdminView({
 
       {activeSection && (
         <section className="space-y-3 scroll-mt-24" aria-label={activeSection.title}>
-          <div className="flex items-center justify-between gap-2 px-1">
+          {selected !== 'subscriptions' && <div className="flex items-center justify-between gap-2 px-1">
             <h2 className="text-base font-extrabold text-slate-900">{activeSection.title}</h2>
             <button type="button" onClick={onBackToSections} className="flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-emerald-700">
               {ar ? 'الأقسام الرئيسية' : 'All sections'} <ChevronUp className="w-4 h-4" />
             </button>
-          </div>
+          </div>}
 
           {!activeSection.ready && (
             <div className="rounded-2xl border border-slate-200 bg-white p-5 flex items-start gap-3">
@@ -132,7 +132,7 @@ export function AdminView({
           )}
 
           {selected === 'users' && <AdminAppUsersView lang={lang} onOpenGrant={onOpenGrant} />}
-          {selected === 'subscriptions' && <><AdminSubscriptionPayments lang={lang} /><AdminTrialSettingsView lang={lang} /><AdminAiQuotaSettings lang={lang} /></>}
+          {selected === 'subscriptions' && <AdminSubscriptionsView lang={lang} page={subscriptionPage} onOpen={onOpenSubscriptionPage} />}
           {selected === 'ai' && <AdminAiUsageCard lang={lang} />}
 
         </section>

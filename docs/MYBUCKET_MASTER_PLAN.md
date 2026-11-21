@@ -1,5 +1,10 @@
 # MyBucket — Master Implementation Plan
 
+## Subscription administration review
+
+- Organize the existing Subscriptions card into full-page sections for payment requests, plan settings, free access duration, and analysis limits.
+- Show the agreed Basic and Pro limits in a read-only review. Plan-limit enforcement, editable Arabic and English subscription content, and draft/preview/publish remain pending.
+
 ## Advertiser checkout page based on CityEve (November 17, 2026 — revision #189)
 
 - Review CityEve `EventPaymentCheckout` from both main and preview; reproduce the full-page payment review structure in My Bucket for featured advertisements: invoice summary, advertiser and schedule, media type, follow-up phone, InstaPay/Vodafone Cash instructions, receipt image picker/drop-zone/preview/remove, and review button. Use the My Bucket green/white identity and Arabic/English responsive layout.

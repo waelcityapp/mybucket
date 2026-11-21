@@ -69,7 +69,7 @@ function adFields(payload: Payload, allowPast = false): AdFields {
   };
 }
 
-function mediaView(media: StoredMedia): PublicOfferAd['media'] {
+function mediaView(media: StoredMedia, thumbnail = false): PublicOfferAd['media'] {
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
   const secret = process.env.CLOUDINARY_API_SECRET;
   if (!cloudName || !secret) return undefined;
@@ -80,7 +80,7 @@ function mediaView(media: StoredMedia): PublicOfferAd['media'] {
   };
   return {
     type: media.resourceType,
-    url: media.resourceType === 'video' ? signedUrl('mp4', 'f_mp4/') : signedUrl(media.format),
+    url: media.resourceType === 'video' ? signedUrl('mp4', 'f_mp4/') : signedUrl(media.format, thumbnail ? 'c_limit,w_320/' : ''),
     ...(media.resourceType === 'video' && { poster: signedUrl('jpg', 'so_0.5,c_limit,w_640/') }),
   };
 }
@@ -190,11 +190,13 @@ export async function readMyOfferAds(uid: string, db = getAdminFirestore()): Pro
   const now = Date.now();
   const snapshot = await db.collection('offerAds').where('ownerId', '==', uid).get();
   return snapshot.docs.flatMap<MyOfferAd>(doc => {
-    const { title, merchant, status, submittedAt, startsAt, endsAt, rejectionReason, payment } = doc.data() as StoredAd;
+    const { title, merchant, status, submittedAt, startsAt, endsAt, rejectionReason, payment, media } = doc.data() as StoredAd;
     if (status !== 'pending' && status !== 'approved' && status !== 'rejected' && status !== 'deleting') return [];
     const deleteAfter = status === 'approved' && now >= endsAt ? endsAt + EXPIRED_RETENTION : null;
     if (deleteAfter !== null && now >= deleteAfter) return [];
-    return [{ id: doc.id, title, merchant, tier: payment ? payment.tier ?? 'featured' : 'free', status, submittedAt, startsAt, endsAt, rejectionReason, deleteAfter }];
+    const preview = media && status !== 'deleting' ? mediaView(media, true) : undefined;
+    const thumbnailUrl = preview?.type === 'video' ? preview.poster : preview?.url;
+    return [{ id: doc.id, title, merchant, thumbnailUrl, tier: payment ? payment.tier ?? 'featured' : 'free', status, submittedAt, startsAt, endsAt, rejectionReason, deleteAfter }];
   }).sort((a, b) => b.submittedAt - a.submittedAt);
 }
 

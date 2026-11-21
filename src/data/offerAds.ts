@@ -33,4 +33,4 @@ export type ReviewOfferAd = PublicOfferAd & {
   payment?: { amountEgp: number; phone: string; receiptUrl?: string };
 };
 
-export type MyOfferAd = Pick<ReviewOfferAd, 'id' | 'title' | 'merchant' | 'tier' | 'status' | 'submittedAt' | 'startsAt' | 'endsAt' | 'rejectionReason'> & { deleteAfter: number | null };
+export type MyOfferAd = Pick<ReviewOfferAd, 'id' | 'title' | 'merchant' | 'tier' | 'status' | 'submittedAt' | 'startsAt' | 'endsAt' | 'rejectionReason'> & { deleteAfter: number | null; thumbnailUrl?: string };

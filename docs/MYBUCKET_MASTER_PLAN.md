@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Ad thumbnails in My ads (#290)
+
+- Display an owner-only preview using the existing ad image or video poster.
+
 ## Advertiser deletion of approved ads (#289)
 
 - Allow owners to delete approved ads before expiry, hide them during deletion, and retry media cleanup before removing Firestore data.

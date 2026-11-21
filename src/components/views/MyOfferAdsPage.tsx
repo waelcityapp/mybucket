@@ -98,6 +98,8 @@ export function MyOfferAdsPage({ uid, lang, onBack, onNavigate }: { uid: string;
         return <div key={ad.id} className="space-y-3">
           {expired && index === expiredStart && <h2 className="pt-2 text-sm font-extrabold">{ar ? 'الإعلانات المنتهية' : 'Expired ads'}</h2>}
           <article className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 space-y-2">
           <p className="break-words text-sm font-semibold">{ad.merchant}</p>
           <h2 className="break-words font-extrabold">{ad.title}</h2>
           {ad.tier === 'vip' && <p className="w-fit rounded-full bg-amber-100 px-2.5 py-1 text-xs font-extrabold text-amber-900">VIP</p>}
@@ -105,6 +107,11 @@ export function MyOfferAdsPage({ uid, lang, onBack, onNavigate }: { uid: string;
           <p className="text-xs text-slate-600 dark:text-slate-300">{ar ? 'تاريخ الإرسال' : 'Submitted'} · {date(ad.submittedAt)}</p>
           {ad.status === 'approved' && <p className="text-xs text-slate-600 dark:text-slate-300">{ar ? 'مدة النشر بتوقيت القاهرة' : 'Publication window, Cairo time'} · {date(ad.startsAt)} — {date(ad.endsAt)}</p>}
           {ad.status === 'rejected' && ad.rejectionReason && <p className="whitespace-pre-wrap break-words text-sm">{ad.rejectionReason}</p>}
+          </div>
+          {ad.thumbnailUrl && <img key={ad.thumbnailUrl} src={ad.thumbnailUrl} alt="" loading="lazy" decoding="async"
+            onError={event => { event.currentTarget.hidden = true; }}
+            className="aspect-square w-20 shrink-0 rounded-xl bg-slate-100 object-contain sm:w-28 dark:bg-slate-800" />}
+          </div>
           {(ad.status === 'approved' || ad.status === 'deleting') && <div className="space-y-2 border-t border-slate-200 pt-2 dark:border-slate-700">
             {expired && <p className={`text-xs font-semibold ${deleteAfter - now < 2 * 86400000 ? 'text-amber-800 dark:text-amber-300' : 'text-slate-600 dark:text-slate-300'}`}>
               {ar ? 'هيتم حذف الإعلان وملفاته يوم' : 'The ad and its files will be deleted on'} {date(deleteAfter)}

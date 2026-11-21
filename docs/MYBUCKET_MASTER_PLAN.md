@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Gemini 3.1 Flash-Lite response deadline (#284)
+
+- Allow up to 22 seconds for 3.1 Flash-Lite generation in production and the model activation check, after production logs showed requests hit the 12-second deadline.
+
 ## Gemini activation and temporary provider errors (#283)
 
 - Exercise the production analysis request format with synthetic data before activating a model. Retry a production HTTP 503 once within the original deadline and quota reservation.

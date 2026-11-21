@@ -9,6 +9,10 @@ export const GEMINI_MODEL_OPTIONS = [
 ] as const;
 
 export const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash-lite';
+export function geminiAnalysisTimeout(model: string): number {
+  return model === 'gemini-3.1-flash-lite' ? 22_000 : 12_000;
+}
+
 const settingsPath = 'systemSettings/gemini';
 const statusPath = 'systemSettings/geminiStatus';
 

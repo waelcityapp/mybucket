@@ -1,6 +1,6 @@
 import { geminiInterpretationBody } from './geminiService.js';
 import { recordGeminiUsage } from './geminiUsage.js';
-import { getSelectedGeminiModel, recordGeminiSuccess } from './geminiSettings.js';
+import { geminiAnalysisTimeout, getSelectedGeminiModel, recordGeminiSuccess } from './geminiSettings.js';
 
 // Admin-only diagnostic: discovers models from the same API key used by the server.
 // Never returns a key, headers, raw provider errors, or any financial information.
@@ -25,7 +25,7 @@ export async function diagnoseGeminiConnection(modelOverride?: string) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return { success: false, stage: 'models_list', reason: 'missing_key', httpStatus: null, googleStatus: null, availableModels: [] };
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 12000);
+  let timer = setTimeout(() => controller.abort(), 12000);
   try {
     const models: GeminiModel[] = [];
     let pageToken: string | undefined;
@@ -56,6 +56,8 @@ export async function diagnoseGeminiConnection(modelOverride?: string) {
     const listedModels = availableModels.slice(0, 30);
     if (!selected) return { success: false, stage: 'model_selection', model: diagnosticModel, reason: 'model_unavailable', httpStatus: null, googleStatus: null, availableModels: listedModels, modelCount: availableModels.length };
 
+    clearTimeout(timer);
+    timer = setTimeout(() => controller.abort(), geminiAnalysisTimeout(selected));
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(selected)}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },

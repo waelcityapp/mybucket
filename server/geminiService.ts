@@ -1,5 +1,5 @@
 import { recordGeminiUsage } from './geminiUsage.js';
-import { getSelectedGeminiModel, recordGeminiSuccess } from './geminiSettings.js';
+import { geminiAnalysisTimeout, getSelectedGeminiModel, recordGeminiSuccess } from './geminiSettings.js';
 import { AIInterpretationRequest, AIInterpretationResult } from '../src/services/ai/types.js';
 import { isFinancialQueryText, parseSemanticNumberRoles } from '../src/utils/semanticParser.js';
 import {
@@ -61,7 +61,7 @@ export async function interpretNaturalLanguageWithGemini(
   // test. Avoid the SDK's previously failing request serialization.
   const model = await getSelectedGeminiModel();
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 12000);
+  const timeoutId = setTimeout(() => controller.abort(), geminiAnalysisTimeout(model));
   try {
     const send = () => fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,

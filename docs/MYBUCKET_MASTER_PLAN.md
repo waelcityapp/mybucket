@@ -662,3 +662,5 @@ Floating feedback uses a centered, manually dismissed notice shared across app r
 The subscription comparison shows the applicable prices without marketer prompts or temporary limit copy. Pending payment status refreshes automatically while the page is visible. Customer and administrator receipt previews open inline, and the approved request identifies the current paid plan and its activation time.
 
 Transaction review presents editable fields directly. Voice capture remains in initial transaction entry, and the review screen omits the AI draft badge and the secondary voice editor.
+
+Local transaction notes omit spoken income introductions and account references while keeping the reason or description the user provided.

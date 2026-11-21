@@ -39,8 +39,10 @@ export function extractTransactionDescription(raw: string, parsedAmount: number 
   }
 
   note = note
+    // An income introduction is transaction metadata, not the user's note.
+    .replace(/^(?:\s|[،,])*?(?:(?:أنا|انا)\s+)?(?:دخل|دخلت|وصل|وصلت|رجع|رجعت)\s*(?:لي|لى)(?=\s|$|[،,.])/i, '')
     .replace(/(^|[\s،,])(?:دفعت|صرفت|صرفتها|صرفته|صرافه|صرافة|اشتريت|قبضت|اخدت|أخدت|أخذت|خدت|خدنا|استرديت|استرددت|استرجعت|رجعلي|رجعتلي|ردلي|ردولي|حولت|حول|استلمت|جالي|paid|spent|bought|purchased|received|earned|transferred|transfer|moved)(?=\s|$|[،,.])/gi, '$1')
-    .replace(/(?:^|\s)(?:من\s+)?(?:الكاش|البنك|الفيزا|كاش|فيزا|بنك|cash|card|bank)(?=\s|$|[،,.])/gi, ' ')
+    .replace(/(?:^|\s)(?:(?:من|في|فى|على|علي)\s+)?(?:الكاش|البنك|الفيزا|كاش|فيزا|بنك|cash|card|bank)(?=\s|$|[،,.])/gi, ' ')
     .replace(/(?:^|\s)(?:للكاش|للبنك|للفيزا|إلى\s+الكاش|الى\s+الكاش|إلى\s+البنك|الى\s+البنك|إلى\s+الفيزا|الى\s+الفيزا)(?=\s|$|[،,.])/gi, ' ')
     .replace(/(?:^|\s)(?:جنيه|جنية|egp|usd|دولار|ريال|درهم|eur|يورو)(?=\s|$|[،,.])/gi, ' ')
     .replace(/\s+/g, ' ')

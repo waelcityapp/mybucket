@@ -23,7 +23,18 @@ try {
     assert.equal(parsed.description, 'هدية لاخويا', raw);
     assert.equal(parsed.type, 'expense', raw);
   }
-  console.log('4/4 end-to-end local transaction parsing cases passed');
+  for (const [raw, description] of [
+    ['دخل لي 200 جنيه في الكاش', ''],
+    ['دخل لي في الكاش ٢٠٠ جنيه', ''],
+    ['دخل لي ٢٠٠ جنيه في الكاش علاوة', 'علاوة'],
+    ['دخل لي ٢٠٠ جنيه في الكاش عشان شغل إضافي', 'شغل إضافي'],
+  ]) {
+    const parsed = parseNaturalLanguageInput(raw, [], []);
+    assert.equal(parsed.amount, 200, raw);
+    assert.equal(parsed.type, 'income', raw);
+    assert.equal(parsed.description, description, raw);
+  }
+  console.log('8/8 end-to-end local transaction parsing cases passed');
 } finally {
   globalThis.Date = OriginalDate;
 }

@@ -1,12 +1,11 @@
 import { useCallback } from 'react';
-import { ArrowRight, CalendarDays, Tag, ShieldCheck } from 'lucide-react';
+import { ArrowRight, CalendarDays } from 'lucide-react';
 import type { Language } from '../../types';
 import type { UserSubscription } from '../../types/prototypeSubscription';
 import { calculateRemainingPaidDays, calculateRemainingTrialDays } from '../../utils/subscriptionUtils';
 import { accessEndedLabel, getTrialDurations, BASIC_PRICE_EGP, BASIC_MARKETER_PRICE_EGP, PRO_PRICE_EGP, PRO_MARKETER_PRICE_EGP, stageFor } from '../../config/subscriptionPolicy';
 import { activeGrant } from '../../config/grantPolicy';
 import { SubscriptionPayment } from './SubscriptionPayment';
-import { AffiliateCodeSection } from '../AffiliateCodeSection';
 
 interface Props {
   lang: Language;
@@ -19,10 +18,9 @@ interface Props {
   onBack: () => void;
   onNavigate?: (path: string, replace?: boolean) => void;
   onSubscription: () => void;
-  onUpdateSubscription: (sub: UserSubscription) => Promise<void>;
 }
 
-export function TrialSubscriptionPages({ lang, subscription, guest = false, guestBasicDays = null, onSignIn, error, page, onBack, onNavigate, onSubscription, onUpdateSubscription }: Props) {
+export function TrialSubscriptionPages({ lang, subscription, guest = false, guestBasicDays = null, onSignIn, error, page, onBack, onNavigate, onSubscription }: Props) {
   const proPlan = useCallback((node: HTMLDivElement | null) => {
     if (node && new URLSearchParams(window.location.search).get('plan') === 'pro') {
       node.scrollIntoView({ block: 'center' });
@@ -80,25 +78,16 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
   const discountApplied = subscription?.hasAppliedAffiliateCode;
   const planOptions = <>
       <p className="text-sm leading-7 text-slate-600">{ar ? 'اختر الخطة المناسبة لك. جميع بياناتك المالية محفوظة عند تغيير الخطة.' : 'Choose the plan that suits you. Your financial records remain saved when you change plans.'}</p>
-      {subscription && <AffiliateCodeSection subscription={subscription} lang={lang} onUpdateSubscription={onUpdateSubscription} />}
       {guest && <button type="button" className="min-h-11 rounded-xl bg-emerald-700 px-3 font-bold text-white" onClick={onSignIn}>{ar ? 'ابدأ بحساب Google' : 'Get started with Google'}</button>}
       {!grant && stage === 'basic-free' && <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm font-bold text-sky-900">{ar ? `Basic مجانية حتى اليوم ${getTrialDurations().basicDays}. المتبقي: ` : `Basic remains free until day ${getTrialDurations().basicDays}. Days remaining: `}{days}</p>}
       {stage === 'expired' && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">{ar ? `${expiryLabel}. اختر خطة اشتراك لمتابعة الاستخدام.` : `${expiryLabel}. Choose a subscription plan to continue.`}</p>}
       {start && <p className="text-xs text-slate-500">{ar ? `تاريخ تسجيلك: ${start}` : `Registration date: ${start}`}</p>}
-      <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-        {ar ? 'حدود الاستخدام المعروضة هي الحدود المقررة للخطط وسيتم تفعيلها في تحديث لاحق.' : 'The usage limits shown are planned for an upcoming update.'}
-      </p>
       <div className="grid gap-4 sm:grid-cols-2">
         {planCards.map(({ id, name, price, discountedPrice }) => (
           <div key={id} ref={id === 'pro' ? proPlan : undefined} className={`flex min-w-0 flex-col rounded-2xl border p-4 ${id === 'pro' ? 'border-emerald-600' : 'border-slate-200'}`}>
             <h2 className="text-lg font-black text-slate-900"><bdi>{name}</bdi></h2>
             <p className="mt-2 text-2xl font-black text-slate-900">
               {number.format(discountApplied ? discountedPrice : price)} <span className="text-sm font-semibold">{ar ? 'جنيه / شهر' : 'EGP / month'}</span>
-            </p>
-            <p className="mt-1 text-sm font-semibold text-emerald-800">
-              {discountApplied
-                ? (ar ? 'السعر بعد خصم كود المسوّق' : 'Price with your marketer code')
-                : (ar ? `${number.format(discountedPrice)} جنيه شهريًا بكود مسوّق صالح` : `EGP ${number.format(discountedPrice)}/month with a valid marketer code`)}
             </p>
             <dl className="my-4 flex-1 divide-y divide-slate-100 border-y border-slate-100">
               {features.map(({ label, basic, pro }) => (
@@ -151,13 +140,11 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
             <p>{grant ? (ar ? 'الأيام المتبقية للتجربة الأصلية: ' : 'Original trial days remaining: ') : (ar ? 'الأيام المجانية المتبقية: ' : 'Introductory days remaining: ')}{days}</p>
             {start && <p>{ar ? `تاريخ تسجيلك: ${start}` : `Registration date: ${start}`}</p>}
             {expiry && <p>{ar ? `تاريخ نهاية التجربة: ${expiry}` : `Trial end date: ${expiry}`}</p>}
-            <p>{subscription.hasAppliedAffiliateCode && subscription.affiliateCode ? (ar ? `كود المسوّق المسجل: ${subscription.affiliateCode}` : `Recorded marketer code: ${subscription.affiliateCode}`) : (ar ? 'لا يوجد كود مسوّق مسجّل في البيانات المتاحة.' : 'No marketer code is recorded in the available data.')}</p>
           </div>
-          {!grant && !subscription.isPaid && days === 0 && <p className="text-sm leading-7 text-slate-700">{ar ? 'التجربة المجانية متاحة مرة واحدة لكل حساب. لا يمكن استخدام نفس الكود أو كود آخر للحصول على تجربة مجانية جديدة.' : 'The free trial is available once per account. Neither the same code nor another code grants a new trial.'}</p>}
-          <p className="text-sm leading-7 text-slate-700">{subscription.hasAppliedAffiliateCode ? (ar ? 'حسابك مرتبط بكود مسوّق؛ يظهر سعر الخصم في تفاصيل الاشتراك.' : 'Your account has a marketer code; the discounted price appears in subscription details.') : (ar ? 'يمكن استخدام كود مسوّق للحصول على خصم الاشتراك، دون بدء تجربة جديدة بعد انتهائها.' : 'A marketer code can provide a subscription discount without starting another trial after expiry.')}</p>
+          {!grant && !subscription.isPaid && days === 0 && <p className="text-sm leading-7 text-slate-700">{ar ? 'التجربة المجانية متاحة مرة واحدة لكل حساب.' : 'The free trial is available once per account.'}</p>}
           <button type="button" onClick={onSubscription} className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-black text-white hover:bg-emerald-800">{ar ? 'الانتقال إلى صفحة الاشتراك' : 'Go to subscription'}</button>
         </> : <>
-          {guest || !onNavigate ? planOptions : <SubscriptionPayment lang={lang} plan={null} onClose={closeCheckout}>
+          {guest || !onNavigate ? planOptions : <SubscriptionPayment lang={lang} plan={null} activePaidPlan={paidEnd ? (subscription?.paidPlan ?? 'pro') : null} onClose={closeCheckout}>
             {planOptions}
           </SubscriptionPayment>}
         </>}

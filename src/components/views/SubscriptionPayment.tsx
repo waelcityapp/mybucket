@@ -25,7 +25,7 @@ function PaymentTimes({ payment, lang }: { payment: Payment; lang: Language }) {
   return <>
     {[
       { date: payment.createdAt, label: ar ? 'وقت إرسال الطلب' : 'Submitted' },
-      { date: payment.reviewedAt, label: ar ? 'وقت المراجعة' : 'Reviewed' },
+      { date: payment.reviewedAt, label: payment.status === 'approved' ? (ar ? 'وقت التفعيل' : 'Activated at') : (ar ? 'وقت المراجعة' : 'Reviewed') },
     ].map(({ date, label }) => date && Number.isFinite(Date.parse(date)) && (
       <p key={label} className="text-xs text-slate-600 dark:text-slate-300">
         {label} <time dateTime={date}>{formatter.format(new Date(date))}</time>
@@ -34,8 +34,30 @@ function PaymentTimes({ payment, lang }: { payment: Payment; lang: Language }) {
   </>;
 }
 
-export function SubscriptionPayment({ lang, plan, onClose, children }: {
-  lang: Language; plan: Plan | null; onClose: () => void; children?: ReactNode;
+function ReceiptPreview({ url, lang }: { url: string; lang: Language }) {
+  const ar = lang === 'ar';
+  const [open, setOpen] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <details className="space-y-2" onToggle={event => {
+      setOpen(event.currentTarget.open);
+      setFailed(false);
+    }}>
+      <summary className="w-fit cursor-pointer py-2 text-sm font-semibold underline">
+        {open ? (ar ? 'إخفاء الإيصال' : 'Hide receipt') : (ar ? 'عرض الإيصال' : 'View receipt')}
+      </summary>
+      {open && (failed
+        ? <p role="alert" className="text-sm text-rose-700">{ar ? 'تعذّر تحميل الإيصال. اقفل المعاينة وافتحها للمحاولة مرة أخرى.' : 'Could not load the receipt. Close and reopen the preview to retry.'}</p>
+        : <img src={url} referrerPolicy="no-referrer" onError={() => setFailed(true)}
+            alt={ar ? 'صورة إيصال تحويل إنستاباي' : 'InstaPay transfer receipt'}
+            className="block h-auto max-h-[75vh] max-w-full rounded-lg border border-slate-200 object-contain" />)}
+    </details>
+  );
+}
+
+export function SubscriptionPayment({ lang, plan, activePaidPlan, onClose, children }: {
+  lang: Language; plan: Plan | null; activePaidPlan?: Plan | null; onClose: () => void; children?: ReactNode;
 }) {
   const ar = lang === 'ar';
   const [latest, setLatest] = useState<Payment | null>(null);
@@ -60,13 +82,40 @@ export function SubscriptionPayment({ lang, plan, onClose, children }: {
   };
 
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
+    let pending = false;
+    let checking = false;
     setLoaded(false);
     setError('');
-    offerAdsRequest<Payment | null>('subscriptionPayment.status', {}, true, AbortSignal.timeout(15000))
-      .then(data => { if (active) { setLatest(data); setLoaded(true); } })
-      .catch(err => { if (active) setError(message(err)); });
-    return () => { active = false; };
+
+    async function loadStatus(initial = false) {
+      if (checking || controller.signal.aborted) return;
+      checking = true;
+      try {
+        const data = await offerAdsRequest<Payment | null>('subscriptionPayment.status', {}, true,
+          AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]));
+        if (controller.signal.aborted) return;
+        pending = data?.status === 'pending';
+        setLatest(data);
+        setLoaded(true);
+      } catch (err) {
+        if (initial && !controller.signal.aborted) setError(message(err));
+      } finally {
+        checking = false;
+      }
+    }
+
+    const checkPending = () => {
+      if (pending && document.visibilityState === 'visible') void loadStatus();
+    };
+    void loadStatus(true);
+    const timer = window.setInterval(checkPending, 30000);
+    document.addEventListener('visibilitychange', checkPending);
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', checkPending);
+    };
   }, [refresh, lang]);
 
   useEffect(() => {
@@ -129,12 +178,17 @@ export function SubscriptionPayment({ lang, plan, onClose, children }: {
     }
   }
 
+  const isActivePlan = latest?.status === 'approved' && latest.plan === activePaidPlan;
+
   return <div className="space-y-4">
-    {latest && (!plan || latest.status === 'pending') && <details className={`${box} group`}>
+    {latest && (!plan || latest.status === 'pending') && <details key={latest.id} className={`${box} group`}>
       <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-emerald-600 [&::-webkit-details-marker]:hidden">
         <span className="space-y-1">
-          <span className="block font-bold">{latest.status === 'pending' ? (ar ? 'تم إرسال طلب الاشتراك' : 'Subscription request sent') : (ar ? 'آخر طلب اشتراك' : 'Latest subscription request')} · {planLabel(latest.plan)}</span>
-          <span className="block text-sm text-slate-600 dark:text-slate-300" role="status">{latest.status === 'pending' ? (ar ? 'قيد المراجعة' : 'Under review') : latest.status === 'correction' ? (ar ? 'مطلوب تصحيح' : 'Correction requested') : (ar ? 'تم التفعيل' : 'Activated')}</span>
+          <span className="block font-bold">{latest.status === 'pending' ? (ar ? 'تم إرسال طلب الاشتراك' : 'Subscription request sent') : (ar ? 'آخر طلب اشتراك' : 'Latest subscription request')} · <span className={isActivePlan ? 'inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400' : undefined}>
+            {isActivePlan && <span aria-hidden="true" className="size-2 rounded-full bg-emerald-500" />}
+            <bdi>{planLabel(latest.plan)}</bdi>
+          </span></span>
+          <span className="block text-sm text-slate-600 dark:text-slate-300" role="status">{latest.status === 'pending' ? (ar ? 'قيد المراجعة' : 'Under review') : latest.status === 'correction' ? (ar ? 'مطلوب تصحيح' : 'Correction requested') : isActivePlan ? (ar ? 'مفعّل حاليًا' : 'Currently active') : (ar ? 'تم التفعيل' : 'Activated')}</span>
         </span>
         <ChevronDown aria-hidden="true" className="size-5 shrink-0 transition-transform group-open:rotate-180" />
       </summary>
@@ -142,13 +196,10 @@ export function SubscriptionPayment({ lang, plan, onClose, children }: {
         <PaymentTimes payment={latest} lang={lang} />
         {latest.reason && <p>{latest.reason}</p>}
         {latest.paidExpiresAt && <p>{ar ? 'ينتهي في' : 'Ends on'} {new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'long', timeZone: 'Africa/Cairo' }).format(new Date(latest.paidExpiresAt))}</p>}
-        <div className="flex flex-wrap items-center gap-4 text-sm">
-          {latest.receiptUrl && <a className="underline" href={latest.receiptUrl} target="_blank" rel="noreferrer">{ar ? 'عرض الإيصال' : 'View receipt'}</a>}
-          <button type="button" onClick={() => setRefresh(value => value + 1)} className="underline">{ar ? 'تحديث الحالة' : 'Refresh status'}</button>
-        </div>
+        {latest.receiptUrl && <ReceiptPreview url={latest.receiptUrl} lang={lang} />}
       </div>
     </details>}
-    {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-900">{error} <button type="button" className="underline" disabled={sending} onClick={() => setRefresh(value => value + 1)}>{ar ? 'تحديث الحالة' : 'Refresh status'}</button></p>}
+    {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-900">{error} <button type="button" className="underline" disabled={sending} onClick={() => setRefresh(value => value + 1)}>{ar ? 'إعادة المحاولة' : 'Retry'}</button></p>}
     {loaded && !plan && latest?.status !== 'pending' && children}
     {!loaded && !error && <p role="status" className="text-sm">{ar ? 'جارٍ تحميل حالة الاشتراك…' : 'Loading subscription status…'}</p>}
     {loaded && plan && latest?.status !== 'pending' && <form onSubmit={submit} className={box}>
@@ -224,7 +275,7 @@ export function AdminSubscriptionPayments({ lang }: { lang: Language }) {
       <p className="break-all">{payment.email}</p>
       <PaymentTimes payment={payment} lang={lang} />
       {payment.status !== 'pending' && payment.reference && <p>{ar ? 'الرقم المرجعي' : 'Reference'} <bdi>{payment.reference}</bdi></p>}
-      {payment.receiptUrl && <a className="block underline" href={payment.receiptUrl} target="_blank" rel="noreferrer">{ar ? 'عرض الإيصال' : 'View receipt'}</a>}
+      {payment.receiptUrl && <ReceiptPreview url={payment.receiptUrl} lang={lang} />}
       {payment.code && <p>{ar ? 'كود المسوّق' : 'Marketer code'} <bdi>{payment.code}</bdi></p>}
       {payment.reason && <p>{payment.reason}</p>}
       {payment.commission !== undefined && <p>{ar ? 'عمولة المسوّق' : 'Marketer commission'} {payment.commission} {ar ? 'جنيه' : 'EGP'}</p>}

@@ -27,7 +27,7 @@ export type PublicOfferAd = {
 };
 
 export type ReviewOfferAd = PublicOfferAd & {
-  status: OfferAdStatus;
+  status: OfferAdStatus | 'deleting';
   submittedAt: number;
   rejectionReason: string;
   payment?: { amountEgp: number; phone: string; receiptUrl?: string };

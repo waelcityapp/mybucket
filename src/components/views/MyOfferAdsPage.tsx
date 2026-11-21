@@ -88,6 +88,7 @@ export function MyOfferAdsPage({ uid, lang, onBack, onNavigate }: { uid: string;
         const published = ad.status === 'approved' && ad.startsAt <= now && now < ad.endsAt;
         const status = ad.status === 'pending' ? (ar ? 'بانتظار الموافقة' : 'Awaiting approval')
           : ad.status === 'rejected' ? (ar ? 'تم الرفض' : 'Rejected')
+          : ad.status === 'deleting' ? (ar ? 'جارٍ حذف الإعلان وملفاته' : 'Deleting ad and files')
           : published ? (ar ? 'تمت الموافقة ونشر الإعلان' : 'Approved and published')
           : ad.startsAt > now ? (ar ? 'تمت الموافقة — في انتظار موعد النشر' : 'Approved — scheduled')
           : (ar ? 'تمت الموافقة — انتهت مدة النشر' : 'Approved — publication ended');
@@ -104,18 +105,18 @@ export function MyOfferAdsPage({ uid, lang, onBack, onNavigate }: { uid: string;
           <p className="text-xs text-slate-600 dark:text-slate-300">{ar ? 'تاريخ الإرسال' : 'Submitted'} · {date(ad.submittedAt)}</p>
           {ad.status === 'approved' && <p className="text-xs text-slate-600 dark:text-slate-300">{ar ? 'مدة النشر بتوقيت القاهرة' : 'Publication window, Cairo time'} · {date(ad.startsAt)} — {date(ad.endsAt)}</p>}
           {ad.status === 'rejected' && ad.rejectionReason && <p className="whitespace-pre-wrap break-words text-sm">{ad.rejectionReason}</p>}
-          {expired && <div className="space-y-2 border-t border-slate-200 pt-2 dark:border-slate-700">
-            <p className={`text-xs font-semibold ${deleteAfter - now < 2 * 86400000 ? 'text-amber-800 dark:text-amber-300' : 'text-slate-600 dark:text-slate-300'}`}>
+          {(ad.status === 'approved' || ad.status === 'deleting') && <div className="space-y-2 border-t border-slate-200 pt-2 dark:border-slate-700">
+            {expired && <p className={`text-xs font-semibold ${deleteAfter - now < 2 * 86400000 ? 'text-amber-800 dark:text-amber-300' : 'text-slate-600 dark:text-slate-300'}`}>
               {ar ? 'هيتم حذف الإعلان وملفاته يوم' : 'The ad and its files will be deleted on'} {date(deleteAfter)}
-            </p>
+            </p>}
             {confirmDelete === ad.id ? <div className="space-y-2">
-              <p className="text-sm font-bold">{ar ? 'تحذف الإعلان وكل ملفاته نهائيًا؟' : 'Permanently delete this ad and its files?'}</p>
+              <p className="text-sm font-bold">{ar ? 'تحذف الإعلان وكل ملفاته نهائيًا؟ سيتوقف ظهوره للجمهور فور التأكيد.' : 'Permanently delete this ad and its files?'}</p>
               <div className="flex flex-wrap gap-3">
                 <button type="button" disabled={deleting} onClick={() => void removeAd(ad.id)} className="min-h-11 rounded-lg bg-red-700 px-3 text-sm font-bold text-white disabled:opacity-50">{ar ? 'تأكيد الحذف' : 'Confirm deletion'}</button>
                 <button type="button" disabled={deleting} onClick={() => setConfirmDelete(null)} className="min-h-11 px-3 text-sm font-bold">{ar ? 'إلغاء' : 'Cancel'}</button>
               </div>
             </div> : <div className="flex flex-wrap gap-3">
-              <a href={`/offers/new?renew=${ad.id}`} onClick={event => followInternalLink(event, onNavigate)} className="inline-flex min-h-11 items-center rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white">{ar ? 'إعادة الإرسال للمراجعة' : 'Resubmit for review'}</a>
+              {expired && <a href={`/offers/new?renew=${ad.id}`} onClick={event => followInternalLink(event, onNavigate)} className="inline-flex min-h-11 items-center rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white">{ar ? 'إعادة الإرسال للمراجعة' : 'Resubmit for review'}</a>}
               <button type="button" disabled={deleting} onClick={() => { setConfirmDelete(ad.id); setDeleteError(false); }} className="min-h-11 px-2 text-sm font-bold text-red-700 dark:text-red-300">{ar ? 'حذف الإعلان' : 'Delete ad'}</button>
             </div>}
           </div>}

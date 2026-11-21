@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Advertiser deletion of approved ads (#289)
+
+- Allow owners to delete approved ads before expiry, hide them during deletion, and retry media cleanup before removing Firestore data.
+
 ## Subscription plan card clarity (#288)
 
 - Remove the repeated Basic introductory-period badge from the plan card.

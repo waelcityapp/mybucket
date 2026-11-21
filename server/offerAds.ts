@@ -191,7 +191,7 @@ export async function readMyOfferAds(uid: string, db = getAdminFirestore()): Pro
   const snapshot = await db.collection('offerAds').where('ownerId', '==', uid).get();
   return snapshot.docs.flatMap<MyOfferAd>(doc => {
     const { title, merchant, status, submittedAt, startsAt, endsAt, rejectionReason, payment } = doc.data() as StoredAd;
-    if (status !== 'pending' && status !== 'approved' && status !== 'rejected') return [];
+    if (status !== 'pending' && status !== 'approved' && status !== 'rejected' && status !== 'deleting') return [];
     const deleteAfter = status === 'approved' && now >= endsAt ? endsAt + EXPIRED_RETENTION : null;
     if (deleteAfter !== null && now >= deleteAfter) return [];
     return [{ id: doc.id, title, merchant, tier: payment ? payment.tier ?? 'featured' : 'free', status, submittedAt, startsAt, endsAt, rejectionReason, deleteAfter }];
@@ -248,7 +248,7 @@ export async function removeExpiredOffer(uid: string, id: string, db = getAdminF
     const ad = (await tx.get(ref)).data() as StoredAd | undefined;
     if (!ad) return null;
     if (ad.ownerId !== uid) return fail('invalid_ad_id', 403);
-    if ((ad.status !== 'approved' && ad.status !== 'deleting') || ad.endsAt > Date.now()) return fail('ad_not_expired', 409);
+    if (ad.status !== 'approved' && ad.status !== 'deleting') return fail('ad_not_deletable', 409);
     const ledger = db.collection('offerAdApprovalLedger').doc(uid);
     const current = (await tx.get(ledger)).data()?.lastApproval ?? 0;
     if (!ad.payment && (ad.reviewedAt ?? 0) > current) tx.set(ledger, { lastApproval: ad.reviewedAt });

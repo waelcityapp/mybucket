@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Gemini rate limits and model selection (#282)
+
+- Link the app usage dashboard to Google AI Studio for project/model quotas. Offer the lower-cost Gemini 3.1 Flash-Lite through the existing test-and-activate control.
+
 ## Subscription card duration and analysis counters (#281)
 
 - Show remaining time for the active grant, paid subscription, or trial; label per-engine counts as analysis attempts.

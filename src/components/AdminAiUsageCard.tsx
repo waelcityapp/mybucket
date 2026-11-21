@@ -255,6 +255,16 @@ export const AdminAiUsageCard: React.FC<AdminAiUsageCardProps> = ({ lang = 'ar',
     </div>
     {error && <div role="alert" className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-900"><AlertCircle className="h-4 w-4 shrink-0" />{ar ? 'تعذر جلب بيانات الاستهلاك الحقيقية: ' : 'Could not load actual usage: '}{error}</div>}
     {!error && !data && <p className="text-sm text-slate-500">{loading ? (ar ? 'جاري قراءة البيانات...' : 'Loading usage...') : (ar ? 'لا توجد بيانات مؤكدة' : 'No confirmed data')}</p>}
+    <div className="space-y-2 rounded-xl border border-slate-200 p-3 text-xs leading-relaxed text-slate-600">
+      <h3 className="text-sm font-extrabold text-slate-900">{ar ? 'حصة Gemini لدى Google' : 'Gemini quota at Google'}</h3>
+      <p>{ar
+        ? 'الأرقام الشهرية هنا تجمع الطلبات اللي سجّلها التطبيق. حصة Google الفعلية ونسبة استخدامها تظهر في AI Studio حسب المشروع والموديل.'
+        : 'Monthly totals here come from requests recorded by the app. AI Studio shows Google’s limits and usage for each project and model.'}</p>
+      <p>{ar ? 'حد الطلبات اليومي يتجدد عند منتصف الليل بتوقيت المحيط الهادئ.' : 'The daily request limit resets at midnight Pacific time.'}</p>
+      <a className="inline-flex min-h-9 items-center font-bold text-indigo-700 underline" href="https://aistudio.google.com/rate-limit" target="_blank" rel="noreferrer">
+        {ar ? 'عرض الحصة والاستهلاك في Google AI Studio' : 'View limits and usage in Google AI Studio'}
+      </a>
+    </div>
     {data && <>
       <p className="text-xs text-slate-600">{ar ? 'الشهر' : 'Month'}: <strong dir="ltr">{data.month}</strong></p>
       {!data.trackingStarted ? <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">{ar ? 'لم يتم تسجيل استهلاك بعد بدء نظام القياس. الاستهلاك السابق غير متاح هنا.' : 'No usage recorded since tracking began. Historical usage is unavailable here.'}</p> :

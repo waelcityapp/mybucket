@@ -3,6 +3,7 @@ import { getAdminFirestore } from './firebaseAdmin.js';
 // A deliberately small list of text-only models with documented per-token pricing.
 // Changes to this list require server review; clients cannot submit arbitrary IDs.
 export const GEMINI_MODEL_OPTIONS = [
+  { id: 'gemini-3.1-flash-lite', inputPerMillion: 0.25, outputPerMillion: 1.50 },
   { id: 'gemini-3.5-flash-lite', inputPerMillion: 0.30, outputPerMillion: 2.50 },
   { id: 'gemini-3.5-flash', inputPerMillion: 1.50, outputPerMillion: 9.00 },
 ] as const;

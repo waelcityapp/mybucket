@@ -29,13 +29,7 @@ interface VoiceNaturalInputProps {
 
 // Typing helper for Web Speech API
 interface SpeechRecognitionEventLike {
-  results: {
-    [index: number]: {
-      [index: number]: {
-        transcript: string;
-      };
-    };
-  };
+  results: ArrayLike<ArrayLike<{ transcript: string }>>;
 }
 
 interface SpeechRecognitionLike {
@@ -238,9 +232,8 @@ export function VoiceNaturalInput({
     }
   };
 
-  // Keep browser speech recognition in short sessions to avoid duplicate text
-  // on Android Chrome. A browser-imposed stop triggers a new session while
-  // the user has not pressed the explicit Finish Recording button.
+  // Prefer continuous recognition. Restart only if the browser ends its session
+  // before the user presses Finish Recording.
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -250,13 +243,11 @@ export function VoiceNaturalInput({
     }
 
     const recognition = new SpeechRecognition() as SpeechRecognitionLike;
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = speechLanguage;
     recognitionRef.current = recognition;
 
-    let segmentFinal = '';
-    let segmentInterim = '';
     const startRecognition = () => {
       if (!recordingActiveRef.current || recognitionRef.current !== recognition) return;
       try { recognition.start(); }
@@ -268,25 +259,20 @@ export function VoiceNaturalInput({
     };
 
     recognition.onstart = () => {
-      segmentFinal = '';
-      segmentInterim = '';
       latestSegmentRef.current = '';
       setIsListening(true);
       setSpeechError(null);
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    recognition.onresult = (event: any) => {
-      segmentFinal = '';
-      segmentInterim = '';
-      for (let i = 0; i < event.results.length; i++) {
-        const phrase = event.results[i]?.[0]?.transcript || '';
-        if (event.results[i]?.isFinal) segmentFinal += phrase;
-        else segmentInterim += phrase;
-      }
-      const segment = (segmentFinal + segmentInterim).trim();
-      latestSegmentRef.current = segment;
+    recognition.onresult = event => {
+      if (recognitionRef.current !== recognition) return;
+      // Each event contains the whole session, including revisions to earlier
+      // interim text. Replace the snapshot instead of appending each event.
+      const segment = Array.from(event.results, result => result[0]?.transcript.trim() ?? '')
+        .filter(Boolean)
+        .join(' ');
       if (segment) {
+        latestSegmentRef.current = segment;
         setInputText([segmentBaseRef.current, segment].filter(Boolean).join(' ').slice(0,300));
       }
     };
@@ -305,16 +291,15 @@ export function VoiceNaturalInput({
     };
 
     recognition.onend = () => {
+      if (recognitionRef.current !== recognition) return;
       setIsListening(false);
-      const segment = (segmentFinal || latestSegmentRef.current).trim();
+      const segment = latestSegmentRef.current.trim();
       if (segment) {
         // Append this completed session once, then reset for the next one.
         segmentBaseRef.current = [segmentBaseRef.current, segment].filter(Boolean).join(' ').slice(0,300);
         setInputText(segmentBaseRef.current);
       }
       latestSegmentRef.current = '';
-      segmentFinal = '';
-      segmentInterim = '';
 
       if (recordingActiveRef.current) {
         clearSpeechRestart();
@@ -327,8 +312,8 @@ export function VoiceNaturalInput({
     return () => {
       recordingActiveRef.current = false;
       clearSpeechRestart();
-      try { recognition.abort?.(); } catch { try { recognition.stop(); } catch {} }
       if (recognitionRef.current === recognition) recognitionRef.current = null;
+      try { recognition.abort?.(); } catch { try { recognition.stop(); } catch {} }
     };
   }, [speechLanguage, t.speechNotSupported]);
 

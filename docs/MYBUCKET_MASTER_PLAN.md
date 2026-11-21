@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Continuous voice capture (#285)
+
+- Ask the browser to recognize speech continuously and preserve the latest visible transcript when a speech session ends. Browser restarts keep earlier text.
+
 ## Gemini 3.1 Flash-Lite response deadline (#284)
 
 - Allow up to 22 seconds for 3.1 Flash-Lite generation in production and the model activation check, after production logs showed requests hit the 12-second deadline.

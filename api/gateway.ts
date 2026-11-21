@@ -186,6 +186,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { endFreeGrant } = await import('../server/grantService.js');
         return res.status(200).json({ ok: true, data: await endFreeGrant(user, payload) });
       }
+      case 'admin.planLimitsDraft.get':
+      case 'admin.planLimitsDraft.save': {
+        if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+        const { readPlanLimitsDraft, savePlanLimitsDraft } = await import('../server/planLimits.js');
+        const data = action === 'admin.planLimitsDraft.get'
+          ? await readPlanLimitsDraft()
+          : await savePlanLimitsDraft(payload, user.uid);
+        return res.status(200).json({ ok: true, data });
+      }
       case 'admin.aiQuota.get': {
         if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
         const { readAiDailyLimits } = await import('../server/aiQuota.js');

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { Globe, Smartphone, Cloud, LogOut, Check, ChevronDown, Edit2, X, ShieldCheck } from 'lucide-react';
+import { Globe, Smartphone, Cloud, LogOut, Check, ChevronDown, Edit2, X, ShieldCheck, Share2 } from 'lucide-react';
 import { Language, AuthUser } from '../types';
+import { useAppNotice } from './AppNotice';
 import { translations } from '../data/translations';
 import type { AppIdentity } from '../services/appIdentityClient';
 
@@ -29,6 +30,28 @@ export function Header({
 }: HeaderProps) {
   const t = translations[lang];
   const isAr = lang === 'ar';
+  const showNotice = useAppNotice();
+  const shareLabel = isAr ? 'شارك التطبيق' : 'Share the app';
+
+  const shareApp = async () => {
+    const url = new URL('/', window.location.origin).href;
+    const title = isAr ? identity.appNameAr : identity.appNameEn;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, url });
+        return;
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') return;
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      showNotice(isAr ? 'تم نسخ رابط التطبيق.' : 'App link copied.', lang);
+    } catch {
+      showNotice(isAr ? `رابط مشاركة التطبيق: ${url}` : `Share this app link: ${url}`, lang);
+    }
+  };
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
@@ -113,6 +136,16 @@ export function Header({
           >
             <Globe className="w-3 h-3 text-blue-500" />
             <span>{lang === 'en' ? 'عربي' : 'EN'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void shareApp()}
+            aria-label={shareLabel}
+            title={shareLabel}
+            className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-2xs hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-emerald-600"
+          >
+            <Share2 aria-hidden="true" className="size-4" />
           </button>
 
           {/* User Auth: Google Button or Avatar Dropdown */}

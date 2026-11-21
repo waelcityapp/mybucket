@@ -664,3 +664,5 @@ The subscription comparison shows the applicable prices without marketer prompts
 Transaction review presents editable fields directly. Voice capture remains in initial transaction entry, and the review screen omits the AI draft badge and the secondary voice editor.
 
 Local transaction notes omit spoken income introductions and account references while keeping the reason or description the user provided.
+
+The app header offers sharing next to the language control. It shares the public home URL and falls back to copying the link.

@@ -1,3 +1,4 @@
+import { cairoDay, proGeminiEntryLimit, readAiDailyLimits } from './aiQuota.js';
 import { randomUUID } from 'node:crypto';
 import { DEFAULT_PLAN_LIMITS } from '../src/config/planLimits.js';
 import { grantFromAccess } from '../src/config/grantPolicy.js';
@@ -11,7 +12,6 @@ import { getOrCreateSubscription, SubscriptionError } from './subscriptionServic
 import { readTrialSettings } from './trialSettings.js';
 
 const validId = (value: unknown): value is string => typeof value === 'string' && /^[\w-]{1,128}$/.test(value);
-const dayInCairo = (date: Date) => date.toLocaleDateString('sv-SE', { timeZone: 'Africa/Cairo' });
 const fail = (code: string, status = 400): never => { throw new SubscriptionError(status, code, code); };
 
 export async function issueAiEntryTicket(uid: string, day: string) {
@@ -58,7 +58,7 @@ export async function saveFinancialTransaction(uid: string, payload: Record<stri
 
   return db.runTransaction(async tx => {
     const date = new Date();
-    const day = dayInCairo(date);
+    const day = cairoDay(date);
     const usageRef = user.collection('entryUsage').doc(day);
     const ticketRef = typeof ticketId === 'string' ? user.collection('entryTickets').doc(ticketId) : null;
     const [saved, policy, billing, access, usage, ticket] = await Promise.all([
@@ -80,18 +80,24 @@ export async function saveFinancialTransaction(uid: string, payload: Record<stri
     const pro = phase === 'paid' || phase === 'pro-trial';
     const limits = publishedPlanLimits(policy);
     const effectiveLimits = limits ?? DEFAULT_PLAN_LIMITS;
-    const aiUsed = usage.get('proAi') ?? 0;
-    if (!Number.isSafeInteger(aiUsed) || aiUsed < 0) return fail('invalid_entry_counter', 503);
     const validTicket = ticket?.exists && ticket.get('day') === day;
-    const aiEntry = pro && validTicket && aiUsed < effectiveLimits.proAiEntries;
-    if (limits && pro && !aiEntry && aiUsed < limits.proAiEntries) {
-      return fail(ticketRef ? 'invalid_entry_ticket' : 'pro_ai_allowance_first', 409);
+    const aiEntry = pro && validTicket;
+    if (limits && pro && !aiEntry) {
+      const [attempts, technicalLimits] = await Promise.all([
+        tx.get(user.collection('aiUsage').doc(`daily_${day}`)),
+        readAiDailyLimits(),
+      ]);
+      const used = attempts.get('proGeminiEntries') ?? 0;
+      if (!Number.isSafeInteger(used) || used < 0) return fail('invalid_quota_counter', 503);
+      if (used < proGeminiEntryLimit(technicalLimits, limits.proAiEntries)) {
+        return fail(ticketRef ? 'invalid_entry_ticket' : 'pro_ai_allowance_first', 409);
+      }
     }
     const bucket = !pro ? 'basic' : aiEntry ? 'proAi' : 'proAdditional';
-    const cap = effectiveLimits[bucket === 'basic' ? 'basicEntries' : bucket === 'proAi' ? 'proAiEntries' : 'proAdditionalEntries'];
+    const cap = bucket === 'basic' ? effectiveLimits.basicEntries : effectiveLimits.proAdditionalEntries;
     const used = usage.get(bucket) ?? 0;
     if (!Number.isSafeInteger(used) || used < 0) return fail('invalid_entry_counter', 503);
-    if (limits && used >= cap) return fail('plan_entry_limit', 429);
+    if (limits && !aiEntry && used >= cap) return fail('plan_entry_limit', 429);
 
     const accounts = user.collection('accounts');
     const cache = new Map<string, FinancialAccount>();

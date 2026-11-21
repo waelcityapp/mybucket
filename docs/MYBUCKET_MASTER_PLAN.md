@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Pro Gemini attempts and additional saves (#287)
+
+- Unlock additional saved transactions once the effective Gemini entry-attempt cap is reached. Valid unconsumed Gemini entry tickets remain saveable. Basic saved transactions and inquiry allowances remain independently metered.
+
 ## Saved transactions in subscription settings (#286)
 
 - Show server-confirmed daily saved transaction counts and published allowance by plan. Separate analyzer attempts from saved transactions.

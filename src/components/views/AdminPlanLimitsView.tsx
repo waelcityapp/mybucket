@@ -50,8 +50,8 @@ export function AdminPlanLimitsView({ lang }: { lang: Language }) {
   }, [attempt]);
 
   const rows: Array<{ label: string; basic?: PlanLimitKey; pro: PlanLimitKey }> = [
-    { label: ar ? 'حفظ العمليات يوميًا' : 'Daily saved transactions', basic: 'basicEntries', pro: 'proAiEntries' },
-    { label: ar ? 'عمليات إضافية بعد حصة الذكاء الاصطناعي' : 'Additional entries after the AI allowance', pro: 'proAdditionalEntries' },
+    { label: ar ? 'حصة العمليات اليومية' : 'Daily transaction allowance', basic: 'basicEntries', pro: 'proAiEntries' },
+    { label: ar ? 'عمليات إضافية بعد انتهاء محاولات Gemini' : 'Additional entries after Gemini attempts', pro: 'proAdditionalEntries' },
     { label: ar ? 'الاستعلامات يوميًا' : 'Daily inquiries', basic: 'basicInquiries', pro: 'proInquiries' },
     { label: ar ? 'الحسابات' : 'Accounts', basic: 'basicAccounts', pro: 'proAccounts' },
     { label: ar ? 'بنود الصرف' : 'Expense categories', basic: 'basicCategories', pro: 'proCategories' },
@@ -161,7 +161,7 @@ export function AdminPlanLimitsView({ lang }: { lang: Language }) {
         <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
           {rows.map(({ label, basic, pro }) => (
             <tr key={pro}>
-              <th scope="row" className="p-2 text-start font-semibold">{label}{pro === 'proAiEntries' && <span className="block text-xs font-normal">{ar ? 'Basic إجمالًا · Pro بالذكاء الاصطناعي' : 'Basic total · Pro AI-assisted'}</span>}</th>
+              <th scope="row" className="p-2 text-start font-semibold">{label}{pro === 'proAiEntries' && <span className="block text-xs font-normal">{ar ? 'Basic عمليات محفوظة · Pro محاولات Gemini' : 'Basic saved transactions · Pro Gemini attempts'}</span>}</th>
               <td className="p-2 text-center">{basic ? input(basic, label + ' — Basic') : (ar ? 'غير متاح' : 'Unavailable')}</td>
               <td className="p-2">{input(pro, label + ' — Pro')}</td>
             </tr>

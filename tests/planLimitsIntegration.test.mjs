@@ -73,9 +73,12 @@ test('published limits coordinate the gateway, the Firestore write boundary and 
     await assert.rejects(reserveReportExport('basic', 'csv'), { code: 'pro_plan_required' });
 
     await assert.rejects(saveFinancialTransaction('pro', { transaction: entry('manual') }), { code: 'pro_ai_allowance_first' });
+    const reservation = await reserveAiQuota('pro', 'صرفت عشرة جنيه');
+    assert.equal(reservation.remaining, 0);
+    await assert.rejects(reserveAiQuota('pro', 'صرفت عشرة جنيه'), { code: 'ai_daily_limit_reached' });
     const ticket = await issueAiEntryTicket('pro', day);
-    await saveFinancialTransaction('pro', { transaction: entry('voice'), ticket });
     await saveFinancialTransaction('pro', { transaction: entry('manual') });
+    await saveFinancialTransaction('pro', { transaction: entry('voice'), ticket });
     await assert.rejects(saveFinancialTransaction('pro', { transaction: entry('another') }), { code: 'plan_entry_limit' });
     const inquiry = 'كام صرفت النهاردة؟';
     const inquiryId = '04fffd58-7251-43a7-89b4-8ce02ca0b42a';
@@ -84,7 +87,8 @@ test('published limits coordinate the gateway, the Firestore write boundary and 
     await assert.rejects(reserveAiQuota('pro', inquiry, true, undefined, inquiryId), { code: 'plan_inquiry_limit' });
     assert.deepEqual((await readOwnAiQuota('basic')).savedEntries.basic, { used: 1, limit: 1, remaining: 0 });
     assert.deepEqual((await readOwnAiQuota('pro')).savedEntries, {
-      proAi: { used: 1, limit: 1, remaining: 0 },
+      proAi: { used: 1, limit: null, remaining: null },
+      geminiAttempts: { used: 1, limit: 1, remaining: 0 },
       proAdditional: { used: 1, limit: 1, remaining: 0 },
     });
     await reserveReportExport('pro', 'csv');

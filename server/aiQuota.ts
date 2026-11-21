@@ -33,7 +33,7 @@ export const DEFAULT_AI_DAILY_LIMITS: AiDailyLimits = {
 const SETTINGS_PATH = 'appSettings/aiDailyLimits';
 const TIME_ZONE = 'Africa/Cairo';
 
-function cairoDay(now = new Date()): string {
+export function cairoDay(now = new Date()): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit',
   }).formatToParts(now);
@@ -102,6 +102,10 @@ type QuotaDeps = {
   now: () => number;
 };
 
+export function proGeminiEntryLimit(limits: AiDailyLimits, publishedLimit?: number) {
+  return Math.min(limits.proGeminiEntries, publishedLimit ?? limits.proGeminiEntries);
+}
+
 /** Read-only snapshot for the authenticated user's settings screen. */
 export async function readOwnAiQuota(uid: string, deps?: { db: ReturnType<typeof getAdminFirestore>; getTrials: typeof readTrialSettings; getLimits: typeof readAiDailyLimits; getRegistration: (uid: string) => Promise<string>; now: () => number }) {
   const db = deps?.db || getAdminFirestore();
@@ -118,10 +122,9 @@ export async function readOwnAiQuota(uid: string, deps?: { db: ReturnType<typeof
   const phase = stageFor({ trialStartedAt: sub.trialStartedAt, isPaid: sub.isPaid === true, paidPlan: sub.paidPlan === 'basic' ? 'basic' : 'pro', paidExpiresAt: typeof sub.paidExpiresAt === 'string' ? sub.paidExpiresAt : null, grant: grantFromAccess(access.data() || null) }, now, trials);
   const plan = phase === 'expired' ? 'expired' : phase === 'paid' || phase === 'pro-trial' ? 'pro' : 'basic';
   const data = counter.exists ? counter.data() || {} : {};
-  const bucket = (key: keyof AiDailyLimits) => {
+  const bucket = (key: keyof AiDailyLimits, limit = limits[key] as number) => {
     const used = data[key] ?? 0;
     if (!Number.isSafeInteger(used) || used < 0) throw new SubscriptionError(503, 'invalid_quota_counter', 'Unable to verify usage.');
-    const limit = limits[key] as number;
     return { used, limit, remaining: Math.max(0, limit - used) };
   };
   const savedEntries = !deps && plan !== 'expired' ? await (async () => {
@@ -137,7 +140,7 @@ export async function readOwnAiQuota(uid: string, deps?: { db: ReturnType<typeof
     };
     return plan === 'basic'
       ? { basic: entries('basic', caps?.basicEntries) }
-      : { proAi: entries('proAi', caps?.proAiEntries), proAdditional: entries('proAdditional', caps?.proAdditionalEntries) };
+      : { proAi: entries('proAi'), proAdditional: entries('proAdditional', caps?.proAdditionalEntries), geminiAttempts: bucket('proGeminiEntries', proGeminiEntryLimit(limits, caps?.proAiEntries)) };
   })() : null;
   return { day, plan, ...(savedEntries ? { savedEntries } : {}), ...(plan === 'basic' ? { local: { entries: bucket('basicLocalEntries'), inquiries: bucket('basicLocalInquiries') } } : plan === 'pro' ? { gemini: { entries: bucket('proGeminiEntries'), inquiries: bucket('proGeminiInquiries') }, local: { entries: bucket('proLocalEntries'), inquiries: bucket('proLocalInquiries') } } : {}) };
 }
@@ -166,20 +169,20 @@ export async function reserveAiQuota(uid: string, rawText: unknown, forceLocal =
     const plan: 'basic' | 'pro' = phase === 'paid' || phase === 'pro-trial' ? 'pro' : 'basic';
     if (plan === 'basic' && !forceLocal) throw new SubscriptionError(403, 'pro_plan_required', 'Gemini is available on Pro; Basic uses the local analyzer.');
     const current = snapshot.exists ? snapshot.data() || {} : {};
-    const policy = operation === 'inquiry' && !deps
+    const policy = !deps && (operation === 'inquiry' || (plan === 'pro' && !forceLocal))
       ? publishedPlanLimits(await tx.get(db.doc(PUBLISHED_PLAN_LIMITS_PATH)))
       : null;
-    const inquiryCap = policy && (plan === 'basic' ? policy.basicInquiries : policy.proInquiries);
+    const inquiryCap = operation === 'inquiry' && policy ? (plan === 'basic' ? policy.basicInquiries : policy.proInquiries) : null;
     const inquiryKey = plan === 'basic' ? 'basicPlanInquiries' : 'proPlanInquiries';
     const totalInquiries = current[inquiryKey] ?? 0;
     const requestKey = typeof inquiryRequestId === 'string' && /^[a-f0-9-]{36}$/i.test(inquiryRequestId) ? inquiryRequestId : null;
-    const receiptRef = policy && plan === 'pro' && requestKey
+    const receiptRef = inquiryCap !== null && plan === 'pro' && requestKey
       ? counterRef.collection('inquiries').doc(requestKey)
       : null;
     const receipt = receiptRef ? await tx.get(receiptRef) : null;
     const fingerprint = receiptRef ? createHash('sha256').update(rawText).digest('hex') : null;
     const continuingLocally = forceLocal && receipt?.get('fingerprint') === fingerprint && receipt?.get('awaitsLocal') === true;
-    if (policy && (!Number.isSafeInteger(totalInquiries) || totalInquiries < 0)) {
+    if (inquiryCap !== null && (!Number.isSafeInteger(totalInquiries) || totalInquiries < 0)) {
       throw new SubscriptionError(503, 'invalid_quota_counter', 'Unable to verify usage.');
     }
     if (inquiryCap !== null && totalInquiries >= inquiryCap && !continuingLocally) {
@@ -191,7 +194,7 @@ export async function reserveAiQuota(uid: string, rawText: unknown, forceLocal =
         : forceLocal
           ? [{ engine: 'local', key: `proLocal${operation === 'entry' ? 'Entries' : 'Inquiries'}`, limit: operation === 'entry' ? limits.proLocalEntries : limits.proLocalInquiries, fallback: true }]
           : [
-              { engine: 'gemini', key: `proGemini${operation === 'entry' ? 'Entries' : 'Inquiries'}`, limit: operation === 'entry' ? limits.proGeminiEntries : limits.proGeminiInquiries, fallback: false },
+              { engine: 'gemini', key: `proGemini${operation === 'entry' ? 'Entries' : 'Inquiries'}`, limit: operation === 'entry' ? proGeminiEntryLimit(limits, policy?.proAiEntries) : limits.proGeminiInquiries, fallback: false },
             ];
 
     for (const attempt of attempts) {
@@ -204,7 +207,7 @@ export async function reserveAiQuota(uid: string, rawText: unknown, forceLocal =
           date: day,
           timeZone: TIME_ZONE,
           [attempt.key]: FieldValue.increment(1),
-          ...(policy && !continuingLocally ? { [inquiryKey]: FieldValue.increment(1) } : {}),
+          ...(inquiryCap !== null && !continuingLocally ? { [inquiryKey]: FieldValue.increment(1) } : {}),
           updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
         if (receiptRef && (!forceLocal || continuingLocally)) {

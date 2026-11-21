@@ -31,7 +31,7 @@ export function planLimitFeatures(lang: 'ar' | 'en', limits: PlanLimits, copy: P
       id: 'entries',
       label: ar ? 'تسجيل العمليات' : 'Recording transactions',
       basic: ar ? `${format(limits.basicEntries)} عملية يوميًا إجمالًا، بالصوت أو يدويًا` : `${format(limits.basicEntries)} transactions a day in total, by voice or manually`,
-      pro: ar ? `${format(limits.proAiEntries)} عملية يوميًا بالذكاء الاصطناعي، ثم ${format(limits.proAdditionalEntries)} إضافية بالصوت أو يدويًا` : `${format(limits.proAiEntries)} AI-assisted transactions a day, then ${format(limits.proAdditionalEntries)} more by voice or manually`,
+      pro: ar ? `${format(limits.proAiEntries)} محاولة تحليل عمليات بـGemini يوميًا، ثم ${format(limits.proAdditionalEntries)} إضافية بالصوت أو يدويًا` : `${format(limits.proAiEntries)} Gemini transaction analysis attempts a day, then ${format(limits.proAdditionalEntries)} more by voice or manually`,
     },
     {
       id: 'inquiries',

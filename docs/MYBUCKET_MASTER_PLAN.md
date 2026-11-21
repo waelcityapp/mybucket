@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Compact My ads cards (#291)
+
+- Group advertiser details and actions beside the thumbnail to reduce card height.
+
 ## Ad thumbnails in My ads (#290)
 
 - Display an owner-only preview using the existing ad image or video poster.

@@ -64,6 +64,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { getAppIdentity } = await import('../server/appIdentity.js');
       return res.status(200).json({ ok: true, data: await getAppIdentity() });
     }
+    if (req.body?.action === 'subscription.publicPlanLimits') {
+      const { readPublishedPlanLimits } = await import('../server/planLimits.js');
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ ok: true, data: await readPublishedPlanLimits() });
+    }
     if (req.body?.action === 'subscription.publicBasicTrial') {
       const { readTrialSettings } = await import('../server/trialSettings.js');
       const { basicDays } = await readTrialSettings();
@@ -186,6 +191,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { endFreeGrant } = await import('../server/grantService.js');
         return res.status(200).json({ ok: true, data: await endFreeGrant(user, payload) });
       }
+      case 'admin.planLimitsDraft.publish': {
+        if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+        if (process.env.PLAN_LIMITS_PUBLISH_ENABLED !== 'true') {
+          return res.status(503).json({ ok: false, error: 'plan_limits_publish_pending_rules' });
+        }
+        const { publishPlanLimits } = await import('../server/planLimits.js');
+        return res.status(200).json({ ok: true, data: await publishPlanLimits(payload, user.uid) });
+      }
       case 'admin.planLimitsDraft.get':
       case 'admin.planLimitsDraft.save': {
         if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
@@ -207,7 +220,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       case 'ai.quota.reserveLocal': {
         const { reserveAiQuota } = await import('../server/aiQuota.js');
-        return res.status(200).json({ ok: true, data: await reserveAiQuota(user.uid, payload.text, true) });
+        return res.status(200).json({ ok: true, data: await reserveAiQuota(user.uid, payload.text, true, undefined, payload.inquiryRequestId) });
       }
       case 'ai.quota.status': {
         const { readOwnAiQuota } = await import('../server/aiQuota.js');
@@ -324,6 +337,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const subscription = await applyAffiliateCode(user.uid, payload.code);
         return res.status(200).json({ ok: true, data: { subscription } });
       }
+      case 'financial.transaction.create': {
+        const { saveFinancialTransaction } = await import('../server/financialTransactions.js');
+        return res.status(200).json({ ok: true, data: await saveFinancialTransaction(user.uid, payload) });
+      }
+      case 'financial.accounts.save':
+      case 'financial.categories.save':
+      case 'financial.categories.initialize': {
+        const { saveFinancialCollection } = await import('../server/financialCollections.js');
+        return res.status(200).json({ ok: true, data: await saveFinancialCollection(user.uid, action, payload) });
+      }
+      case 'report.export.reserve': {
+        const { reserveReportExport } = await import('../server/reportExport.js');
+        return res.status(200).json({ ok: true, data: await reserveReportExport(user.uid, payload.format) });
+      }
       case 'ai.interpret': {
         const { text, accounts, categories, currentDateTime, userTimezone, lang, currentProposal, learnedMemory } = payload;
         if (!text || typeof text !== 'string') {
@@ -331,7 +358,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const { reserveAiQuota } = await import('../server/aiQuota.js');
-        await reserveAiQuota(user.uid, text, false);
+        const reservation = await reserveAiQuota(user.uid, text, false, undefined, payload.inquiryRequestId);
 
         const { interpretNaturalLanguageWithGemini } = await import('../server/geminiService.js');
         const result = await interpretNaturalLanguageWithGemini({
@@ -344,6 +371,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           currentProposal: payload.currentProposal as never,
           learnedMemory: Array.isArray(learnedMemory) ? learnedMemory : [],
         });
+        if (reservation.operation === 'entry' && result.intent === 'CREATE_TRANSACTION' && result.transaction) {
+          const { issueAiEntryTicket } = await import('../server/financialTransactions.js');
+          const entryTicket = await issueAiEntryTicket(user.uid, reservation.day);
+          return res.status(200).json({ ok: true, data: { ...result, entryTicket } });
+        }
         return res.status(200).json({ ok: true, data: result });
       }
       default:

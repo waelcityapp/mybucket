@@ -1,9 +1,11 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ArrowRight, CalendarDays } from 'lucide-react';
 import type { Language } from '../../types';
 import type { UserSubscription } from '../../types/prototypeSubscription';
 import { calculateRemainingPaidDays, calculateRemainingTrialDays } from '../../utils/subscriptionUtils';
 import { accessEndedLabel, getTrialDurations, BASIC_PRICE_EGP, BASIC_MARKETER_PRICE_EGP, PRO_PRICE_EGP, PRO_MARKETER_PRICE_EGP, stageFor } from '../../config/subscriptionPolicy';
+import { fetchPublishedPlanLimits, type PlanPresentation } from '../../config/planLimits';
+import { planLimitFeatures } from '../../config/planLimitFeatures';
 import { activeGrant } from '../../config/grantPolicy';
 import { SubscriptionPayment } from './SubscriptionPayment';
 
@@ -26,6 +28,17 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
       node.scrollIntoView({ block: 'center' });
     }
   }, []);
+  const [publishedLimits, setPublishedLimits] = useState<PlanPresentation | null>(null);
+  const [limitsError, setLimitsError] = useState(false);
+  useEffect(() => {
+    if (page !== 'subscription') return;
+    const controller = new AbortController();
+    setLimitsError(false);
+    fetchPublishedPlanLimits(controller.signal)
+      .then(limits => { if (!controller.signal.aborted) setPublishedLimits(limits); })
+      .catch(() => { if (!controller.signal.aborted) { setPublishedLimits(null); setLimitsError(true); } });
+    return () => controller.abort();
+  }, [page]);
   const ar = lang === 'ar';
   const basicDays = guest ? guestBasicDays : getTrialDurations().basicDays;
   const days = subscription ? calculateRemainingTrialDays(subscription) : null;
@@ -62,15 +75,7 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
     ? new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'long' }).format(new Date(subscription.trialStartedAt)) : null;
   const expiry = subscription && Number.isFinite(Date.parse(subscription.trialExpiresAt))
     ? new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'long' }).format(new Date(subscription.trialExpiresAt)) : null;
-  const features = [
-    { label: ar ? 'تسجيل العمليات' : 'Recording transactions', basic: ar ? '١٥ عملية يوميًا إجمالًا، بالصوت أو يدويًا' : '15 transactions a day in total, by voice or manually', pro: ar ? '١٥ عملية يوميًا بالذكاء الاصطناعي، ثم ١٠ إضافية بالصوت أو يدويًا' : '15 AI-assisted transactions a day, then 10 more by voice or manually' },
-    { label: ar ? 'الاستعلام عن فلوسك' : 'Financial queries', basic: ar ? '٣ يوميًا، بالصوت أو الكتابة' : '3 a day, by voice or text', pro: ar ? '١٠ يوميًا، بالصوت أو الكتابة' : '10 a day, by voice or text' },
-    { label: ar ? 'الحسابات' : 'Accounts', basic: ar ? '٤ حسابات قابلة للتعديل' : '4 editable accounts', pro: ar ? 'حتى ١٠ حسابات إجمالًا، مع دعم الفيزا وبطاقة الائتمان' : 'Up to 10 accounts total, including debit and credit cards' },
-    { label: ar ? 'بنود الصرف' : 'Expense categories', basic: ar ? '٧ بنود تقدر تعدّل أسماءها' : '7 categories you can rename', pro: ar ? 'حتى ٢٠ بندًا إجمالًا، مع الإضافة وتعديل الأسماء' : 'Up to 20 total, with the option to add and rename categories' },
-    { label: ar ? 'مستحقاتي والتزاماتي' : 'Receivables and obligations', basic: ar ? 'بند مفتوح واحد في كل قسم' : '1 open item per section', pro: ar ? '٣ بنود مفتوحة في كل قسم' : '3 open items per section' },
-    { label: ar ? 'التذكيرات' : 'Reminders', basic: ar ? '٥ تذكيرات نشطة إجمالًا' : '5 active reminders total', pro: ar ? '٢٠ تذكيرًا نشطًا إجمالًا' : '20 active reminders total' },
-    { label: ar ? 'تصدير البيانات' : 'Data export', basic: ar ? 'غير متاح' : 'Unavailable', pro: ar ? '٤ عمليات تصدير يوميًا إجمالًا، تشمل Excel والصيغ الأخرى المتاحة' : '4 exports a day in total, including Excel and other available formats' },
-  ];
+  const features = publishedLimits ? planLimitFeatures(lang, publishedLimits.limits, publishedLimits.copy) : [];
   const planCards = [
     { id: 'basic', name: 'Basic', price: BASIC_PRICE_EGP, discountedPrice: BASIC_MARKETER_PRICE_EGP },
     { id: 'pro', name: 'Pro', price: PRO_PRICE_EGP, discountedPrice: PRO_MARKETER_PRICE_EGP },
@@ -82,6 +87,10 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
       {!grant && stage === 'basic-free' && <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm font-bold text-sky-900">{ar ? `Basic مجانية حتى اليوم ${getTrialDurations().basicDays}. المتبقي: ` : `Basic remains free until day ${getTrialDurations().basicDays}. Days remaining: `}{days}</p>}
       {stage === 'expired' && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">{ar ? `${expiryLabel}. اختر خطة اشتراك لمتابعة الاستخدام.` : `${expiryLabel}. Choose a subscription plan to continue.`}</p>}
       {start && <p className="text-xs text-slate-500">{ar ? `تاريخ تسجيلك: ${start}` : `Registration date: ${start}`}</p>}
+      {!publishedLimits && <p role={limitsError ? 'alert' : 'status'} className="text-sm text-slate-600">
+        {limitsError ? (ar ? 'تعذّر تحميل حدود الخطط.' : 'Could not load plan limits.')
+          : (ar ? 'جارٍ تحميل حدود الخطط…' : 'Loading plan limits…')}
+      </p>}
       <div className="grid gap-4 sm:grid-cols-2">
         {planCards.map(({ id, name, price, discountedPrice }) => (
           <div key={id} ref={id === 'pro' ? proPlan : undefined} className={`flex min-w-0 flex-col rounded-2xl border p-4 ${id === 'pro' ? 'border-emerald-600' : 'border-slate-200'}`}>
@@ -90,10 +99,11 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
               {number.format(discountApplied ? discountedPrice : price)} <span className="text-sm font-semibold">{ar ? 'جنيه / شهر' : 'EGP / month'}</span>
             </p>
             <dl className="my-4 flex-1 divide-y divide-slate-100 border-y border-slate-100">
-              {features.map(({ label, basic, pro }) => (
-                <div key={label} className="py-2.5 text-sm leading-6">
+              {features.map(({ id: featureId, label, basic, pro, detail }) => (
+                <div key={featureId} className="py-2.5 text-sm leading-6">
                   <dt className="font-bold text-slate-900">{label}</dt>
                   <dd className="text-slate-600">{id === 'basic' ? basic : pro}</dd>
+                  {detail && <dd className="text-slate-600">{detail}</dd>}
                 </div>
               ))}
             </dl>

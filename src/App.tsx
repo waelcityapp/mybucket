@@ -92,7 +92,7 @@ import {
   setFinancialWriteBlocked,
   createFinancialTransaction,
   InsufficientBalanceError,
-  initializeDefaultDocuments,
+  initializeDefaultCategories,
   subscribeUserAccounts,
   subscribeUserTransactions,
   subscribeUserCategories,
@@ -754,7 +754,7 @@ export default function App() {
       if (cloudCats && cloudCats.length > 0) {
         setCloudCategories(cloudCats);
       } else if (trialSettingsReady) {
-        initializeDefaultDocuments(authUser.uid, 'categories', INITIAL_CATEGORIES).catch(() => setToastMessage(lang === 'ar' ? 'تعذر إعداد التصنيفات.' : 'Could not initialize categories.'));
+        initializeDefaultCategories(authUser.uid).catch(() => setToastMessage(lang === 'ar' ? 'تعذر إعداد التصنيفات.' : 'Could not initialize categories.'));
       }
     });
 
@@ -1039,13 +1039,14 @@ export default function App() {
     }
     saveInFlight.current = true;
     const uid = authUser.uid;
-    const key = JSON.stringify({ uid, ...newTxData });
+    const ticket = analyzerFeedbackContext?.entryTicket;
+    const key = JSON.stringify({ uid, ...newTxData, ticket });
     const newTx: Transaction = pendingTransaction.current?.key === key ? pendingTransaction.current.tx : { ...newTxData, id: `tx_${crypto.randomUUID()}`, createdAt: new Date().toISOString() };
     pendingTransaction.current = { key, tx: newTx };
     try {
       // Firestore rejects undefined fields; omit optional fields not selected by the user.
       const cleanTx = Object.fromEntries(Object.entries(newTx).filter(([, value]) => value !== undefined)) as unknown as Transaction;
-      await createFinancialTransaction(uid, cleanTx);
+      await createFinancialTransaction(uid, cleanTx, ticket);
       if (auth.currentUser?.uid !== uid) return { ok: false };
       pendingTransaction.current = null;
       if (newTx.description) {
@@ -1059,6 +1060,19 @@ export default function App() {
       return { ok: true };
     } catch (error) {
       console.error('Transaction save failed:', error);
+      const code = error instanceof Error ? error.message : '';
+      const entryErrors: Record<string, [string, string]> = {
+        plan_entry_limit: ['وصلت لحد تسجيل العمليات النهارده.', 'You reached your daily transaction limit.'],
+        pro_ai_allowance_first: ['استخدم التسجيل بالذكاء الاصطناعي أولًا. العمليات الإضافية بتتاح بعد انتهاء حصته.', 'Use the AI transaction allowance first. Additional entries unlock once it is used.'],
+        invalid_entry_ticket: ['انتهت صلاحية مسودة التحليل. أعد تحليل العملية قبل الحفظ.', 'The analyzed draft expired. Analyze the transaction again before saving.'],
+        'insufficient-balance': ['الرصيد المتاح لا يكفي لحفظ العملية.', 'There is not enough available balance to save this transaction.'],
+        'credit-limit-exceeded': ['العملية تتجاوز حد بطاقة الائتمان.', 'The transaction exceeds the credit card limit.'],
+      };
+      if (entryErrors[code]) {
+        const message = entryErrors[code][lang === 'ar' ? 0 : 1];
+        if (auth.currentUser?.uid === uid) setToastMessage(message, true);
+        return { ok: false, message };
+      }
       const message = error instanceof InsufficientBalanceError
         ? (lang === 'ar'
           ? `لا يمكن ${newTx.type === 'transfer' ? 'التحويل' : 'تسجيل المصروف'}: رصيد ${error.accountNameAr} هو ${new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency} فقط.`
@@ -1174,6 +1188,10 @@ export default function App() {
       return true;
     } catch (error) {
       console.error('Firestore save account error:', error);
+      if (error instanceof Error && error.message === 'plan_accounts_limit') {
+        setToastMessage(lang === 'ar' ? 'وصلت للحد الأقصى للحسابات في خطتك.' : 'You reached the account limit for your plan.');
+        return false;
+      }
       setToastMessage(lang === 'ar' ? 'تعذر إضافة الحساب. راجع البيانات والاتصال.' : 'Could not add account. Check details and connection.');
       return false;
     }
@@ -1204,34 +1222,31 @@ export default function App() {
     }
   };
 
-  // Add New Category Handler (from autocomplete or categories view)
-  const handleAddCategory = async (newCat: Category) => {
-    const updated = [...categories, newCat];
-    setCategories(updated);
-
-    if (authUser) {
-      try {
-        await saveAllCategoriesToFirestore(authUser.uid, updated);
-      } catch (err) {
-        console.error('Firestore save category error:', err);
+  const saveCategories = async (items: Category[], localList: Category[]) => {
+    try {
+      if (authUser) {
+        await saveAllCategoriesToFirestore(authUser.uid, items);
+      } else {
+        setCategories(localList);
       }
+      return true;
+    } catch (error) {
+      const limit = error instanceof Error && error.message === 'plan_categories_limit';
+      setToastMessage(limit
+        ? (lang === 'ar' ? 'إضافة بند الصرف غير متاحة ضمن حدود خطتك.' : 'Your plan does not allow an additional expense category.')
+        : (lang === 'ar' ? 'تعذر حفظ بنود الصرف.' : 'Could not save expense categories.'), true);
+      return false;
     }
   };
 
-  // Bulk update or modify categories handler (from ExpenseCategoriesModal)
+  const handleAddCategory = async (newCat: Category) => {
+    await saveCategories([newCat], [...categories, newCat]);
+  };
+
   const handleUpdateCategories = async (updatedList: Category[]) => {
-    setCategories(updatedList);
-
-    if (authUser) {
-      try {
-        await saveAllCategoriesToFirestore(authUser.uid, updatedList);
-      } catch (err) {
-        console.error('Firestore save all categories error:', err);
-      }
+    if (await saveCategories(updatedList, updatedList)) {
+      setToastMessage(lang === 'ar' ? 'تم حفظ بنود الصرف بنجاح!' : 'Spending categories saved successfully!');
     }
-
-    setToastMessage(lang === 'ar' ? 'تم حفظ بنود الصرف بنجاح!' : 'Spending categories saved successfully!');
-
   };
 
   // Open Edit Balance Modal

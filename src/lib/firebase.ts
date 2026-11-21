@@ -14,7 +14,6 @@ import {
   setDoc,
   collection,
   onSnapshot,
-  writeBatch,
   runTransaction,
   getDocFromServer,
   getDocsFromServer,
@@ -203,30 +202,25 @@ function requireFinancialWriteAccess(): void {
   if (financialWriteBlocked) throw new Error('subscription-expired');
 }
 
-// Save single account to Firestore
-export async function saveAccountToFirestore(userId: string, account: FinancialAccount) {
+async function callFinancialWrite(userId: string, action: string, payload: Record<string, unknown> = {}) {
   requireFinancialWriteAccess();
-  if ((account.name || '').length > 40 || (account.nameAr || '').length > 40) throw new Error('account-name-too-long');
-  if (account.type === 'credit') validateBalance(account, account.balance);
-  else if (!isNonNegativeBalance(account.balance)) throw new Error('invalid-balance');
-  const accountRef = doc(db, 'users', userId, 'accounts', account.id);
-  await setDoc(accountRef, { ...account, userId }, { merge: true });
+  const user = auth.currentUser;
+  if (user?.uid !== userId) throw new Error('auth-changed');
+  const response = await fetch('/api/gateway', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + await user.getIdToken() },
+    body: JSON.stringify({ action, payload }),
+  });
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error(result.error || 'financial_write_failed');
 }
 
-// Save all accounts (batch)
+export async function saveAccountToFirestore(userId: string, account: FinancialAccount) {
+  await saveAllAccountsToFirestore(userId, [account]);
+}
+
 export async function saveAllAccountsToFirestore(userId: string, accounts: FinancialAccount[]) {
-  requireFinancialWriteAccess();
-  for (const account of accounts) {
-    if ((account.name || '').length > 40 || (account.nameAr || '').length > 40) throw new Error('account-name-too-long');
-    if (account.type === 'credit') validateBalance(account, account.balance);
-    else if (!isNonNegativeBalance(account.balance)) throw new Error('invalid-balance');
-  }
-  const batch = writeBatch(db);
-  accounts.forEach((acc) => {
-    const accRef = doc(db, 'users', userId, 'accounts', acc.id);
-    batch.set(accRef, { ...acc, userId }, { merge: true });
-  });
-  await batch.commit();
+  await callFinancialWrite(userId, 'financial.accounts.save', { items: accounts });
 }
 
 // Delete an unused account only. Existing transactions and linked payment methods
@@ -283,17 +277,8 @@ export async function zeroAccountBalances(userId: string): Promise<void> {
   });
 }
 
-// Create defaults only if still absent, preventing concurrent sign-ins from resetting data.
-export async function initializeDefaultDocuments(userId: string, group: 'accounts' | 'categories', items: Array<FinancialAccount | Category>): Promise<void> {
-  requireFinancialWriteAccess();
-  if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
-  const refs = items.map(item => doc(db, 'users', userId, group, item.id));
-  await runTransaction(db, async transaction => {
-    const snapshots = await Promise.all(refs.map(ref => transaction.get(ref)));
-    snapshots.forEach((snapshot, index) => {
-      if (!snapshot.exists()) transaction.set(refs[index], { ...items[index], userId });
-    });
-  });
+export async function initializeDefaultCategories(userId: string): Promise<void> {
+  await callFinancialWrite(userId, 'financial.categories.initialize');
 }
 
 export class InsufficientBalanceError extends Error {
@@ -373,14 +358,10 @@ async function applyFinancialChange(userId: string, expected: Transaction | null
   });
 }
 
-export async function createFinancialTransaction(userId: string, tx: Transaction): Promise<void> {
-  if (typeof tx.description === 'string' && tx.description.length > 150) throw new Error('transaction-note-too-long');
-  await applyFinancialChange(userId, null, tx);
-  if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
-  const confirmed = await getDocFromServer(doc(db, 'users', userId, 'transactions', tx.id));
-  const saved = confirmed.data();
-  if (!confirmed.exists() || saved?.userId !== userId || !Object.entries(tx).every(([key, value]) => saved[key] === value)) throw new Error('transaction-verification-failed');
+export async function createFinancialTransaction(userId: string, tx: Transaction, ticket?: string): Promise<void> {
+  await callFinancialWrite(userId, 'financial.transaction.create', { transaction: tx, ticket });
 }
+
 export async function updateFinancialTransaction(userId: string, expected: Transaction, updated: Transaction): Promise<void> {
   if (typeof updated.description === 'string' && updated.description.length > 150) throw new Error('transaction-note-too-long');
   await applyFinancialChange(userId, expected, updated);
@@ -393,15 +374,8 @@ export async function deleteTransactionFromFirestore(userId: string, transaction
   return result === 'changed' ? 'deleted' : 'already-deleted';
 }
 
-// Save all categories (batch)
 export async function saveAllCategoriesToFirestore(userId: string, categories: Category[]) {
-  requireFinancialWriteAccess();
-  const batch = writeBatch(db);
-  categories.forEach((cat) => {
-    const catRef = doc(db, 'users', userId, 'categories', cat.id);
-    batch.set(catRef, { ...cat, userId }, { merge: true });
-  });
-  await batch.commit();
+  await callFinancialWrite(userId, 'financial.categories.save', { items: categories });
 }
 
 // Save learned AI memory to Firestore

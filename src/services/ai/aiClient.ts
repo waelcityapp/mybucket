@@ -19,13 +19,13 @@ import {
   matchTransferAccountsFromText,
 } from '../../utils/entityMatcher';
 
-async function reserveLocalQuota(text: string): Promise<void> {
+async function reserveLocalQuota(text: string, inquiryRequestId?: string): Promise<void> {
   const user = auth.currentUser;
   if (!user) throw new Error('يرجى تسجيل الدخول للتحقق من الحد اليومي.');
   const response = await fetch('/api/gateway', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
-    body: JSON.stringify({ action: 'ai.quota.reserveLocal', payload: { text } }),
+    body: JSON.stringify({ action: 'ai.quota.reserveLocal', payload: { text, inquiryRequestId } }),
   });
   const body = await response.json();
   if (!response.ok || !body?.ok) throw new Error(body?.message || 'تعذر التحقق من الحد اليومي للمحلل المحلي.');
@@ -33,6 +33,7 @@ async function reserveLocalQuota(text: string): Promise<void> {
 
 export class GeminiAIClient implements AIInterpretationProvider {
   async interpret(request: AIInterpretationRequest): Promise<AIInterpretationResult> {
+    const inquiryRequestId = crypto.randomUUID();
     try {
       const payload: AIInterpretationRequest = {
         ...request,
@@ -51,7 +52,7 @@ export class GeminiAIClient implements AIInterpretationProvider {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ action: 'ai.interpret', payload }),
+        body: JSON.stringify({ action: 'ai.interpret', payload: { ...payload, inquiryRequestId } }),
       });
 
       if (!response.ok) {
@@ -62,10 +63,10 @@ export class GeminiAIClient implements AIInterpretationProvider {
       if (!gatewayResponse?.ok || !gatewayResponse?.data) {
         throw new Error(gatewayResponse?.message || 'Gateway returned an invalid response');
       }
-      return { ...this.validateAndSanitize(gatewayResponse.data as AIInterpretationResult, request), engineUsed: 'gemini' };
+      return { ...this.validateAndSanitize(gatewayResponse.data as AIInterpretationResult, request), engineUsed: 'gemini', entryTicket: gatewayResponse.data.entryTicket };
     } catch (err) {
       console.warn('Gemini unavailable; checking local allowance before fallback:', err);
-      await reserveLocalQuota(request.text);
+      await reserveLocalQuota(request.text, inquiryRequestId);
       return { ...this.fallbackInterpretation(request), engineUsed: 'local-fallback' };
     }
   }

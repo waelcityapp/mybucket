@@ -11,6 +11,7 @@ export type FeedbackConfig = {
   active:boolean;
 };
 export type AnalyzerFeedbackContext = {
+  entryTicket?: string;
   analyzedText:string;
   originalText:string;
   inputSource:'voice'|'text';

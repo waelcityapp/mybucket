@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { FieldPath } from 'firebase-admin/firestore';
 import { getAdminFirestore } from './firebaseAdmin.js';
+import { PUBLISHED_PLAN_LIMITS_PATH, publishedPlanLimits } from './planLimits.js';
+import { readTrialSettings } from './trialSettings.js';
+import { stageFor } from '../src/config/subscriptionPolicy.js';
+import { grantFromAccess } from '../src/config/grantPolicy.js';
 import { SubscriptionError } from './subscriptionService.js';
 import { occurrenceDate, occurrenceId, parseOccurrenceId, isoDate, type Frequency, type OccurrenceChange, type OccurrenceOverride } from './recurrence.js';
 
@@ -163,6 +167,64 @@ export async function monthlyReminderSummary(uid: string) {
   }
   return { month, totals: monthlyReminderTotals(masters, month) };
 }
+function reminderUsage(reminders: Reminder[]) {
+  const usage = { obligation: 0, receivable: 0, active: 0 };
+  for (const reminder of reminders) {
+    const frequency = reminder.frequency ?? 'none';
+    const count = frequency === 'none' ? 1 : frequency === 'installments' ? (reminder.installmentCount ?? 1) : 400;
+    let open = false;
+    let active = false;
+    for (let index = 0; index < count; index++) {
+      const state = frequency === 'none' ? reminder : reminder.states?.[String(index)];
+      if (state?.done || ('cancelled' in (state ?? {}) && (state as Status).cancelled)) continue;
+      open = true;
+      if (!state?.alertDisabled) {
+        active = true;
+        break;
+      }
+    }
+    if (open) usage[reminder.kind]++;
+    if (active) usage.active++;
+  }
+  return usage;
+}
+
+async function checkReminderGrowth(
+  tx: FirebaseFirestore.Transaction,
+  collection: FirebaseFirestore.CollectionReference,
+  before: Reminder | null,
+  after: Reminder,
+) {
+  const db = getAdminFirestore();
+  const limits = publishedPlanLimits(await tx.get(db.doc(PUBLISHED_PLAN_LIMITS_PATH)));
+  if (!limits) return;
+  const user = collection.parent!;
+  const [settings, billing, access, all] = await Promise.all([
+    readTrialSettings(),
+    tx.get(user.collection('billing').doc('subscription')),
+    tx.get(user.collection('billing').doc('access')),
+    tx.get(collection),
+  ]);
+  const data = billing.data();
+  if (!data || !access.exists) fail('access_record_missing', 503);
+  const phase = stageFor({
+    trialStartedAt: data!.trialStartedAt,
+    isPaid: data!.isPaid === true,
+    paidPlan: data!.paidPlan,
+    paidExpiresAt: data!.paidExpiresAt,
+    grant: grantFromAccess(access.data() ?? null),
+  }, Date.now(), settings);
+  if (phase === 'expired') fail('subscription_expired', 403);
+  const pro = phase === 'paid' || phase === 'pro-trial';
+  const siblings = all.docs.filter(doc => doc.id !== after.id).map(doc => doc.data() as Reminder);
+  const previous = reminderUsage(before ? [...siblings, before] : siblings);
+  const next = reminderUsage([...siblings, after]);
+  const maxOpen = pro ? limits.proOpenItems : limits.basicOpenItems;
+  const maxActive = pro ? limits.proReminders : limits.basicReminders;
+  if (next[after.kind] > previous[after.kind] && next[after.kind] > maxOpen) fail('plan_open_items_limit', 409);
+  if (next.active > previous.active && next.active > maxActive) fail('plan_active_reminders_limit', 409);
+}
+
 export async function reminderAction(uid: string, action: string, payload: Record<string, unknown>) {
   const col = getAdminFirestore().collection('users').doc(uid).collection('reminders');
   if (action === 'reminders.list') {
@@ -178,7 +240,10 @@ export async function reminderAction(uid: string, action: string, payload: Recor
     const schedule = scheduleOf(payload);
     const item: Reminder = { id: doc.id, kind: kind(payload.kind), ...fields, ...schedule,
       done:false, alertDisabled:false, snoozedUntil:null, changes:[], overrides:{}, states:{}, createdAt:now, updatedAt:now };
-    await doc.set(item);
+    await getAdminFirestore().runTransaction(async transaction => {
+      await checkReminderGrowth(transaction, col, null, item);
+      transaction.create(doc, item);
+    });
     return { reminder: item };
   }
   const id = String(payload.id ?? '');
@@ -211,17 +276,24 @@ export async function reminderAction(uid: string, action: string, payload: Recor
         }
       } else {
         const schedule = scheduleOf(payload);
-        transaction.update(ref,{...fields,kind:nextKind,...schedule,done:master.done,states:schedule.frequency === 'none' ? (master.states || {}) : {'0':{done:master.done}},updatedAt:Date.now()});
+        const patch = {...fields,kind:nextKind,...schedule,done:master.done,states:schedule.frequency === 'none' ? (master.states || {}) : {'0':{done:master.done}},updatedAt:Date.now()};
+        await checkReminderGrowth(transaction, col, master, {...master, ...patch});
+        transaction.update(ref, patch);
       }
       return { id, updated:true };
     }
     if (action === 'reminders.toggle') {
-      if (typeof payload.done !== 'boolean') fail('invalid_reminder_state');
+      const done = payload.done;
+      if (typeof done !== 'boolean') return fail('invalid_reminder_state');
       if (recurring) {
-        const states = {...master.states,[String(index)]:{...master.states?.[String(index)],done:payload.done}};
+        const states = {...master.states,[String(index)]:{...master.states?.[String(index)],done}};
+        if (!done) await checkReminderGrowth(transaction, col, master, {...master, states});
         transaction.update(ref,{states,updatedAt:Date.now()});
-      } else transaction.update(ref,{done:payload.done,updatedAt:Date.now()});
-      return {id,done:payload.done};
+      } else {
+        if (!done) await checkReminderGrowth(transaction, col, master, {...master, done: false});
+        transaction.update(ref,{done,updatedAt:Date.now()});
+      }
+      return {id,done};
     }
     if (action === 'reminders.alert') {
       if (payload.mode !== 'stop' && payload.mode !== 'resume' && payload.mode !== 'tomorrow') fail('invalid_alert_action');
@@ -230,8 +302,12 @@ export async function reminderAction(uid: string, action: string, payload: Recor
       const state = {alertDisabled:payload.mode === 'stop',snoozedUntil:payload.mode === 'tomorrow' ? tomorrow.toISOString().slice(0,10) : null};
       if (recurring) {
         const states = {...master.states,[String(index)]:{...master.states?.[String(index)],...state}};
+        if (!state.alertDisabled) await checkReminderGrowth(transaction, col, master, {...master, states});
         transaction.update(ref,{states,updatedAt:Date.now()});
-      } else transaction.update(ref,{...state,updatedAt:Date.now()});
+      } else {
+        if (!state.alertDisabled) await checkReminderGrowth(transaction, col, master, {...master, ...state});
+        transaction.update(ref,{...state,updatedAt:Date.now()});
+      }
       return {id,...state};
     }
     if (action === 'reminders.delete') {

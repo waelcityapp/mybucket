@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   Search, Filter, RefreshCcw, Calendar, Tag, Wallet, Database, 
   ArrowDownRight, ArrowUpRight, ArrowRightLeft, SlidersHorizontal,
-  FileText, BarChart, Download, FileSpreadsheet, Share2, Mail, Printer, Crown, Sparkles
+  FileText, BarChart, Download, FileSpreadsheet, Crown, Sparkles
 } from 'lucide-react';
 import { Transaction, Category, FinancialAccount, Language, AuthUser } from '../../types';
 import { translations } from '../../data/translations';
@@ -40,7 +40,7 @@ export function SearchView({ transactions, categories, accounts, lang, authUser 
 
   // Pro Export Modal State
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [selectedExportFormat, setSelectedExportFormat] = useState<ExportFormat>('excel');
+  const [selectedExportFormat, setSelectedExportFormat] = useState<ExportFormat>('csv');
 
   // Compute Results
   const filteredTransactions = useMemo(() => {
@@ -341,24 +341,24 @@ export function SearchView({ transactions, categories, accounts, lang, authUser 
                       </span>
                     </div>
                     <span className="text-[11px] text-amber-800 font-medium block">
-                      {isAr ? 'تصدير فوري إلى Excel و PDF ومشاركة عبر WhatsApp و Email' : 'Instant export to Excel, PDF & share via WhatsApp'}
+                      {isAr ? 'تصدير CSV متوافق مع Excel أو طباعة PDF' : 'Export CSV for Excel or print to PDF'}
                     </span>
                   </div>
                 </div>
               </div>
 
               {/* Export Buttons Options */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+              <div className="grid grid-cols-2 gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => {
-                    setSelectedExportFormat('excel');
+                    setSelectedExportFormat('csv');
                     setIsExportModalOpen(true);
                   }}
                   className="flex items-center justify-center gap-1.5 py-2 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-xl text-xs font-bold transition-transform active:scale-95 cursor-pointer"
                 >
                   <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>{isAr ? 'ملف Excel' : 'Excel (.xlsx)'}</span>
+                  <span>{isAr ? 'ملف CSV لـExcel' : 'CSV for Excel'}</span>
                 </button>
 
                 <button
@@ -371,30 +371,6 @@ export function SearchView({ transactions, categories, accounts, lang, authUser 
                 >
                   <FileText className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                   <span>{isAr ? 'تقرير PDF' : 'PDF Report'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedExportFormat('whatsapp');
-                    setIsExportModalOpen(true);
-                  }}
-                  className="flex items-center justify-center gap-1.5 py-2 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-xl text-xs font-bold transition-transform active:scale-95 cursor-pointer"
-                >
-                  <Share2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>{isAr ? 'واتساب' : 'WhatsApp'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedExportFormat('email');
-                    setIsExportModalOpen(true);
-                  }}
-                  className="flex items-center justify-center gap-1.5 py-2 px-2.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200/80 rounded-xl text-xs font-bold transition-transform active:scale-95 cursor-pointer"
-                >
-                  <Mail className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  <span>{isAr ? 'إيميل / طباعة' : 'Email/Print'}</span>
                 </button>
               </div>
             </div>
@@ -509,25 +485,14 @@ export function SearchView({ transactions, categories, accounts, lang, authUser 
       </div>
 
       {/* Pro Export Modal */}
-      <ProExportModal
+      {isExportModalOpen && <ProExportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         lang={lang}
         title={keyword ? `بحث: ${keyword}` : (isAr ? 'نتائج الاستفسار المالي' : 'Financial Inquiry Results')}
-        subtitle={isAr ? 'تصدير نتائج البحث والفلاتر المحددة' : 'Export searched & filtered financial data'}
-        itemCount={filteredTransactions.length}
-        totalAmount={totalAmount}
-        periodLabel={
-          fromDate && toDate
-            ? `${fromDate} ➔ ${toDate}`
-            : fromDate
-            ? `من ${fromDate}`
-            : toDate
-            ? `إلى ${toDate}`
-            : (isAr ? 'كل الفترات' : 'All Periods')
-        }
+        transactions={filteredTransactions}
         initialFormat={selectedExportFormat}
-      />
+      />}
     </div>
   );
 }

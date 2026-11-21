@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { PUBLISHED_PLAN_LIMITS_PATH, publishedPlanLimits } from './planLimits.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin.js';
 import { SubscriptionError, getOrCreateSubscription } from './subscriptionService.js';
@@ -124,7 +126,7 @@ export async function readOwnAiQuota(uid: string, deps?: { db: ReturnType<typeof
   };
   return { day, plan, ...(plan === 'basic' ? { local: { entries: bucket('basicLocalEntries'), inquiries: bucket('basicLocalInquiries') } } : plan === 'pro' ? { gemini: { entries: bucket('proGeminiEntries'), inquiries: bucket('proGeminiInquiries') }, local: { entries: bucket('proLocalEntries'), inquiries: bucket('proLocalInquiries') } } : {}) };
 }
-export async function reserveAiQuota(uid: string, rawText: unknown, forceLocal = false, deps?: QuotaDeps): Promise<AiQuotaDecision> {
+export async function reserveAiQuota(uid: string, rawText: unknown, forceLocal = false, deps?: QuotaDeps, inquiryRequestId?: unknown): Promise<AiQuotaDecision> {
   if (typeof rawText !== 'string' || !rawText.trim() || rawText.length > 300) {
     throw new SubscriptionError(400, 'invalid_ai_input', 'Missing or invalid AI input.');
   }
@@ -149,6 +151,25 @@ export async function reserveAiQuota(uid: string, rawText: unknown, forceLocal =
     const plan: 'basic' | 'pro' = phase === 'paid' || phase === 'pro-trial' ? 'pro' : 'basic';
     if (plan === 'basic' && !forceLocal) throw new SubscriptionError(403, 'pro_plan_required', 'Gemini is available on Pro; Basic uses the local analyzer.');
     const current = snapshot.exists ? snapshot.data() || {} : {};
+    const policy = operation === 'inquiry' && !deps
+      ? publishedPlanLimits(await tx.get(db.doc(PUBLISHED_PLAN_LIMITS_PATH)))
+      : null;
+    const inquiryCap = policy && (plan === 'basic' ? policy.basicInquiries : policy.proInquiries);
+    const inquiryKey = plan === 'basic' ? 'basicPlanInquiries' : 'proPlanInquiries';
+    const totalInquiries = current[inquiryKey] ?? 0;
+    const requestKey = typeof inquiryRequestId === 'string' && /^[a-f0-9-]{36}$/i.test(inquiryRequestId) ? inquiryRequestId : null;
+    const receiptRef = policy && plan === 'pro' && requestKey
+      ? counterRef.collection('inquiries').doc(requestKey)
+      : null;
+    const receipt = receiptRef ? await tx.get(receiptRef) : null;
+    const fingerprint = receiptRef ? createHash('sha256').update(rawText).digest('hex') : null;
+    const continuingLocally = forceLocal && receipt?.get('fingerprint') === fingerprint && receipt?.get('awaitsLocal') === true;
+    if (policy && (!Number.isSafeInteger(totalInquiries) || totalInquiries < 0)) {
+      throw new SubscriptionError(503, 'invalid_quota_counter', 'Unable to verify usage.');
+    }
+    if (inquiryCap !== null && totalInquiries >= inquiryCap && !continuingLocally) {
+      throw new SubscriptionError(429, 'plan_inquiry_limit', 'انتهت حصة الاستعلامات اليومية، وتتجدد غدًا.');
+    }
     const attempts: Array<{ engine: 'local' | 'gemini'; key: string; limit: number; fallback: boolean }> =
       plan === 'basic'
         ? [{ engine: 'local', key: `basicLocal${operation === 'entry' ? 'Entries' : 'Inquiries'}`, limit: operation === 'entry' ? limits.basicLocalEntries : limits.basicLocalInquiries, fallback: false }]
@@ -160,16 +181,24 @@ export async function reserveAiQuota(uid: string, rawText: unknown, forceLocal =
 
     for (const attempt of attempts) {
       const used = Number(current[attempt.key] || 0);
-      if (used < attempt.limit) {
+      const localInquiry = inquiryCap !== null && attempt.engine === 'local';
+      const limit = localInquiry ? inquiryCap : attempt.limit;
+      const usedForDisplay = localInquiry ? totalInquiries : used;
+      if (localInquiry || used < attempt.limit) {
         tx.set(counterRef, {
           date: day,
           timeZone: TIME_ZONE,
           [attempt.key]: FieldValue.increment(1),
+          ...(policy && !continuingLocally ? { [inquiryKey]: FieldValue.increment(1) } : {}),
           updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
+        if (receiptRef && (!forceLocal || continuingLocally)) {
+          tx.set(receiptRef, { fingerprint, awaitsLocal: !forceLocal });
+        }
+        const nextUsed = usedForDisplay + (localInquiry && continuingLocally ? 0 : 1);
         return {
-          plan, engine: attempt.engine, operation, used: used + 1,
-          limit: attempt.limit, remaining: Math.max(0, attempt.limit - used - 1),
+          plan, engine: attempt.engine, operation, used: nextUsed,
+          limit, remaining: Math.max(0, limit - nextUsed),
           day, fallbackFromGemini: attempt.fallback,
         };
       }

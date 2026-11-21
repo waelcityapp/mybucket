@@ -9,6 +9,9 @@ service cloud.firestore {
     function settingsPath() {
       return /databases/$(database)/documents/appSettings/subscriptionTrials;
     }
+    function gatewayLimitsActive() {
+      return exists(/databases/$(database)/documents/appSettings/publishedPlanLimits);
+    }
     function accessPath(uid) {
       return /databases/$(database)/documents/users/$(uid)/billing/access;
     }
@@ -133,17 +136,21 @@ service cloud.firestore {
       allow delete: if false;
       match /accounts/{accountId} {
         allow read: if isOwner(userId);
-        allow create, update, delete: if allowedFinancialWrite(userId);
+        allow create: if allowedFinancialWrite(userId) && !gatewayLimitsActive();
+        allow update, delete: if allowedFinancialWrite(userId);
       }
       match /transactions/{transactionId} {
         allow read: if isOwner(userId);
-        allow create, update: if allowedFinancialWrite(userId)
+        allow create: if allowedFinancialWrite(userId) && !gatewayLimitsActive()
+          && (!('type' in request.resource.data) || validTransferCurrency(userId, request.resource.data));
+        allow update: if allowedFinancialWrite(userId)
           && (!('type' in request.resource.data) || validTransferCurrency(userId, request.resource.data));
         allow delete: if allowedFinancialWrite(userId);
       }
       match /categories/{categoryId} {
         allow read: if isOwner(userId);
-        allow create, update, delete: if allowedFinancialWrite(userId);
+        allow create, update: if allowedFinancialWrite(userId) && !gatewayLimitsActive();
+        allow delete: if allowedFinancialWrite(userId);
       }
       match /preferences/{preferenceId} {
         allow read: if isOwner(userId);

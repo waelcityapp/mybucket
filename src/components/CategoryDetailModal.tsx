@@ -91,7 +91,7 @@ export function CategoryDetailPage({
 
   // Pro Export Modal State
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [selectedExportFormat, setSelectedExportFormat] = useState<ExportFormat>('excel');
+  const [selectedExportFormat, setSelectedExportFormat] = useState<ExportFormat>('csv');
 
   // Editing inline state
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
@@ -511,7 +511,7 @@ export function CategoryDetailPage({
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedExportFormat('excel');
+                  setSelectedExportFormat('csv');
                   setIsExportModalOpen(true);
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold transition-transform active:scale-95 cursor-pointer shadow-xs"
@@ -785,7 +785,7 @@ export function CategoryDetailPage({
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedExportFormat('excel');
+                  setSelectedExportFormat('csv');
                   setIsExportModalOpen(true);
                 }}
                 className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/80 rounded-xl text-xs font-bold transition-transform active:scale-95 cursor-pointer flex items-center gap-1.5"
@@ -806,27 +806,14 @@ export function CategoryDetailPage({
       </div>
 
       {/* Pro Export Modal */}
-      <ProExportModal
+      {isExportModalOpen && <ProExportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         lang={lang}
         title={isAr ? `كشف بند: ${category.nameAr}` : `Category Statement: ${category.name}`}
-        subtitle={isAr ? 'تصدير كشف حساب البند المالي' : 'Export category detailed statement'}
-        itemCount={filteredTransactions.length}
-        totalAmount={totalAmount}
-        periodLabel={
-          periodType === 'this_month'
-            ? isAr ? 'هذا الشهر' : 'This Month'
-            : periodType === 'last_month'
-            ? isAr ? 'الشهر السابق' : 'Last Month'
-            : periodType === 'specific_month'
-            ? `${selectedMonth}/${selectedYear}`
-            : periodType === 'specific_year'
-            ? `${selectedYear}`
-            : `${customStartDate} ➔ ${customEndDate}`
-        }
+        transactions={filteredTransactions}
         initialFormat={selectedExportFormat}
-      />
+      />}
     </section>
   );
 }

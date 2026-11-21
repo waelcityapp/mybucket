@@ -203,7 +203,7 @@ export function VoiceNaturalInput({
         onTransactionDraft(draft, tx.missingFields || [], {
           analyzedText:text,
           originalText:inputSource==='voice' ? (originalTranscript.trim() || text) : text,
-          inputSource,analysisId:crypto.randomUUID(),appRevision:APP_REVISION,
+          entryTicket: result.entryTicket, inputSource,analysisId:crypto.randomUUID(),appRevision:APP_REVISION,
         });
       } else if (result.intent === 'CORRECT_PROPOSAL' && result.correction) {
         if (onAICorrection) {

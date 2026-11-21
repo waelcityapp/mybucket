@@ -132,9 +132,21 @@ export function AccountsView({ accounts, lang, canAddAccounts, onOpenProPlan, on
         </div>
       </div>
 
-      {!canAddAccounts && (showUpgrade || addRequested) && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-900">
-        {lang === 'ar' ? 'يجب الترقية إلى خطة Pro لإضافة حساب آخر.' : 'Upgrade to Pro to add another account.'}
-      </p>}
+      {!canAddAccounts && (showUpgrade || addRequested) && (
+        <div className="flex items-center justify-between gap-3 rounded-xl bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-900">
+          <p role="status">
+            {lang === 'ar' ? 'يجب الترقية إلى خطة Pro لإضافة حساب آخر.' : 'Upgrade to Pro to add another account.'}
+          </p>
+          <button
+            type="button"
+            onClick={onOpenProPlan}
+            className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-2 text-xs hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-emerald-600"
+          >
+            {lang === 'ar' ? 'عرض خطة Pro' : 'View Pro plan'}
+            {lang === 'ar' ? <ArrowLeft aria-hidden="true" className="size-4" /> : <ArrowRight aria-hidden="true" className="size-4" />}
+          </button>
+        </div>
+      )}
       {/* Balances by currency badge banner */}
       <div className={showAddModal ? "hidden" : "bg-slate-900 text-white p-5 rounded-3xl space-y-2"}>
         <div className="flex items-center gap-2 text-xs font-bold text-slate-300">

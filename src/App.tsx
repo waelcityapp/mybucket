@@ -1,3 +1,4 @@
+import { AppNoticeDialog, useAppNotice } from './components/AppNotice';
 import { ReminderHomeCards } from './components/ReminderHomeCards';
 import { ReminderAlerts } from './components/ReminderAlerts';
 import { ReminderWorkspace } from './components/views/ReminderWorkspace';
@@ -54,7 +55,7 @@ import { CategoriesView } from './components/views/CategoriesView';
 import { MyOfferAdsPage } from './components/views/MyOfferAdsPage';
 import { SettingsView } from './components/views/SettingsView';
 import { SearchView } from './components/views/SearchView';
-import { CheckCircle2, Smartphone, Cloud, ArrowRight, Sparkles, Clock, BookOpen, Tag } from 'lucide-react';
+import { Smartphone, Cloud, ArrowRight, Sparkles, Clock, BookOpen, Tag } from 'lucide-react';
 import { AIFinancialQuery, AICorrection } from './services/ai/types';
 import {
   executeDeterministicQuery,
@@ -589,15 +590,10 @@ export default function App() {
   const [promoBanner, setPromoBanner] = useState<PromoBannerData>(INITIAL_PROMO_BANNER);
   const [perkDeals, setPerkDeals] = useState<PerkDealItem[]>(INITIAL_PERK_DEALS);
 
-  // 8. Success Toast Notification
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const showNotice = useAppNotice();
+  const setToastMessage = (message: string | null, warning = false) => showNotice(message, lang, warning ? 'warning' : 'info');
   const [expiredNoticeOpen, setExpiredNoticeOpen] = useState(false);
   const showExpiredNotice = () => setExpiredNoticeOpen(true);
-  useEffect(() => {
-    if (!toastMessage) return;
-    const timer = window.setTimeout(() => setToastMessage(null), 4000);
-    return () => window.clearTimeout(timer);
-  }, [toastMessage]);
 
   // Sync Language & RTL to document body
   useEffect(() => {
@@ -853,7 +849,7 @@ export default function App() {
           ? `أهلاً بك، تم تسجيل الدخول بنجاح (${user.displayName || user.email})`
           : `Welcome! Signed in as ${user.displayName || user.email}`
       );
-      setTimeout(() => setToastMessage(null), 3500);
+
     } catch (err: any) {
       // User closed popup or cancelled - normal user interaction, do not treat as error
       if (
@@ -877,7 +873,7 @@ export default function App() {
             : 'Could not sign in right now. Please try again later.'
         );
       }
-      setTimeout(() => setToastMessage(null), 4000);
+
     }
   };
 
@@ -891,7 +887,7 @@ export default function App() {
       setOfferLocation('/');
       setActiveTab('home');
       setToastMessage(lang === 'ar' ? 'تم تسجيل الخروج بنجاح' : 'Signed out successfully');
-      setTimeout(() => setToastMessage(null), 3000);
+
     } catch (err) {
       console.error('Sign-Out error:', err);
     }
@@ -904,11 +900,11 @@ export default function App() {
       await updateUserNameInFirebase(authUser.uid, newName.trim());
       setAuthUser((prev) => (prev ? { ...prev, displayName: newName.trim() } : null));
       setToastMessage(lang === 'ar' ? 'تم تحديث اسم المستخدم بنجاح' : 'Display name updated successfully');
-      setTimeout(() => setToastMessage(null), 3000);
+
     } catch (err) {
       console.error('Update display name error:', err);
       setToastMessage(lang === 'ar' ? 'تعذر حفظ الاسم' : 'Could not save name');
-      setTimeout(() => setToastMessage(null), 3000);
+
     }
   };
 
@@ -981,7 +977,7 @@ export default function App() {
       }
       
       setToastMessage(lang === 'ar' ? 'تم تعديل العملية' : 'Transaction updated');
-      setTimeout(() => setToastMessage(null), 3000);
+
     }
   };
 
@@ -1022,7 +1018,7 @@ export default function App() {
           ? { ...account, balance: Math.round((account.balance + amount) * 100) / 100 } : account));
       setGuestTransactions(previous => [{ ...newTxData, id: `sim_${crypto.randomUUID()}`, createdAt: new Date().toISOString() }, ...previous]);
       setToastMessage(lang === 'ar' ? 'تم تسجيل العملية التجريبية' : 'Sample transaction recorded');
-      window.setTimeout(() => setToastMessage(null), 3500);
+
       return { ok: true };
     }
     if (currentTrialExpired) { showExpiredNotice(); return { ok: false, message: lang === 'ar' ? `${expiryLabel}. اختر خطتك للاستمرار.` : `${expiryLabel}. Choose your plan to continue.` }; }
@@ -1050,7 +1046,7 @@ export default function App() {
         void saveLearnedMemoryToFirestore(uid, aiLearnedMemory.getLearnedList());
       }
       setToastMessage(translations[lang].successSaved);
-      setTimeout(() => setToastMessage(null), 3500);
+
       return { ok: true };
     } catch (error) {
       console.error('Transaction save failed:', error);
@@ -1065,7 +1061,7 @@ export default function App() {
         : error instanceof Error && error.message === 'credit-overpayment'
         ? (lang === 'ar' ? 'المبلغ أكبر من المستحق على بطاقة الائتمان.' : 'The amount exceeds the outstanding credit balance.')
         : (lang === 'ar' ? 'تعذر تأكيد الحفظ. راجع قائمة العمليات قبل إعادة المحاولة حتى لا تتكرر.' : 'Could not confirm the transaction was saved. Check your connection and account.');
-      if (auth.currentUser?.uid === uid) setToastMessage(message);
+      if (auth.currentUser?.uid === uid) setToastMessage(message, true);
       return { ok: false, message };
     } finally {
       saveInFlight.current = false;
@@ -1129,7 +1125,7 @@ export default function App() {
       await updateFinancialTransaction(uid, expected, updated);
       if (auth.currentUser?.uid !== uid) return { ok: false };
       setToastMessage(lang === 'ar' ? 'تم حفظ التعديل وتحديث الأرصدة.' : 'Transaction and balances updated.');
-      setTimeout(() => setToastMessage(null), 3500);
+
       return { ok: true };
     } catch (error) {
       console.error('Firestore edit transaction error:', error);
@@ -1147,7 +1143,7 @@ export default function App() {
   // Add New Account Handler
   const rejectInvalidBalance = () => {
     setToastMessage(lang === 'ar' ? 'لا يمكن حفظ رصيد سالب. أدخل صفرًا أو مبلغًا موجبًا.' : 'A balance cannot be negative. Enter zero or a positive amount.');
-    setTimeout(() => setToastMessage(null), 4000);
+
   };
 
   const accountPlanStage = userSubscription ? stageFor(userSubscription) : null;
@@ -1226,7 +1222,7 @@ export default function App() {
     }
 
     setToastMessage(lang === 'ar' ? 'تم حفظ بنود الصرف بنجاح!' : 'Spending categories saved successfully!');
-    setTimeout(() => setToastMessage(null), 3500);
+
   };
 
   // Open Edit Balance Modal
@@ -1294,7 +1290,7 @@ export default function App() {
     }
 
     setToastMessage(lang === 'ar' ? `تم حفظ بيانات ${newNameAr} بنجاح` : 'Bank account updated successfully');
-    setTimeout(() => setToastMessage(null), 3500);
+
   };
 
   // Open Card / Visa Account Management Modal
@@ -1366,7 +1362,7 @@ export default function App() {
     }
 
     setToastMessage(lang === 'ar' ? `تم حفظ بيانات ${newNameAr} بنجاح` : 'Wallet updated successfully');
-    setTimeout(() => setToastMessage(null), 3500);
+
   };
 
   // Open Other Payment/Receiving Methods Modal
@@ -1400,7 +1396,7 @@ export default function App() {
     }
 
     setToastMessage(lang === 'ar' ? `تم حفظ بيانات ${newNameAr} بنجاح` : 'Payment method updated successfully');
-    setTimeout(() => setToastMessage(null), 3500);
+
   };
 
   // Open Extra / Other Accounts Modal
@@ -1434,7 +1430,7 @@ export default function App() {
     }
 
     setToastMessage(lang === 'ar' ? `تم حفظ بيانات ${newNameAr} بنجاح` : 'Account updated successfully');
-    setTimeout(() => setToastMessage(null), 3500);
+
   };
 
   // Update Single Account Balance
@@ -1454,7 +1450,7 @@ export default function App() {
 
     const t = translations[lang];
     setToastMessage(t.openingBalanceUpdated);
-    setTimeout(() => setToastMessage(null), 3000);
+
   };
 
   // Update Bulk Account Balances
@@ -1474,7 +1470,7 @@ export default function App() {
 
     const t = translations[lang];
     setToastMessage(t.openingBalanceUpdated);
-    setTimeout(() => setToastMessage(null), 3000);
+
   };
 
   // Confirm the effect before resetting balances; retain the transaction history.
@@ -1495,12 +1491,12 @@ export default function App() {
     try {
       await zeroAccountBalances(authUser.uid);
       setToastMessage(lang === 'ar' ? 'تم تصفير أرصدة الحسابات. العمليات المسجلة لم تُحذف.' : 'Account balances reset. Transaction history was retained.');
-      setTimeout(() => setToastMessage(null), 5000);
+
       return true;
     } catch (error) {
       console.error('Could not reset account balances:', error);
       setToastMessage(lang === 'ar' ? 'تعذر تصفير الأرصدة. تحقق من الاتصال وحاول مرة أخرى.' : 'Could not reset balances. Check your connection and try again.');
-      setTimeout(() => setToastMessage(null), 5000);
+
       return false;
     }
   };
@@ -1772,23 +1768,14 @@ export default function App() {
       className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col font-sans selection:bg-emerald-500 selection:text-white"
     >
       {authUser && <ReminderAlerts uid={authUser.uid} lang={lang} onOpen={() => { window.history.pushState({ myBucketTab: 'reminders' }, '', '/reminders/alerts'); setActiveTab('reminders'); }} />}
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-60 bg-emerald-600 text-white px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-2 text-xs font-bold animate-in fade-in slide-in-from-top duration-200">
-          <CheckCircle2 className="w-4 h-4 text-emerald-200 shrink-0" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
-      {expiredNoticeOpen && <div role="presentation" className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4">
-        <div role="alertdialog" aria-modal="true" aria-labelledby="expired-access-heading" aria-describedby="expired-access-description" className="w-full max-w-sm rounded-3xl border border-amber-200 bg-white px-5 py-6 shadow-2xl space-y-4 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700"><Clock className="h-6 w-6" /></div>
-          <h2 id="expired-access-heading" className="text-lg font-black text-slate-900">{expiryLabel}</h2>
-          <p id="expired-access-description" className="text-sm leading-7 text-slate-700">{lang === 'ar' ? 'اختر خطة للاشتراك قبل تسجيل أي عملية جديدة، سواء يدويًا أو بالكتابة أو بالصوت. جميع عملياتك السابقة وأرصدتك ما زالت محفوظة ويمكنك الاطلاع عليها.' : 'Choose a subscription plan before recording new transactions by hand, text or voice. Your existing records and balances are still safe and visible.'}</p>
-          <button type="button" onClick={() => { setExpiredNoticeOpen(false); openSubscriptionPage('subscription'); }} className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-800">{lang === 'ar' ? 'عرض خطط الاشتراك' : 'View subscription plans'}</button>
-          <button type="button" onClick={() => setExpiredNoticeOpen(false)} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">{lang === 'ar' ? 'إغلاق' : 'Close'}</button>
-        </div>
-      </div>}
+      {expiredNoticeOpen && <AppNoticeDialog
+        lang={lang}
+        tone="warning"
+        message={lang === 'ar' ? `${expiryLabel}. اختر خطة للاشتراك قبل تسجيل أي عملية جديدة. عملياتك السابقة وأرصدتك محفوظة ومتاحة للاطلاع.` : `${expiryLabel}. Choose a plan before recording new transactions. Your existing records and balances remain visible.`}
+        onClose={() => setExpiredNoticeOpen(false)}
+      >
+        <button type="button" onClick={() => { setExpiredNoticeOpen(false); openSubscriptionPage('subscription'); }} className="mt-3 min-h-11 w-full rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800">{lang === 'ar' ? 'عرض خطط الاشتراك' : 'View subscription plans'}</button>
+      </AppNoticeDialog>}
 
       {/* Top Header Matching Reference + Google Account / Mobile quick actions */}
       <Header

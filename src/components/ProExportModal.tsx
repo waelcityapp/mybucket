@@ -1,3 +1,4 @@
+import { useAppNotice } from './AppNotice';
 import React, { useState } from 'react';
 import {
   Crown,
@@ -46,7 +47,7 @@ export function ProExportModal({
 }: ProExportModalProps) {
   const isAr = lang === 'ar';
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>(initialFormat);
-  const [showNotification, setShowNotification] = useState(false);
+  const showNotice = useAppNotice();
 
   if (!isOpen) return null;
 
@@ -126,10 +127,10 @@ export function ProExportModal({
   ];
 
   const handleRequestPro = () => {
-    setShowNotification(true);
-    setTimeout(() => {
-      setShowNotification(false);
-    }, 4500);
+    showNotice(
+      isAr ? 'تم تسجيل اهتمامك بالترقية للباقة البرو! سيتواصل معك فريق الدعم فور الإطلاق.' : 'Interest registered! Support will notify you upon PRO launch.',
+      isAr ? 'ar' : 'en',
+    );
   };
 
   const currentOption = exportOptions.find((o) => o.id === selectedFormat) || exportOptions[0];
@@ -308,19 +309,6 @@ export function ProExportModal({
             </div>
           </div>
 
-          {/* Toast Notification when clicking Request */}
-          {showNotification && (
-            <div className="p-3 bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center justify-between gap-2 animate-in fade-in duration-150">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0" />
-                <span>
-                  {isAr
-                    ? 'تم تسجيل اهتمامك بالترقية للباقة البرو! سيتواصل معك فريق الدعم فور الإطلاق.'
-                    : 'Interest registered! Support will notify you upon PRO launch.'}
-                </span>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Modal Footer Actions */}

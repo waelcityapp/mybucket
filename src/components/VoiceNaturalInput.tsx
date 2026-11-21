@@ -1,3 +1,4 @@
+import { useAppNotice } from './AppNotice';
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Send, Sparkles, Loader2, HelpCircle } from 'lucide-react';
 import { Language, FinancialAccount, Category, Transaction, CurrencyCode } from '../types';
@@ -70,7 +71,7 @@ export function VoiceNaturalInput({
   const [inputText, setInputText] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isProcessingAI, setIsProcessingAI] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const showNotice = useAppNotice();
   const [speechError, setSpeechError] = useState<string | null>(null);
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -98,7 +99,7 @@ export function VoiceNaturalInput({
     restartTimerRef.current = null;
     try { recognitionRef.current?.abort?.(); } catch { /* ignore */ }
     setIsRecording(false); setIsListening(false);
-    setInputText(''); setPendingVoiceReview(false); setStatusMessage(null);
+    setInputText(''); setPendingVoiceReview(false);
   }, [subscriptionExpired]);
 
   useEffect(() => {
@@ -134,14 +135,13 @@ export function VoiceNaturalInput({
     if (subscriptionExpired) { onExpiredAttempt?.(); return; }
     if (!text) return;
     if (text.length > 300) {
-      setStatusMessage(isAr ? 'الحد الأقصى لنص العملية أو السؤال 300 حرف.' : 'Maximum transaction or query length is 300 characters.');
+      showNotice(isAr ? 'الحد الأقصى لنص العملية أو السؤال 300 حرف.' : 'Maximum transaction or query length is 300 characters.', lang, 'warning');
       return;
     }
 
     if (processingRequestRef.current) return;
     processingRequestRef.current = true;
     setIsProcessingAI(true);
-    setStatusMessage(isAr ? 'جاري فهم كلامك وتجهيز البيانات...' : 'Understanding your request and preparing details...');
 
     let analyzed = false;
     try {
@@ -178,13 +178,13 @@ export function VoiceNaturalInput({
 
       // Handle Result based on classified INTENT
       if (result.intent === 'FINANCIAL_QUERY') {
-        setStatusMessage(engineNotice);
+        if (engineNotice) showNotice(engineNotice, lang);
         onFinancialQuery(
           result.query || { metric: 'total_spent', period: 'all_time', transactionType: 'expense' },
           text
         );
       } else if (result.intent === 'CREATE_TRANSACTION' && result.transaction) {
-        setStatusMessage(engineNotice);
+        if (engineNotice) showNotice(engineNotice, lang);
         const tx = result.transaction;
 
         // Build transaction draft
@@ -206,7 +206,6 @@ export function VoiceNaturalInput({
           inputSource,analysisId:crypto.randomUUID(),appRevision:APP_REVISION,
         });
       } else if (result.intent === 'CORRECT_PROPOSAL' && result.correction) {
-        setStatusMessage(null);
         if (onAICorrection) {
           onAICorrection(result.correction);
         }
@@ -217,17 +216,17 @@ export function VoiceNaturalInput({
           (isAr
             ? 'لم أتمكن من فهم العملية بدقة، يمكنك كتابة مثل: "دفعت 150 سوبرماركت من الكاش" أو "صرفت كام الأسبوع ده؟"'
             : 'Could not understand clearly. Try e.g. "Paid 150 grocery from Cash" or "How much did I spend this week?"');
-        setStatusMessage(clarification);
-        setTimeout(() => setStatusMessage(null), 6000);
+        showNotice(clarification, lang, 'warning');
       }
     } catch (err) {
       console.error('AI processing error:', err);
-      setStatusMessage(
+      showNotice(
         isAr
           ? (err instanceof Error && err.message ? err.message : 'تعذر تحليل النص، يرجى مراجعة البيانات والمحاولة مرة أخرى')
-          : 'Could not analyze text; review your input and try again'
+          : 'Could not analyze text; review your input and try again',
+        lang,
+        'warning',
       );
-      setTimeout(() => setStatusMessage(null), 4000);
     } finally {
       processingRequestRef.current = false;
       setIsProcessingAI(false);
@@ -497,14 +496,6 @@ export function VoiceNaturalInput({
           </div>
         </div>
       </form>
-
-      {/* Clarification or Status Banner */}
-      {statusMessage && (
-        <div className="text-xs text-indigo-900 bg-indigo-50/90 border border-indigo-200/90 px-3.5 py-2 rounded-2xl flex items-center gap-2 animate-in fade-in">
-          <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
-          <span className="font-medium">{statusMessage}</span>
-        </div>
-      )}
 
       {/* Speech Hint / Error if any */}
       {speechError && (

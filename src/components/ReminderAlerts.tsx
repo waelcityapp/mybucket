@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowRight, BellRing, X } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { AppNoticeDialog } from './AppNotice';
 import { auth } from '../lib/firebase';
 import type { Language } from '../types';
 import { cairoClock, shouldShowReminderBanner, visibleReminderAlerts, type DismissedAlerts, type ReminderAlert } from '../utils/reminderAlertPolicy';
@@ -52,7 +53,14 @@ export function ReminderAlerts({ uid, lang, page, onOpen, onBack }: { uid: strin
   };
   if (!page) {
     if (!shouldShowReminderBanner(alerts, dismissed, now)) return null;
-    return <div role="status" dir={ar ? 'rtl' : 'ltr'} className="bg-red-700 text-white px-4 py-3 shadow-md"><div className="mx-auto max-w-xl flex items-center gap-2"><BellRing className="h-5 w-5 shrink-0"/><div className="flex-1 min-w-0 text-sm font-bold">{ar ? `لديك ${alerts.length} تذكير يحتاج انتباهك` : `${alerts.length} reminders need your attention`}</div><button type="button" onClick={onOpen} className="text-xs font-bold underline whitespace-nowrap">{ar ? 'عرض التذكيرات' : 'View reminders'}</button><button type="button" onClick={hide} aria-label={ar ? 'إخفاء التذكيرات اليوم' : 'Hide reminders for today'} className="rounded-lg p-1 hover:bg-red-800"><X className="h-5 w-5"/></button></div></div>;
+    return (
+      <AppNoticeDialog lang={lang} tone="warning" onClose={hide}
+        message={ar ? `لديك ${alerts.length} تذكير يحتاج انتباهك` : `${alerts.length} reminders need your attention`}>
+        <button type="button" onClick={onOpen} className="mt-3 min-h-11 w-full rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800">
+          {ar ? 'عرض التذكيرات' : 'View reminders'}
+        </button>
+      </AppNoticeDialog>
+    );
   }
   return <main dir={ar ? 'rtl' : 'ltr'} className="min-h-screen bg-slate-50 px-4 py-6"><div className="mx-auto max-w-xl space-y-4">
     <button type="button" onClick={onBack} className="inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-2 text-sm font-bold"><ArrowRight className={'h-4 w-4 ' + (ar ? '' : 'rotate-180')}/>{ar ? 'رجوع' : 'Back'}</button>

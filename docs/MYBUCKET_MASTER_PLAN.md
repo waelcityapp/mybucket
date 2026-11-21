@@ -654,3 +654,7 @@ Views for published and demo cards are recorded on the server. A given ad and br
 The profile activity section links to /settings/favorites, using the same account-backed saved offer cards as the offers page. The detail page returns to the saved list when opened from it.
 
 Admin system data management includes a transaction deletion page with type and date filters, balance handling choices, review and explicit confirmation. Deletions are performed one at a time with transaction-level atomicity and partial progress reported if interrupted.
+
+### App notifications
+
+Floating feedback uses a centered, manually dismissed notice shared across app routes. Transaction feedback, voice analysis feedback, export upgrade notices, and reminder alerts use this presentation. Inline field validation stays beside its form.

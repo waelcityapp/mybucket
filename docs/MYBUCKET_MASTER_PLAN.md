@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Account card access (#280)
+
+- Show Visa and credit-card upgrade prompts only when the account page requires a Pro upgrade. Active Pro users already have both card types in the Add account form.
+
 ## Subscription administration review
 
 - Organize the existing Subscriptions card into full-page sections for payment requests, plan settings, free access duration, and analysis limits.

@@ -270,7 +270,7 @@ export function AccountsView({ accounts, lang, canAddAccounts, onOpenProPlan, on
             )}
           </div>
         ))}
-        {[
+        {!canAddAccounts && [
           { id: 'visa', label: lang === 'ar' ? 'فيزا' : 'Visa' },
           { id: 'credit', label: lang === 'ar' ? 'بطاقة الائتمان' : 'Credit card' },
         ].map(({ id, label }) => (

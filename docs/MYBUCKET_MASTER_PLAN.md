@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Gemini activation and temporary provider errors (#283)
+
+- Exercise the production analysis request format with synthetic data before activating a model. Retry a production HTTP 503 once within the original deadline and quota reservation.
+
 ## Gemini rate limits and model selection (#282)
 
 - Link the app usage dashboard to Google AI Studio for project/model quotas. Offer the lower-cost Gemini 3.1 Flash-Lite through the existing test-and-activate control.

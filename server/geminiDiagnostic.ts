@@ -1,3 +1,4 @@
+import { geminiInterpretationBody } from './geminiService.js';
 import { recordGeminiUsage } from './geminiUsage.js';
 import { getSelectedGeminiModel, recordGeminiSuccess } from './geminiSettings.js';
 
@@ -58,7 +59,14 @@ export async function diagnoseGeminiConnection(modelOverride?: string) {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(selected)}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-      body: JSON.stringify({ contents: [{ parts: [{ text: 'Reply with exactly OK.' }] }], generationConfig: { maxOutputTokens: 32 } }),
+      body: geminiInterpretationBody({
+        text: 'صرفت ٢٠٠ جنيه مواصلات من الكاش',
+        accounts: [{ id: 'sample_cash', name: 'Cash', nameAr: 'كاش', type: 'cash', currency: 'EGP' }],
+        categories: [{ id: 'sample_transport', name: 'Transport', nameAr: 'مواصلات', type: 'expense' }],
+        currentDateTime: '2026-01-15T12:00:00',
+        userTimezone: 'Africa/Cairo',
+        lang: 'ar',
+      }),
       signal: controller.signal,
     });
     const result = await response.json() as {
@@ -66,6 +74,14 @@ export async function diagnoseGeminiConnection(modelOverride?: string) {
       usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number };
     } & GoogleError;
     if (!response.ok) return { success: false, stage: 'generate_content', model: selected, ...googleFailure(response.status, result), availableModels: listedModels, modelCount: availableModels.length };
+    const reply = (result.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '').trim();
+    let validAnalysis = false;
+    try {
+      const analysis = JSON.parse(reply.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''));
+      validAnalysis = analysis?.intent === 'CREATE_TRANSACTION' && analysis?.transaction?.type === 'expense' &&
+        analysis.transaction.amount === 200;
+    } catch { /* Non-JSON replies cannot pass activation. */ }
+    if (!validAnalysis) return { success: false, stage: 'generate_content', model: selected, reason: 'invalid_request', httpStatus: response.status, googleStatus: null, availableModels: listedModels, modelCount: availableModels.length };
     try { await recordGeminiSuccess(selected); } catch { /* Diagnosis succeeded even if status saving failed. */ }
     const usage = result.usageMetadata;
     let trackingRecorded = false;
@@ -84,7 +100,7 @@ export async function diagnoseGeminiConnection(modelOverride?: string) {
     }
     return {
       success: true, stage: 'generate_content', model: selected,
-      reply: (result.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '').trim().slice(0, 30),
+      reply: 'CREATE_TRANSACTION',
       totalTokens: usage?.totalTokenCount ?? null, trackingRecorded,
       availableModels: listedModels, modelCount: availableModels.length,
     };

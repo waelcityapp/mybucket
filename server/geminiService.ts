@@ -11,12 +11,7 @@ import {
   matchTransferAccountsFromText,
 } from '../src/utils/entityMatcher.js';
 
-export async function interpretNaturalLanguageWithGemini(
-  req: AIInterpretationRequest
-): Promise<AIInterpretationResult> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY is not configured on the server');
-
+export function geminiInterpretationBody(req: AIInterpretationRequest) {
   // Only send concise task instructions and existing IDs to Gemini.
   // The extensive Arabic synonym knowledge base remains available locally in
   // entityMatcher/semanticParser; sending the full dictionary on every call
@@ -49,6 +44,18 @@ Categories: ${JSON.stringify(categoriesContext)}
 Relevant user vocabulary: ${JSON.stringify(relevantMemory)}`;
 
   const prompt = `Input: ${JSON.stringify(req.text)}${req.currentProposal ? `\nDraft for correction: ${JSON.stringify(req.currentProposal)}` : ''}`;
+  return JSON.stringify({
+    contents: [{ parts: [{ text: `${instructions}\n\n${prompt}` }] }],
+    generationConfig: { maxOutputTokens: 1200 },
+  });
+}
+
+export async function interpretNaturalLanguageWithGemini(
+  req: AIInterpretationRequest
+): Promise<AIInterpretationResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY is not configured on the server');
+
   let responseText: string | undefined;
   // Use the exact REST API and working model proven by the admin connection
   // test. Avoid the SDK's previously failing request serialization.
@@ -56,18 +63,21 @@ Relevant user vocabulary: ${JSON.stringify(relevantMemory)}`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 12000);
   try {
-    const response = await fetch(
+    const send = () => fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `${instructions}\n\n${prompt}` }] }],
-          generationConfig: { maxOutputTokens: 1200 },
-        }),
+        body: geminiInterpretationBody(req),
         signal: controller.signal,
-      }
+      },
     );
+    let response = await send();
+    if (response.status === 503) {
+      await response.body?.cancel();
+      await new Promise(resolve => setTimeout(resolve, 350));
+      response = await send();
+    }
     if (!response.ok) {
       // Never log the provider's raw error body: it may contain submitted
       // financial text. Keep only the safe HTTP status.

@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Subscription plan card clarity (#288)
+
+- Remove the repeated Basic introductory-period badge from the plan card.
+
 ## Pro Gemini attempts and additional saves (#287)
 
 - Unlock additional saved transactions once the effective Gemini entry-attempt cap is reached. Valid unconsumed Gemini entry tickets remain saveable. Basic saved transactions and inquiry allowances remain independently metered.

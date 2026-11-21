@@ -107,9 +107,6 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
                 </div>
               ))}
             </dl>
-            {id === 'basic' && !paidEnd && <p className="mb-3 rounded-xl bg-slate-100 px-3 py-2 text-center text-sm font-bold text-slate-700">{basicDays === null
-              ? (ar ? 'تجربة مجانية عند التسجيل' : 'Free trial when you sign up')
-              : ar ? `مجانية لأول ${number.format(basicDays)} يومًا` : `Free for the first ${number.format(basicDays)} days`}</p>}
             {!guest && onNavigate && <button type="button" onClick={() => choosePlan(id)} className="min-h-11 rounded-xl bg-emerald-700 px-3 text-sm font-bold text-white hover:bg-emerald-800">
               {ar ? 'اشترك أو جدّد' : 'Subscribe or renew'} <bdi>{name}</bdi>
             </button>}

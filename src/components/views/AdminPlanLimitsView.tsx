@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { DEFAULT_PLAN_LIMITS, fetchPublishedPlanLimits, PLAN_LIMIT_KEYS, parsePlanLimits, type PlanPresentation, type PlanLimitKey, type PlanLimitsDraft } from '../../config/planLimits';
+import { DEFAULT_PLAN_LIMITS, fetchPublishedPlanLimits, PLAN_LIMIT_KEYS, parsePlanLimits, type PublishedPlanPresentation, type PlanLimitKey, type PlanLimitsDraft } from '../../config/planLimits';
 import { PLAN_FEATURE_IDS, planLimitFeatures, type PlanFeatureCopy, type PlanFeatureId } from '../../config/planLimitFeatures';
 import { auth } from '../../lib/firebase';
 import type { Language } from '../../types';
@@ -27,11 +27,11 @@ export function AdminPlanLimitsView({ lang }: { lang: Language }) {
   const [fields, setFields] = useState<Fields | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [published, setPublished] = useState<PlanPresentation | null>(null);
+  const [published, setPublished] = useState<PublishedPlanPresentation | null>(null);
   const [copy, setCopy] = useState<PlanFeatureCopy>({});
   const [copyLanguage, setCopyLanguage] = useState<Language>(lang);
   const [confirmPublish, setConfirmPublish] = useState(false);
-  const [status, setStatus] = useState<'load-error' | 'save-error' | 'conflict' | 'saved' | 'published' | 'publish-error' | 'publish-pending-rules' | null>(null);
+  const [status, setStatus] = useState<'load-error' | 'save-error' | 'conflict' | 'saved' | 'published' | 'publish-error' | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -94,13 +94,11 @@ export function AdminPlanLimitsView({ lang }: { lang: Language }) {
     setConfirmPublish(false);
     setStatus(null);
     try {
-      const next = await requestPlanSettings<PlanPresentation>('admin.planLimitsDraft.publish', { revision: draft.revision });
+      const next = await requestPlanSettings<PublishedPlanPresentation>('admin.planLimitsDraft.publish', { revision: draft.revision });
       setPublished(next);
       setStatus('published');
     } catch (error) {
-      const code = error instanceof Error ? error.message : '';
-      if (code === 'plan_limits_publish_pending_rules') setStatus('publish-pending-rules');
-      else setStatus(code === 'plan_limits_draft_changed' ? 'conflict' : 'publish-error');
+      setStatus(error instanceof Error && error.message === 'plan_limits_draft_changed' ? 'conflict' : 'publish-error');
     } finally {
       setSaving(false);
     }
@@ -146,7 +144,7 @@ export function AdminPlanLimitsView({ lang }: { lang: Language }) {
     ? [{ key, label, plan, before: published.limits[key], after: limits[key] }]
     : []));
 
-  const publishable = Boolean(draft?.revision && !changed && (differences.length || (published && !sameCopy(copy, published.copy))) && !saving && status !== 'conflict');
+  const publishable = Boolean(draft && limits && published && !changed && (!published.active || differences.length || !sameCopy(copy, published.copy)) && !saving && status !== 'conflict');
 
   return (
     <form onSubmit={save} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 sm:p-6">
@@ -239,7 +237,6 @@ export function AdminPlanLimitsView({ lang }: { lang: Language }) {
         <button type="button" onClick={reload} className="min-h-11 font-bold underline">{ar ? 'إعادة التحميل' : 'Reload draft'}</button>
       </div>}
       {status === 'published' && <p role="status">{ar ? 'تم نشر الحدود.' : 'Plan limits published.'}</p>}
-      {status === 'publish-pending-rules' && <p role="alert">{ar ? 'نشر الحدود متوقف لحد تفعيل قواعد قاعدة البيانات.' : 'Publishing will be available after the database rules are deployed.'}</p>}
       {status === 'publish-error' && <p role="alert">{ar ? 'تعذّر نشر الحدود.' : 'Could not publish plan limits.'}</p>}
       {publishable && <div className="space-y-2 text-sm">
         <label className="flex items-start gap-2">

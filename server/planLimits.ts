@@ -55,7 +55,7 @@ export async function readPublishedPlanLimits() {
   const limits = publishedPlanLimits(snapshot) ?? DEFAULT_PLAN_LIMITS;
   const copy = parsePlanFeatureCopy(snapshot.get('copy'));
   if (!copy) throw new SubscriptionError(503, 'invalid_published_plan_copy', 'Unable to read published plan content.');
-  return { limits, copy };
+  return { limits, copy, active: snapshot.exists };
 }
 
 export async function publishPlanLimits(payload: Record<string, unknown>, uid: string) {
@@ -69,11 +69,11 @@ export async function publishPlanLimits(payload: Record<string, unknown>, uid: s
   return db.runTransaction(async tx => {
     const [draftSnapshot, publishedSnapshot] = await Promise.all([tx.get(draftRef), tx.get(publishedRef)]);
     const draft = readDraft(draftSnapshot);
-    if (!draftSnapshot.exists || draft.revision !== payload.revision) {
+    if (draft.revision !== payload.revision) {
       throw new SubscriptionError(409, 'plan_limits_draft_changed', 'The draft was changed. Reload before publishing.');
     }
     const previous = { limits: publishedPlanLimits(publishedSnapshot) ?? DEFAULT_PLAN_LIMITS, copy: parsePlanFeatureCopy(publishedSnapshot.get('copy')) ?? {} };
-    const next = { limits: draft.limits, copy: draft.copy };
+    const next = { limits: draft.limits, copy: draft.copy, active: true };
     if (publishedSnapshot.get('revision') === draft.revision) return next;
     const publishedAt = FieldValue.serverTimestamp();
     tx.set(publishedRef, { ...draft, publishedBy: uid, publishedAt });

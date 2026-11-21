@@ -51,9 +51,10 @@ test('published limits coordinate the gateway, the Firestore write boundary and 
     const copy = { entries: { order: 1, ar: { title: 'تسجيل', detail: '' }, en: { title: 'Entries', detail: '' } } };
     const draft = await savePlanLimitsDraft({ limits, copy, revision: 0 }, 'owner');
     assert.equal((await readPublishedPlanLimits()).limits.basicEntries, 15);
+    assert.equal((await readPublishedPlanLimits()).active, false);
     await assert.rejects(publishPlanLimits({ revision: 0 }, 'owner'), { code: 'plan_limits_draft_changed' });
-    assert.deepEqual(await publishPlanLimits({ revision: draft.revision }, 'owner'), { limits, copy });
-    assert.deepEqual(await readPublishedPlanLimits(), { limits, copy });
+    assert.deepEqual(await publishPlanLimits({ revision: draft.revision }, 'owner'), { limits, copy, active: true });
+    assert.deepEqual(await readPublishedPlanLimits(), { limits, copy, active: true });
 
     await assertFails(setDoc(transactionRef('direct'), entry('direct')));
     await assertFails(setDoc(doc(client, 'users/basic/accounts/direct'), account));

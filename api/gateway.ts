@@ -193,9 +193,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       case 'admin.planLimitsDraft.publish': {
         if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
-        if (process.env.PLAN_LIMITS_PUBLISH_ENABLED !== 'true') {
-          return res.status(503).json({ ok: false, error: 'plan_limits_publish_pending_rules' });
-        }
         const { publishPlanLimits } = await import('../server/planLimits.js');
         return res.status(200).json({ ok: true, data: await publishPlanLimits(payload, user.uid) });
       }

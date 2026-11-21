@@ -13,6 +13,7 @@ export const DEFAULT_PLAN_LIMITS = {
 export type PlanLimits = typeof DEFAULT_PLAN_LIMITS;
 export type PlanLimitKey = keyof PlanLimits;
 export type PlanPresentation = { limits: PlanLimits; copy: PlanFeatureCopy };
+export type PublishedPlanPresentation = PlanPresentation & { active: boolean };
 export type PlanLimitsDraft = PlanPresentation & { revision: number };
 
 export const PLAN_LIMIT_KEYS = Object.keys(DEFAULT_PLAN_LIMITS) as PlanLimitKey[];
@@ -33,7 +34,7 @@ export function parsePlanLimits(value: unknown): PlanLimits | null {
   return limits;
 }
 
-export async function fetchPublishedPlanLimits(signal?: AbortSignal): Promise<PlanPresentation> {
+export async function fetchPublishedPlanLimits(signal?: AbortSignal): Promise<PublishedPlanPresentation> {
   const response = await fetch('/api/gateway', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -44,6 +45,6 @@ export async function fetchPublishedPlanLimits(signal?: AbortSignal): Promise<Pl
   const result = await response.json();
   const limits = response.ok && result.ok === true ? parsePlanLimits(result.data?.limits) : null;
   const copy = parsePlanFeatureCopy(result.data?.copy);
-  if (!limits || !copy) throw new Error('published_plan_limits_unavailable');
-  return { limits, copy };
+  if (!limits || !copy || typeof result.data?.active !== 'boolean') throw new Error('published_plan_limits_unavailable');
+  return { limits, copy, active: result.data.active };
 }

@@ -5,7 +5,7 @@
 - Organize the existing Subscriptions card into full-page sections for payment requests, plan settings, free access duration, and analysis limits.
 - Allow the owner to edit and save a server-validated draft of Basic and Pro limits, with revision checks and a comparison against the published limits. Drafts have no effect on customer entitlements or subscription copy. The draft preview formats customer-facing allowances with the same formatter as the subscription page. Administrators can edit Arabic and English feature titles and descriptions and their shared order in the same draft.
 
-- Local integration prepares a published-limit reader, an aggregate inquiry ceiling and transactional reminder ceilings. Local publishing checks the saved revision transactionally and records publishing history. Customer subscription pages read the published limits from the gateway. Publish the app first. Keep PLAN_LIMITS_PUBLISH_ENABLED disabled until the production Firestore rules are deployed and verified. The revised rules only close direct creation once a published plan policy exists.
+- Local integration prepares a published-limit reader, an aggregate inquiry ceiling and transactional reminder ceilings. Local publishing checks the saved revision transactionally and records publishing history. Customer subscription pages read the published limits from the gateway. The gateway was deployed ahead of the production Firestore rules. The revised rules close direct creation once the administrator publishes the first plan policy.
 
 - Local report export now supports CSV and browser print/PDF for filtered results, with an authenticated, shared Pro allowance per Cairo day.
 

@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Subscription card duration and analysis counters (#281)
+
+- Show remaining time for the active grant, paid subscription, or trial; label per-engine counts as analysis attempts.
+
 ## Account card access (#280)
 
 - Show Visa and credit-card upgrade prompts only when the account page requires a Pro upgrade. Active Pro users already have both card types in the Add account form.

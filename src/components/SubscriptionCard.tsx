@@ -50,8 +50,15 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
 
   const paidDays = calculateRemainingPaidDays(subscription);
   const remainingDays = calculateRemainingTrialDays(subscription);
-  const grant = stageFor(subscription) !== 'paid' ? activeGrant(subscription.grant) : null;
+  const stage = stageFor(subscription);
+  const grant = stage === 'pro-trial' || stage === 'basic-free' ? activeGrant(subscription.grant) : null;
   const grantDays = grant ? Math.max(0, Math.ceil((Date.parse(grant.endsAt) - Date.now()) / 86400000)) : null;
+  const days = grantDays ?? (paidDays > 0 ? paidDays : remainingDays);
+  const durationLabel = grant
+    ? (isAr ? 'الأيام المتبقية للمنحة' : 'Grant days remaining')
+    : paidDays > 0
+      ? (isAr ? 'الأيام المتبقية للاشتراك' : 'Subscription days remaining')
+      : (isAr ? 'الأيام المتبقية للتجربة' : 'Trial days remaining');
 
 
   return (
@@ -63,7 +70,7 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
         </div>
         <span
           className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
-            grant || subscription.isPaid
+            grant || paidDays > 0
               ? 'bg-emerald-100 text-emerald-800'
               : remainingDays > 0
               ? 'bg-amber-100 text-amber-900'
@@ -71,8 +78,8 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
           }`}
         >
           {grant
-            ? (isAr ? `منحة ${grant.plan === 'pro' ? 'Pro' : 'Basic'} مجانية (${grantDays} يوم)` : `Free ${grant.plan} grant (${grantDays} days)`)
-            : subscription.isPaid
+            ? (isAr ? `منحة ${grant.plan === 'pro' ? 'Pro' : 'Basic'} مجانية` : `Free ${grant.plan} grant`)
+            : paidDays > 0
             ? (isAr ? `اشتراك ${subscription.paidPlan === 'basic' ? 'Basic' : 'Pro'} نشط` : `Active ${subscription.paidPlan === 'basic' ? 'Basic' : 'Pro'} subscription`)
             : remainingDays > 0
             ? (isAr ? `تجربة مجانية (${remainingDays} يوم متبقي)` : `Trial (${remainingDays} days left)`)
@@ -85,10 +92,10 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
         <div className="flex items-center justify-between text-xs">
           <span className="text-slate-600 font-medium flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5 text-slate-400" />
-            <span>{paidDays > 0 ? (isAr ? 'الأيام المتبقية للاشتراك' : 'Subscription days remaining') : (isAr ? 'إجمالي مدة التجربة' : 'Total trial duration')}</span>
+            <span>{durationLabel}</span>
           </span>
           <span className="font-bold text-slate-900">
-            {new Intl.NumberFormat(isAr ? 'ar-EG' : 'en-GB').format(paidDays || subscription.totalTrialDays)} {isAr ? 'يوماً' : 'days'}
+            {new Intl.NumberFormat(isAr ? 'ar-EG' : 'en-GB').format(days)} {isAr ? 'يوماً' : 'days'}
           </span>
         </div>
 
@@ -99,18 +106,13 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
             <p className="font-bold text-slate-800">{usage.plan === 'expired' ? (isAr ? 'انتهت صلاحية الاستخدام' : 'Access expired') : (isAr ? `الخطة الحالية: ${usage.plan === 'pro' ? 'Pro' : 'Basic'}` : `Current plan: ${usage.plan === 'pro' ? 'Pro' : 'Basic'}`)}</p>
             {([['gemini', usage.gemini], ['local', usage.local]] as const).map(([engine, counts]) => counts && <div key={engine} className="rounded-lg border border-slate-200 bg-white p-2">
               <p className="font-bold text-slate-700">{engine === 'gemini' ? (isAr ? 'Gemini' : 'Gemini') : usage.plan === 'pro' ? (isAr ? 'المحلل المحلي عند عدم توفر Gemini أو انتهاء حصته' : 'Local analyzer when Gemini is unavailable or exhausted') : (isAr ? 'المحلل المحلي' : 'Local analyzer')}</p>
-              <p>{isAr ? `التسجيلات: ${counts.entries.used} من ${counts.entries.limit} · المتبقي ${counts.entries.remaining}` : `Entries: ${counts.entries.used} of ${counts.entries.limit} · ${counts.entries.remaining} left`}</p>
-              <p>{isAr ? `الاستعلامات: ${counts.inquiries.used} من ${counts.inquiries.limit} · المتبقي ${counts.inquiries.remaining}` : `Inquiries: ${counts.inquiries.used} of ${counts.inquiries.limit} · ${counts.inquiries.remaining} left`}</p>
+              <p>{isAr ? `محاولات تحليل العمليات: ${counts.entries.used} من ${counts.entries.limit} · المتبقي ${counts.entries.remaining}` : `Entry analysis attempts: ${counts.entries.used} of ${counts.entries.limit} · ${counts.entries.remaining} left`}</p>
+              <p>{isAr ? `محاولات تحليل الاستعلامات: ${counts.inquiries.used} من ${counts.inquiries.limit} · المتبقي ${counts.inquiries.remaining}` : `Inquiry analysis attempts: ${counts.inquiries.used} of ${counts.inquiries.limit} · ${counts.inquiries.remaining} left`}</p>
             </div>)}
             {usage.plan !== 'expired' && <p className="text-[10px] text-slate-500">{isAr ? 'تُحسب المحاولة عند بدء التحليل، وتتجدد الحدود يوميًا بتوقيت القاهرة.' : 'Attempts count when analysis starts; limits reset daily in Cairo time.'}</p>}
           </>}
         </div>
 
-        <p className="text-[10px] text-slate-500 font-medium leading-relaxed pt-0.5">
-          {isAr
-              ? 'الإدخال اليدوي متاح خلال صلاحية الاستخدام حتى بعد انتهاء حصة الذكاء الاصطناعي اليومية.'
-              : 'Manual entry remains available while access is active after the daily AI quota.'}
-        </p>
       </div>
 
 

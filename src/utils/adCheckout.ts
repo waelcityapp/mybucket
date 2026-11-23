@@ -59,3 +59,9 @@ export function adRunDays(startsAt: Date, endsAt: Date): number | null {
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
   return Math.ceil((end - start) / 86_400_000);
 }
+
+
+export function validVipDurationDays(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 &&
+    Date.now() + value * 86_400_000 <= 8.64e15;
+}

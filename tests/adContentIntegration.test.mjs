@@ -25,7 +25,7 @@ const details = (overrides = {}) => {
 test('server rejects external links, malformed contact fields and Free video before signing media or storing a draft', async () => {
   for (const key of ['title', 'merchant', 'description', 'contact']) {
     for (const tier of ['free', 'featured', 'vip']) {
-      const data = details({ tier, [key]: 'Visit example.com', resourceType: 'image' });
+      const data = details({ tier, ...(tier === 'vip' && { vipDurationDays: 1 }), [key]: 'Visit example.com', resourceType: 'image' });
       await assert.rejects(request(tier === 'free' ? 'ads.prepare' : 'ads.lockPrice', data), { code: 'ad_external_link' });
       assert.equal((await ref(data.id).get()).exists, false);
     }
@@ -90,7 +90,7 @@ test('trusted Cloudinary duration enforces 30/60 and an older locked Featured in
       responseSignature: createHash('sha1').update(`public_id=${publicId}&version=1test-secret`).digest('hex') };
   };
   for (const [tier, limit] of [['featured', 30], ['vip', 60]]) {
-    const data = details({ tier, amountEgp: 0, resourceType: 'video', bytes: 100 });
+    const data = details({ tier, ...(tier === 'vip' && { vipDurationDays: 1 }), amountEgp: 0, resourceType: 'video', bytes: 100 });
     await request('ads.lockPrice', data);
     await request('ads.prepare', data);
     duration = limit + 0.01;

@@ -1,3 +1,4 @@
+import { waitUntil } from '@vercel/functions';
 import type { Request } from 'express';
 
 type VercelRequest = {
@@ -87,6 +88,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { readPublicOfferAds } = await import('../server/offerAds.js');
       return res.status(200).json({ ok: true, data: await readPublicOfferAds(req.body.action, req.body.payload || {}) });
     }
+    if (typeof req.body?.action === 'string' && req.body.action.startsWith('vipPush.')) {
+      const { vipPushActions, isVipPushOrigin, vipPushAction } = await import('../server/vipPush.js');
+      if (!vipPushActions.has(req.body.action)) return res.status(400).json({ ok: false, error: 'invalid_gateway_action' });
+      if (!isVipPushOrigin(req.headers.origin, req.headers.host)) return res.status(403).json({ ok: false, error: 'invalid_origin' });
+      res.setHeader?.('Cache-Control', 'no-store');
+      const ip = typeof req.headers['x-vercel-forwarded-for'] === 'string' ? req.headers['x-vercel-forwarded-for'].split(',')[0].trim() : '';
+      return res.status(200).json({ ok: true, data: await vipPushAction(req.body.action, req.body.payload || {}, ip) });
+    }
+
     const user = await verifyAuthenticatedUser({
       header: (name: string) => name.toLowerCase() === 'authorization' ? authorization : undefined,
     } as unknown as Request);
@@ -137,7 +147,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action === 'admin.ads.list' || action === 'admin.ads.review' || action === 'admin.ads.policy' || action === 'admin.ads.uploadStats' || action === 'admin.ads.prices') {
       if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
       const { reviewOfferAds } = await import('../server/offerAds.js');
-      return res.status(200).json({ ok: true, data: await reviewOfferAds(action, user.uid, payload) });
+      const data = await reviewOfferAds(action, user.uid, payload);
+      if (action === 'admin.ads.review' && payload.status === 'approved' && typeof payload.id === 'string') {
+        const { vipPushKey, deliverVipPush } = await import('../server/vipPush.js');
+        if (vipPushKey()) waitUntil(deliverVipPush(undefined, undefined, payload.id).catch(() => console.error('VIP notification delivery failed')));
+      }
+      return res.status(200).json({ ok: true, data });
     }
 
     // Vercel production uses this serverless gateway, not the Express server.ts route.

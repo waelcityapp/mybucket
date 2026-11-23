@@ -1,5 +1,6 @@
+import { queueVipPush, readVipPushCampaigns } from './vipPush.js';
 import { adContactError, adVideoLimit, containsExternalAdLink, normalizeAdPhone, normalizeGoogleMapsUrl } from '../src/utils/adContent.js';
-import { DEFAULT_PAID_AD_PRICES, isPaidAdPrice, paidAdDailyPrice, adRunDays, normalizePaymentContactPhone, normalizeAdTransferReference, type LegacyAdTransfer } from '../src/utils/adCheckout.js';
+import { DEFAULT_PAID_AD_PRICES, isPaidAdPrice, paidAdDailyPrice, adRunDays, normalizePaymentContactPhone, normalizeAdTransferReference, type LegacyAdTransfer, validVipDurationDays } from '../src/utils/adCheckout.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { getAdminFirestore } from './firebaseAdmin.js';
 import { confirmAdminAdTestUpload, deleteAdminAdTestUpload, signAdminAdTestUpload } from './adminAdTestUpload.js';
@@ -33,6 +34,7 @@ type StoredAd = AdFields & {
   rejectionReason: string;
   paidPrepared?: boolean;
   priceLockedAt?: number;
+  formerVipSchedule?: { startsAt: number; endsAt: number };
   adContentVersion?: 1;
   legacyTransfer?: LegacyAdTransfer;
   confirmedTransfer?: { reference: string; amountEgp: number; transferredAt?: number };
@@ -65,7 +67,7 @@ function expiry(payload: Payload, now: number, allowPast = false) {
   return { startsAt, endsAt };
 }
 
-function adFields(payload: Payload, paid: boolean): AdFields {
+function adFields(payload: Payload, paid: boolean, vipDurationDays?: number): AdFields {
   const categorySlug = field(payload.categorySlug, 60);
   if (!OFFER_CATEGORY_IDS.some(category => category === categorySlug)) return fail('invalid_ad_details');
   return {
@@ -77,7 +79,8 @@ function adFields(payload: Payload, paid: boolean): AdFields {
     ...(payload.callPhone !== undefined && { callPhone: field(payload.callPhone, 50, false) }),
     ...(payload.whatsappPhone !== undefined && { whatsappPhone: field(payload.whatsappPhone, 50, false) }),
     ...(payload.mapsUrl !== undefined && { mapsUrl: field(payload.mapsUrl, 2048, false) }),
-    ...(paid ? expiry(payload, Date.now(), true) : { startsAt: 0, endsAt: 0 }),
+    ...(vipDurationDays !== undefined ? { vipDurationDays, startsAt: 0, endsAt: vipDurationDays * DAY }
+      : paid ? expiry(payload, Date.now(), true) : { startsAt: 0, endsAt: 0 }),
   };
 }
 
@@ -117,7 +120,7 @@ function requiresVideoCorrection(ad: StoredAd) {
 function offerView(id: string, ad: StoredAd): PublicOfferAd {
   const { title, description, merchant, categorySlug, contact, startsAt, endsAt, media, callPhone, whatsappPhone, mapsUrl } = ad;
   return { id, title, description, merchant, categorySlug, contact, startsAt, endsAt,
-    ...(callPhone && { callPhone }), ...(whatsappPhone && { whatsappPhone }), ...(mapsUrl && { mapsUrl }), engagement: engagementOf(ad), tier: offerTier(ad), media: media ? mediaView(media) : undefined };
+    ...(callPhone && { callPhone }), ...(whatsappPhone && { whatsappPhone }), ...(mapsUrl && { mapsUrl }), ...(ad.vipDurationDays && { vipDurationDays: ad.vipDurationDays }), engagement: engagementOf(ad), tier: offerTier(ad), media: media ? mediaView(media) : undefined };
 }
 
 export function isPublicOffer(ad: Pick<StoredAd, 'status' | 'startsAt' | 'endsAt'>, now: number) {
@@ -488,7 +491,10 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
     const paidTier = payload.tier === 'featured' || payload.tier === 'vip' ? payload.tier : null;
     const featured = paidTier !== null;
     if (lockPrice && !featured) return fail('invalid_ad_details');
-    const fields = adFields(payload, featured);
+    const duration = payload.vipDurationDays;
+    if ((duration !== undefined && (paidTier !== 'vip' || !validVipDurationDays(duration))) ||
+        (lockPrice && paidTier === 'vip' && duration === undefined)) return fail('ad_invalid_vip_duration');
+    const fields = adFields(payload, featured, validVipDurationDays(duration) ? duration : undefined);
     const correctionId = payload.correctionId === undefined ? undefined : adId(payload.correctionId);
     if (correctionId && (featured || correctionId === id)) return fail('invalid_ad_details');
     const phone = typeof payload.paymentPhone === 'string' && payload.paymentPhone.length <= 24 ? normalizePaymentContactPhone(payload.paymentPhone) : null;
@@ -530,7 +536,7 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
         const previous = existing?.legacyTransfer;
         const sameClaim = !lockPrice || (previous?.reference === legacyTransfer?.reference &&
           previous?.transferredAt === legacyTransfer?.transferredAt && previous?.amountEgp === legacyTransfer?.amountEgp);
-        const sameInvoice = sameClaim && payment.phone === phone &&
+        const sameInvoice = sameClaim && existing?.vipDurationDays === fields.vipDurationDays && payment.phone === phone &&
           Object.entries(fields).every(([key, value]) => (existing?.[key as keyof StoredAd] ?? '') === value) &&
           (['callPhone', 'whatsappPhone', 'mapsUrl'] as const).every(key => (existing?.[key] ?? '') === (fields[key] ?? ''));
         if (!sameInvoice || payment.amountEgp !== payload.amountEgp) return fail('ad_invoice_mismatch', 409);
@@ -599,7 +605,7 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
   if (draft.status === 'cancelled') return fail('ad_cancelled', 409);
   if (draft.status !== 'draft') return { submitted: true };
   if (draft.payment) {
-    expiry(draft, Date.now(), true);
+    if (!draft.vipDurationDays) expiry(draft, Date.now(), true);
     if (draft.payment.dailyPriceEgp !== undefined && !draft.uploadDay && !draft.paidPrepared) return fail('ad_invoice_not_prepared', 409);
   }
   if (!draft.payment || draft.adContentVersion) validateAdContent(draft, !!draft.payment);
@@ -645,7 +651,7 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
     if (!latest || latest.ownerId !== uid) return fail('invalid_ad_id', 403);
     if (latest.status === 'cancelled') return fail('ad_cancelled', 409);
     if (latest.status !== 'draft') return;
-    if (latest.payment) expiry(latest, Date.now(), true);
+    if (latest.payment && !latest.vipDurationDays) expiry(latest, Date.now(), true);
     if (!latest.payment || latest.adContentVersion) validateAdContent(latest, !!latest.payment);
     if (requiresVideoCorrection(latest)) return fail('ad_free_image_only');
     if (!latest.payment) await assertFreeOfferAvailable(db, tx, uid, id, Date.now());
@@ -716,10 +722,15 @@ export async function reviewOfferAds(action: string, uid: string, payload: Paylo
     const status = payload.status ?? 'pending';
     if (status !== 'pending' && status !== 'approved' && status !== 'rejected') return fail('invalid_ad_status');
     const snapshot = await db.collection('offerAds').where('status', '==', status).get();
+    const campaigns = await readVipPushCampaigns(db, status === 'approved'
+      ? snapshot.docs.filter(doc => doc.get('payment.tier') === 'vip').map(doc => doc.id)
+      : []);
     return snapshot.docs.map(doc => {
       const ad = doc.data() as StoredAd;
       return { ...offerView(doc.id, ad), status, submittedAt: ad.submittedAt, rejectionReason: ad.rejectionReason,
         ...(ad.legacyTransfer && { legacyTransfer: ad.legacyTransfer }),
+        ...(campaigns.has(doc.id) && { vipPushCampaign: campaigns.get(doc.id) }),
+        ...(ad.formerVipSchedule && { formerVipSchedule: ad.formerVipSchedule }),
         ...(ad.confirmedTransfer && { confirmedTransfer: ad.confirmedTransfer }),
         requiresVideoCorrection: !ad.correctedBy && requiresVideoCorrection(ad),
         ...(ad.payment && { payment: { ...ad.payment, receiptUrl: ad.receipt ? mediaView(ad.receipt)?.url : undefined } }) };
@@ -738,6 +749,10 @@ export async function reviewOfferAds(action: string, uid: string, payload: Paylo
     const now = Date.now();
     if (status === 'approved' && requiresVideoCorrection(ad)) return fail('ad_free_image_only', 409);
     if (status === 'approved' && requiresPaidReceipt(ad.payment) && (!ad.receipt || payload.paymentConfirmed !== true)) return fail('payment_confirmation_required');
+    const approveVip = status === 'approved' && ad.payment?.tier === 'vip';
+    const formerVipSchedule = approveVip && !ad.vipDurationDays && ad.startsAt > now
+      ? { startsAt: ad.startsAt, endsAt: ad.endsAt } : undefined;
+    if (formerVipSchedule && payload.publishVipNow !== true) return fail('ad_vip_immediate_confirmation_required', 409);
     let confirmedTransfer: StoredAd['confirmedTransfer'];
     if (status === 'approved' && ad.payment && requiresPaidReceipt(ad.payment)) {
       const reference = normalizeAdTransferReference(payload.transferReference);
@@ -767,7 +782,7 @@ export async function reviewOfferAds(action: string, uid: string, payload: Paylo
     let { startsAt, endsAt } = ad;
     if (status === 'approved') {
       if (ad.payment) {
-        startsAt = Math.max(now, ad.startsAt);
+        startsAt = approveVip ? now : Math.max(now, ad.startsAt);
         endsAt += startsAt - ad.startsAt;
       } else {
         const policy = await assertFreeOfferAvailable(db, tx, ad.ownerId, ref.id, now);
@@ -776,8 +791,9 @@ export async function reviewOfferAds(action: string, uid: string, payload: Paylo
         tx.set(db.collection('offerAdApprovalLedger').doc(ad.ownerId), { lastApproval: now }, { merge: true });
       }
     }
+    if (status === 'approved' && ad.payment?.tier === 'vip') queueVipPush(tx, db, ref.id, startsAt, endsAt);
     tx.update(ref, { status, rejectionReason, reviewerId: uid, reviewedAt: now, startsAt, endsAt,
-      publishedUntil: status === 'approved' ? endsAt : 0, ...(confirmedTransfer && { paymentConfirmedAt: now, confirmedTransfer }) });
+      publishedUntil: status === 'approved' ? endsAt : 0, ...(formerVipSchedule && { formerVipSchedule }), ...(confirmedTransfer && { paymentConfirmedAt: now, confirmedTransfer }) });
     return { status };
   });
 }

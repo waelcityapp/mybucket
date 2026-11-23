@@ -33,6 +33,7 @@ interface Props {
   videoLimit: number;
   mediaFile?: File | string;
   dailyPriceEgp: number;
+  vipDurationDays?: number;
   initialInvoice?: Invoice;
   onPricesChange: (prices: PaidAdPrices) => void;
   onBack: () => void;
@@ -40,7 +41,7 @@ interface Props {
 }
 
 export function AdPaymentCheckout({
-  tier, lang, advertiserName, adTitle, startsAt, endsAt, mediaType, adDescription, categorySlug, adContact, adContacts, videoLimit, mediaFile, dailyPriceEgp, initialInvoice, onPricesChange, onBack, onNavigate
+  tier, lang, advertiserName, adTitle, startsAt, endsAt, mediaType, adDescription, categorySlug, adContact, adContacts, videoLimit, mediaFile, dailyPriceEgp, vipDurationDays, initialInvoice, onPricesChange, onBack, onNavigate
 }: Props) {
   const ar = lang === 'ar';
   const [invoice, setInvoice] = useState(initialInvoice);
@@ -91,7 +92,7 @@ export function AdPaymentCheckout({
   const [receiptError, setReceiptError] = useState('');
   const [dragging, setDragging] = useState(false);
   const phoneValid = isPaymentContactPhoneValid(phone);
-  const runDays = adRunDays(startsAt, endsAt);
+  const runDays = vipDurationDays ?? adRunDays(startsAt, endsAt);
   const amount = (value: number) => new Intl.NumberFormat(ar ? 'ar-EG' : 'en-EG', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 }).format(value);
   const phoneSaved = !!savedPhone && normalizePaymentContactPhone(phone) === savedPhone;
   type PaymentAvailability = 'checking' | 'yes' | 'daily_limit' | 'active' | 'paused' | 'error';
@@ -115,7 +116,8 @@ export function AdPaymentCheckout({
   const adDetails = {
     tier, title: adTitle, description: adDescription, merchant: advertiserName,
     categorySlug, contact: adContact, ...adContacts, paymentPhone: savedPhone,
-    startsAt: startsAt.getTime(), endsAt: endsAt.getTime(), resourceType: mediaType === 'none' ? null : mediaType,
+    ...(vipDurationDays !== undefined ? { vipDurationDays } : { startsAt: startsAt.getTime(), endsAt: endsAt.getTime() }),
+    resourceType: mediaType === 'none' ? null : mediaType,
   };
 
   const lockPrice = async () => {
@@ -303,8 +305,9 @@ export function AdPaymentCheckout({
                       : (ar ? 'بدون وسائط' : 'No media'), mediaType === 'video' ? Video : ImageIcon)}
               </div>
               <div className="grid grid-cols-1 gap-2 text-xs leading-6 text-slate-600 sm:grid-cols-2 dark:text-slate-300">
+                {vipDurationDays !== undefined ? <p>{ar ? 'النشر يبدأ فور موافقة الإدارة.' : 'Publication begins immediately upon approval.'}</p> : <>
                 <p>{ar ? 'بداية النشر بتوقيت القاهرة ' : 'Starts (Cairo time) '}{dates.format(startsAt)}</p>
-                <p>{ar ? 'نهاية النشر بتوقيت القاهرة ' : 'Ends (Cairo time) '}{dates.format(endsAt)}</p>
+                <p>{ar ? 'نهاية النشر بتوقيت القاهرة ' : 'Ends (Cairo time) '}{dates.format(endsAt)}</p></>}
               </div>
               {invoice && <p className="text-xs text-slate-600 dark:text-slate-300">
                 {ar ? 'رقم الطلب' : 'Request ID'} <bdi>{invoice.id}</bdi> · {dates.format(invoice.createdAt)}

@@ -1,3 +1,4 @@
+import { validVipDurationDays } from '../../utils/adCheckout';
 import { AD_NO_LINKS_AR, AD_NO_LINKS_EN, adContactError, adVideoLimit, containsExternalAdLink } from '../../utils/adContent';
 import { type PaidAdPrices, type AdPriceLock, type LegacyAdTransfer } from '../../utils/adCheckout';
 import { AdTierInfoDialog } from './FeaturedAdInfoPage';
@@ -135,6 +136,8 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   const fieldWarningClass = 'mt-1 text-xs font-bold text-rose-700 dark:text-rose-300';
   const videoLimitMessage = ar ? `اختر فيديو مدته ${new Intl.NumberFormat('ar-EG').format(videoLimit)} ثانية أو أقل.`
     : `Choose a video no longer than ${videoLimit} seconds.`;
+  const [vipDays, setVipDays] = useState('');
+  const vipDurationDays = Number(vipDays);
   const [startsAt, setStartsAt] = useState(emptyAdSchedule);
   const [endsAt, setEndsAt] = useState(emptyAdSchedule);
   const [dateError, setDateError] = useState<'invalid' | 'order' | 'past' | null>(null);
@@ -232,10 +235,13 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     if (tier === 'free') {
       if (previewType === 'video') return;
     } else {
+      if (tier === 'vip' && !validVipDurationDays(vipDurationDays)) return;
       const start = adScheduleDate(startsAt), end = adScheduleDate(endsAt);
-      if (!start || !end) { setDateError('invalid'); return; }
-      if (end.getTime() <= start.getTime()) { setDateError('order'); return; }
-      if (end.getTime() <= Date.now()) { setDateError('past'); return; }
+      if (tier === 'featured') {
+        if (!start || !end) { setDateError('invalid'); return; }
+        if (end.getTime() <= start.getTime()) { setDateError('order'); return; }
+        if (end.getTime() <= Date.now()) { setDateError('past'); return; }
+      }
       const source = image ?? reusedMedia?.url;
       if (source && previewType === 'video') {
         setCheckingVideo(true);
@@ -393,15 +399,16 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
       adTitle={resumed.title} startsAt={new Date(resumed.startsAt)} endsAt={new Date(resumed.endsAt)}
       mediaType={resumed.mediaType ?? 'none'} adDescription={resumed.description} categorySlug={resumed.categorySlug}
       adContact={resumed.contact} adContacts={{ callPhone: resumed.callPhone, whatsappPhone: resumed.whatsappPhone, mapsUrl: resumed.mapsUrl }}
-      videoLimit={resumed.videoLimit} dailyPriceEgp={resumed.payment.dailyPriceEgp}
+      vipDurationDays={resumed.vipDurationDays} videoLimit={resumed.videoLimit} dailyPriceEgp={resumed.payment.dailyPriceEgp}
       initialInvoice={{ ...resumed.payment, id: invoiceId, createdAt: resumed.createdAt, legacyTransfer: resumed.legacyTransfer }} onPricesChange={setPrices}
       onBack={onBack} onNavigate={onNavigate} />;
   }
 
   if (checkoutOpen) {
-    const start = adScheduleDate(startsAt);
-    const end = adScheduleDate(endsAt);
-    if (!prices || !preview || (tier !== 'featured' && tier !== 'vip') || !start || !end || !title.trim() || !merchant.trim() || !category) {
+    const vipDurationValid = tier === 'vip' && validVipDurationDays(vipDurationDays);
+    const start = vipDurationValid ? new Date(0) : adScheduleDate(startsAt);
+    const end = vipDurationValid ? new Date(vipDurationDays * 86400000) : adScheduleDate(endsAt);
+    if (!prices || !preview || (tier !== 'featured' && tier !== 'vip') || !start || !end || (tier === 'vip' && !vipDurationValid) || !title.trim() || !merchant.trim() || !category) {
       return (
         <main dir={ar ? 'rtl' : 'ltr'} className="min-h-screen bg-slate-50 px-4 py-12 text-slate-900">
           <section className="mx-auto max-w-xl space-y-4 rounded-2xl border border-emerald-100 bg-white p-6">
@@ -418,7 +425,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
       );
     }
     return <AdPaymentCheckout tier={tier} lang={lang} advertiserName={merchant} adTitle={title} startsAt={start} endsAt={end}
-      mediaType={previewType ?? 'none'} adDescription={description} categorySlug={category} adContact="" adContacts={adContacts} videoLimit={videoLimit}
+      mediaType={previewType ?? 'none'} adDescription={description} categorySlug={category} adContact="" adContacts={adContacts} vipDurationDays={vipDurationValid ? vipDurationDays : undefined} videoLimit={videoLimit}
       mediaFile={image ?? reusedMedia?.url} dailyPriceEgp={prices[tier]} onPricesChange={setPrices} onBack={returnFromPayment} onNavigate={onNavigate} />;
   }
 
@@ -462,7 +469,9 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
           <section className={`rounded-2xl border border-slate-200 bg-white p-4 space-y-4 ${formSurface}`}>
             <h2 className="font-extrabold">{ar ? 'معاينة الإعلان قبل الإرسال' : 'Preview before submission'}</h2>
             <AdCreativeCard lang={lang} title={title} description={description} merchant={merchant} contact={isPaid ? callPhone : contact} mediaUrl={previewUrl} poster={poster} mediaType={previewType} videoQuotaId="local-ad-preview-demo" />
-            {tier === 'free' ? <p className="text-xs text-slate-600 dark:text-slate-300">{freeSchedule}</p> : <>
+            {tier === 'free' ? <p className="text-xs text-slate-600 dark:text-slate-300">{freeSchedule}</p> : tier === 'vip' ? <p className="text-sm dark:text-slate-300">
+              {ar ? `النشر فور الموافقة لمدة ${vipDurationDays} يوم.` : `Publishes on approval for ${vipDurationDays} days.`}
+            </p> : <>
             <p className={`text-xs text-slate-600 ${formMuted}`}>{ar ? 'بداية النشر بتوقيت القاهرة' : 'Publication starts (Cairo time)'} {adScheduleDate(startsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: AD_TIME_ZONE })}</p>
             <p className={`text-xs text-slate-600 ${formMuted}`}>{ar ? 'نهاية النشر بتوقيت القاهرة' : 'Publication ends (Cairo time)'} {adScheduleDate(endsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: AD_TIME_ZONE })}</p>
             </>}
@@ -599,7 +608,12 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
             </section>
             <section className={`bg-white rounded-2xl border border-slate-200 p-4 space-y-3 ${formSurface}`}>
               <h2 className="font-extrabold text-sm">{ar ? '3. مدة النشر' : '3. Publication schedule'}</h2>
-              {tier === 'free' ? <p className="text-xs text-slate-600 dark:text-slate-300">{freeSchedule}</p> : <>
+              {tier === 'free' ? <p className="text-xs text-slate-600 dark:text-slate-300">{freeSchedule}</p> : tier === 'vip' ? <div className="space-y-2">
+                <p className="text-sm">{ar ? 'ينشر إعلان VIP فور موافقة الإدارة.' : 'VIP ads publish immediately after approval.'}</p>
+                <label htmlFor="offer-vip-days" className={label}>{ar ? 'مدة النشر المدفوعة (بالأيام)' : 'Paid publication duration (days)'}</label>
+                <input id="offer-vip-days" type="number" inputMode="numeric" min={1} step={1} required value={vipDays}
+                  onChange={event => setVipDays(event.target.value)} className={field} />
+              </div> : <>
               <p className={`text-xs text-slate-500 ${formMuted}`}>{ar ? 'المواعيد بتوقيت القاهرة. الإعلان لا يظهر إلا بعد موافقة الإدارة.' : 'All times are in Cairo time. The advertisement appears only after admin approval.'}</p>
               <AdScheduleFields id="start" lang={lang} value={startsAt} onChange={value => { setStartsAt(value); setDateError(null); }} />
               <AdScheduleFields id="end" lang={lang} value={endsAt} onChange={value => { setEndsAt(value); setDateError(null); }} />
@@ -694,7 +708,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
 
 
             </section>
-            <button type="submit" disabled={imageStatus === 'compressing' || imageStatus === 'error' || checkingVideo || !!contentError} className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold py-3 flex justify-center items-center gap-2"><Megaphone className="w-5 h-5" />{ar ? 'مراجعة الإعلان' : 'Review advertisement'}</button>
+            <button type="submit" disabled={imageStatus === 'compressing' || imageStatus === 'error' || (tier === 'vip' && !validVipDurationDays(vipDurationDays)) || checkingVideo || !!contentError} className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold py-3 flex justify-center items-center gap-2"><Megaphone className="w-5 h-5" />{ar ? 'مراجعة الإعلان' : 'Review advertisement'}</button>
             </fieldset>}
           </form>
         )}

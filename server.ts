@@ -70,6 +70,15 @@ async function startServer() {
         const { readPublicOfferAds } = await import('./server/offerAds.js');
         return res.json({ ok: true, data: await readPublicOfferAds(req.body.action, req.body.payload || {}) });
       }
+      if (typeof req.body?.action === 'string' && req.body.action.startsWith('vipPush.')) {
+        const { vipPushActions, isVipPushOrigin, vipPushAction } = await import('./server/vipPush.js');
+        if (!vipPushActions.has(req.body.action)) return res.status(400).json({ ok: false, error: 'invalid_gateway_action' });
+        if (!isVipPushOrigin(req.headers.origin, req.headers.host)) return res.status(403).json({ ok: false, error: 'invalid_origin' });
+        res.setHeader('Cache-Control', 'no-store');
+        const ip = req.ip || '';
+        return res.status(200).json({ ok: true, data: await vipPushAction(req.body.action, req.body.payload || {}, ip) });
+      }
+
       const user = await verifyAuthenticatedUser(req);
       const action = req.body?.action;
       const payload = req.body?.payload || {};
@@ -116,7 +125,12 @@ async function startServer() {
       if (action === 'admin.ads.list' || action === 'admin.ads.review' || action === 'admin.ads.policy' || action === 'admin.ads.uploadStats' || action === 'admin.ads.prices') {
         if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
         const { reviewOfferAds } = await import('./server/offerAds.js');
-        return res.json({ ok: true, data: await reviewOfferAds(action, user.uid, payload) });
+        const data = await reviewOfferAds(action, user.uid, payload);
+        if (action === 'admin.ads.review' && payload.status === 'approved' && typeof payload.id === 'string') {
+          const { vipPushKey, deliverVipPush } = await import('./server/vipPush.js');
+          if (vipPushKey()) void deliverVipPush(undefined, undefined, payload.id).catch(() => console.error('VIP notification delivery failed'));
+        }
+        return res.json({ ok: true, data });
       }
 
       if (action === 'appLock.status' || action === 'appLock.enable' || action === 'appLock.verify' || action === 'appLock.disable' || action === 'appLock.change' || action === 'appLock.timeout' || action === 'appLock.toggle') {

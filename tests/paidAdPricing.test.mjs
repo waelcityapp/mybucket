@@ -79,7 +79,7 @@ test('a stale or manipulated total does not create an invoice and a confirmed am
 
 test('zero-priced VIP can be reviewed without a receipt and stays VIP after a rate change', async () => {
   await admin('admin.ads.prices', { featured: 130, vip: 0 });
-  const data = invoice({ tier: 'vip', amountEgp: 0 });
+  const data = invoice({ tier: 'vip', amountEgp: 0, vipDurationDays: 2 });
   await request('ads.lockPrice', data);
   await assert.rejects(request('ads.submit', { id: data.id }), { code: 'ad_invoice_not_prepared' });
   await admin('admin.ads.prices', { featured: 130, vip: 250 });
@@ -90,6 +90,8 @@ test('zero-priced VIP can be reviewed without a receipt and stays VIP after a ra
   const saved = (await ad(data.id).get()).data();
   assert.equal(saved.payment.amountEgp, 0);
   assert.equal(saved.payment.tier, 'vip');
+  assert.equal(saved.startsAt, saved.reviewedAt);
+  assert.equal(saved.endsAt - saved.startsAt, 2 * 86400000);
   assert.equal(saved.receipt, undefined);
 });
 

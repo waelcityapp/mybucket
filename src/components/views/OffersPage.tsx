@@ -1,3 +1,4 @@
+import { VipPushSettings } from '../VipPushSettings';
 import { OfferContactActions } from '../OfferContactActions';
 import { followInternalLink } from '../../utils/navigationHistory';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -254,6 +255,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
       </header>
 
       <main className={`mx-auto px-4 py-6 pb-16 ${categorySlug || showVip ? "max-w-7xl" : "max-w-xl"}`}>
+        {!categorySlug && !favoritesPage && <VipPushSettings lang={lang} />}
         {loadError ? <p role="alert" className="mb-4 text-sm text-red-700">
           {isAr ? 'تعذّر تحميل العروض المنشورة.' : 'Could not load published ads.'}{' '}
           <button type="button" className="font-bold underline" onClick={() => setAttempt(value => value + 1)}>{isAr ? 'حاول تاني' : 'Retry'}</button>

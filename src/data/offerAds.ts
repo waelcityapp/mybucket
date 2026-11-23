@@ -35,9 +35,16 @@ export type PublicOfferAd = AdContactDetails & {
   description: string;
   merchant: string;
   contact: string;
+  vipDurationDays?: number;
   startsAt: number;
   endsAt: number;
   media?: { type: 'image' | 'video'; url: string; poster?: string };
+};
+
+export type VipPushCampaign = {
+  status: 'queued' | 'sending' | 'completed' | 'completed_with_failures' | 'stopped';
+  scannedCount: number;
+  failedCount: number;
 };
 
 export type ReviewOfferAd = PublicOfferAd & {
@@ -45,6 +52,8 @@ export type ReviewOfferAd = PublicOfferAd & {
   submittedAt: number;
   rejectionReason: string;
   requiresVideoCorrection?: boolean;
+  vipPushCampaign?: VipPushCampaign;
+  formerVipSchedule?: { startsAt: number; endsAt: number };
   legacyTransfer?: LegacyAdTransfer;
   confirmedTransfer?: Omit<LegacyAdTransfer, 'transferredAt'> & { transferredAt?: number };
   payment?: { amountEgp: number; dailyPriceEgp?: number; phone: string; receiptUrl?: string };

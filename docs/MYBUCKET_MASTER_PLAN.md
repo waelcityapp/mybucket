@@ -1,5 +1,12 @@
 # MyBucket — Master Implementation Plan
 
+## Opt-in VIP push notifications (#296)
+
+- The offers landing page requests permission only on an explicit click. Browsers enroll with a per-device credential through the existing gateway, with no Google account requirement. Opt-out removes the Firestore enrollment.
+- VIP ads publish immediately on approval and the approval queues one background FCM campaign, processed in batches. New requests choose paid days. Pending legacy requests with future dates require explicit administrator confirmation, and approval preserves their original schedule for audit, exact duration and locked amount.
+- Admins can see saved campaign progress, exhausted delivery failures, and interrupted campaigns in the approved VIP list. The existing Refresh button reads the latest status. The last batch must be processed before completion is recorded. No automatic recovery is guaranteed if the Vercel invocation terminates.
+- Set `VIP_PUSH_VAPID_PUBLIC_KEY` in Vercel production to the Firebase Web Push public key. The existing Firebase Admin identity needs permission to send FCM messages. No external scheduler or rule changes are needed.
+
 ## Featured and VIP contact and media (#295)
 
 - Paid advertisements can store separate call, mobile WhatsApp and Google Maps contact fields. Published actions use validated values, and existing contact details continue to display.

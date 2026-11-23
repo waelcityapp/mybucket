@@ -1,6 +1,6 @@
 import { cairoAdTransferTime, normalizeAdTransferReference, isPaidAdPrice, MAX_AD_DAILY_PRICE_EGP, type PaidAdPrices } from '../../utils/adCheckout';
 import { useEffect, useState } from 'react';
-import type { FreeOfferPolicy, OfferAdStatus, ReviewOfferAd } from '../../data/offerAds';
+import type { FreeOfferPolicy, OfferAdStatus, ReviewOfferAd, VipPushCampaign } from '../../data/offerAds';
 import { offerAdsRequest } from '../../services/offerAdsClient';
 import type { Language } from '../../types';
 import { AdCreativeCard } from '../AdCreativeCard';
@@ -27,6 +27,13 @@ function readHiddenAds(): Set<string> {
 
 export function AdminOfferAds({ lang }: { lang: Language }) {
   const ar = lang === 'ar';
+  const campaignLabels: Record<VipPushCampaign['status'], string> = {
+    queued: ar ? 'بانتظار بدء الإرسال' : 'Waiting to send',
+    sending: ar ? 'جارٍ الإرسال' : 'Sending',
+    completed: ar ? 'اكتملت المعالجة' : 'Processing complete',
+    completed_with_failures: ar ? 'اكتملت المعالجة مع فشل بعض الإشعارات' : 'Processing complete with delivery failures',
+    stopped: ar ? 'توقفت الحملة قبل اكتمال المعالجة' : 'Campaign stopped before processing finished',
+  };
   const [receiptErrors, setReceiptErrors] = useState<Record<string, boolean>>({});
   const [status, setStatus] = useState<OfferAdStatus>('pending');
   const [ads, setAds] = useState<ReviewOfferAd[] | null>(null);
@@ -37,6 +44,7 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [decision, setDecision] = useState<{ id: string; status: 'approved' | 'rejected' } | null>(null);
+  const [vipPublishNow, setVipPublishNow] = useState(false);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [transferReference, setTransferReference] = useState('');
   const [receivedAmount, setReceivedAmount] = useState('');
@@ -150,7 +158,7 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
     setError('');
     setNotice('');
     try {
-      await offerAdsRequest('admin.ads.review', { ...decision, reason, paymentConfirmed,
+      await offerAdsRequest('admin.ads.review', { ...decision, reason, paymentConfirmed, publishVipNow: vipPublishNow,
         transferReference, receivedAmountEgp: receivedAmount.trim() ? Number(receivedAmount) : null,
         receivedAt: cairoAdTransferTime(receivedTime),
       }, true);
@@ -180,6 +188,7 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
           ad_legacy_transfer_after_cutoff: ar ? 'التحويل لا يسبق أول تغيير للأسعار. الطلب ما زال معلقًا.' : 'The transfer does not predate the first price change. The request is still pending.',
           ad_legacy_transfer_pending: ar ? 'التحويل القديم يظل معلقًا حتى يتم التحقق منه.' : 'The legacy transfer stays pending until it is verified.',
           ad_legacy_transfer_cutoff_unknown: ar ? 'تعذر التحقق من تاريخ بدء الأسعار الجديدة. الطلب ما زال معلقًا.' : 'The first rate change could not be verified. The request is still pending.',
+          ad_vip_immediate_confirmation_required: ar ? 'أكّد النشر الفوري للطلب اللي له موعد مستقبلي.' : 'Confirm immediate publication for this previously scheduled request.',
           ad_free_image_only: ar ? 'الإعلان المجاني فيه فيديو. ارجعه للمعلن للتصحيح.' : 'This free ad contains a video. Return it to the advertiser for correction.',
           ad_active_exists: ar ? 'الحساب عنده إعلان مجاني نشط.' : 'This account already has an active free ad.',
           ad_pending_exists: ar ? 'الحساب عنده طلب مجاني تاني قيد المراجعة.' : 'This account has another free ad awaiting review.',
@@ -309,12 +318,28 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
           mediaUrl={ad.media?.url} mediaType={ad.media?.type} poster={ad.media?.poster} />
         <dl className="space-y-1 text-xs text-slate-600">
           <div><dt className="inline font-bold">{ar ? 'وصل في' : 'Received'} </dt><dd className="inline">{date(ad.submittedAt)}</dd></div>
-          {(ad.payment || status === 'approved') && <div><dt className="inline font-bold">{ar ? 'مدة النشر بتوقيت القاهرة' : 'Publication window, Cairo time'} </dt><dd className="inline">{date(ad.startsAt)} — {date(ad.endsAt)}</dd></div>}
+          {(status === 'approved' || (ad.payment && !ad.vipDurationDays)) && <div><dt className="inline font-bold">{ar ? 'مدة النشر بتوقيت القاهرة' : 'Publication window, Cairo time'} </dt><dd className="inline">{date(ad.startsAt)} — {date(ad.endsAt)}</dd></div>}
+          {ad.vipDurationDays && status === 'pending' && <div>
+            <dt className="inline font-bold">{ar ? 'مدة VIP من وقت الموافقة' : 'VIP duration from approval'} </dt>
+            <dd className="inline">{ad.vipDurationDays} {ar ? 'يوم' : 'days'}</dd>
+          </div>}
+          {ad.formerVipSchedule && <div>
+            <dt className="inline font-bold">{ar ? 'الموعد الأصلي قبل الموافقة' : 'Original schedule before approval'} </dt>
+            <dd className="inline">{date(ad.formerVipSchedule.startsAt)} — {date(ad.formerVipSchedule.endsAt)}</dd>
+          </div>}
           {!ad.payment && status === 'pending' && <div>
             <dt className="inline font-bold">{ar ? 'بداية النشر' : 'Publication start'} </dt>
             <dd className="inline">{ar ? 'فور الموافقة' : 'Immediately upon approval'}</dd>
           </div>}
         </dl>
+        {status === 'approved' && ad.tier === 'vip' && <section className="space-y-1 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+          <h3 className="font-extrabold">{ar ? 'حملة إشعارات VIP' : 'VIP notification campaign'}</h3>
+          {ad.vipPushCampaign ? <>
+            <p className="font-semibold">{campaignLabels[ad.vipPushCampaign.status]}</p>
+            <p>{ar ? 'سجلات الأجهزة التي تمت مراجعتها' : 'Device registrations checked'} · {ad.vipPushCampaign.scannedCount.toLocaleString(ar ? 'ar-EG' : 'en')}</p>
+            <p>{ar ? 'فشل الإرسال بعد المحاولات' : 'Failed after retries'} · {ad.vipPushCampaign.failedCount.toLocaleString(ar ? 'ar-EG' : 'en')}</p>
+          </> : <p>{ar ? 'لا يوجد سجل حملة لهذا الإعلان.' : 'No campaign is recorded for this ad.'}</p>}
+        </section>}
         {ad.payment && <section className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-slate-900">
           <h3 className="font-extrabold">{ad.legacyTransfer ? (ar ? 'مراجعة استثنائية لتحويل قديم' : 'Legacy transfer review') : (ar ? 'إيصال إنستا باي' : 'InstaPay receipt')}</h3>
           {ad.legacyTransfer && <p>{ar ? 'بيانات المعلن' : 'Advertiser claim'} · <bdi>{ad.legacyTransfer.reference}</bdi> · {date(ad.legacyTransfer.transferredAt)} · {ad.legacyTransfer.amountEgp} EGP</p>}
@@ -341,10 +366,15 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
         </p>}
         {status === 'pending' && (decision?.id === ad.id ? <div className="space-y-2 rounded-xl bg-slate-50 p-3">
           <p className="text-sm font-bold">{decision.status === 'approved'
-            ? (ad.payment
+            ? (ad.payment && ad.tier !== 'vip'
               ? (ar ? 'تأكيد الموافقة على نشر الإعلان في المدة المحددة؟' : 'Confirm approval for the selected publication window?')
               : (ar ? 'تأكيد الموافقة والنشر الفوري؟' : 'Approve and publish now?'))
             : (ad.requiresVideoCorrection ? (ar ? 'تأكيد إرجاع الإعلان للتصحيح؟' : 'Return the ad for correction?') : (ar ? 'تأكيد رفض الإعلان؟' : 'Confirm rejection?'))}</p>
+          {decision.status === 'approved' && ad.tier === 'vip' && !ad.vipDurationDays && ad.startsAt > Date.now() && <label className="flex items-start gap-2 rounded-lg bg-amber-100 p-2 text-sm font-bold">
+            <input type="checkbox" checked={vipPublishNow} onChange={event => setVipPublishNow(event.target.checked)} />
+            {ar ? 'هذا الطلب له موعد نشر مستقبلي. أؤكد النشر الآن بنفس المدة والمبلغ، مع حفظ الموعد الأصلي.'
+              : 'This request had a future start. Confirm publication now with the same duration and amount, keeping the original schedule on record.'}
+          </label>}
           {decision.status === 'approved' && ad.payment && (ad.payment.amountEgp !== 0 || ad.payment.dailyPriceEgp !== 0) && <div className="space-y-2">
             <label className="grid gap-1 text-xs font-bold">{ar ? 'المرجع في سجل الاستلام الفعلي' : 'Reference in the incoming transfer record'}
               <input value={transferReference} maxLength={48} onChange={event => setTransferReference(event.target.value)} dir="ltr" className="min-h-11 rounded-lg border bg-white px-2" />
@@ -364,12 +394,12 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
             <textarea maxLength={500} value={reason} onChange={event => setReason(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-2" />
           </label>}
           <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy || (decision.status === 'approved' && !!ad.payment && (ad.payment.amountEgp !== 0 || ad.payment.dailyPriceEgp !== 0) && (!paymentConfirmed || !ad.payment.receiptUrl || !normalizeAdTransferReference(transferReference) || !receivedAmount.trim() || (!!ad.legacyTransfer && cairoAdTransferTime(receivedTime) === null)))} onClick={() => void review()} className={`${button} ${decision.status === 'approved' ? 'bg-emerald-700' : 'bg-red-700'} text-white`}>{ar ? 'تأكيد القرار' : 'Confirm decision'}</button>
+            <button type="button" disabled={busy || (decision.status === 'approved' && ad.tier === 'vip' && !ad.vipDurationDays && ad.startsAt > Date.now() && !vipPublishNow) || (decision.status === 'approved' && !!ad.payment && (ad.payment.amountEgp !== 0 || ad.payment.dailyPriceEgp !== 0) && (!paymentConfirmed || !ad.payment.receiptUrl || !normalizeAdTransferReference(transferReference) || !receivedAmount.trim() || (!!ad.legacyTransfer && cairoAdTransferTime(receivedTime) === null)))} onClick={() => void review()} className={`${button} ${decision.status === 'approved' ? 'bg-emerald-700' : 'bg-red-700'} text-white`}>{ar ? 'تأكيد القرار' : 'Confirm decision'}</button>
             <button type="button" disabled={busy} onClick={() => setDecision(null)} className={`${button} bg-slate-200 text-slate-800`}>{ar ? 'إلغاء' : 'Cancel'}</button>
           </div>
         </div> : <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={busy || ad.requiresVideoCorrection} onClick={() => { setReason(''); setPaymentConfirmed(false); setTransferReference(''); setReceivedAmount(''); setReceivedTime(''); setDecision({ id: ad.id, status: 'approved' }); }} className={`${button} bg-emerald-700 text-white`}>{ar ? 'موافقة' : 'Approve'}</button>
-          {!ad.legacyTransfer && <button type="button" disabled={busy} onClick={() => { setReason(''); setPaymentConfirmed(false); setTransferReference(''); setReceivedAmount(''); setReceivedTime(''); setDecision({ id: ad.id, status: 'rejected' }); }} className={`${button} bg-red-50 text-red-800`}>{ad.requiresVideoCorrection ? (ar ? 'إرجاع للتصحيح' : 'Return for correction') : (ar ? 'رفض' : 'Reject')}</button>}
+          <button type="button" disabled={busy || ad.requiresVideoCorrection} onClick={() => { setReason(''); setPaymentConfirmed(false); setVipPublishNow(false); setTransferReference(''); setReceivedAmount(''); setReceivedTime(''); setDecision({ id: ad.id, status: 'approved' }); }} className={`${button} bg-emerald-700 text-white`}>{ar ? 'موافقة' : 'Approve'}</button>
+          {!ad.legacyTransfer && <button type="button" disabled={busy} onClick={() => { setReason(''); setPaymentConfirmed(false); setVipPublishNow(false); setTransferReference(''); setReceivedAmount(''); setReceivedTime(''); setDecision({ id: ad.id, status: 'rejected' }); }} className={`${button} bg-red-50 text-red-800`}>{ad.requiresVideoCorrection ? (ar ? 'إرجاع للتصحيح' : 'Return for correction') : (ar ? 'رفض' : 'Reject')}</button>}
         </div>)}
       </div>)}
     </div>

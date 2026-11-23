@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { auth } from '../../lib/firebase';
 import type { Language } from '../../types';
 
-type Settings = { proDays: number; basicDays: number; updatedAt: string | null };
-type Change = { id: string; timestamp: string; previous: { proDays: number; basicDays: number }; next: { proDays: number; basicDays: number } };
+type Settings = { basicDays: number; updatedAt: string | null };
+type Change = { id: string; timestamp: string; previous: { basicDays: number }; next: { basicDays: number } };
 async function gateway(action: string, payload: Record<string, unknown> = {}) {
   const user = auth.currentUser;
   if (!user) throw new Error('Please sign in');
@@ -18,7 +18,6 @@ async function gateway(action: string, payload: Record<string, unknown> = {}) {
 export function AdminTrialSettingsView({ lang }: { lang: Language }) {
   const ar = lang === 'ar';
   const [value, setValue] = useState<Settings | null>(null);
-  const [pro, setPro] = useState('15');
   const [basic, setBasic] = useState('75');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -63,38 +62,35 @@ export function AdminTrialSettingsView({ lang }: { lang: Language }) {
     gateway('admin.subscriptionTrials.get').then(data => {
       if (!active) return;
       const settings = data as Settings;
-      setValue(settings); setPro(String(settings.proDays)); setBasic(String(settings.basicDays)); setError('');
+      setValue(settings); setBasic(String(settings.basicDays)); setError('');
     }).catch(err => { if (active) setError(err instanceof Error ? err.message : String(err)); });
     return () => { active = false; };
   }, []);
 
   const proposedBasic = Number(basic);
-  const proposedPro = Math.min(Number(pro), proposedBasic);
-  const valid = pro.trim() !== '' && basic.trim() !== '' &&
-    Number.isInteger(proposedPro) && Number.isInteger(proposedBasic) &&
-    proposedPro >= 1 && proposedPro <= 365 && proposedBasic >= proposedPro && proposedBasic <= 365;
-  const changed = value && (value.proDays !== proposedPro || value.basicDays !== proposedBasic);
+  const valid = Number.isInteger(proposedBasic) && proposedBasic >= 1 && proposedBasic <= 365;
+  const changed = value && value.basicDays !== proposedBasic;
   const save = async () => {
     if (!valid || !confirm || !changed || busy) return;
     setBusy(true); setError(''); setSuccess('');
     try {
-      const saved = await gateway('admin.subscriptionTrials.save', { proDays: proposedPro, basicDays: proposedBasic }) as Settings;
+      const saved = await gateway('admin.subscriptionTrials.save', { basicDays: proposedBasic }) as Settings;
       setValue(saved); setConfirm(false);
       if (historyOpen) void loadHistory();
       window.dispatchEvent(new Event('mybucket:trial-settings-changed'));
-      setSuccess(ar ? 'تم حفظ المدد في Firebase وتطبيقها على جميع الحسابات عند تحديث حالتها.' : 'Durations saved to Firebase for all accounts.');
+      setSuccess(ar ? 'تم حفظ المدة في Firebase وتطبيقها على جميع الحسابات عند تحديث حالتها.' : 'Duration saved to Firebase for all accounts.');
     } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
     finally { setBusy(false); }
   };
   return <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 space-y-4">
-    <h3 className="font-extrabold text-slate-900">{ar ? 'إدارة مدد التجربة' : 'Manage trial durations'}</h3>
-    <p className="text-sm text-slate-600">{ar ? 'تتحكم هنا في مدد جميع الحسابات، القديمة والجديدة. يبدأ الحساب من تاريخ التسجيل الأصلي، ولا تُمس البيانات المالية.' : 'Changes apply globally to old and new accounts using their original registration dates; financial data is preserved.'}</p>
+    <h3 className="font-extrabold text-slate-900">{ar ? 'إدارة مدة تجربة Basic' : 'Manage Basic trial duration'}</h3>
+    <p className="text-sm text-slate-600">{ar ? 'تتحكم هنا في مدة تجربة Basic لجميع الحسابات، القديمة والجديدة. يبدأ الحساب من تاريخ التسجيل الأصلي، ولا تُمس البيانات المالية.' : 'The Basic trial duration applies globally to old and new accounts using their original registration dates; financial data is preserved.'}</p>
     {!value && !error && <p className="text-sm text-slate-500">{ar ? 'جارٍ تحميل إعدادات Firebase...' : 'Loading Firebase settings...'}</p>}
     <div className="grid gap-3">
       <label className="text-xs font-bold text-slate-700">{ar ? 'فترة Basic بالأيام' : 'Basic period (days)'}<input type="number" min="1" max="365" step="1" value={basic} onChange={e=>{setBasic(e.target.value);setConfirm(false);setSuccess('');}} className="mt-2 block w-full border rounded-xl px-3 py-2 text-base" /></label>
     </div>
     <p className="text-xs text-amber-900 rounded-xl border border-amber-200 bg-amber-50 p-3">{ar ? 'تنبيه: تقليل المدة قد ينهي التجربة لبعض المستخدمين فورًا. التغيير لا يعيد تشغيل العدادات.' : 'Warning: reducing days may immediately expire some users. The clock never restarts.'}</p>
-    <label className="flex items-start gap-2 text-sm text-slate-700"><input type="checkbox" checked={confirm} onChange={e=>setConfirm(e.target.checked)} />{ar ? 'أؤكد تطبيق المدد الجديدة على جميع الحسابات' : 'Apply the new durations to all accounts'}</label>
+    <label className="flex items-start gap-2 text-sm text-slate-700"><input type="checkbox" checked={confirm} onChange={e=>setConfirm(e.target.checked)} />{ar ? 'أؤكد تطبيق المدة الجديدة على جميع الحسابات' : 'Apply the new duration to all accounts'}</label>
     {!valid && <p className="text-xs text-rose-600">{ar ? 'مدة Basic لازم تكون عددًا صحيحًا من 1 إلى 365.' : 'Enter a whole number from 1 to 365 for Basic.'}</p>}
     {error && <p role="alert" className="text-sm text-rose-700 break-words">{error}</p>}
     {success && <p role="status" className="text-sm text-emerald-700">{success}</p>}
@@ -109,8 +105,6 @@ export function AdminTrialSettingsView({ lang }: { lang: Language }) {
         {!historyLoading && !historyError && history.length > 0 && <>
           <p className="text-xs text-slate-500">{ar ? 'أحدث 50 تعديلًا؛ يمكن إخفاء المدخلات القديمة من العرض مع الاحتفاظ بها في سجل التدقيق.' : 'Latest 50 changes. Hide older entries from this view while retaining their audit records.'}</p>
           {history.map(change => {
-            const proChanged = change.previous.proDays !== change.next.proDays;
-            const basicChanged = change.previous.basicDays !== change.next.basicDays;
             return <div key={change.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs font-extrabold text-slate-800">{renderDate(change.timestamp)}</p>
@@ -123,9 +117,7 @@ export function AdminTrialSettingsView({ lang }: { lang: Language }) {
                   <button type="button" disabled={Boolean(archivingId)} onClick={() => setArchivePendingId(null)} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700">{ar ? 'إلغاء' : 'Cancel'}</button>
                 </div>
               </div>}
-              {proChanged && <p className="text-sm text-slate-700">Pro: <span className="text-xs">{ar ? 'من' : 'from'}</span> <span className="font-bold">{change.previous.proDays}</span> <span className="text-xs">{ar ? 'إلى' : 'to'}</span> <span className="font-extrabold text-emerald-800">{change.next.proDays}</span> <span className="text-xs">{ar ? 'يومًا' : 'days'}</span></p>}
-              {basicChanged && <p className="text-sm text-slate-700">Basic: <span className="text-xs">{ar ? 'من' : 'from'}</span> <span className="font-bold">{change.previous.basicDays}</span> <span className="text-xs">{ar ? 'إلى' : 'to'}</span> <span className="font-extrabold text-emerald-800">{change.next.basicDays}</span> <span className="text-xs">{ar ? 'يومًا' : 'days'}</span></p>}
-              {!proChanged && !basicChanged && <p className="text-xs text-slate-500">{ar ? 'حفظ بدون تغيير في المدد' : 'Saved without a duration change'}</p>}
+              <p className="text-sm text-slate-700">Basic: <span className="text-xs">{ar ? 'من' : 'from'}</span> <span className="font-bold">{change.previous.basicDays}</span> <span className="text-xs">{ar ? 'إلى' : 'to'}</span> <span className="font-extrabold text-emerald-800">{change.next.basicDays}</span> <span className="text-xs">{ar ? 'يومًا' : 'days'}</span></p>
             </div>;
           })}
         </>}

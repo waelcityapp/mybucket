@@ -13,7 +13,7 @@ test('real Firestore transactions preserve data, enforce concurrent limits and s
   const auth={getUser:async id=>({uid:id})};
   const deps={db,auth};
   const sub={trialStartedAt:'2025-01-01T00:00:00Z',isPaid:false,paidExpiresAt:null};
-  const quotas={db,getSubscription:async()=>sub,getTrials:async()=>({proDays:15,basicDays:75}),getLimits:async()=>({...DEFAULT_AI_DAILY_LIMITS}),now:()=>now};
+  const quotas={db,getSubscription:async()=>sub,getTrials:async()=>({basicDays:75}),getLimits:async()=>({...DEFAULT_AI_DAILY_LIMITS}),now:()=>now};
   try {
     await db.doc(`users/${uid}/billing/access`).set({registeredAt:Timestamp.fromMillis(Date.parse(sub.trialStartedAt)),paidUntil:null,schemaVersion:1});
     await db.doc(`users/${uid}/billing/subscription`).set(sub);
@@ -46,7 +46,7 @@ test('granting and ending Basic preserves an existing paid entitlement', async (
   const paidUntil=Timestamp.fromDate(new Date('2027-12-01T00:00:00Z'));
   const sub={trialStartedAt:'2025-01-01T00:00:00Z',isPaid:true,paidExpiresAt:'2027-12-01T00:00:00Z'};
   const deps={db,auth:{getUser:async id=>({uid:id})}};
-  const quota={db,getSubscription:async()=>sub,getTrials:async()=>({proDays:15,basicDays:75}),getLimits:async()=>({...DEFAULT_AI_DAILY_LIMITS}),now:()=>now+1000};
+  const quota={db,getSubscription:async()=>sub,getTrials:async()=>({basicDays:75}),getLimits:async()=>({...DEFAULT_AI_DAILY_LIMITS}),now:()=>now+1000};
   try {
     await db.doc(`users/${uid}/billing/access`).set({registeredAt:Timestamp.fromDate(new Date(sub.trialStartedAt)),paidUntil,schemaVersion:1});
     await db.doc(`users/${uid}/billing/subscription`).set(sub);

@@ -7,7 +7,7 @@ export interface UserSubscription {
   trialDatesStored?: boolean;
   affiliateCode?: string | null;
   hasAppliedAffiliateCode: boolean;
-  totalTrialDays: number; // 10 without code, 35 with code
+  totalTrialDays: number;
   trialStartedAt: string; // ISO string date
   trialExpiresAt: string; // ISO string date
   isPaid: boolean;
@@ -23,12 +23,4 @@ export interface UserDailyUsage {
   date: string; // YYYY-MM-DD
   expenseAiCount: number; // Max 15 in trial
   inquiryAiCount: number; // Max 5 in trial
-}
-
-export interface AffiliateCodeInfo {
-  code: string;
-  name: string;
-  bonusDays: number; // 25 bonus days (giving 35 total)
-  discountMonthlyRate: number; // 120 EGP
-  regularMonthlyRate: number; // 180 EGP
 }

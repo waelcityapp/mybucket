@@ -302,14 +302,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { syncDirectoryUser } = await import('../server/userDirectory.js');
         await syncDirectoryUser(user.uid).catch(error => console.error('[directory] sync failed', error));
         await ensureTrialAccess(user.uid);
-        const { readTrialSettings } = await import('../server/trialSettings.js');
-        const { proDays, basicDays } = await readTrialSettings();
-        return res.status(200).json({ ok: true, data: { proDays, basicDays } });
+        const { readTrialSettings, trialSettingsResponse } = await import('../server/trialSettings.js');
+        const { basicDays } = await readTrialSettings();
+        return res.status(200).json({ ok: true, data: trialSettingsResponse({ basicDays }) });
       }
       case 'admin.subscriptionTrials.get': {
         if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
-        const { readTrialSettings } = await import('../server/trialSettings.js');
-        return res.status(200).json({ ok: true, data: await readTrialSettings() });
+        const { readTrialSettings, trialSettingsResponse } = await import('../server/trialSettings.js');
+        return res.status(200).json({ ok: true, data: trialSettingsResponse(await readTrialSettings()) });
       }
       case 'admin.subscriptionTrials.history': {
         if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
@@ -323,8 +323,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       case 'admin.subscriptionTrials.save': {
         if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
-        const { saveTrialSettings } = await import('../server/trialSettings.js');
-        return res.status(200).json({ ok: true, data: await saveTrialSettings(payload, user.uid) });
+        const { saveTrialSettings, trialSettingsResponse } = await import('../server/trialSettings.js');
+        return res.status(200).json({ ok: true, data: trialSettingsResponse(await saveTrialSettings(payload, user.uid)) });
       }
       case 'subscription.get': {
         const subscription = await getOrCreateSubscription(user.uid);

@@ -136,12 +136,12 @@ async function startServer() {
       switch (action) {
         case 'subscription.trialSettings': {
           const { ensureTrialAccess } = await import('./server/trialAccessBootstrap');
-          const { readTrialSettings } = await import('./server/trialSettings');
+          const { readTrialSettings, trialSettingsResponse } = await import('./server/trialSettings');
           const { syncDirectoryUser } = await import('./server/userDirectory');
           await syncDirectoryUser(user.uid).catch(error => console.error('[directory] sync failed', error));
           await ensureTrialAccess(user.uid);
-          const { proDays, basicDays } = await readTrialSettings();
-          return res.json({ ok: true, data: { proDays, basicDays } });
+          const { basicDays } = await readTrialSettings();
+          return res.json({ ok: true, data: trialSettingsResponse({ basicDays }) });
         }
         case 'app.presence': {
           const { recordPresence } = await import('./server/presence');

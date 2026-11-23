@@ -29,7 +29,7 @@ test('published limits coordinate the gateway, the Firestore write boundary and 
 
   try {
     await env.clearFirestore();
-    await db.doc('appSettings/subscriptionTrials').set({ basicDays: 75, proDays: 15 });
+    await db.doc('appSettings/subscriptionTrials').set({ basicDays: 75 });
     for (const uid of ['basic', 'pro']) {
       const user = db.collection('users').doc(uid);
       await user.collection('billing').doc('subscription').set({ trialStartedAt: register.toISOString(), isPaid: false });

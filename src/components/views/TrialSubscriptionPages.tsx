@@ -142,7 +142,7 @@ export function TrialSubscriptionPages({ lang, subscription, guest = false, gues
           <button type="button" onClick={onSubscription} className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white">{ar ? 'عرض الاشتراكات والتجديد' : 'View plans and renewal'}</button>
         </> : page === 'trial-details' ? <>
           <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 space-y-3 text-sm text-slate-700">
-            <p className="font-black text-slate-900">{grant ? (ar ? 'منحة مجانية نشطة' : 'Active free grant') : (stage === 'paid' || stage === 'paid-basic') ? (ar ? 'اشتراك نشط' : 'Subscription active') : stage === 'pro-trial' ? (ar ? 'تجربة Pro نشطة' : 'Pro trial active') : stage === 'basic-free' ? (ar ? 'فترة Basic المجانية' : 'Basic introductory period') : expiryLabel}</p>
+            <p className="font-black text-slate-900">{grant ? (ar ? 'منحة مجانية نشطة' : 'Active free grant') : (stage === 'paid' || stage === 'paid-basic') ? (ar ? 'اشتراك نشط' : 'Subscription active') : stage === 'basic-free' ? (ar ? 'فترة Basic المجانية' : 'Basic introductory period') : expiryLabel}</p>
             <p>{ar ? `Basic مجانية حتى اليوم ${getTrialDurations().basicDays} من التسجيل.` : `Basic is free until day ${getTrialDurations().basicDays} after signup.`}</p>
             <p>{grant ? (ar ? 'الأيام المتبقية للتجربة الأصلية: ' : 'Original trial days remaining: ') : (ar ? 'الأيام المجانية المتبقية: ' : 'Introductory days remaining: ')}{days}</p>
             {start && <p>{ar ? `تاريخ تسجيلك: ${start}` : `Registration date: ${start}`}</p>}

@@ -19,6 +19,7 @@ import {
 import { Language, AuthUser } from '../../types';
 import { UserSubscription } from '../../types/prototypeSubscription';
 import { translations } from '../../data/translations';
+import { AffiliateCodeSection } from '../AffiliateCodeSection';
 import { SubscriptionCard } from '../SubscriptionCard';
 
 interface SettingsViewProps {
@@ -33,7 +34,7 @@ interface SettingsViewProps {
   subscription?: UserSubscription | null;
   subscriptionUnavailable?: boolean;
   onRetrySubscription?: () => void;
-  onUpdateSubscription?: (sub: UserSubscription) => Promise<void>;
+  onApplyMarketerCode?: (code: string) => Promise<void>;
   onLogin: () => void;
   onLogout: () => void;
   onOpenMobileLink: () => void;
@@ -53,7 +54,7 @@ export function SettingsView({
   subscription,
   subscriptionUnavailable,
   onRetrySubscription,
-  onUpdateSubscription,
+  onApplyMarketerCode,
   onLogin,
   onLogout,
   onOpenMobileLink,
@@ -210,12 +211,10 @@ export function SettingsView({
 
       {/* 2. Subscription & Promo Code Card */}
       {subscriptionUnavailable && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p>{lang === 'ar' ? 'تعذر تحميل حالة اشتراكك. تحقق من الاتصال وحاول مرة أخرى.' : 'Could not load your subscription. Check your connection and try again.'}</p>{onRetrySubscription && <button type="button" onClick={onRetrySubscription} className="mt-2 font-bold underline">{lang === 'ar' ? 'إعادة المحاولة' : 'Try again'}</button>}</div>}
-      {!subscriptionUnavailable && subscription && onUpdateSubscription && (
-        <SubscriptionCard
-          subscription={subscription}
-          lang={lang}
-        />
-      )}
+      {!subscriptionUnavailable && subscription && <>
+        <SubscriptionCard subscription={subscription} lang={lang} />
+        {onApplyMarketerCode && <div key={user?.uid}><AffiliateCodeSection subscription={subscription} lang={lang} onApply={onApplyMarketerCode} /></div>}
+      </>}
 
       {/* 4. Installable mobile app card */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">

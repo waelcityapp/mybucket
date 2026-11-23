@@ -12,7 +12,7 @@ function harness(plan='basic', usage={}) {
     'users/alice/aiUsage/daily_2026-11-09': usage,
   };
   const db={doc(path){reads.push(path);return {async get(){return {exists:docs[path]!==undefined,data:()=>docs[path]};}};}};
-  return {reads,deps:{db,now:()=>now,getTrials:async()=>({proDays:15,basicDays:75}),getLimits:async()=>({...DEFAULT_AI_DAILY_LIMITS}),getRegistration:async()=>{throw Error('unexpected registration lookup');}}};
+  return {reads,deps:{db,now:()=>now,getTrials:async()=>({basicDays:75}),getLimits:async()=>({...DEFAULT_AI_DAILY_LIMITS}),getRegistration:async()=>{throw Error('unexpected registration lookup');}}};
 }
 test('Basic usage reads only the signed-in user and exposes its local counters',async()=>{
   const h=harness('basic',{basicLocalEntries:3,basicLocalInquiries:1,proGeminiEntries:9});
@@ -34,8 +34,8 @@ test('invalid stored counters never appear as valid usage',async()=>{
 test('without a billing document the recorded registration date determines the trial',async()=>{
   const paths=[];
   const db={doc(path){paths.push(path);return {async get(){return {exists:path.endsWith('/billing/access'),data:()=>({})};}};}};
-  const value=await readOwnAiQuota('alice',{db,now:()=>now,getTrials:async()=>({proDays:15,basicDays:75}),getLimits:async()=>({...DEFAULT_AI_DAILY_LIMITS}),getRegistration:async()=>new Date(now-86400000).toISOString()});
-  assert.equal(value.plan,'pro');assert.equal(value.gemini.entries.remaining,15);assert.equal(paths.length,3);
+  const value=await readOwnAiQuota('alice',{db,now:()=>now,getTrials:async()=>({basicDays:75}),getLimits:async()=>({...DEFAULT_AI_DAILY_LIMITS}),getRegistration:async()=>new Date(now-86400000).toISOString()});
+  assert.equal(value.plan,'basic');assert.equal(value.gemini,undefined);assert.equal(value.local.entries.remaining,10);assert.equal(paths.length,3);
 });
 test('expired accounts do not display a usable daily allowance',async()=>{
   const h=harness('basic');h.deps.now=()=>Date.parse('2027-11-09T10:00:00Z');

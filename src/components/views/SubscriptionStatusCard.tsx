@@ -133,14 +133,7 @@ export function SubscriptionStatusCard({
         <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-200/70 pt-3 text-xs text-slate-600">
           <span>{isArabic ? 'كود المسوّق المفعّل:' : 'Applied marketer code:'}</span>
           <b dir="ltr" className="rounded-lg bg-white px-2 py-1 font-mono text-slate-800">{subscription.affiliateCode}</b>
-          <span>{isArabic ? `إجمالي التجربة ${subscription.totalTrialDays} يومًا` : `${subscription.totalTrialDays} trial days total`}</span>
         </div>
-      )}
-
-      {subscription.temporaryLocalOnly && (
-        <p className="mt-3 text-xs leading-5 text-amber-800">
-          {isArabic ? 'تفعيل الكود محفوظ مؤقتًا على هذا المتصفح فقط حتى يكتمل ربط الاشتراكات.' : 'The code is saved temporarily in this browser until subscriptions are connected.'}
-        </p>
       )}
 
       {!subscription.hasAppliedAffiliateCode && (

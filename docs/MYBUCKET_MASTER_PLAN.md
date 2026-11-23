@@ -1,5 +1,10 @@
 # MyBucket — Master Implementation Plan
 
+## Basic-only introductory access (#293)
+
+- The administrator configures a single Basic duration. Access is calculated from the original registration date. Legacy Pro duration fields are ignored and existing Firestore documents are preserved.
+- Existing paid terms and manual Basic/Pro grants keep their current precedence. Only server-validated marketer redemption changes the discounted subscription price. Browser and profile prototype codes are not counted as a redemption.
+
 ## Free ads policy, phase one (#292)
 
 - Free publication starts on admin approval and lasts seven days by default. Advertisers see the duration before submitting and do not enter dates. The server stores the publication window at approval.

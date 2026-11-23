@@ -1,15 +1,15 @@
 import { activeGrant, type FreeGrant } from './grantPolicy.js';
 
-export const PRO_TRIAL_DAYS = 15;
-export const BASIC_FREE_DAYS = 75; // Default only; Firebase setting takes priority.
-export type TrialDurations = { proDays: number; basicDays: number };
-let currentDurations: TrialDurations = { proDays: PRO_TRIAL_DAYS, basicDays: BASIC_FREE_DAYS };
+export const BASIC_FREE_DAYS = 75;
+export type TrialDurations = { basicDays: number };
+let currentDurations: TrialDurations = { basicDays: BASIC_FREE_DAYS };
 export function getTrialDurations(): TrialDurations { return { ...currentDurations }; }
+export function isBasicTrialDuration(days: unknown): days is number {
+  return typeof days === 'number' && Number.isInteger(days) && days >= 1 && days <= 365;
+}
 export function setTrialDurations(value: TrialDurations): void {
-  if (!Number.isInteger(value.proDays) || !Number.isInteger(value.basicDays) ||
-      value.proDays < 1 || value.proDays > 365 || value.basicDays < value.proDays || value.basicDays > 365)
-    throw new Error('Invalid trial settings');
-  currentDurations = { proDays: value.proDays, basicDays: value.basicDays };
+  if (!isBasicTrialDuration(value.basicDays)) throw new Error('Invalid trial settings');
+  currentDurations = { basicDays: value.basicDays };
 }
 export const PRO_PRICE_EGP = 180;
 export const PRO_MARKETER_PRICE_EGP = 120;

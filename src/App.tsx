@@ -76,8 +76,6 @@ import { UsageGuideView } from './components/views/UsageGuideView';
 import { UserSubscription, UserDailyUsage } from './types/prototypeSubscription';
 import { accessEndedLabel, nextAccessChange, stageFor, getTrialDurations, setTrialDurations } from './config/subscriptionPolicy';
 import {
-  createInitialSubscription,
-  applyAffiliateCodeToExistingSubscription,
   calculateRemainingTrialDays,
   getTodayUsage,
   incrementExpenseAiUsage,
@@ -115,7 +113,7 @@ import { recordTabNavigation, tabFromHistory } from './utils/navigationHistory';
 import { referencesAccount } from './utils/accountDetails';
 import { validateBalance } from './utils/accountLinking';
 
-import { saveUserSubscriptionToFirestore, subscribeUserSubscription, type SubscriptionReadIssue } from './services/prototypeSubscriptionClient';
+import { redeemMarketerCode, subscribeUserSubscription, type SubscriptionReadIssue } from './services/prototypeSubscriptionClient';
 
 const STORAGE_KEY_PREFIX = 'mybucket_';
 
@@ -791,8 +789,8 @@ export default function App() {
         if (!response.ok || !json.ok || !json.data) throw new Error(json.message || 'Cannot read trial settings');
         if (!live) return;
         const before = getTrialDurations();
-        const changed = before.proDays !== json.data.proDays || before.basicDays !== json.data.basicDays;
-        setTrialDurations({ proDays: json.data.proDays, basicDays: json.data.basicDays });
+        const changed = before.basicDays !== json.data.basicDays;
+        setTrialDurations({ basicDays: json.data.basicDays });
         setTrialSettingsReady(true);
         if (changed) setSubscriptionRetry(n => n + 1);
       } catch (error) {
@@ -2155,12 +2153,7 @@ export default function App() {
             subscription={userSubscription}
             subscriptionUnavailable={!!subscriptionError}
             onRetrySubscription={() => setSubscriptionRetry(n => n + 1)}
-            onUpdateSubscription={async (updatedSub) => {
-              if (authUser) {
-                const saved = await saveUserSubscriptionToFirestore(authUser.uid, updatedSub);
-                setUserSubscription(saved);
-              }
-            }}
+            onApplyMarketerCode={authUser ? code => redeemMarketerCode(authUser.uid, code) : undefined}
             onLogin={handleGoogleLogin}
             onLogout={handleGoogleLogout}
             onOpenMobileLink={() => setIsMobileModalOpen(true)}

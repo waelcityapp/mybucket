@@ -1,17 +1,9 @@
 import type { User } from 'firebase/auth';
-import { doc, getDocFromServer, runTransaction } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { auth } from '../lib/firebase';
 import type { UserSubscription } from '../types/subscription';
 import { getTrialDurations, addDays, stageFor } from '../config/subscriptionPolicy';
 
 export type SubscriptionAction = 'subscription.get' | 'subscription.applyAffiliate';
-
-const LOCAL_CODE_PREFIX = 'mybucket_prototype_affiliate_';
-// Temporary Google prototype codes. This is display-only until server redemption is enabled.
-const PROTOTYPE_CODES = new Set([
-  'WAEL2026', 'VIP2025', 'VIP35', 'MARKET50',
-  'OCTOBER2025', 'SAVE35', 'MYBUCKET35',
-]);
 
 type LegacySubscription = Record<string, unknown>;
 
@@ -41,13 +33,11 @@ function normalizeSubscription(raw: LegacySubscription): UserSubscription | null
   const trialStartedAt = dateString(source.trialStartedAt);
   if (!trialStartedAt) return null;
 
-  const savedExpiry = dateString(source.trialExpiresAt);
-  if (!savedExpiry) return null;
-  const expiry = addDays(trialStartedAt, getTrialDurations().basicDays);
-  const code = typeof source.affiliateCode === 'string' && source.affiliateCode.trim()
-    ? source.affiliateCode.trim().toUpperCase()
-    : null;
   const totalDays = getTrialDurations().basicDays;
+  const expiry = addDays(trialStartedAt, totalDays);
+  const code = raw.hasAppliedAffiliateCode === true && typeof raw.affiliateCode === 'string' && raw.affiliateCode.trim()
+    ? raw.affiliateCode.trim().toUpperCase()
+    : null;
   const isPaid = source.isPaid === true;
   const paidExpiresAt = dateString(source.paidExpiresAt);
   const paidPlan = source.paidPlan === 'basic' ? 'basic' : 'pro';
@@ -89,83 +79,9 @@ function fromGoogleRegistration(user: User): UserSubscription {
   })!, recordSource: 'account', trialDatesStored: false };
 }
 
-function localCodeKey(uid: string): string {
-  return `${LOCAL_CODE_PREFIX}${uid}`;
-}
-
-function withCode(subscription: UserSubscription, code: string, temporaryLocalOnly: boolean): UserSubscription {
-  if (subscription.hasAppliedAffiliateCode || subscription.isPaid) return subscription;
-  return {
-    ...subscription,
-    // Code discount only: do not change trial start or expiry.
-    affiliateCode: code,
-    hasAppliedAffiliateCode: true,
-    monthlyPriceEgp: 120,
-    temporaryLocalOnly,
-    trialDatesStored: subscription.trialDatesStored,
-  };
-}
-
-// Resolve data already delivered by Firestore listeners without starting another network read.
-export function resolveSubscriptionRecords(
-  user: User,
-  billing: LegacySubscription | null,
-  profile: LegacySubscription | null
-): UserSubscription {
+export function resolveSubscriptionRecords(user: User, billing: LegacySubscription | null): UserSubscription {
   const subscription = billing ? normalizeSubscription(billing) : fromGoogleRegistration(user);
   if (!subscription) throw new Error('سجل الاشتراك المحفوظ لا يحتوي على تاريخ صالح لحساب الأيام.');
-  if (subscription.hasAppliedAffiliateCode || subscription.isPaid) return subscription;
-  const savedCode = profile?.prototypeAffiliateCode;
-  if (typeof savedCode === 'string' && PROTOTYPE_CODES.has(savedCode)) {
-    return withCode(subscription, savedCode, false);
-  }
-  return subscription;
-}
-
-async function persistPrototypeCode(uid: string, code: string): Promise<void> {
-  const profileRef = doc(db, 'users', uid);
-  await runTransaction(db, async (transaction) => {
-    const profile = await transaction.get(profileRef);
-    if (profile.data()?.prototypeAffiliateCode) {
-      throw new Error('تم تسجيل كود مسوّق مسبقًا لهذا الحساب.');
-    }
-    transaction.set(profileRef, {
-      prototypeAffiliateCode: code,
-      prototypeAffiliateAppliedAt: new Date().toISOString(),
-    }, { merge: true });
-  });
-}
-
-async function readSubscription(user: User): Promise<UserSubscription> {
-  const snapshot = await getDocFromServer(doc(db, 'users', user.uid, 'billing', 'subscription'));
-  let subscription: UserSubscription;
-  if (snapshot.exists()) {
-    const existing = normalizeSubscription(snapshot.data());
-    if (!existing) throw new Error('سجل الاشتراك المحفوظ لا يحتوي على تاريخ صالح لحساب الأيام.');
-    subscription = existing;
-  } else {
-    // The account creation time is stable across browsers; never start a new trial on refresh.
-    subscription = fromGoogleRegistration(user);
-  }
-
-  if (subscription.hasAppliedAffiliateCode || subscription.isPaid) return subscription;
-  const profile = await getDocFromServer(doc(db, 'users', user.uid));
-  const savedCode = profile.data()?.prototypeAffiliateCode;
-  if (typeof savedCode === 'string' && PROTOTYPE_CODES.has(savedCode)) {
-    localStorage.removeItem(localCodeKey(user.uid));
-    return withCode(subscription, savedCode, false);
-  }
-
-  const localCode = localStorage.getItem(localCodeKey(user.uid));
-  if (localCode && PROTOTYPE_CODES.has(localCode)) {
-    try {
-      await persistPrototypeCode(user.uid, localCode);
-      localStorage.removeItem(localCodeKey(user.uid));
-      return withCode(subscription, localCode, false);
-    } catch {
-      return withCode(subscription, localCode, true);
-    }
-  }
   return subscription;
 }
 
@@ -175,18 +91,13 @@ export async function requestSubscription(
   firebaseUser?: User
 ): Promise<UserSubscription> {
   const user = firebaseUser || auth.currentUser;
-  if (!user) throw new Error('سجّل الدخول بحساب Google أولاً.');
-
-  const current = await readSubscription(user);
-  if (action === 'subscription.get') return current;
-
-  const code = typeof payload.code === 'string' ? payload.code.trim().toUpperCase() : '';
-  if (!PROTOTYPE_CODES.has(code)) throw new Error('كود المسوّق غير صحيح أو غير مفعل حالياً.');
-  if (current.hasAppliedAffiliateCode) throw new Error('تم تفعيل كود مسوّق مسبقًا لهذا الحساب.');
-  try {
-    await persistPrototypeCode(user.uid, code);
-  } catch {
-    throw new Error('تعذر حفظ كود المسوّق في Firebase. لم يتم تفعيله؛ حاول مرة أخرى.');
-  }
-  return withCode(current, code, false);
+  if (!user) throw new Error('authentication_required');
+  const response = await fetch('/api/gateway', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + await user.getIdToken() },
+    body: JSON.stringify({ action, payload }),
+  });
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error(result.error || 'subscription_request_failed');
+  return result.data.subscription;
 }

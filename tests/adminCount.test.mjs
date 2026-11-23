@@ -12,7 +12,7 @@ function setup() {
     async getAll(...refs) { docReads += refs.length; return refs.map(ref => ({exists:true, data:()=>({isPaid: Number(ref.path.match(/u(\d+)/)[1]) % 10 === 0, paidExpiresAt:'2099-01-01T00:00:00Z',trialStartedAt:'2026-11-01T00:00:00Z'})})); },
   };
   const readPage = async (_actor, params) => {const start = params.cursor ? users.findIndex(u=>u.uid===params.cursor)+1 : 0; const page = users.slice(start,start+25); return {users:page,nextCursor:start+page.length<users.length?page.at(-1).uid:null};};
-  return {users, deps:{db,readPage,readSettings:async()=>({proDays:15,basicDays:75})}, reads:()=>docReads};
+  return {users, deps:{db,readPage,readSettings:async()=>({basicDays:75})}, reads:()=>docReads};
 }
 
 test('count all uses aggregation rather than loading user details', async () => {
@@ -36,10 +36,10 @@ test('non-admin cannot request a count', async () => {
   const x=setup(); await assert.rejects(countFilteredUsers({uid:'other',email:'other@example.com'},{},x.deps),e=>e.code==='admin_only');
 });
 
-test('trial plan filters distinguish Basic and Pro', async () => {
+test('all introductory accounts are Basic and the legacy Pro filter is empty', async () => {
   const x=setup();
   x.deps.db.getAll = async (...refs) => refs.map(ref => ({exists:true, data:()=>({isPaid:false, trialStartedAt:new Date(Date.now() - (Number(ref.path.match(/u(\d+)/)[1]) % 2 === 0 ? 5 : 30) * 86400000).toISOString()})}));
-  for (const [filter,expected] of [['trial_pro',165],['trial_basic',165]]) {
+  for (const [filter,expected] of [['trial_pro',0],['trial_basic',330]]) {
     let cursor=null,total=0;
     do {const page=await countFilteredUsers(actor,{filter,cursor},x.deps);total+=page.count;cursor=page.nextCursor;} while(cursor);
     assert.equal(total,expected);

@@ -19,8 +19,6 @@ export interface UserSubscription {
   maxHistoricalQueryDays: number;
   createdAt: string;
   updatedAt: string;
-  // Prototype-only marketer code saved on this browser until backend redemption is enabled.
-  temporaryLocalOnly?: boolean;
   recordSource?: 'billing' | 'account';
   trialDatesStored?: boolean;
 }
@@ -28,7 +26,6 @@ export interface UserSubscription {
 export interface AffiliateCodeRecord {
   code: string;
   active: boolean;
-  totalTrialDays: number;
   monthlyPriceEgp: number | null;
   maxRedemptions: number | null;
   redemptionCount: number;

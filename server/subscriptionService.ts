@@ -2,12 +2,10 @@ import type { Request } from 'express';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin.js';
 import type { AffiliateCodeRecord, UserSubscription } from '../src/types/subscription';
-import { BASIC_FREE_DAYS, PRO_PRICE_EGP, addDays, stageFor, type TrialDurations } from '../src/config/subscriptionPolicy.js';
+import { PRO_PRICE_EGP, addDays, stageFor, type TrialDurations } from '../src/config/subscriptionPolicy.js';
 import { grantFromAccess } from '../src/config/grantPolicy.js';
 
-const BASE_TRIAL_DAYS = BASIC_FREE_DAYS;
 const DEFAULT_MONTHLY_PRICE_EGP = PRO_PRICE_EGP;
-const DAY_MS = 24 * 60 * 60 * 1000;
 const CODE_PATTERN = /^[A-Z0-9_-]{3,32}$/;
 
 export class SubscriptionError extends Error {
@@ -69,15 +67,11 @@ export async function verifyAuthenticatedUser(req: Request): Promise<{ uid: stri
   }
 }
 
-function isoAfterDays(startIso: string, days: number): string {
-  return new Date(new Date(startIso).getTime() + days * DAY_MS).toISOString();
-}
-
-function createBaseSubscription(nowIso: string, basicDays = BASE_TRIAL_DAYS): UserSubscription {
+function createBaseSubscription(nowIso: string, basicDays: number): UserSubscription {
   return {
     status: 'trial',
     trialStartedAt: nowIso,
-    trialExpiresAt: isoAfterDays(nowIso, basicDays),
+    trialExpiresAt: addDays(nowIso, basicDays),
     totalTrialDays: basicDays,
     affiliateCode: null,
     affiliateAppliedAt: null,
@@ -137,7 +131,7 @@ export async function getOrCreateSubscription(uid: string, knownDurations?: Tria
   }, durations);
 }
 
-function validateAffiliateCodeRecord(data: AffiliateCodeRecord | undefined, normalizedCode: string) {
+function validateAffiliateCodeRecord(data: AffiliateCodeRecord | undefined) {
   if (!data || data.active !== true) {
     throw new SubscriptionError(404, 'affiliate_code_invalid', 'The marketer code is invalid or inactive.');
   }
@@ -153,10 +147,13 @@ function validateAffiliateCodeRecord(data: AffiliateCodeRecord | undefined, norm
     throw new SubscriptionError(409, 'affiliate_code_limit_reached', 'The marketer code reached its redemption limit.');
   }
 
-  return true; // Valid marketer codes discount Pro, never extend trials.
 }
 
-export async function applyAffiliateCode(uid: string, rawCode: unknown): Promise<UserSubscription> {
+export async function applyAffiliateCode(
+  uid: string,
+  rawCode: unknown,
+  getRegistration = async (userId: string) => (await getAdminAuth().getUser(userId)).metadata.creationTime,
+): Promise<UserSubscription> {
   const normalizedCode = typeof rawCode === 'string' ? rawCode.trim().toUpperCase() : '';
   if (!CODE_PATTERN.test(normalizedCode)) {
     throw new SubscriptionError(400, 'affiliate_code_invalid_format', 'Enter a valid marketer code.');
@@ -169,9 +166,10 @@ export async function applyAffiliateCode(uid: string, rawCode: unknown): Promise
   const codeRef = db.doc(`affiliateCodes/${normalizedCode}`);
   const redemptionRef = codeRef.collection('redemptions').doc(uid);
 
-  const accountCreationTime = (await getAdminAuth().getUser(uid)).metadata.creationTime;
+  const accountCreationTime = await getRegistration(uid);
   if (!Number.isFinite(Date.parse(accountCreationTime))) throw new SubscriptionError(503, 'missing_registration_date', 'Account registration date is unavailable.');
-  const updated = await db.runTransaction(async (transaction) => {
+  const access = await db.doc(`users/${uid}/billing/access`).get();
+  return db.runTransaction(async (transaction) => {
     const [subscriptionSnapshot, codeSnapshot, redemptionSnapshot] = await Promise.all([
       transaction.get(subscriptionRef),
       transaction.get(codeRef),
@@ -189,22 +187,24 @@ export async function applyAffiliateCode(uid: string, rawCode: unknown): Promise
     const codeData = codeSnapshot.exists
       ? ({ code: normalizedCode, ...codeSnapshot.data() } as AffiliateCodeRecord)
       : undefined;
-    validateAffiliateCodeRecord(codeData, normalizedCode);
+    validateAffiliateCodeRecord(codeData);
     const nowIso = new Date().toISOString();
-    const next: UserSubscription = {
-      ...current,
-      status: current.isPaid ? 'paid' : 'trial',
-      totalTrialDays: durations.basicDays,
-      trialExpiresAt: addDays(current.trialStartedAt, durations.basicDays),
+    const discount = {
       affiliateCode: normalizedCode,
       affiliateAppliedAt: nowIso,
       hasAppliedAffiliateCode: true,
       monthlyPriceEgp: codeData?.monthlyPriceEgp ?? current.monthlyPriceEgp,
       updatedAt: nowIso,
     };
-
+    const next: UserSubscription = { ...current, ...discount };
+    const response = withComputedStatus({
+      ...next,
+      grant: grantFromAccess(access.data() || null),
+      totalTrialDays: durations.basicDays,
+      trialExpiresAt: addDays(next.trialStartedAt, durations.basicDays),
+    }, durations);
     if (subscriptionSnapshot.exists) {
-      transaction.set(subscriptionRef, next, { merge: true });
+      transaction.update(subscriptionRef, discount);
     } else {
       transaction.create(subscriptionRef, next);
     }
@@ -218,8 +218,6 @@ export async function applyAffiliateCode(uid: string, rawCode: unknown): Promise
       lastRedeemedAt: nowIso,
     });
 
-    return next;
+    return response;
   });
-
-  return withComputedStatus(updated, durations);
 }

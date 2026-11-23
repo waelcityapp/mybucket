@@ -28,7 +28,7 @@ function toPrototype(sub: StoredSubscription): UserSubscription {
 }
 
 export interface SubscriptionReadIssue {
-  source: 'billing' | 'profile' | 'access' | 'dates' | 'auth';
+  source: 'billing' | 'access' | 'dates' | 'auth';
   code: string;
   messageAr: string;
   messageEn: string;
@@ -44,30 +44,18 @@ export function subscribeUserSubscription(
 ) {
   let active = true;
   let billing: Record<string, unknown> | null | undefined;
-  let profile: Record<string, unknown> | null | undefined;
   let access: Record<string, unknown> | null | undefined;
   let delivered = false;
   const readErrors = new Map<SubscriptionReadIssue['source'], string>();
 
-  const hasSelfContainedBilling = () => {
-    const user = auth.currentUser;
-    if (!user || user.uid !== uid || !billing) return false;
-    try {
-      const subscription = resolveSubscriptionRecords(user, billing, null);
-      return subscription.hasAppliedAffiliateCode || subscription.isPaid;
-    } catch {
-      return false;
-    }
-  };
-
   const report = (source: SubscriptionReadIssue['source'], error: unknown, overrideCode?: string) => {
-    if (!active || (source === 'profile' && hasSelfContainedBilling())) return;
+    if (!active) return;
     const code = overrideCode || (error && typeof error === 'object' && 'code' in error && typeof error.code === 'string'
       ? error.code : 'subscription-read-failed');
     const denied = code === 'permission-denied';
     const timeout = code === 'subscription-read-timeout';
-    const labelAr = source === 'profile' ? 'كود المسوق المحفوظ في الحساب' : source === 'access' ? 'صلاحية الاستخدام' : 'سجل الاشتراك';
-    const labelEn = source === 'profile' ? 'the saved marketer code' : source === 'access' ? 'the access record' : 'the subscription record';
+    const labelAr = source === 'access' ? 'صلاحية الاستخدام' : 'سجل الاشتراك';
+    const labelEn = source === 'access' ? 'the access record' : 'the subscription record';
     console.warn(`Subscription ${source} read failed (${code}):`, error);
     readErrors.set(source, `${source}: ${code}`);
     onError({
@@ -98,7 +86,7 @@ export function subscribeUserSubscription(
 
   const timeout = setTimeout(() => {
     if (active && !delivered) {
-      report(billing === undefined ? 'billing' : access === undefined ? 'access' : 'profile', new Error('No confirmed snapshot within 12 seconds.'), 'subscription-read-timeout');
+      report(billing === undefined ? 'billing' : 'access', new Error('No confirmed snapshot within 12 seconds.'), 'subscription-read-timeout');
     }
   }, 12000);
 
@@ -110,10 +98,8 @@ export function subscribeUserSubscription(
       return;
     }
     try {
-      const sub = resolveSubscriptionRecords(user, billing, profile || null);
+      const sub = resolveSubscriptionRecords(user, billing);
       sub.grant = grantFromAccess(access);
-      // A recorded code or paid status is complete in billing; profile is only needed for a prototype code.
-      if (profile === undefined && !hasSelfContainedBilling()) return;
       clearTimeout(timeout);
       delivered = true;
       readErrors.clear();
@@ -124,15 +110,6 @@ export function subscribeUserSubscription(
     }
   };
 
-  const unsubscribeProfile = onSnapshot(doc(db, 'users', uid), { includeMetadataChanges: true }, (snapshot) => {
-    const fromCache = snapshot.metadata.fromCache;
-    if (fromCache) return;
-    profile = snapshot.exists() ? snapshot.data() : null;
-    refresh();
-  }, error => {
-    clearTimeout(timeout);
-    report('profile', error);
-  });
   const unsubscribeBilling = onSnapshot(doc(db, 'users', uid, 'billing', 'subscription'), { includeMetadataChanges: true }, (snapshot) => {
     const fromCache = snapshot.metadata.fromCache;
     if (fromCache) return;
@@ -150,21 +127,13 @@ export function subscribeUserSubscription(
   return () => {
     active = false;
     clearTimeout(timeout);
-    unsubscribeProfile();
     unsubscribeBilling();
     unsubscribeAccess();
   };
 }
 
-export async function saveUserSubscriptionToFirestore(uid: string, proposed: Partial<UserSubscription>) {
+export async function redeemMarketerCode(uid: string, code: string) {
   const user = auth.currentUser;
-  if (!user || user.uid !== uid) throw new Error('Sign in to update your subscription.');
-  const existing = await requestSubscription('subscription.get', {}, user);
-  if (proposed.affiliateCode && proposed.affiliateCode !== existing.affiliateCode) {
-    return toPrototype(await requestSubscription('subscription.applyAffiliate', { code: proposed.affiliateCode }, user));
-  }
-  if (existing.affiliateCode && !proposed.affiliateCode) {
-    throw new Error('لا يمكن إزالة كود مسجل من سجل الحساب.');
-  }
-  return toPrototype(existing);
+  if (!user || user.uid !== uid) throw new Error('authentication_required');
+  await requestSubscription('subscription.applyAffiliate', { code }, user);
 }

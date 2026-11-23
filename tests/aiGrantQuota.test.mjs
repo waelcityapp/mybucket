@@ -7,7 +7,7 @@ function harness() {
   let data={}, chain=Promise.resolve();
   let sub={trialStartedAt:'2025-01-01T00:00:00.000Z',isPaid:false,grant:{plan:'pro',startsAt:'2026-11-01T00:00:00.000Z',endsAt:'2027-11-01T00:00:00.000Z'}};
   const db={doc:path=>({path}),runTransaction(fn){const call=chain.then(async()=>fn({get:async ref=>({exists:true,data:()=>ref.path.endsWith('/billing/access') ? (sub.grant ? {grantPlan:sub.grant.plan,grantStartsAt:Timestamp.fromDate(new Date(sub.grant.startsAt)),grantUntil:Timestamp.fromDate(new Date(sub.grant.endsAt))} : {}) : ref.path.endsWith('/billing/subscription') ? sub : ({...data})}),set(_ref,fields){for(const [key,value] of Object.entries(fields)) if(value?.constructor?.name==='NumericIncrementTransform')data[key]=(data[key]||0)+value.operand;}}));chain=call.catch(()=>{});return call;}};
-  const deps={db,getSubscription:async()=>sub,getTrials:async()=>({proDays:15,basicDays:75}),getLimits:async()=>({...DEFAULT_AI_DAILY_LIMITS}),now:()=>Date.parse('2026-11-09T10:00:00.000Z')};
+  const deps={db,getSubscription:async()=>sub,getTrials:async()=>({basicDays:75}),getLimits:async()=>({...DEFAULT_AI_DAILY_LIMITS}),now:()=>Date.parse('2026-11-09T10:00:00.000Z')};
   return {deps,setSub:value=>{sub=value;},getData:()=>({...data})};
 }
 

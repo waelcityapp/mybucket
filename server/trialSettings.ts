@@ -1,33 +1,35 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminFirestore } from './firebaseAdmin.js';
+import { BASIC_FREE_DAYS, isBasicTrialDuration } from '../src/config/subscriptionPolicy.js';
 import { SubscriptionError } from './subscriptionService.js';
 
-export type TrialSettings = { proDays: number; basicDays: number; updatedAt: string | null; updatedBy: string | null };
+export type TrialSettings = { basicDays: number; updatedAt: string | null; updatedBy: string | null };
 const SETTINGS_PATH = 'appSettings/subscriptionTrials';
-export const DEFAULT_TRIAL_SETTINGS: TrialSettings = { proDays: 15, basicDays: 75, updatedAt: null, updatedBy: null };
+export const DEFAULT_TRIAL_SETTINGS: TrialSettings = { basicDays: BASIC_FREE_DAYS, updatedAt: null, updatedBy: null };
+
+// The already-open #292 client checks this field when validating Basic settings.
+export function trialSettingsResponse<T extends { basicDays: number }>(settings: T) {
+  return { ...settings, proDays: 1 };
+}
 
 export async function readTrialSettings(): Promise<TrialSettings> {
   const doc = await getAdminFirestore().doc(SETTINGS_PATH).get();
   if (!doc.exists) return { ...DEFAULT_TRIAL_SETTINGS };
   const data = doc.data();
-  const proDays = data?.proDays;
   const basicDays = data?.basicDays;
-  if (!Number.isInteger(proDays) || !Number.isInteger(basicDays) || proDays < 1 || basicDays < proDays || basicDays > 365) {
+  if (!isBasicTrialDuration(basicDays)) {
     throw new SubscriptionError(503, 'invalid_trial_settings', 'Subscription configuration is invalid.');
   }
-  return { proDays, basicDays, updatedAt: typeof data?.updatedAt === 'string' ? data.updatedAt : null, updatedBy: typeof data?.updatedBy === 'string' ? data.updatedBy : null };
+  return { basicDays, updatedAt: typeof data?.updatedAt === 'string' ? data.updatedAt : null, updatedBy: typeof data?.updatedBy === 'string' ? data.updatedBy : null };
 }
 export async function saveTrialSettings(payload: Record<string, unknown>, uid: string): Promise<TrialSettings> {
-  const proDays = payload.proDays;
   const basicDays = payload.basicDays;
-  if (!Number.isInteger(proDays) || !Number.isInteger(basicDays) ||
-      (proDays as number) < 1 || (proDays as number) > 365 ||
-      (basicDays as number) < (proDays as number) || (basicDays as number) > 365) {
-    throw new SubscriptionError(400, 'invalid_trial_duration', 'Pro days must be 1–365 and Basic must be between Pro days and 365.');
+  if (!isBasicTrialDuration(basicDays)) {
+    throw new SubscriptionError(400, 'invalid_trial_duration', 'Basic trial duration must be a whole number from 1 to 365.');
   }
   const db = getAdminFirestore();
   const timestamp = new Date().toISOString();
-  const next: TrialSettings = { proDays: proDays as number, basicDays: basicDays as number, updatedAt: timestamp, updatedBy: uid };
+  const next: TrialSettings = { basicDays, updatedAt: timestamp, updatedBy: uid };
   await db.runTransaction(async tx => {
     const ref = db.doc(SETTINGS_PATH);
     const previous = await tx.get(ref);
@@ -42,8 +44,8 @@ export async function saveTrialSettings(payload: Record<string, unknown>, uid: s
 export type TrialSettingsChange = {
   id: string;
   timestamp: string;
-  previous: { proDays: number; basicDays: number };
-  next: { proDays: number; basicDays: number };
+  previous: { basicDays: number };
+  next: { basicDays: number };
 };
 export async function listTrialSettingsHistory(): Promise<TrialSettingsChange[]> {
   const results = await getAdminFirestore().collection('subscriptionTrialsAudit')
@@ -54,11 +56,9 @@ export async function listTrialSettingsHistory(): Promise<TrialSettingsChange[]>
     if (data.archivedAt) continue; // Hidden from UI, retained for audit integrity.
     const before = data.previous;
     const after = data.next;
-    const beforePro = before?.proDays;
     const beforeBasic = before?.basicDays;
-    const afterPro = after?.proDays;
     const afterBasic = after?.basicDays;
-    if (![beforePro, beforeBasic, afterPro, afterBasic].every(v => Number.isInteger(v) && v >= 1 && v <= 365)) continue;
+    if (!isBasicTrialDuration(beforeBasic) || !isBasicTrialDuration(afterBasic) || beforeBasic === afterBasic) continue;
     const time = typeof data.timestamp?.toDate === 'function' ? data.timestamp.toDate() : null;
     const timestamp = time && Number.isFinite(time.getTime()) ? time.toISOString()
       : typeof after?.updatedAt === 'string' && Number.isFinite(Date.parse(after.updatedAt)) ? after.updatedAt : null;
@@ -66,8 +66,8 @@ export async function listTrialSettingsHistory(): Promise<TrialSettingsChange[]>
     changes.push({
       id: doc.id,
       timestamp,
-      previous: { proDays: beforePro, basicDays: beforeBasic },
-      next: { proDays: afterPro, basicDays: afterBasic },
+      previous: { basicDays: beforeBasic },
+      next: { basicDays: afterBasic },
     });
   }
   return changes;

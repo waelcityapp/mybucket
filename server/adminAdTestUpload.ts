@@ -29,7 +29,7 @@ export function signAdminAdTestUpload(uid: string, payload: Record<string, unkno
   return { cloudName: cfg.cloudName, apiKey: cfg.apiKey, uploadPreset: cfg.uploadPreset, publicId, timestamp, signature, resourceType, deliveryType: 'authenticated' as const };
 }
 
-export async function confirmAdminAdTestUpload(uid: string, payload: Record<string, unknown>, cfg = config(), getResource = fetch, folder: 'test' | 'submissions' | 'receipts' | 'subscription-receipts' = 'test') {
+export async function confirmAdminAdTestUpload(uid: string, payload: Record<string, unknown>, cfg = config(), getResource = fetch, folder: 'test' | 'submissions' | 'receipts' | 'subscription-receipts' = 'test', maxVideoSeconds = 60) {
   owner(uid);
   const resourceType = resource(payload.resourceType);
   const publicId = payload.publicId;
@@ -58,7 +58,7 @@ export async function confirmAdminAdTestUpload(uid: string, payload: Record<stri
     // Admin API can return video_duration with media_metadata=true; retain duration as a fallback.
     const duration = data.video_duration ?? data.duration;
     if (typeof duration !== 'number' || !Number.isFinite(duration) || duration <= 0) return fail('ad_video_duration_unavailable', 422);
-    if (duration > 60) return fail('invalid_video_duration');
+    if (duration > maxVideoSeconds) return fail('invalid_video_duration');
   }
   return { publicId, resourceType, assetId: data.asset_id, secureUrl: secureUrl.href, version, bytes: data.bytes, format: data.format };
 }

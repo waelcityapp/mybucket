@@ -1,3 +1,4 @@
+import { OfferContactActions } from '../OfferContactActions';
 import { followInternalLink } from '../../utils/navigationHistory';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -338,6 +339,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                                   {isAr ? 'مزيد من التفاصيل' : 'More details'} <ForwardIcon className="size-4" aria-hidden="true" />
                                 </a>
                               </div>
+                              {(tier === 'featured' || tier === 'vip') && <OfferContactActions details={ad as PublicOfferAd} lang={lang} />}
                               <OfferCardActions id={ad.id} isAr={isAr} canSave={!demo && supportsOfferFavorites('tier' in ad ? ad.tier : undefined)} state={reactions?.[ad.id]}
                                 engagement={demo ? demoEngagement[ad.id] : 'engagement' in ad ? ad.engagement : undefined}
                                 onReact={reaction => reactToAd(ad.id, demo, reaction)} />

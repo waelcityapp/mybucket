@@ -1,3 +1,4 @@
+import type { AdContactDetails } from '../../utils/adContent';
 import { uploadAdMedia, type SignedAdUpload, type UploadedAdMedia } from '../../services/adMediaUpload';
 import { followInternalLink } from '../../utils/navigationHistory';
 import { AD_TIME_ZONE } from '../../utils/adSchedule';
@@ -12,7 +13,7 @@ import { type AdPriceLock, type AdPriceLockResult, type PaidAdPrices, DEFAULT_PA
 
 import { INSTA_PAY_LINK } from '../../config/instaPay';
 import { compressAdImage } from '../../utils/adImageCompression';
-import { compressAdVideo } from '../../utils/adVideoCompression';
+import { compressAdVideo, validateAdVideoDuration } from '../../utils/adVideoCompression';
 
 type Invoice = AdPriceLock & { id: string; phone: string };
 type PaidPreparation = { submitted: boolean; signed: SignedAdUpload | null; receiptSigned?: SignedAdUpload };
@@ -28,6 +29,8 @@ interface Props {
   adDescription: string;
   categorySlug: string;
   adContact: string;
+  adContacts?: AdContactDetails;
+  videoLimit: number;
   mediaFile?: File | string;
   dailyPriceEgp: number;
   initialInvoice?: Invoice;
@@ -37,7 +40,7 @@ interface Props {
 }
 
 export function AdPaymentCheckout({
-  tier, lang, advertiserName, adTitle, startsAt, endsAt, mediaType, adDescription, categorySlug, adContact, mediaFile, dailyPriceEgp, initialInvoice, onPricesChange, onBack, onNavigate
+  tier, lang, advertiserName, adTitle, startsAt, endsAt, mediaType, adDescription, categorySlug, adContact, adContacts, videoLimit, mediaFile, dailyPriceEgp, initialInvoice, onPricesChange, onBack, onNavigate
 }: Props) {
   const ar = lang === 'ar';
   const [invoice, setInvoice] = useState(initialInvoice);
@@ -111,7 +114,7 @@ export function AdPaymentCheckout({
   const [priceMessage, setPriceMessage] = useState('');
   const adDetails = {
     tier, title: adTitle, description: adDescription, merchant: advertiserName,
-    categorySlug, contact: adContact, paymentPhone: savedPhone,
+    categorySlug, contact: adContact, ...adContacts, paymentPhone: savedPhone,
     startsAt: startsAt.getTime(), endsAt: endsAt.getTime(), resourceType: mediaType === 'none' ? null : mediaType,
   };
 
@@ -184,7 +187,9 @@ export function AdPaymentCheckout({
       if (code === 'ad_upload_daily_limit') setPaymentReady('daily_limit');
       if (code === 'ad_upload_active') setPaymentReady('active');
       if (code === 'ad_upload_paused') setPaymentReady('paused');
-      setSendError(code === 'ad_upload_daily_limit'
+      setSendError(code === 'invalid_video_duration' || code === 'ad_video_duration_unavailable'
+        ? (ar ? `مدة الفيديو تتجاوز ${videoLimit} ثانية أو لا يمكن التحقق منها.` : `The video exceeds ${videoLimit} seconds or its duration could not be verified.`)
+        : code === 'ad_upload_daily_limit'
         ? (ar ? 'حصة رفع الملفات غير كافية حاليًا. جرّب بعد منتصف الليل بتوقيت القاهرة واحتفظ بالإيصال.' : 'Your upload allowance is too low right now. Keep your receipt and retry after midnight Cairo time.')
         : code === 'ad_upload_active' || code === 'ad_upload_paused'
           ? (ar ? 'رفع الملفات غير متاح حاليًا. احتفظ بالإيصال وحاول تاني بعد قليل.' : 'Uploads are temporarily unavailable. Keep your receipt and try again shortly.')
@@ -408,15 +413,30 @@ export function AdPaymentCheckout({
                   setRestoringMedia(true);
                   setRestoredMedia(null);
                   try {
-                    setRestoredMedia(mediaType === 'image' ? await compressAdImage(original) : await compressAdVideo(original));
+                    if (mediaType === 'image') {
+                      setRestoredMedia(await compressAdImage(original));
+                    } else {
+                      let ready = original;
+                      try {
+                        ready = await compressAdVideo(original, undefined, undefined, videoLimit);
+                      } catch (error) {
+                        if (!(error instanceof Error) || error.message !== 'video_compression_unavailable') throw error;
+                      }
+                      if (ready !== original) {
+                        try { await validateAdVideoDuration(ready, videoLimit); }
+                        catch { ready = original; }
+                      }
+                      setRestoredMedia(ready);
+                    }
                   } catch {
                     setMediaError(true);
                   } finally {
                     setRestoringMedia(false);
                   }
                 }} />
+              {mediaType === 'video' && <p className="text-xs">{ar ? `الحد الأقصى للفيديو ${videoLimit} ثانية.` : `Video limit: ${videoLimit} seconds.`}</p>}
               {restoringMedia && <p role="status">{ar ? 'جارٍ تجهيز الملف…' : 'Preparing media…'}</p>}
-              {mediaError && <p role="alert">{ar ? 'تعذّر تجهيز الملف. اختر ملفًا صالحًا.' : 'Could not prepare the media. Choose a valid file.'}</p>}
+              {mediaError && <p role="alert">{ar ? 'تعذّر تجهيز الملف. راجع نوع الملف وحجمه ومدة الفيديو.' : 'Could not prepare the media. Check the file type, size and video limit.'}</p>}
             </section>}
             {invoice && receiptRequired && <section className="space-y-3" aria-labelledby="ad-receipt-title">
               <h2 id="ad-receipt-title" className="flex items-center gap-2 text-sm font-extrabold">

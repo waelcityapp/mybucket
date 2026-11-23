@@ -1,3 +1,4 @@
+import type { AdContactDetails } from '../utils/adContent';
 import type { LegacyAdTransfer } from '../utils/adCheckout';
 
 export const OFFER_CATEGORY_IDS = [
@@ -25,7 +26,7 @@ export type OfferEngagement = { likeCount: number; favoriteCount: number };
 export type OfferReaction = 'liked' | 'saved';
 export type OfferReactionState = { liked: boolean; saved: boolean };
 
-export type PublicOfferAd = {
+export type PublicOfferAd = AdContactDetails & {
   engagement?: OfferEngagement;
   id: string;
   categorySlug: string;

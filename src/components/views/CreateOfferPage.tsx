@@ -1,3 +1,4 @@
+import { AD_NO_LINKS_AR, AD_NO_LINKS_EN, adContactError, adVideoLimit, containsExternalAdLink } from '../../utils/adContent';
 import { type PaidAdPrices, type AdPriceLock, type LegacyAdTransfer } from '../../utils/adCheckout';
 import { AdTierInfoDialog } from './FeaturedAdInfoPage';
 import { followInternalLink } from '../../utils/navigationHistory';
@@ -7,7 +8,7 @@ import { ArrowRight, ArrowLeft, ImagePlus, Megaphone, CheckCircle2, LoaderCircle
 import type { Language } from '../../types';
 import { compressAdImage } from '../../utils/adImageCompression';
 import { captureAdVideoPoster } from '../../utils/adVideoPoster';
-import { compressAdVideo } from '../../utils/adVideoCompression';
+import { compressAdVideo, validateAdVideoDuration } from '../../utils/adVideoCompression';
 import { AdVideoPlayer } from '../AdVideoPlayer';
 import { AdPaymentCheckout } from './AdPaymentCheckout';
 import { AdCreativeCard } from '../AdCreativeCard';
@@ -49,6 +50,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     payment: Omit<AdPriceLock, 'createdAt' | 'legacyTransfer'> & { tier: keyof PaidAdPrices; phone: string };
     createdAt: number;
     legacyTransfer?: LegacyAdTransfer;
+    videoLimit: number;
   }) | null>(null);
   const [invoiceFailed, setInvoiceFailed] = useState(false);
   useEffect(() => {
@@ -104,6 +106,23 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   const [description, setDescription] = useState('');
   const [merchant, setMerchant] = useState('');
   const [contact, setContact] = useState('');
+  const [callPhone, setCallPhone] = useState('');
+  const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [mapsUrl, setMapsUrl] = useState('');
+  const [checkingVideo, setCheckingVideo] = useState(false);
+  const adContacts = { callPhone, whatsappPhone, mapsUrl };
+  const isPaid = tier === 'featured' || tier === 'vip';
+  const videoLimit = adVideoLimit(tier ?? 'free');
+  const contentError = [title, description, merchant, isPaid ? '' : contact].some(containsExternalAdLink)
+    ? 'ad_external_link' : isPaid ? adContactError(adContacts) : null;
+  const contentErrors = {
+    ad_external_link: ar ? 'أزل الروابط الخارجية من نص الإعلان قبل رفع الملفات أو الإرسال.' : 'Remove external links from the ad text before uploading or submitting.',
+    ad_invalid_call_phone: ar ? 'أدخل رقم اتصال مصري أو دولي صحيح، أو اترك الحقل فارغًا.' : 'Enter a valid Egyptian or international phone number, or leave it blank.',
+    ad_invalid_whatsapp_phone: ar ? 'أدخل رقم محمول صحيح لواتساب، أو اترك الحقل فارغًا.' : 'Enter a valid mobile number for WhatsApp, or leave it blank.',
+    ad_invalid_maps_url: ar ? 'أدخل رابط مشاركة صحيح من خرائط Google، أو اترك الحقل فارغًا.' : 'Enter a valid Google Maps share link, or leave it blank.',
+  };
+  const videoLimitMessage = ar ? `اختر فيديو مدته ${new Intl.NumberFormat('ar-EG').format(videoLimit)} ثانية أو أقل.`
+    : `Choose a video no longer than ${videoLimit} seconds.`;
   const [startsAt, setStartsAt] = useState(emptyAdSchedule);
   const [endsAt, setEndsAt] = useState(emptyAdSchedule);
   const [dateError, setDateError] = useState<'invalid' | 'order' | 'past' | null>(null);
@@ -120,6 +139,9 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
         setCategory(ad.categorySlug);
         setMerchant(ad.merchant);
         setContact(ad.contact);
+        setCallPhone(ad.callPhone ?? '');
+        setWhatsappPhone(ad.whatsappPhone ?? '');
+        setMapsUrl(ad.mapsUrl ?? '');
         setReusedMedia(ad.media);
         setRenewState('ready');
       })
@@ -192,9 +214,9 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     setVideoProgress(null);
     setCompressionNotice(false);
   };
-  const handleReview = (event: FormEvent<HTMLFormElement>) => {
+  const handleReview = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!tier || freeFieldsLocked) return;
+    if (!tier || freeFieldsLocked || contentError || checkingVideo || imageStatus === 'compressing' || imageStatus === 'error') return;
     if (tier === 'free') {
       if (previewType === 'video') return;
     } else {
@@ -202,6 +224,19 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
       if (!start || !end) { setDateError('invalid'); return; }
       if (end.getTime() <= start.getTime()) { setDateError('order'); return; }
       if (end.getTime() <= Date.now()) { setDateError('past'); return; }
+      const source = image ?? reusedMedia?.url;
+      if (source && previewType === 'video') {
+        setCheckingVideo(true);
+        try {
+          await validateAdVideoDuration(source, videoLimit);
+        } catch (error) {
+          setMediaError(error instanceof Error && error.message === 'video_too_long' ? 'video_too_long' : 'generic');
+          setImageStatus('error');
+          return;
+        } finally {
+          setCheckingVideo(false);
+        }
+      }
     }
     setDateError(null);
     if (title.trim() && description.trim() && category && merchant.trim()) setPreview(true);
@@ -241,7 +276,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   };
   const sendForReview = async () => {
     if (sendLock.current || cancellingSend || cancelRequired || submitted || tier !== 'free') return;
-    if (freeFieldsLocked || previewType === 'video') return;
+    if (freeFieldsLocked || contentError || previewType === 'video') return;
     sendLock.current = true;
     setSending(true);
     setSendProgress(null);
@@ -287,6 +322,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
         ad_upload_active: ar ? 'عندك ملف قيد الرفع أو التحقق. كمّله أو ألغيه قبل محاولة رفع تانية.' : 'Complete or cancel your current upload before starting another.',
         ad_upload_paused: ar ? 'رفع ملفات الإعلانات متوقف مؤقتًا. حاول لاحقًا.' : 'Ad media uploads are temporarily paused.',
         ad_free_interval: ar ? 'لسه ما مرّتش المدة المطلوبة من آخر إعلان مجاني اتوافق عليه.' : 'Your free-ad interval has not passed since the last approval.',
+        ...contentErrors,
         ad_active_exists: ar ? 'عندك إعلان مجاني نشط. استنى لحد ما مدته تنتهي.' : 'You already have an active free ad. Wait for it to end.',
         ad_free_image_only: ar ? 'الإعلان المجاني يسمح بصورة واحدة اختيارية بدون فيديو.' : 'Free ads allow one optional image and no video.',
         ad_correction_unavailable: ar ? 'الطلب ده مش متاح للتصحيح حاليًا. راجع إعلاناتي.' : 'This ad is no longer available for correction. Check My ads.',
@@ -321,7 +357,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     setPreview(false);
   };
   const goToPayment = () => {
-    if (!prices || !preview || (tier !== 'featured' && tier !== 'vip')) return;
+    if (contentError || !prices || !preview || (tier !== 'featured' && tier !== 'vip')) return;
     if (window.location.pathname !== '/offers/new/payment') {
       window.history.pushState({ myBucketTab: 'offers', offerPaymentPreview: true }, '', '/offers/new/payment');
     }
@@ -344,7 +380,8 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     return <AdPaymentCheckout tier={resumed.payment.tier} lang={lang} advertiserName={resumed.merchant}
       adTitle={resumed.title} startsAt={new Date(resumed.startsAt)} endsAt={new Date(resumed.endsAt)}
       mediaType={resumed.mediaType ?? 'none'} adDescription={resumed.description} categorySlug={resumed.categorySlug}
-      adContact={resumed.contact} dailyPriceEgp={resumed.payment.dailyPriceEgp}
+      adContact={resumed.contact} adContacts={{ callPhone: resumed.callPhone, whatsappPhone: resumed.whatsappPhone, mapsUrl: resumed.mapsUrl }}
+      videoLimit={resumed.videoLimit} dailyPriceEgp={resumed.payment.dailyPriceEgp}
       initialInvoice={{ ...resumed.payment, id: invoiceId, createdAt: resumed.createdAt, legacyTransfer: resumed.legacyTransfer }} onPricesChange={setPrices}
       onBack={onBack} onNavigate={onNavigate} />;
   }
@@ -369,32 +406,32 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
       );
     }
     return <AdPaymentCheckout tier={tier} lang={lang} advertiserName={merchant} adTitle={title} startsAt={start} endsAt={end}
-      mediaType={previewType ?? 'none'} adDescription={description} categorySlug={category} adContact={contact}
+      mediaType={previewType ?? 'none'} adDescription={description} categorySlug={category} adContact="" adContacts={adContacts} videoLimit={videoLimit}
       mediaFile={image ?? reusedMedia?.url} dailyPriceEgp={prices[tier]} onPricesChange={setPrices} onBack={returnFromPayment} onNavigate={onNavigate} />;
   }
 
-  const label = `block text-xs font-extrabold text-slate-700 mb-1.5 ${tier === 'free' ? 'dark:text-slate-300' : ''}`;
-  const field = `w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 ${tier === 'free' ? 'dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100' : ''}`;
+  const label = `block text-xs font-extrabold text-slate-700 mb-1.5 dark:text-slate-300`;
+  const field = `w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100`;
   const BackIcon = ar ? ArrowRight : ArrowLeft;
-  const freeSurface = tier === 'free' ? 'dark:border-slate-700 dark:bg-slate-900' : '';
-  const freeMuted = tier === 'free' ? 'dark:text-slate-300' : '';
+  const formSurface = 'dark:border-slate-700 dark:bg-slate-900';
+  const formMuted = 'dark:text-slate-300';
   return (
-    <div dir={ar ? 'rtl' : 'ltr'} className={`min-h-screen bg-[#F8FAFC] text-slate-900 ${tier === 'free' ? 'dark:bg-slate-950 dark:text-slate-100' : ''}`}>
-      <header className={`bg-white border-b border-slate-200 ${freeSurface}`}>
+    <div dir={ar ? 'rtl' : 'ltr'} className={`min-h-screen bg-[#F8FAFC] text-slate-900 dark:bg-slate-950 dark:text-slate-100`}>
+      <header className={`bg-white border-b border-slate-200 ${formSurface}`}>
         <div className="max-w-xl mx-auto px-4 py-4 flex items-center gap-3">
           <button type="button" disabled={sending || cancellingSend || (hasSubmission && !submitted)} onClick={preview && !submitted ? () => setPreview(false) : onBack}
-            className={`w-11 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 inline-flex items-center justify-center shrink-0 ${tier === 'free' ? 'dark:bg-slate-800 dark:hover:bg-slate-700' : ''}`}
+            className={`w-11 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 inline-flex items-center justify-center shrink-0 dark:bg-slate-800 dark:hover:bg-slate-700`}
             aria-label={ar ? 'العودة' : 'Back'}><BackIcon className="w-5 h-5" /></button>
           <div className="min-w-0">
             <h1 className="font-extrabold text-lg">{preview ? (ar ? 'مراجعة الإعلان' : 'Review advertisement') : (ar ? 'إنشاء إعلان' : 'Create advertisement')}</h1>
-            <p className={`text-xs text-slate-500 ${freeMuted}`}>My Bucket</p>
+            <p className={`text-xs text-slate-500 ${formMuted}`}>My Bucket</p>
           </div>
         </div>
       </header>
       {infoTier && <AdTierInfoDialog lang={lang} tier={infoTier} freeDays={freeDays} durationDays={durationDays} prices={prices} onClose={closeTierInfo} />}
       <main className="max-w-xl mx-auto px-4 py-5 pb-20 space-y-5">
         {renewState !== 'ready' ? (
-          <section className={`rounded-2xl border border-slate-200 bg-white p-5 ${freeSurface}`}>
+          <section className={`rounded-2xl border border-slate-200 bg-white p-5 ${formSurface}`}>
             <p role={renewState === 'error' ? 'alert' : 'status'}>{renewState === 'loading'
               ? (ar ? 'جاري تحميل بيانات الإعلان...' : 'Loading ad details…')
               : (ar ? 'تعذّر فتح الإعلان لإعادة الإرسال. راجع «إعلاناتي» وحاول تاني.' : 'Could not open this ad for resubmission. Check My ads and try again.')}</p>
@@ -410,15 +447,15 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
             </div>
           </section>
         ) : preview ? (
-          <section className={`rounded-2xl border border-slate-200 bg-white p-4 space-y-4 ${freeSurface}`}>
+          <section className={`rounded-2xl border border-slate-200 bg-white p-4 space-y-4 ${formSurface}`}>
             <h2 className="font-extrabold">{ar ? 'معاينة الإعلان قبل الإرسال' : 'Preview before submission'}</h2>
-            <AdCreativeCard lang={lang} title={title} description={description} merchant={merchant} contact={contact} mediaUrl={previewUrl} poster={poster} mediaType={previewType} videoQuotaId="local-ad-preview-demo" />
+            <AdCreativeCard lang={lang} title={title} description={description} merchant={merchant} contact={isPaid ? callPhone : contact} mediaUrl={previewUrl} poster={poster} mediaType={previewType} videoQuotaId="local-ad-preview-demo" />
             {tier === 'free' ? <p className="text-xs text-slate-600 dark:text-slate-300">{freeSchedule}</p> : <>
-            <p className={`text-xs text-slate-600 ${freeMuted}`}>{ar ? 'بداية النشر بتوقيت القاهرة' : 'Publication starts (Cairo time)'} {adScheduleDate(startsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: AD_TIME_ZONE })}</p>
-            <p className={`text-xs text-slate-600 ${freeMuted}`}>{ar ? 'نهاية النشر بتوقيت القاهرة' : 'Publication ends (Cairo time)'} {adScheduleDate(endsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: AD_TIME_ZONE })}</p>
+            <p className={`text-xs text-slate-600 ${formMuted}`}>{ar ? 'بداية النشر بتوقيت القاهرة' : 'Publication starts (Cairo time)'} {adScheduleDate(startsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: AD_TIME_ZONE })}</p>
+            <p className={`text-xs text-slate-600 ${formMuted}`}>{ar ? 'نهاية النشر بتوقيت القاهرة' : 'Publication ends (Cairo time)'} {adScheduleDate(endsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: AD_TIME_ZONE })}</p>
             </>}
-            <button type="button" disabled={hasSubmission || cancellingSend} onClick={() => setPreview(false)} className={`w-full rounded-xl border border-emerald-600 text-emerald-700 py-3 text-sm font-bold disabled:opacity-50 ${tier === 'free' ? 'dark:text-emerald-300' : ''}`}>{ar ? 'تعديل الإعلان' : 'Edit advertisement'}</button>
-            <div className={`space-y-2 rounded-xl bg-slate-50 p-3 text-center ${tier === 'free' ? 'dark:bg-slate-800' : ''}`}>
+            <button type="button" disabled={hasSubmission || cancellingSend} onClick={() => setPreview(false)} className={`w-full rounded-xl border border-emerald-600 text-emerald-700 py-3 text-sm font-bold disabled:opacity-50 dark:text-emerald-300`}>{ar ? 'تعديل الإعلان' : 'Edit advertisement'}</button>
+            <div className={`space-y-2 rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800`}>
               <button type="button" onClick={tier === 'free' ? () => void sendForReview() : goToPayment} disabled={sending || cancellingSend || cancelRequired || sendRecovery === 'changeVideo' || (tier !== 'free' && !prices)}
                 className="w-full rounded-xl bg-emerald-700 px-3 py-3 text-sm font-extrabold text-white hover:bg-emerald-800 disabled:opacity-50">
                 {tier === 'free' ? (sending ? (ar ? 'جاري إرسال الإعلان...' : 'Sending ad…') : (sendRecovery === 'retry' || sendRecovery === 'restartUpload' ? (ar ? 'إعادة المحاولة' : 'Try again') : (ar ? 'إرسال للمراجعة' : 'Send for review'))) : (ar ? 'الانتقال إلى صفحة الدفع' : 'Continue to payment')}
@@ -434,20 +471,20 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                 className="inline-flex min-h-11 items-center gap-1 rounded-xl px-3 text-sm font-bold text-red-700 disabled:opacity-50">
                 <X className="size-5" aria-hidden="true" />{ar ? 'إلغاء الإرسال' : 'Cancel submission'}
               </button>}
-              {cancellingSend && <p role="status" className={`text-xs text-slate-600 ${freeMuted}`}>{ar ? 'جاري إلغاء الإرسال وتنظيف الملف...' : 'Cancelling the submission and cleaning up the media…'}</p>}
+              {cancellingSend && <p role="status" className={`text-xs text-slate-600 ${formMuted}`}>{ar ? 'جاري إلغاء الإرسال وتنظيف الملف...' : 'Cancelling the submission and cleaning up the media…'}</p>}
               {sendProgress !== null && <div className="space-y-1">
                 <p className="text-xs font-bold">{ar ? 'جاري رفع الملف' : 'Uploading media'} <span dir="ltr">{sendProgress}%</span></p>
                 <progress max={100} value={sendProgress} aria-label={ar ? 'تقدّم رفع الملف' : 'Media upload progress'} className="block h-2 w-full accent-emerald-700" />
               </div>}
               {sendError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{sendError}</p>}
-              <p className={`text-xs text-slate-600 ${freeMuted}`}>{tier === 'free'
+              <p className={`text-xs text-slate-600 ${formMuted}`}>{tier === 'free'
                 ? (ar ? 'الإعلان يظهر للجمهور بعد موافقة الإدارة.' : 'Your ad becomes public after the administrator approves it.')
                 : (ar ? 'ادفع عبر إنستا باي وأرسل الإيصال مع الإعلان للمراجعة.' : 'Pay via InstaPay and send the receipt with your ad for review.')}</p>
             </div>
           </section>
         ) : (
           <form onSubmit={handleReview} className="space-y-5">
-            <section className={`bg-white rounded-2xl border border-slate-200 p-4 space-y-3 ${freeSurface}`}>
+            <section className={`bg-white rounded-2xl border border-slate-200 p-4 space-y-3 ${formSurface}`}>
               <h2 className="font-extrabold text-sm">{ar ? '1. نوع الإعلان' : '1. Advertisement type'}</h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {!correctionId && priceFailure && <p role="alert" className="col-span-full text-sm text-rose-700 dark:text-rose-300">
@@ -463,18 +500,18 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                     }
                     setTier(value);
                   }}
-                    className={`min-h-16 rounded-xl border p-3 text-start text-sm font-extrabold transition-colors ${tier === value ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : `border-slate-200 text-slate-700 ${freeMuted}`}`}>
+                    className={`min-h-16 rounded-xl border p-3 text-start text-sm font-extrabold transition-colors ${tier === value ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : `border-slate-200 text-slate-700 ${formMuted}`}`}>
                     {value === 'free' ? (ar ? 'مجاني' : 'Free') : value === 'vip' ? 'VIP' : (ar ? 'مميز' : 'Featured')}
                     {value === 'free' && <span className="mt-1 block text-xs font-normal">
                       {ar ? `انتظار ${new Intl.NumberFormat('ar-EG').format(freeDays)} يوم من آخر موافقة` : `${freeDays} ${freeDays === 1 ? 'day' : 'days'} between approvals`}
                     </span>}
                   </button>
-                  {value !== 'free' && <span className={`text-xs text-slate-600 ${freeMuted}`}>
+                  {value !== 'free' && <span className={`text-xs text-slate-600 ${formMuted}`}>
                     {prices ? (ar ? `${new Intl.NumberFormat('ar-EG').format(prices[value])} جنيه / يوم` : `EGP ${new Intl.NumberFormat('en-EG').format(prices[value])} / day`)
                       : (ar ? 'السعر غير متاح حاليًا' : 'Price currently unavailable')}
                   </span>}
                   <button type="button" aria-haspopup="dialog" onClick={() => setInfoTier(value)}
-                    className={`inline-flex min-h-11 items-center px-1 text-xs font-bold text-emerald-800 underline underline-offset-2 ${tier === 'free' ? 'dark:text-emerald-300' : ''}`}>
+                    className={`inline-flex min-h-11 items-center px-1 text-xs font-bold text-emerald-800 underline underline-offset-2 dark:text-emerald-300`}>
                     {ar ? 'المميزات والأسعار' : 'Benefits and pricing'}
                   </button>
                   </div>
@@ -500,7 +537,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
               {ar ? 'بيانات الطلب السابق جاهزة للتصحيح. أعد الإرسال بصورة واحدة أو بدون صورة.' : 'Your original ad details are ready to edit. Resubmit with one image or without an image.'}
             </p>}
             {tier && !freeFieldsLocked && <fieldset className="m-0 min-w-0 space-y-5 border-0 p-0">
-            <section className={`bg-white rounded-2xl border border-slate-200 p-4 space-y-3 ${freeSurface}`}>
+            <section className={`bg-white rounded-2xl border border-slate-200 p-4 space-y-3 ${formSurface}`}>
               <h2 className="font-extrabold text-sm">{ar ? '2. بيانات الإعلان' : '2. Advertisement details'}</h2>
               <div><label htmlFor="offer-category" className={label}>{ar ? 'القسم' : 'Category'}</label>
                 <select id="offer-category" required value={category} onChange={event => setCategory(event.target.value)} className={field}>
@@ -512,25 +549,39 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                 <input id="offer-title" required maxLength={120} value={title} onChange={event => setTitle(event.target.value)} className={field} placeholder={ar ? 'اكتب عنوانًا واضحًا للإعلان' : 'A clear advertisement title'} />
               </div>
               <div><label htmlFor="offer-desc" className={label}>{ar ? 'التفاصيل' : 'Description'}</label>
-                <textarea id="offer-desc" rows={5} required maxLength={1000} value={description} onChange={event => setDescription(event.target.value.slice(0,1000))} className={field} placeholder={ar ? 'اكتب تفاصيل الإعلان وشروط العرض إن وجدت' : 'Describe the advertisement and any conditions'} /><p aria-live="polite" className={`text-end text-[11px] font-semibold ${1000 - description.length <= 15 ? 'text-red-600' : 'text-slate-500'}`}>{ar ? `المتبقي: ${1000 - description.length} حرف` : `Remaining: ${1000 - description.length} characters`}</p>
+                <textarea id="offer-desc" rows={5} required maxLength={1000} value={description} onChange={event => setDescription(event.target.value.slice(0,1000))} className={field} placeholder={ar ? AD_NO_LINKS_AR : AD_NO_LINKS_EN} /><p aria-live="polite" className={`text-end text-[11px] font-semibold ${1000 - description.length <= 15 ? 'text-red-600' : 'text-slate-500'}`}>{ar ? `المتبقي: ${1000 - description.length} حرف` : `Remaining: ${1000 - description.length} characters`}</p>
               </div>
               <div><label htmlFor="offer-merchant" className={label}>{ar ? 'اسم المعلن أو النشاط' : 'Advertiser or business name'}</label>
                 <input id="offer-merchant" required maxLength={100} value={merchant} onChange={event => setMerchant(event.target.value)} className={field} />
               </div>
-              <div><label htmlFor="offer-contact" className={label}>{ar ? 'وسيلة التواصل (اختياري)' : 'Contact details (optional)'}</label>
+              {isPaid ? <div className="grid gap-3 sm:grid-cols-2">
+                <div><label htmlFor="offer-call-phone" className={label}>{ar ? 'رقم الاتصال (اختياري)' : 'Phone number (optional)'}</label>
+                  <input id="offer-call-phone" type="tel" dir="ltr" maxLength={50} value={callPhone} onChange={event => setCallPhone(event.target.value)}
+                    aria-invalid={contentError === 'ad_invalid_call_phone'} className={field} />
+                </div>
+                <div><label htmlFor="offer-whatsapp-phone" className={label}>{ar ? 'رقم واتساب (اختياري)' : 'WhatsApp number (optional)'}</label>
+                  <input id="offer-whatsapp-phone" type="tel" dir="ltr" maxLength={50} value={whatsappPhone} onChange={event => setWhatsappPhone(event.target.value)}
+                    aria-invalid={contentError === 'ad_invalid_whatsapp_phone'} className={field} />
+                </div>
+                <div className="sm:col-span-2"><label htmlFor="offer-maps-url" className={label}>{ar ? 'رابط خرائط Google (اختياري)' : 'Google Maps link (optional)'}</label>
+                  <input id="offer-maps-url" type="url" dir="ltr" maxLength={2048} value={mapsUrl} onChange={event => setMapsUrl(event.target.value)}
+                    aria-invalid={contentError === 'ad_invalid_maps_url'} className={field} />
+                </div>
+              </div> : <div><label htmlFor="offer-contact" className={label}>{ar ? 'وسيلة التواصل (اختياري)' : 'Contact details (optional)'}</label>
                 <input id="offer-contact" maxLength={200} value={contact} onChange={event => setContact(event.target.value)} className={field} />
-              </div>
+              </div>}
+              {contentError && <p role="alert" className="text-sm font-bold text-rose-700 dark:text-rose-300">{contentErrors[contentError]}</p>}
             </section>
-            <section className={`bg-white rounded-2xl border border-slate-200 p-4 space-y-3 ${freeSurface}`}>
+            <section className={`bg-white rounded-2xl border border-slate-200 p-4 space-y-3 ${formSurface}`}>
               <h2 className="font-extrabold text-sm">{ar ? '3. مدة النشر' : '3. Publication schedule'}</h2>
               {tier === 'free' ? <p className="text-xs text-slate-600 dark:text-slate-300">{freeSchedule}</p> : <>
-              <p className={`text-xs text-slate-500 ${freeMuted}`}>{ar ? 'المواعيد بتوقيت القاهرة. الإعلان لا يظهر إلا بعد موافقة الإدارة.' : 'All times are in Cairo time. The advertisement appears only after admin approval.'}</p>
+              <p className={`text-xs text-slate-500 ${formMuted}`}>{ar ? 'المواعيد بتوقيت القاهرة. الإعلان لا يظهر إلا بعد موافقة الإدارة.' : 'All times are in Cairo time. The advertisement appears only after admin approval.'}</p>
               <AdScheduleFields id="start" lang={lang} value={startsAt} onChange={value => { setStartsAt(value); setDateError(null); }} />
               <AdScheduleFields id="end" lang={lang} value={endsAt} onChange={value => { setEndsAt(value); setDateError(null); }} />
               {dateError && <p role="alert" className="text-xs font-bold text-red-700">{dateError === 'invalid' ? (ar ? 'يرجى اختيار تاريخ ووقت صحيحين لبداية النشر ونهايته.' : 'Please choose valid start and end dates and times.') : dateError === 'order' ? (ar ? 'يجب أن يكون موعد نهاية النشر بعد موعد بدايته.' : 'The publication end must be after its start.') : (ar ? 'موعد نهاية النشر قد مضى. يرجى اختيار موعد في المستقبل.' : 'The publication end has passed. Please choose a future date and time.')}</p>}
               </>}
             </section>
-            <section className={`bg-white rounded-2xl border border-slate-200 p-4 space-y-3 ${freeSurface}`}>
+            <section className={`bg-white rounded-2xl border border-slate-200 p-4 space-y-3 ${formSurface}`}>
               <h2 className="flex items-center gap-2 font-extrabold text-sm"><ImagePlus className="w-5 h-5 text-emerald-700" aria-hidden="true" />{tier === 'free'
                 ? (ar ? '4. صورة الإعلان (اختيارية)' : '4. Ad image (optional)')
                 : (ar ? '4. صورة أو فيديو الإعلان (اختياري)' : '4. Advertisement image or video (optional)')}</h2>
@@ -538,7 +589,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
               <input ref={fileInput} type="file" hidden onChange={async event => {
                 const input = event.currentTarget;
                 const next = input.files?.[0];
-                if (!next) return;
+                if (!next || contentError === 'ad_external_link' || checkingVideo) return;
                 const acceptedTypes = input.accept.split(',');
                 input.value = '';
                 const selection = ++imageSelection.current;
@@ -558,9 +609,14 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                   const result = isVideo
                     ? await compressAdVideo(next, progress => {
                       if (selection === imageSelection.current) setVideoProgress(progress);
-                    }, controller.signal)
+                    }, controller.signal, videoLimit)
                     : await compressAdImage(next, controller.signal);
-                  if (selection === imageSelection.current) { setImage(result); setImageStatus('ready'); }
+                  let selected = result;
+                  if (isVideo && result !== next) {
+                    try { await validateAdVideoDuration(result, videoLimit); }
+                    catch { selected = next; }
+                  }
+                  if (selection === imageSelection.current) { setImage(selected); setImageStatus('ready'); }
                 } catch (error) {
                   if (selection === imageSelection.current) {
                     const code = error instanceof Error ? error.message : '';
@@ -573,7 +629,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                 <div className={`grid min-w-0 flex-1 grid-cols-1 gap-2 ${tier !== 'free' ? 'sm:grid-cols-2' : ''}`}>
                   {(tier === 'free' ? ['image'] as const : ['image', 'video'] as const).map(kind => {
                     const Icon = kind === 'image' ? ImagePlus : Video;
-                    return <button key={kind} type="button" onClick={() => openMediaPicker(kind)}
+                    return <button key={kind} type="button" disabled={contentError === 'ad_external_link' || checkingVideo} onClick={() => openMediaPicker(kind)}
 
                       className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-2 text-sm font-bold text-emerald-900 hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-emerald-700 disabled:opacity-50">
                       <Icon className="size-4 shrink-0" aria-hidden="true" />
@@ -588,11 +644,12 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                   <X className="size-5" aria-hidden="true" />
                 </button>}
               </div>
-              <p className={`text-xs text-slate-500 ${freeMuted}`}>{tier === 'free'
+              <p className={`text-xs text-slate-500 ${formMuted}`}>{tier === 'free'
                 ? (ar ? 'صورة واحدة بحد أقصى ٥ ميجابايت. الرفع يبدأ عند الإرسال للمراجعة.' : 'One image up to 5 MB. It uploads when you submit for review.')
-                : ar ? 'الصور حتى ٥ ميجابايت، والفيديو حتى ٢٥ ميجابايت ومدته دقيقة كحد أقصى. الملف بيتجهّز على جهازك، والرفع يبدأ عند الإرسال للمراجعة.' : 'Images up to 5 MB. Videos up to 25 MB and one minute. Files are prepared on your device and uploaded when you submit for review.'}</p>
+                : ar ? 'الصور حتى ٥ ميجابايت، والفيديو حتى ٢٥ ميجابايت. الملف بيتجهّز على جهازك، والرفع يبدأ عند الإرسال للمراجعة.' : 'Images up to 5 MB. Videos up to 25 MB. Files are prepared on your device and uploaded when you submit for review.'}</p>
+              {tier !== 'free' && <p className="text-xs text-slate-600 dark:text-slate-300">{videoLimitMessage}</p>}
               {imageStatus === 'compressing' && (videoProgress === null
-                ? <p role="status" className={`text-xs text-slate-600 ${freeMuted}`}>{ar ? 'جاري تجهيز الصورة...' : 'Preparing the image…'}</p>
+                ? <p role="status" className={`text-xs text-slate-600 ${formMuted}`}>{ar ? 'جاري تجهيز الصورة...' : 'Preparing the image…'}</p>
                 : <div className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-900">
                   <div className="flex items-center justify-between gap-2 text-sm font-bold">
                     <p role="status">{videoProgress === 'checking'
@@ -605,14 +662,14 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                     className="block h-2.5 w-full accent-emerald-700" />
                   <p className="text-xs">{ar ? 'التجهيز بيتم على جهازك وقد يستغرق مدة الفيديو. خليك في الصفحة لحد ما تظهر المعاينة.' : 'Preparation runs on your device and can take as long as the video. Keep this page open until the preview appears.'}</p>
                 </div>)}
-              {imageStatus === 'ready' && <p role="status" className={`text-xs text-emerald-700 ${tier === 'free' ? 'dark:text-emerald-300' : ''}`}>{ar ? 'الملف جاهز للمعاينة.' : 'File is ready for preview.'}</p>}
+              {imageStatus === 'ready' && <p role="status" className={`text-xs text-emerald-700 dark:text-emerald-300`}>{ar ? 'الملف جاهز للمعاينة.' : 'File is ready for preview.'}</p>}
               {compressionNotice && <p className="text-xs text-amber-800">{ar ? 'المتصفح لا يدعم ضغط الفيديو؛ المعاينة تستخدم الملف الأصلي على جهازك.' : 'This browser cannot compress video; the local preview uses the original file.'}</p>}
-              {imageStatus === 'error' && <p role="alert" className={`text-xs text-red-700 ${tier === 'free' ? 'dark:text-red-300' : ''}`}>{mediaError === 'video_too_long' ? (ar ? 'مدة الفيديو أكتر من دقيقة. اختار فيديو مدته دقيقة أو أقل.' : 'The video is longer than one minute. Choose a video of one minute or less.') : mediaError === 'video_too_large' ? (ar ? 'حجم الفيديو أكبر من 25 ميجابايت. اختار ملفًا أصغر.' : 'The video exceeds 25 MB. Choose a smaller file.') : (ar ? 'تعذر تجهيز الملف. تأكد من الحجم ونوع الملف ودعم المتصفح.' : 'Could not prepare the file. Check its size, type and browser support.')}</p>}
+              {imageStatus === 'error' && <p role="alert" className={`text-xs text-red-700 dark:text-red-300`}>{mediaError === 'video_too_long' ? videoLimitMessage : mediaError === 'video_too_large' ? (ar ? 'حجم الفيديو أكبر من 25 ميجابايت. اختار ملفًا أصغر.' : 'The video exceeds 25 MB. Choose a smaller file.') : (ar ? 'تعذر تجهيز الملف. تأكد من الحجم ونوع الملف ودعم المتصفح.' : 'Could not prepare the file. Check its size, type and browser support.')}</p>}
               {previewUrl && (previewType === 'video' ? <AdVideoPlayer src={previewUrl} poster={poster} label={ar ? 'معاينة فيديو الإعلان' : 'Advertisement video preview'} className="w-full max-h-48 object-contain rounded-xl bg-slate-50" /> : <img src={previewUrl} alt={ar ? 'معاينة الصورة' : 'Image preview'} className="w-full max-h-48 object-contain rounded-xl bg-slate-50" />)}
 
 
             </section>
-            <button type="submit" disabled={imageStatus === 'compressing'} className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold py-3 flex justify-center items-center gap-2"><Megaphone className="w-5 h-5" />{ar ? 'مراجعة الإعلان' : 'Review advertisement'}</button>
+            <button type="submit" disabled={imageStatus === 'compressing' || imageStatus === 'error' || checkingVideo || !!contentError} className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold py-3 flex justify-center items-center gap-2"><Megaphone className="w-5 h-5" />{ar ? 'مراجعة الإعلان' : 'Review advertisement'}</button>
             </fieldset>}
           </form>
         )}

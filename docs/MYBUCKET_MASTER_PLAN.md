@@ -1,5 +1,11 @@
 # MyBucket — Master Implementation Plan
 
+## Featured and VIP contact and media (#295)
+
+- Paid advertisements can store separate call, mobile WhatsApp and Google Maps contact fields. Published actions use validated values, and existing contact details continue to display.
+- New ad text cannot include external links. Video limits are 30 seconds for Featured and 60 seconds for VIP, with both browser and verified Cloudinary duration checks. Free still accepts no video. Previously locked paid invoices retain their original content policy.
+- Pricing, invoice totals, receipt approval and stored legacy records remain in their existing paths.
+
 ## Paid ad pricing settings (#294)
 
 - Ad administration manages daily Featured and VIP rates in the existing Firestore ad policy. An absent pricing configuration uses EGP 100 and EGP 200, respectively.

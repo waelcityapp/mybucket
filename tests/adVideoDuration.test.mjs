@@ -26,3 +26,10 @@ test('rejects unreadable duration before compression', async () => {
   mockVideo(NaN);
   await assert.rejects(compressAdVideo({type:'video/mp4',size:100}),/invalid_video_duration/);
 });
+
+test('rejects Featured over 30 seconds and accepts its exact boundary before compression', async () => {
+  mockVideo(30.01);
+  await assert.rejects(compressAdVideo({type:'video/mp4',size:100}, undefined, undefined, 30), /video_too_long/);
+  mockVideo(30);
+  await assert.rejects(compressAdVideo({type:'video/mp4',size:100}, undefined, undefined, 30), /video_compression_unavailable/);
+});

@@ -1,5 +1,5 @@
 /** Compress using native browser APIs; never silently claim compression on unsupported devices. */
-export async function compressAdVideo(file: File, onProgress?: (percent: number) => void, signal?: AbortSignal): Promise<File> {
+export async function compressAdVideo(file: File, onProgress?: (percent: number) => void, signal?: AbortSignal, maxSeconds = 60): Promise<File> {
   signal?.throwIfAborted();
   if (!['video/mp4', 'video/webm', 'video/quicktime'].includes(file.type)) throw new Error('unsupported_video');
   const video = document.createElement('video');
@@ -21,7 +21,7 @@ export async function compressAdVideo(file: File, onProgress?: (percent: number)
     });
     signal?.throwIfAborted();
     if (!Number.isFinite(video.duration) || video.duration <= 0) throw new Error('invalid_video_duration');
-    if (video.duration > 60) throw new Error('video_too_long');
+    if (video.duration > maxSeconds) throw new Error('video_too_long');
     if (file.size > 25 * 1024 * 1024) throw new Error('video_too_large');
     if (typeof MediaRecorder === 'undefined') throw new Error('video_compression_unavailable');
     const capture = (video as HTMLVideoElement & { captureStream?: () => MediaStream; mozCaptureStream?: () => MediaStream }).captureStream
@@ -63,4 +63,28 @@ export async function compressAdVideo(file: File, onProgress?: (percent: number)
     stream?.getTracks().forEach(track => track.stop());
     video.removeAttribute('src'); video.load(); URL.revokeObjectURL(sourceUrl);
   }
+}
+
+
+export function validateAdVideoDuration(source: File | string, seconds: number): Promise<void> {
+  const video = document.createElement('video');
+  const objectUrl = typeof source === 'string' ? null : URL.createObjectURL(source);
+  return new Promise((resolve, reject) => {
+    const finish = (error?: string) => {
+      window.clearTimeout(timer);
+      video.onloadedmetadata = null;
+      video.onerror = null;
+      video.removeAttribute('src');
+      video.load();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      if (error) reject(new Error(error));
+      else resolve();
+    };
+    const timer = window.setTimeout(() => finish('invalid_video_duration'), 10000);
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => finish(!Number.isFinite(video.duration) || video.duration <= 0
+      ? 'invalid_video_duration' : video.duration > seconds ? 'video_too_long' : undefined);
+    video.onerror = () => finish('invalid_video_duration');
+    video.src = typeof source === 'string' ? source : objectUrl!;
+  });
 }

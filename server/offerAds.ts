@@ -1,3 +1,4 @@
+import { adContactError, adVideoLimit, containsExternalAdLink, normalizeAdPhone, normalizeGoogleMapsUrl } from '../src/utils/adContent.js';
 import { DEFAULT_PAID_AD_PRICES, isPaidAdPrice, paidAdDailyPrice, adRunDays, normalizePaymentContactPhone, normalizeAdTransferReference, type LegacyAdTransfer } from '../src/utils/adCheckout.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { getAdminFirestore } from './firebaseAdmin.js';
@@ -32,6 +33,7 @@ type StoredAd = AdFields & {
   rejectionReason: string;
   paidPrepared?: boolean;
   priceLockedAt?: number;
+  adContentVersion?: 1;
   legacyTransfer?: LegacyAdTransfer;
   confirmedTransfer?: { reference: string; amountEgp: number; transferredAt?: number };
   uploadCleanupClaim?: { id: string; expiresAt: number };
@@ -71,9 +73,21 @@ function adFields(payload: Payload, paid: boolean): AdFields {
     title: field(payload.title, 120),
     description: field(payload.description, 1000),
     merchant: field(payload.merchant, 100),
-    contact: field(payload.contact, 200, false),
+    contact: field(payload.contact ?? '', 200, false),
+    ...(payload.callPhone !== undefined && { callPhone: field(payload.callPhone, 50, false) }),
+    ...(payload.whatsappPhone !== undefined && { whatsappPhone: field(payload.whatsappPhone, 50, false) }),
+    ...(payload.mapsUrl !== undefined && { mapsUrl: field(payload.mapsUrl, 2048, false) }),
     ...(paid ? expiry(payload, Date.now(), true) : { startsAt: 0, endsAt: 0 }),
   };
+}
+
+function validateAdContent(fields: AdFields, paid: boolean) {
+  if ([fields.title, fields.merchant, fields.description, fields.contact].some(value => typeof value === 'string' && containsExternalAdLink(value))) {
+    return fail('ad_external_link');
+  }
+  if (!paid && (fields.callPhone || fields.whatsappPhone || fields.mapsUrl)) return fail('invalid_ad_details');
+  const error = adContactError(fields);
+  if (error) return fail(error);
 }
 
 function mediaView(media: StoredMedia, thumbnail = false): PublicOfferAd['media'] {
@@ -101,8 +115,9 @@ function requiresVideoCorrection(ad: StoredAd) {
 }
 
 function offerView(id: string, ad: StoredAd): PublicOfferAd {
-  const { title, description, merchant, categorySlug, contact, startsAt, endsAt, media } = ad;
-  return { id, title, description, merchant, categorySlug, contact, startsAt, endsAt, engagement: engagementOf(ad), tier: offerTier(ad), media: media ? mediaView(media) : undefined };
+  const { title, description, merchant, categorySlug, contact, startsAt, endsAt, media, callPhone, whatsappPhone, mapsUrl } = ad;
+  return { id, title, description, merchant, categorySlug, contact, startsAt, endsAt,
+    ...(callPhone && { callPhone }), ...(whatsappPhone && { whatsappPhone }), ...(mapsUrl && { mapsUrl }), engagement: engagementOf(ad), tier: offerTier(ad), media: media ? mediaView(media) : undefined };
 }
 
 export function isPublicOffer(ad: Pick<StoredAd, 'status' | 'startsAt' | 'endsAt'>, now: number) {
@@ -428,7 +443,7 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
       return fail('ad_invoice_unavailable', 404);
     }
     return { ...offerView(id, ad), mediaType: ad.mediaType, payment: ad.payment,
-      createdAt: ad.priceLockedAt, legacyTransfer: ad.legacyTransfer };
+      createdAt: ad.priceLockedAt, legacyTransfer: ad.legacyTransfer, videoLimit: ad.adContentVersion ? adVideoLimit(offerTier(ad)) : 60 };
   }
 
   if (action === 'ads.cancel') {
@@ -495,6 +510,13 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
         if (lockPrice) return fail('ad_already_submitted', 409);
         return { submitted: true, signed: null };
       }
+      const applyContentPolicy = !existing?.payment || existing.adContentVersion === 1;
+      if (applyContentPolicy) {
+        validateAdContent(fields, featured);
+        if (fields.callPhone) fields.callPhone = normalizeAdPhone(fields.callPhone) ?? '';
+        if (fields.whatsappPhone) fields.whatsappPhone = normalizeAdPhone(fields.whatsappPhone, true) ?? '';
+        if (fields.mapsUrl) fields.mapsUrl = normalizeGoogleMapsUrl(fields.mapsUrl) ?? '';
+      }
       if (!featured) await assertFreeOfferAvailable(db, tx, uid, id, now);
       if (existing && (existing.payment ? existing.payment.tier ?? 'featured' : null) !== paidTier) return fail('invalid_ad_details');
       if (existing && existing.correctionId !== correctionId) return fail('invalid_ad_details');
@@ -508,7 +530,9 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
         const previous = existing?.legacyTransfer;
         const sameClaim = !lockPrice || (previous?.reference === legacyTransfer?.reference &&
           previous?.transferredAt === legacyTransfer?.transferredAt && previous?.amountEgp === legacyTransfer?.amountEgp);
-        const sameInvoice = sameClaim && payment.phone === phone && Object.entries(fields).every(([key, value]) => existing?.[key as keyof StoredAd] === value);
+        const sameInvoice = sameClaim && payment.phone === phone &&
+          Object.entries(fields).every(([key, value]) => (existing?.[key as keyof StoredAd] ?? '') === value) &&
+          (['callPhone', 'whatsappPhone', 'mapsUrl'] as const).every(key => (existing?.[key] ?? '') === (fields[key] ?? ''));
         if (!sameInvoice || payment.amountEgp !== payload.amountEgp) return fail('ad_invoice_mismatch', 409);
       } else if (paidTier && days !== null && phone) {
         if (!lockPrice) return fail('ad_invoice_not_locked', 409);
@@ -524,7 +548,7 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
         if (!payment || payment.dailyPriceEgp === undefined || (existing && !existing.priceLockedAt)) return fail('ad_invoice_unavailable', 409);
         if (!existing) tx.create(ref, {
           ...fields, ownerId: uid, status: 'draft', mediaType, media: null,
-          submittedAt: 0, rejectionReason: '', payment, priceLockedAt: now, ...(legacyTransfer && { legacyTransfer }),
+          submittedAt: 0, rejectionReason: '', payment, priceLockedAt: now, adContentVersion: 1, ...(legacyTransfer && { legacyTransfer }),
         });
         return { priceChanged: false, dailyPriceEgp: payment.dailyPriceEgp, amountEgp: payment.amountEgp,
           createdAt: existing?.priceLockedAt ?? now, ...((existing?.legacyTransfer ?? legacyTransfer) && { legacyTransfer: existing?.legacyTransfer ?? legacyTransfer }) };
@@ -561,6 +585,7 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
         ...(correctionId && { correctionId }),
         ...(permits && { uploadDay: existing?.uploadDay || day, uploadCleanupAt: existing?.uploadCleanupAt || now + DAY }),
         ...(payment && { payment }),
+        ...(applyContentPolicy && { adContentVersion: 1 }),
         ...(existing?.priceLockedAt && { priceLockedAt: existing.priceLockedAt }),
         ...(existing?.legacyTransfer && { legacyTransfer: existing.legacyTransfer }),
         ...(payment && !permits && { paidPrepared: true }),
@@ -577,6 +602,7 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
     expiry(draft, Date.now(), true);
     if (draft.payment.dailyPriceEgp !== undefined && !draft.uploadDay && !draft.paidPrepared) return fail('ad_invoice_not_prepared', 409);
   }
+  if (!draft.payment || draft.adContentVersion) validateAdContent(draft, !!draft.payment);
   if (requiresVideoCorrection(draft)) return fail('ad_free_image_only');
 
   let media: StoredMedia | null = null;
@@ -584,7 +610,8 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
   if (draft.mediaType) {
     const publicId = `mybucket/ads/submissions/${uid}/${id}`;
     if (payload.publicId !== publicId || payload.resourceType !== draft.mediaType) return fail('invalid_upload_request');
-    const confirmed = await confirmAdminAdTestUpload(uid, payload, undefined, undefined, 'submissions');
+    const confirmed = await confirmAdminAdTestUpload(uid, payload, undefined, undefined, 'submissions',
+      draft.adContentVersion ? adVideoLimit(offerTier(draft)) : 60);
     verifiedBytes = confirmed.bytes;
     media = { publicId, resourceType: confirmed.resourceType, version: confirmed.version, format: confirmed.format };
   }
@@ -619,6 +646,7 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
     if (latest.status === 'cancelled') return fail('ad_cancelled', 409);
     if (latest.status !== 'draft') return;
     if (latest.payment) expiry(latest, Date.now(), true);
+    if (!latest.payment || latest.adContentVersion) validateAdContent(latest, !!latest.payment);
     if (requiresVideoCorrection(latest)) return fail('ad_free_image_only');
     if (!latest.payment) await assertFreeOfferAvailable(db, tx, uid, id, Date.now());
     if (latest.correctionId !== draft.correctionId) return fail('invalid_ad_details');

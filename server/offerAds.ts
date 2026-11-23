@@ -1,5 +1,5 @@
-import { paidAdDailyPrice, adRunDays, normalizePaymentContactPhone } from '../src/utils/adCheckout.js';
-import { createHash } from 'node:crypto';
+import { DEFAULT_PAID_AD_PRICES, isPaidAdPrice, paidAdDailyPrice, adRunDays, normalizePaymentContactPhone, normalizeAdTransferReference, type LegacyAdTransfer } from '../src/utils/adCheckout.js';
+import { createHash, randomUUID } from 'node:crypto';
 import { getAdminFirestore } from './firebaseAdmin.js';
 import { confirmAdminAdTestUpload, deleteAdminAdTestUpload, signAdminAdTestUpload } from './adminAdTestUpload.js';
 import { SubscriptionError } from './subscriptionService.js';
@@ -23,13 +23,18 @@ type StoredAd = AdFields & {
   status: OfferAdStatus | 'draft' | 'cancelled' | 'deleting';
   mediaType: StoredMedia['resourceType'] | null;
   media: StoredMedia | null;
-  payment?: { method: 'instapay'; tier?: 'featured' | 'vip'; amountEgp: number; phone: string };
+  payment?: { method: 'instapay'; tier?: 'featured' | 'vip'; amountEgp: number; dailyPriceEgp?: number; phone: string };
   receipt?: StoredMedia;
   submittedAt: number;
   reviewedAt?: number;
   uploadDay?: string;
   uploadCleanupAt?: number;
   rejectionReason: string;
+  paidPrepared?: boolean;
+  priceLockedAt?: number;
+  legacyTransfer?: LegacyAdTransfer;
+  confirmedTransfer?: { reference: string; amountEgp: number; transferredAt?: number };
+  uploadCleanupClaim?: { id: string; expiresAt: number };
   correctionId?: string;
   correctedBy?: string;
 };
@@ -217,6 +222,31 @@ export async function readMyOfferAds(uid: string, db = getAdminFirestore()): Pro
 
 const policyRef = (db: ReturnType<typeof getAdminFirestore>) => db.collection('offerAdSettings').doc('policy');
 
+function paidOfferPrices(settings?: FirebaseFirestore.DocumentData) {
+  const prices = settings?.paidPrices;
+  if (prices === undefined) return DEFAULT_PAID_AD_PRICES;
+  if (!isPaidAdPrice(prices?.featured) || !isPaidAdPrice(prices?.vip)) {
+    return fail('ad_prices_unavailable', 503);
+  }
+  return { featured: prices.featured, vip: prices.vip };
+}
+
+function readLegacyTransfer(value: unknown): LegacyAdTransfer {
+  const input = value as Partial<LegacyAdTransfer> | undefined;
+  const reference = normalizeAdTransferReference(input?.reference);
+  const transferredAt = input?.transferredAt;
+  const amountEgp = input?.amountEgp;
+  if (!reference || typeof transferredAt !== 'number' || !Number.isSafeInteger(transferredAt) ||
+      transferredAt <= 0 || transferredAt > Date.now() || typeof amountEgp !== 'number' ||
+      !Number.isSafeInteger(amountEgp) || amountEgp <= 0) return fail('ad_legacy_transfer_invalid');
+  return { reference, transferredAt, amountEgp };
+}
+
+function requiresPaidReceipt(payment?: StoredAd['payment']) {
+  return !!payment && (payment.amountEgp !== 0 || payment.dailyPriceEgp !== 0);
+}
+
+
 // The phase-one waiting period has a new storage key so an old saved interval
 // cannot override the initial 14 days. The admin and client API keep their field names.
 function freeOfferPolicy(settings?: FirebaseFirestore.DocumentData): FreeOfferPolicy {
@@ -316,11 +346,13 @@ async function purgeAbandonedUpload(doc: FirebaseFirestore.QueryDocumentSnapshot
     const ad = (await tx.get(doc.ref)).data() as StoredAd | undefined;
     if (!ad || (ad.status !== 'draft' && ad.status !== 'cancelled') || (!ad.mediaType && !ad.payment) ||
         !ad.uploadCleanupAt || ad.uploadCleanupAt > Date.now()) return null;
+    if (ad.priceLockedAt && (ad.uploadCleanupClaim?.expiresAt ?? 0) > Date.now()) return null;
+    const claim = ad.priceLockedAt ? { id: randomUUID(), expiresAt: Date.now() + 5 * 60_000 } : undefined;
     const lease = activeUpload(db, ad.ownerId);
     const leaseData = (await tx.get(lease)).data();
     if (leaseData?.id === doc.id) tx.delete(lease);
-    tx.update(doc.ref, { status: 'cancelled' });
-    return { ownerId: ad.ownerId, type: ad.mediaType, paid: !!ad.payment };
+    tx.update(doc.ref, { status: 'cancelled', ...(claim && { uploadCleanupClaim: claim }) });
+    return { ownerId: ad.ownerId, type: ad.mediaType, paid: requiresPaidReceipt(ad.payment), claim };
   });
   if (!asset) return;
   if (asset.type) await deleteAdminAdTestUpload(asset.ownerId, {
@@ -329,7 +361,15 @@ async function purgeAbandonedUpload(doc: FirebaseFirestore.QueryDocumentSnapshot
   if (asset.paid) await deleteAdminAdTestUpload(asset.ownerId, {
     publicId: `mybucket/ads/receipts/${asset.ownerId}/${doc.id}`, resourceType: 'image',
   }, undefined, undefined, 'receipts');
-  await doc.ref.delete();
+  if (!asset.claim) {
+    await doc.ref.delete();
+    return;
+  }
+  await db.runTransaction(async tx => {
+    const snapshot = await tx.get(doc.ref);
+    if (snapshot.get('uploadCleanupClaim')?.id !== asset.claim?.id) return;
+    tx.update(doc.ref, { status: 'draft', uploadDay: '', uploadCleanupAt: 0, uploadCleanupClaim: null });
+  });
 }
 
 export async function purgeExpiredOffers(db = getAdminFirestore()) {
@@ -352,6 +392,7 @@ export async function purgeExpiredOffers(db = getAdminFirestore()) {
 
 export async function sendOfferAd(action: string, uid: string, payload: Payload, db = getAdminFirestore(), isOwner = false, destroy = deleteAdminAdTestUpload) {
   const uploadLimit = isOwner ? OWNER_MAX_UPLOADS : MAX_UPLOADS;
+  if (action === 'ads.paidPrices') return paidOfferPrices((await policyRef(db).get()).data());
   if (action === 'ads.paidAvailability') {
     const now = Date.now();
     const [usage, lease, policy] = await Promise.all([
@@ -381,6 +422,15 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
   if (action === 'ads.deleteExpired') return removeExpiredOffer(uid, id, db);
   const ref = db.collection('offerAds').doc(id);
 
+  if (action === 'ads.resumePayment') {
+    const ad = (await ref.get()).data() as StoredAd | undefined;
+    if (!ad || ad.ownerId !== uid || (ad.status !== 'draft' && ad.status !== 'cancelled') || !ad.priceLockedAt || ad.payment?.dailyPriceEgp === undefined) {
+      return fail('ad_invoice_unavailable', 404);
+    }
+    return { ...offerView(id, ad), mediaType: ad.mediaType, payment: ad.payment,
+      createdAt: ad.priceLockedAt, legacyTransfer: ad.legacyTransfer };
+  }
+
   if (action === 'ads.cancel') {
     const assets = await db.runTransaction(async tx => {
       const draft = (await tx.get(ref)).data() as StoredAd | undefined;
@@ -388,6 +438,7 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
       if (draft.ownerId !== uid) return fail('invalid_ad_id', 403);
       if (draft.status === 'cancelled') return { mediaType: draft.mediaType, paid: !!draft.payment };
       if (draft.status !== 'draft') return fail('ad_already_submitted', 409);
+      if (draft.priceLockedAt) return fail('ad_invoice_locked', 409);
       if (draft.uploadDay) {
         const usage = uploadUsage(db, draft.uploadDay).doc(uid);
         const lease = activeUpload(db, uid);
@@ -414,18 +465,23 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
     return { cancelled: true };
   }
 
-  if (action === 'ads.prepare') {
+  if (action === 'ads.prepare' || action === 'ads.lockPrice') {
+    const lockPrice = action === 'ads.lockPrice';
+    if (!lockPrice && payload.legacyTransfer !== undefined) return fail('invalid_ad_details');
+    const legacyTransfer = payload.legacyTransfer === undefined ? undefined : readLegacyTransfer(payload.legacyTransfer);
     if (payload.tier !== undefined && payload.tier !== 'free' && payload.tier !== 'featured' && payload.tier !== 'vip') return fail('invalid_ad_details');
     const paidTier = payload.tier === 'featured' || payload.tier === 'vip' ? payload.tier : null;
     const featured = paidTier !== null;
+    if (lockPrice && !featured) return fail('invalid_ad_details');
     const fields = adFields(payload, featured);
     const correctionId = payload.correctionId === undefined ? undefined : adId(payload.correctionId);
     if (correctionId && (featured || correctionId === id)) return fail('invalid_ad_details');
     const phone = typeof payload.paymentPhone === 'string' && payload.paymentPhone.length <= 24 ? normalizePaymentContactPhone(payload.paymentPhone) : null;
     if (featured && !phone) return fail('invalid_payment_phone');
     const days = featured ? adRunDays(new Date(fields.startsAt), new Date(fields.endsAt)) : null;
-    const amountEgp = paidTier && days ? days * paidAdDailyPrice(paidTier) : null;
-    if (featured && (amountEgp === null || payload.amountEgp !== amountEgp)) return fail('invalid_payment_amount');
+    if (featured && (days === null || typeof payload.amountEgp !== 'number' || !Number.isSafeInteger(payload.amountEgp) || payload.amountEgp < 0)) {
+      return fail('invalid_payment_amount');
+    }
     const mediaType = payload.resourceType;
     if (mediaType !== null && mediaType !== 'image' && mediaType !== 'video') return fail('invalid_media_type');
     if (!featured && mediaType === 'video') return fail('ad_free_image_only');
@@ -435,7 +491,10 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
       const existing = (await tx.get(ref)).data() as StoredAd | undefined;
       if (existing && existing.ownerId !== uid) return fail('invalid_ad_id', 403);
       if (existing?.status === 'cancelled') return fail('ad_cancelled', 409);
-      if (existing && existing.status !== 'draft') return { submitted: true, signed: null };
+      if (existing && existing.status !== 'draft') {
+        if (lockPrice) return fail('ad_already_submitted', 409);
+        return { submitted: true, signed: null };
+      }
       if (!featured) await assertFreeOfferAvailable(db, tx, uid, id, now);
       if (existing && (existing.payment ? existing.payment.tier ?? 'featured' : null) !== paidTier) return fail('invalid_ad_details');
       if (existing && existing.correctionId !== correctionId) return fail('invalid_ad_details');
@@ -444,25 +503,54 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
         if (!correctableVideoAd(original, uid)) return fail('ad_correction_unavailable', 404);
       }
       if (existing && existing.mediaType !== mediaType) return fail('invalid_media_type');
+      let payment = existing?.payment;
+      if (payment) {
+        const previous = existing?.legacyTransfer;
+        const sameClaim = !lockPrice || (previous?.reference === legacyTransfer?.reference &&
+          previous?.transferredAt === legacyTransfer?.transferredAt && previous?.amountEgp === legacyTransfer?.amountEgp);
+        const sameInvoice = sameClaim && payment.phone === phone && Object.entries(fields).every(([key, value]) => existing?.[key as keyof StoredAd] === value);
+        if (!sameInvoice || payment.amountEgp !== payload.amountEgp) return fail('ad_invoice_mismatch', 409);
+      } else if (paidTier && days !== null && phone) {
+        if (!lockPrice) return fail('ad_invoice_not_locked', 409);
+        const prices = legacyTransfer ? DEFAULT_PAID_AD_PRICES : paidOfferPrices((await tx.get(policyRef(db))).data());
+        const dailyPriceEgp = paidAdDailyPrice(paidTier, prices);
+        const amountEgp = days * dailyPriceEgp;
+        if (!Number.isSafeInteger(amountEgp)) return fail('invalid_payment_amount');
+        if (payload.amountEgp !== amountEgp) return { priceChanged: true, prices };
+        payment = { method: 'instapay', tier: paidTier, amountEgp, dailyPriceEgp, phone };
+      }
+
+      if (lockPrice) {
+        if (!payment || payment.dailyPriceEgp === undefined || (existing && !existing.priceLockedAt)) return fail('ad_invoice_unavailable', 409);
+        if (!existing) tx.create(ref, {
+          ...fields, ownerId: uid, status: 'draft', mediaType, media: null,
+          submittedAt: 0, rejectionReason: '', payment, priceLockedAt: now, ...(legacyTransfer && { legacyTransfer }),
+        });
+        return { priceChanged: false, dailyPriceEgp: payment.dailyPriceEgp, amountEgp: payment.amountEgp,
+          createdAt: existing?.priceLockedAt ?? now, ...((existing?.legacyTransfer ?? legacyTransfer) && { legacyTransfer: existing?.legacyTransfer ?? legacyTransfer }) };
+      }
       let signed = null;
       let receiptSigned = null;
-      const permits = Number(!!mediaType || featured);
+      const receiptRequired = requiresPaidReceipt(payment);
+      const permits = Number(!!mediaType || receiptRequired);
       if (permits) {
-        if (existing?.uploadDay) return fail('ad_upload_already_issued', 409);
+        const reissue = Boolean(existing?.priceLockedAt && existing.uploadDay);
+        if (existing?.uploadDay && !reissue) return fail('ad_upload_already_issued', 409);
+        if (reissue && (existing?.uploadCleanupAt ?? 0) <= now) return fail('ad_upload_cleanup_pending', 409);
         const usage = uploadUsage(db, day).doc(uid);
         const lease = activeUpload(db, uid);
         const [used, active, policy] = await Promise.all([tx.get(usage), tx.get(lease), tx.get(policyRef(db))]);
         if (policy.data()?.uploadsPaused === true) return fail('ad_upload_paused', 503);
         const count = used.data()?.issued ?? 0;
-        if (count + permits > uploadLimit) return fail('ad_upload_daily_limit', 429);
-        if ((active.data()?.expiresAt ?? 0) > now) return fail('ad_upload_active', 409);
+        if (!reissue && count + permits > uploadLimit) return fail('ad_upload_daily_limit', 429);
+        if ((active.data()?.expiresAt ?? 0) > now && (!reissue || active.data()?.id !== id)) return fail('ad_upload_active', 409);
         if (mediaType) signed = signAdminAdTestUpload(uid, payload, undefined, now, id, 'submissions');
-        if (featured) receiptSigned = signAdminAdTestUpload(uid, {
+        if (receiptRequired) receiptSigned = signAdminAdTestUpload(uid, {
           resourceType: 'image', bytes: payload.receiptBytes,
         }, undefined, now, id, 'receipts');
-        tx.set(usage, { issued: count + permits, limit: uploadLimit }, { merge: true });
-        tx.set(lease, { id, expiresAt: now + 3600000 });
-      } else if (!existing) {
+        if (!reissue) tx.set(usage, { issued: count + permits, limit: uploadLimit }, { merge: true });
+        tx.set(lease, { id, expiresAt: Math.min(now + 3600000, existing?.uploadCleanupAt || Infinity) });
+      } else if (!existing || (payment && !existing.paidPrepared)) {
         const quota = db.collection('offerAdUploadLimits').doc(`${uid}_${day}`);
         const count = (await tx.get(quota)).data()?.count ?? 0;
         if (count >= 5) return fail('ad_daily_limit', 429);
@@ -471,8 +559,11 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
       tx.set(ref, {
         ...fields, ownerId: uid, status: 'draft', mediaType, media: null, submittedAt: 0, rejectionReason: '',
         ...(correctionId && { correctionId }),
-        ...(permits && { uploadDay: day, uploadCleanupAt: now + DAY }),
-        ...(paidTier && { payment: { method: 'instapay', tier: paidTier, amountEgp, phone } }),
+        ...(permits && { uploadDay: existing?.uploadDay || day, uploadCleanupAt: existing?.uploadCleanupAt || now + DAY }),
+        ...(payment && { payment }),
+        ...(existing?.priceLockedAt && { priceLockedAt: existing.priceLockedAt }),
+        ...(existing?.legacyTransfer && { legacyTransfer: existing.legacyTransfer }),
+        ...(payment && !permits && { paidPrepared: true }),
       });
       return { submitted: false, signed, receiptSigned };
     });
@@ -482,7 +573,10 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
   if (!draft || draft.ownerId !== uid) return fail('invalid_ad_id', 403);
   if (draft.status === 'cancelled') return fail('ad_cancelled', 409);
   if (draft.status !== 'draft') return { submitted: true };
-  if (draft.payment) expiry(draft, Date.now(), true);
+  if (draft.payment) {
+    expiry(draft, Date.now(), true);
+    if (draft.payment.dailyPriceEgp !== undefined && !draft.uploadDay && !draft.paidPrepared) return fail('ad_invoice_not_prepared', 409);
+  }
   if (requiresVideoCorrection(draft)) return fail('ad_free_image_only');
 
   let media: StoredMedia | null = null;
@@ -495,7 +589,7 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
     media = { publicId, resourceType: confirmed.resourceType, version: confirmed.version, format: confirmed.format };
   }
   let receipt: StoredMedia | undefined;
-  if (draft.payment) {
+  if (requiresPaidReceipt(draft.payment)) {
     const proof = payload.receipt;
     const publicId = `mybucket/ads/receipts/${uid}/${id}`;
     if (!proof || typeof proof !== 'object') return fail('receipt_required');
@@ -549,6 +643,19 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
 }
 
 export async function reviewOfferAds(action: string, uid: string, payload: Payload, db = getAdminFirestore()) {
+  if (action === 'admin.ads.prices') {
+    const ref = policyRef(db);
+    if (payload.featured === undefined && payload.vip === undefined) return paidOfferPrices((await ref.get()).data());
+    if (!isPaidAdPrice(payload.featured) || !isPaidAdPrice(payload.vip)) return fail('invalid_ad_prices');
+    const paidPrices = { featured: payload.featured, vip: payload.vip };
+    await db.runTransaction(async tx => {
+      const settings = (await tx.get(ref)).data();
+      const previous = paidOfferPrices(settings);
+      const changed = previous.featured !== paidPrices.featured || previous.vip !== paidPrices.vip;
+      tx.set(ref, { paidPrices, ...(changed && settings?.firstPaidPriceChangeAt === undefined && { firstPaidPriceChangeAt: Date.now() }) }, { merge: true });
+    });
+    return paidPrices;
+  }
   if (action === 'admin.ads.uploadStats') {
     const day = cairoDay.format(Date.now());
     const ref = policyRef(db);
@@ -584,6 +691,8 @@ export async function reviewOfferAds(action: string, uid: string, payload: Paylo
     return snapshot.docs.map(doc => {
       const ad = doc.data() as StoredAd;
       return { ...offerView(doc.id, ad), status, submittedAt: ad.submittedAt, rejectionReason: ad.rejectionReason,
+        ...(ad.legacyTransfer && { legacyTransfer: ad.legacyTransfer }),
+        ...(ad.confirmedTransfer && { confirmedTransfer: ad.confirmedTransfer }),
         requiresVideoCorrection: !ad.correctedBy && requiresVideoCorrection(ad),
         ...(ad.payment && { payment: { ...ad.payment, receiptUrl: ad.receipt ? mediaView(ad.receipt)?.url : undefined } }) };
     }).sort((a, b) => b.submittedAt - a.submittedAt);
@@ -597,9 +706,36 @@ export async function reviewOfferAds(action: string, uid: string, payload: Paylo
     if (!ad) return fail('invalid_ad_id', 404);
     if (ad.status === status) return { status };
     if (ad.status !== 'pending') return fail('ad_already_reviewed', 409);
+    if (ad.legacyTransfer && status === 'rejected') return fail('ad_legacy_transfer_pending', 409);
     const now = Date.now();
     if (status === 'approved' && requiresVideoCorrection(ad)) return fail('ad_free_image_only', 409);
-    if (status === 'approved' && ad.payment && (!ad.receipt || payload.paymentConfirmed !== true)) return fail('payment_confirmation_required');
+    if (status === 'approved' && requiresPaidReceipt(ad.payment) && (!ad.receipt || payload.paymentConfirmed !== true)) return fail('payment_confirmation_required');
+    let confirmedTransfer: StoredAd['confirmedTransfer'];
+    if (status === 'approved' && ad.payment && requiresPaidReceipt(ad.payment)) {
+      const reference = normalizeAdTransferReference(payload.transferReference);
+      if (!reference) return fail('invalid_transfer_reference');
+      if (payload.receivedAmountEgp !== ad.payment.amountEgp) return fail('ad_transfer_amount_mismatch', 409);
+      if (ad.legacyTransfer) {
+        const settings = (await tx.get(policyRef(db))).data();
+        const firstChange = settings?.firstPaidPriceChangeAt;
+        const currentPrices = paidOfferPrices(settings);
+        if (reference !== ad.legacyTransfer.reference || payload.receivedAt !== ad.legacyTransfer.transferredAt ||
+          ad.legacyTransfer.amountEgp !== ad.payment.amountEgp) return fail('ad_legacy_transfer_mismatch', 409);
+        if (firstChange === undefined) {
+          if (currentPrices.featured !== DEFAULT_PAID_AD_PRICES.featured || currentPrices.vip !== DEFAULT_PAID_AD_PRICES.vip) {
+            return fail('ad_legacy_transfer_cutoff_unknown', 409);
+          }
+        } else if (!Number.isSafeInteger(firstChange) || ad.legacyTransfer.transferredAt >= firstChange) {
+          return fail('ad_legacy_transfer_after_cutoff', 409);
+        }
+      }
+      // The subscription approval path checks this same index before claiming a transfer.
+      const used = db.doc(`subscriptionPaymentReferences/${createHash('sha256').update(reference).digest('hex')}`);
+      if ((await tx.get(used)).exists) return fail('reference_already_used', 409);
+      confirmedTransfer = { reference, amountEgp: ad.payment.amountEgp,
+        ...(ad.legacyTransfer && { transferredAt: ad.legacyTransfer.transferredAt }) };
+      tx.create(used, { offerAdId: ref.id, reviewedBy: uid, reviewedAt: now });
+    }
     let { startsAt, endsAt } = ad;
     if (status === 'approved') {
       if (ad.payment) {
@@ -613,7 +749,7 @@ export async function reviewOfferAds(action: string, uid: string, payload: Paylo
       }
     }
     tx.update(ref, { status, rejectionReason, reviewerId: uid, reviewedAt: now, startsAt, endsAt,
-      publishedUntil: status === 'approved' ? endsAt : 0, ...(ad.payment && status === 'approved' && { paymentConfirmedAt: now }) });
+      publishedUntil: status === 'approved' ? endsAt : 0, ...(confirmedTransfer && { paymentConfirmedAt: now, confirmedTransfer }) });
     return { status };
   });
 }

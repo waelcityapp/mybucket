@@ -109,11 +109,11 @@ async function startServer() {
         const { readMyOfferAds } = await import('./server/offerAds.js');
         return res.json({ ok: true, data: await readMyOfferAds(user.uid) });
       }
-      if (action === 'ads.paidAvailability' || action === 'ads.paymentContact' || action === 'ads.freePolicy' || action === 'ads.freeEligibility' || action === 'ads.prepare' || action === 'ads.submit' || action === 'ads.cancel' || action === 'ads.renewal' || action === 'ads.deleteExpired') {
+      if (action === 'ads.paidAvailability' || action === 'ads.paidPrices' || action === 'ads.lockPrice' || action === 'ads.resumePayment' || action === 'ads.paymentContact' || action === 'ads.freePolicy' || action === 'ads.freeEligibility' || action === 'ads.prepare' || action === 'ads.submit' || action === 'ads.cancel' || action === 'ads.renewal' || action === 'ads.deleteExpired') {
         const { sendOfferAd } = await import('./server/offerAds.js');
         return res.json({ ok: true, data: await sendOfferAd(action, user.uid, payload, undefined, user.email?.trim().toLowerCase() === 'waelvts@gmail.com') });
       }
-      if (action === 'admin.ads.list' || action === 'admin.ads.review' || action === 'admin.ads.policy' || action === 'admin.ads.uploadStats') {
+      if (action === 'admin.ads.list' || action === 'admin.ads.review' || action === 'admin.ads.policy' || action === 'admin.ads.uploadStats' || action === 'admin.ads.prices') {
         if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
         const { reviewOfferAds } = await import('./server/offerAds.js');
         return res.json({ ok: true, data: await reviewOfferAds(action, user.uid, payload) });

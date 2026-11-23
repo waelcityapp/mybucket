@@ -1,3 +1,5 @@
+import type { LegacyAdTransfer } from '../utils/adCheckout';
+
 export const OFFER_CATEGORY_IDS = [
   'banks-finance', 'restaurants-cafes-outings', 'food-beverages', 'fashion',
   'travel-events', 'sports-fitness', 'cars-transport', 'health-beauty',
@@ -42,7 +44,9 @@ export type ReviewOfferAd = PublicOfferAd & {
   submittedAt: number;
   rejectionReason: string;
   requiresVideoCorrection?: boolean;
-  payment?: { amountEgp: number; phone: string; receiptUrl?: string };
+  legacyTransfer?: LegacyAdTransfer;
+  confirmedTransfer?: Omit<LegacyAdTransfer, 'transferredAt'> & { transferredAt?: number };
+  payment?: { amountEgp: number; dailyPriceEgp?: number; phone: string; receiptUrl?: string };
 };
 
 export type MyOfferAd = Pick<ReviewOfferAd, 'id' | 'title' | 'merchant' | 'tier' | 'status' | 'submittedAt' | 'startsAt' | 'endsAt' | 'rejectionReason' | 'requiresVideoCorrection'> & { deleteAfter: number | null; thumbnailUrl?: string };

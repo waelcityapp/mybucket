@@ -217,7 +217,7 @@ test('featured and VIP retain their paid approval and favorites, free retains li
       receipt: { publicId: 'test', resourceType: 'image', version: 1, format: 'png' },
     }));
     await assert.rejects(review(id, 'approved'), { code: 'payment_confirmation_required' });
-    await review(id, 'approved', { paymentConfirmed: true });
+    await review(id, 'approved', { paymentConfirmed: true, transferReference: `TEST-${tier}`, receivedAmountEgp: 100 });
     const approved = (await ad(id).get()).data();
     assert.equal(approved.endsAt - approved.startsAt, 2 * DAY);
     assert.equal(approved.mediaType, 'video');

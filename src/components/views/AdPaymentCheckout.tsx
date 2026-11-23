@@ -8,9 +8,13 @@ import {
 } from 'lucide-react';
 import type { Language } from '../../types';
 import { offerAdsRequest } from '../../services/offerAdsClient';
-import { paidAdDailyPrice, normalizePaymentContactPhone, adRunDays, isPaymentContactPhoneValid, isReceiptImageAllowed } from '../../utils/adCheckout';
+import { type AdPriceLock, type AdPriceLockResult, type PaidAdPrices, DEFAULT_PAID_AD_PRICES, cairoAdTransferTime, normalizeAdTransferReference, normalizePaymentContactPhone, adRunDays, isPaymentContactPhoneValid, isReceiptImageAllowed } from '../../utils/adCheckout';
 
 import { INSTA_PAY_LINK } from '../../config/instaPay';
+import { compressAdImage } from '../../utils/adImageCompression';
+import { compressAdVideo } from '../../utils/adVideoCompression';
+
+type Invoice = AdPriceLock & { id: string; phone: string };
 type PaidPreparation = { submitted: boolean; signed: SignedAdUpload | null; receiptSigned?: SignedAdUpload };
 
 interface Props {
@@ -25,28 +29,39 @@ interface Props {
   categorySlug: string;
   adContact: string;
   mediaFile?: File | string;
+  dailyPriceEgp: number;
+  initialInvoice?: Invoice;
+  onPricesChange: (prices: PaidAdPrices) => void;
   onBack: () => void;
   onNavigate: (path: string) => void;
 }
 
 export function AdPaymentCheckout({
-  tier, lang, advertiserName, adTitle, startsAt, endsAt, mediaType, adDescription, categorySlug, adContact, mediaFile, onBack, onNavigate
+  tier, lang, advertiserName, adTitle, startsAt, endsAt, mediaType, adDescription, categorySlug, adContact, mediaFile, dailyPriceEgp, initialInvoice, onPricesChange, onBack, onNavigate
 }: Props) {
   const ar = lang === 'ar';
-  const dailyPrice = paidAdDailyPrice(tier);
+  const [invoice, setInvoice] = useState(initialInvoice);
+  const [legacyMode, setLegacyMode] = useState(Boolean(initialInvoice?.legacyTransfer));
+  const [legacyReference, setLegacyReference] = useState('');
+  const [legacyTime, setLegacyTime] = useState('');
+  const [legacyAmount, setLegacyAmount] = useState('');
+  const dailyPrice = invoice?.dailyPriceEgp ?? (legacyMode ? DEFAULT_PAID_AD_PRICES[tier] : dailyPriceEgp);
+  const receiptRequired = (invoice?.amountEgp ?? dailyPrice) > 0;
+  const needsUpload = receiptRequired || mediaType !== 'none';
   const tierLabel = tier === 'vip' ? 'VIP' : (ar ? 'مميز' : 'Featured');
   const BackIcon = ar ? ArrowRight : ArrowLeft;
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(initialInvoice?.phone ?? '');
   const [phoneTouched, setPhoneTouched] = useState(false);
-  const [savedPhone, setSavedPhone] = useState('');
-  const [phoneState, setPhoneState] = useState<'loading' | 'ready' | 'saving' | 'error'>('loading');
+  const [savedPhone, setSavedPhone] = useState(initialInvoice?.phone ?? '');
+  const [phoneState, setPhoneState] = useState<'loading' | 'ready' | 'saving' | 'error'>(initialInvoice ? 'ready' : 'loading');
   useEffect(() => {
+    if (initialInvoice) return;
     let active = true;
     offerAdsRequest<{ phone: string }>('ads.paymentContact', {}, true)
       .then(({ phone }) => { if (active) { setPhone(phone); setSavedPhone(phone); setPhoneState('ready'); } })
       .catch(() => { if (active) setPhoneState('error'); });
     return () => { active = false; };
-  }, []);
+  }, [initialInvoice]);
   const savePhone = async () => {
     setPhoneTouched(true);
     if (!isPaymentContactPhoneValid(phone)) {
@@ -64,6 +79,11 @@ export function AdPaymentCheckout({
       setPhoneState('error');
     }
   };
+  const [restoredMedia, setRestoredMedia] = useState<File | null>(null);
+  const [restoringMedia, setRestoringMedia] = useState(false);
+  const [mediaError, setMediaError] = useState(false);
+  const checkoutMedia = mediaFile ?? restoredMedia;
+  const mediaReady = mediaType === 'none' || !!checkoutMedia;
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [receiptError, setReceiptError] = useState('');
   const [dragging, setDragging] = useState(false);
@@ -87,30 +107,71 @@ export function AdPaymentCheckout({
   const [sendError, setSendError] = useState('');
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const sendLock = useRef(false);
-  const paymentDraft = useRef<{ id: string; prepared?: PaidPreparation; receipt?: UploadedAdMedia; media?: UploadedAdMedia } | null>(null);
-  const submit = async () => {
-    if (sendLock.current || !receiptFile || !phoneSaved || runDays === null || submitted) return;
+  const paymentDraft = useRef<{ id: string; prepared?: PaidPreparation; receipt?: UploadedAdMedia; media?: UploadedAdMedia } | null>(initialInvoice ? { id: initialInvoice.id } : null);
+  const [priceMessage, setPriceMessage] = useState('');
+  const adDetails = {
+    tier, title: adTitle, description: adDescription, merchant: advertiserName,
+    categorySlug, contact: adContact, paymentPhone: savedPhone,
+    startsAt: startsAt.getTime(), endsAt: endsAt.getTime(), resourceType: mediaType === 'none' ? null : mediaType,
+  };
+
+  const lockPrice = async () => {
+    if (sendLock.current || invoice || !phoneSaved || runDays === null || (needsUpload && paymentReady !== 'yes')) return;
+    const transferredAt = legacyMode ? cairoAdTransferTime(legacyTime) : null;
+    const reference = legacyMode ? normalizeAdTransferReference(legacyReference) : null;
+    const amountEgp = Number(legacyAmount);
+    if (legacyMode && (!reference || transferredAt === null || transferredAt > Date.now() || !Number.isSafeInteger(amountEgp) || amountEgp <= 0)) {
+      setPriceMessage(ar ? 'أدخل مرجع التحويل وتوقيته بتوقيت القاهرة والمبلغ المحوّل.' : 'Enter the transfer reference, Cairo date and time, and the amount sent.');
+      return;
+    }
     sendLock.current = true;
     setSending(true);
-    setSendError('');
+    setPriceMessage('');
     const draft = paymentDraft.current ?? { id: crypto.randomUUID() };
     paymentDraft.current = draft;
     try {
+      const result = await offerAdsRequest<AdPriceLockResult>('ads.lockPrice', {
+        ...adDetails, id: draft.id, amountEgp: runDays * dailyPrice,
+        ...(legacyMode && { legacyTransfer: { reference, transferredAt, amountEgp } }),
+      }, true);
+      if (result.priceChanged === true) {
+        onPricesChange(result.prices);
+        setPriceMessage(ar ? 'سعر الإعلان اتغيّر. راجع الإجمالي الجديد وثبّت السعر عشان تكمل.' : 'The ad rate changed. Review the new total and confirm the price to continue.');
+        return;
+      }
+      setInvoice({ ...result, id: draft.id, phone: savedPhone });
+      const url = new URL(window.location.href);
+      url.searchParams.set('invoice', draft.id);
+      window.history.replaceState(window.history.state, '', url);
+    } catch {
+      setPriceMessage(legacyMode ? (ar ? 'تعذّر تسجيل طلب المراجعة. تأكد من البيانات وحاول مرة أخرى.' : 'Could not create the review request. Check the details and try again.') : ar ? 'تعذّر تثبيت سعر الفاتورة. حاول مرة أخرى قبل التحويل.' : 'The invoice price could not be locked. Try again before transferring money.');
+    } finally {
+      sendLock.current = false;
+      setSending(false);
+    }
+  };
+
+  const submit = async () => {
+    if (sendLock.current || !invoice || (receiptRequired && !receiptFile) || !mediaReady || submitted) return;
+    sendLock.current = true;
+    setSending(true);
+    setSendError('');
+    const draft = paymentDraft.current;
+    try {
       draft.prepared ??= await offerAdsRequest<PaidPreparation>('ads.prepare', {
-        id: draft.id, tier, title: adTitle, description: adDescription, merchant: advertiserName,
-        categorySlug, contact: adContact, paymentPhone: savedPhone, amountEgp: runDays * dailyPrice,
-        startsAt: startsAt.getTime(), endsAt: endsAt.getTime(), resourceType: mediaType === 'none' ? null : mediaType,
-        bytes: typeof mediaFile === 'string' ? 1 : mediaFile?.size ?? 0, receiptBytes: receiptFile.size,
+        ...adDetails, id: invoice.id, amountEgp: invoice.amountEgp,
+        bytes: typeof checkoutMedia === 'string' ? 1 : checkoutMedia?.size ?? 0,
+        receiptBytes: receiptFile?.size,
       }, true);
       if (!draft.prepared.submitted) {
-        if (!draft.prepared.receiptSigned) throw new Error('receipt_required');
-        if (!draft.receipt) {
+        if (receiptRequired && !draft.prepared.receiptSigned) throw new Error('receipt_required');
+        if (receiptFile && draft.prepared.receiptSigned && !draft.receipt) {
           setUploadProgress(0);
           draft.receipt = await uploadAdMedia(receiptFile, draft.prepared.receiptSigned, setUploadProgress);
         }
-        if (mediaFile && draft.prepared.signed && !draft.media) {
+        if (checkoutMedia && draft.prepared.signed && !draft.media) {
           setUploadProgress(0);
-          draft.media = await uploadAdMedia(mediaFile, draft.prepared.signed, setUploadProgress);
+          draft.media = await uploadAdMedia(checkoutMedia, draft.prepared.signed, setUploadProgress);
         }
         setUploadProgress(null);
         const result = await offerAdsRequest<{ submitted: boolean }>('ads.submit', { id: draft.id, ...draft.media, receipt: draft.receipt }, true);
@@ -142,7 +203,7 @@ export function AdPaymentCheckout({
   }, [receiptPreviewUrl]);
 
   const selectReceipt = (file: File | null) => {
-    if (!file || sendLock.current || paymentDraft.current?.prepared) return;
+    if (!file || !invoice || sendLock.current || paymentDraft.current?.prepared) return;
     if (!isReceiptImageAllowed(file.type, file.size)) {
       setReceiptError(ar
         ? 'اختر صورة JPG أو PNG أو WebP بحجم لا يتجاوز 5 ميجابايت.'
@@ -174,7 +235,7 @@ export function AdPaymentCheckout({
 
   if (submitted) return <main dir={ar ? 'rtl' : 'ltr'} className="min-h-screen bg-slate-50 p-5 dark:bg-slate-950">
     <section role="status" className="mx-auto max-w-xl space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950">
-      <h1 className="flex items-center gap-2 text-lg font-extrabold"><Check className="size-5" aria-hidden="true" />{ar ? `مبروك! تم إرسال إعلانك ${tierLabel} والإيصال للإدارة بنجاح.` : `Your ${tierLabel} ad and receipt were sent successfully.`}</h1>
+      <h1 className="flex items-center gap-2 text-lg font-extrabold"><Check className="size-5" aria-hidden="true" />{ar ? `تم إرسال إعلانك ${tierLabel} للإدارة بنجاح.` : `Your ${tierLabel} ad was sent successfully.`}</h1>
       <p className="text-sm">{ar ? 'تتم المراجعة والرد خلال ٢٤ ساعة تقريبًا. تقدر تتابع من الملف الشخصي في «إعلاناتي».' : 'Review usually takes around 24 hours. Track the status in My ads in your profile.'}</p>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
         <a href="/settings/ads" onClick={event => followInternalLink(event, onNavigate)} className="inline-flex min-h-11 items-center font-bold underline">{ar ? 'متابعة الإعلان' : 'Track ad'}</a>
@@ -200,7 +261,7 @@ export function AdPaymentCheckout({
                 </p>
               </div>
             </div>
-            <button type="button" onClick={onBack} disabled={sending || !!paymentDraft.current?.prepared} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 text-xs font-extrabold text-slate-700 hover:bg-slate-50 sm:self-center dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+            <button type="button" onClick={onBack} disabled={sending || !!invoice} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 text-xs font-extrabold text-slate-700 hover:bg-slate-50 sm:self-center dark:border-slate-700 dark:bg-slate-800 dark:text-white">
               <BackIcon className="h-4 w-4" />
               {ar ? 'الرجوع لتعديل الإعلان' : 'Back to edit advertisement'}
             </button>
@@ -240,15 +301,18 @@ export function AdPaymentCheckout({
                 <p>{ar ? 'بداية النشر بتوقيت القاهرة ' : 'Starts (Cairo time) '}{dates.format(startsAt)}</p>
                 <p>{ar ? 'نهاية النشر بتوقيت القاهرة ' : 'Ends (Cairo time) '}{dates.format(endsAt)}</p>
               </div>
+              {invoice && <p className="text-xs text-slate-600 dark:text-slate-300">
+                {ar ? 'رقم الطلب' : 'Request ID'} <bdi>{invoice.id}</bdi> · {dates.format(invoice.createdAt)}
+              </p>}
               <div className="space-y-3 border-t border-emerald-200 pt-4 text-sm dark:border-slate-700">
                 <div className="flex items-center justify-between gap-3 text-slate-600 dark:text-slate-300">
-                  <span>{ar ? 'السعر التجريبي لليوم' : 'Trial daily rate'}</span>
+                  <span>{ar ? 'سعر اليوم' : 'Daily rate'}</span>
                   <span className="font-bold">{amount(dailyPrice)}</span>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-300">{ar ? 'أي جزء من يوم يتحسب يوم كامل.' : 'A partial day is billed as a full day.'}</p>
                 <div className="flex items-center justify-between gap-3 border-t border-emerald-200 pt-3 text-base font-black dark:border-slate-700">
                   <span className="flex items-center gap-2"><CreditCard className="h-5 w-5 text-emerald-700" />{ar ? 'إجمالي المبلغ المطلوب' : 'Total due'}</span>
-                  <span className="rounded-xl bg-emerald-700 px-4 py-2 text-white">{runDays === null ? '—' : amount(runDays * dailyPrice)}</span>
+                  <span className="rounded-xl bg-emerald-700 px-4 py-2 text-white">{runDays === null ? '—' : amount(invoice?.amountEgp ?? runDays * dailyPrice)}</span>
                 </div>
               </div>
             </section>
@@ -260,7 +324,7 @@ export function AdPaymentCheckout({
               </label>
               <div className="relative">
                 <input id="ad-checkout-phone" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" value={phone}
-                  onChange={event => setPhone(event.target.value)} maxLength={24} disabled={phoneState === 'loading' || phoneState === 'saving' || sending || !!paymentDraft.current?.prepared}
+                  onChange={event => setPhone(event.target.value)} maxLength={24} disabled={phoneState === 'loading' || phoneState === 'saving' || sending || !!invoice}
                   placeholder={ar ? 'مثال: 01000000000' : 'Example: 01000000000'}
                   aria-invalid={phoneTouched && !phoneValid}
                   aria-describedby="ad-checkout-phone-help"
@@ -276,7 +340,7 @@ export function AdPaymentCheckout({
               {phoneState === 'loading' && <p role="status" className="text-xs">{ar ? 'جاري تحميل رقم المتابعة...' : 'Loading your contact number…'}</p>}
               {phoneState === 'error' && <p role="alert" className="text-xs text-rose-700">{ar ? 'تعذّر تحميل أو حفظ الرقم. تقدر تدخله وتحفظه تاني.' : 'Could not load or save the number. Enter it and try saving again.'}</p>}
               {phoneSaved && <p role="status" className="text-xs font-bold text-emerald-700">{ar ? 'الرقم محفوظ في حسابك.' : 'Number saved to your account.'}</p>}
-              <button type="button" onClick={() => void savePhone()} disabled={phoneSaved || phoneState === 'saving' || phoneState === 'loading'}
+              <button type="button" onClick={() => void savePhone()} disabled={phoneSaved || !!invoice || phoneState === 'saving' || phoneState === 'loading'}
                 className="min-h-11 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-50">
                 {phoneState === 'saving' ? (ar ? 'جاري الحفظ...' : 'Saving…') : (ar ? 'حفظ رقم المتابعة' : 'Save contact number')}
               </button>
@@ -287,30 +351,74 @@ export function AdPaymentCheckout({
                 <ShieldCheck className="h-5 w-5" />
                 {ar ? 'تعليمات الدفع' : 'Payment instructions'}
               </h2>
-              <p className="text-sm leading-6 text-slate-700 dark:text-slate-200">{ar
-                ? 'رابط إنستا باي بيفتح التحويل. اكتب مبلغ الفاتورة داخل إنستا باي، وبعد التحويل ارجع هنا عشان ترفق صورة الإيصال وترسلها للمراجعة.'
-                : 'The InstaPay link opens the transfer. Enter the invoice amount in InstaPay, then return here to attach and submit your receipt.'}</p>
-              {phoneSaved && runDays !== null && paymentReady === 'yes' ? (
+              {priceMessage && <p role="alert" className="text-sm font-bold text-rose-700 dark:text-rose-300">{priceMessage}</p>}
+              {invoice ? (invoice.legacyTransfer ? <p role="status" className="text-sm">
+                {ar ? 'أرفق إيصال التحويل السابق. الإعلان يظل معلقًا لحد مطابقة التحويل بسجل الاستلام.' : 'Attach the previous transfer receipt. The ad stays pending until the administrator matches it to an incoming transfer.'}
+              </p> : receiptRequired ? <>
+                <p className="text-sm">{ar ? 'المبلغ مثبت. اكتب مبلغ الفاتورة في إنستا باي، وبعد التحويل ارجع لنفس الصفحة لإرفاق الإيصال.' : 'The amount is locked. Enter the invoice total in InstaPay, then return to this page to attach the receipt.'}</p>
                 <a href={INSTA_PAY_LINK} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-xl bg-emerald-700 px-4 font-bold text-white">
                   {ar ? 'فتح إنستا باي' : 'Open InstaPay'}
                 </a>
-              ) : <div className="space-y-2">
-                <button type="button" disabled className="min-h-11 rounded-xl bg-slate-200 px-4 text-sm font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                  {ar ? 'فتح إنستا باي' : 'Open InstaPay'}
+              </> : <p className="text-sm">{ar ? 'المبلغ المثبت صفر جنيه. تقدر ترسل الإعلان للمراجعة مباشرة.' : 'The locked total is EGP 0. You can send the ad directly for review.'}</p>) : <>
+                <button type="button" disabled={sending} className="block text-sm font-semibold underline" onClick={() => {
+                  setLegacyMode(value => !value);
+                  setPriceMessage('');
+                  paymentDraft.current = null;
+                }}>{legacyMode ? (ar ? 'العودة للدفع الجديد' : 'Back to new payment')
+                  : (ar ? 'حوّلت قبل تغيير الأسعار ومفيش طلب مسجّل' : 'I already transferred before the rate change and have no recorded request')}</button>
+                {legacyMode ? <div className="grid gap-2 sm:grid-cols-3">
+                  <label className="grid gap-1 text-xs font-bold">{ar ? 'مرجع التحويل' : 'Transfer reference'}
+                    <input value={legacyReference} maxLength={48} onChange={event => setLegacyReference(event.target.value)} dir="ltr" disabled={sending}
+                      className="min-h-11 min-w-0 rounded-lg border border-slate-300 bg-white px-2 dark:border-slate-700 dark:bg-slate-900" />
+                  </label>
+                  <label className="grid gap-1 text-xs font-bold">{ar ? 'وقت التحويل بتوقيت القاهرة' : 'Transfer time in Cairo'}
+                    <input type="datetime-local" step={1} value={legacyTime} onChange={event => setLegacyTime(event.target.value)} disabled={sending}
+                      className="min-h-11 min-w-0 rounded-lg border border-slate-300 bg-white px-2 dark:border-slate-700 dark:bg-slate-900" />
+                  </label>
+                  <label className="grid gap-1 text-xs font-bold">{ar ? 'المبلغ المحوّل (ج.م.)' : 'Amount sent (EGP)'}
+                    <input type="number" min={1} step={1} value={legacyAmount} onChange={event => setLegacyAmount(event.target.value)} disabled={sending}
+                      className="min-h-11 min-w-0 rounded-lg border border-slate-300 bg-white px-2 dark:border-slate-700 dark:bg-slate-900" />
+                  </label>
+                </div> : <p className="text-sm">{ar ? 'راجع المبلغ وثبّت سعر الفاتورة قبل الدفع.' : 'Review the total and confirm the invoice price before paying.'}</p>}
+                <button type="button" disabled={sending || !phoneSaved || runDays === null || (needsUpload && paymentReady !== 'yes')}
+                  onClick={() => void lockPrice()} className="min-h-11 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-50">
+                  {sending ? (ar ? 'جارٍ تسجيل الطلب…' : 'Saving request…') : legacyMode ? (ar ? 'متابعة لمراجعة التحويل القديم' : 'Continue with legacy transfer review') : (ar ? 'تثبيت سعر الفاتورة' : 'Confirm invoice price')}
                 </button>
-                <p role="status" className="text-xs font-semibold">
+                {needsUpload && paymentReady !== 'yes' && <p role="status" className="text-xs font-semibold">
                   {paymentReady === 'checking' ? (ar ? 'جاري التحقق من إتاحة الإرسال...' : 'Checking submission availability…')
-                    : paymentReady === 'daily_limit' ? (ar ? 'استخدمت كل محاولات الرفع المتاحة النهارده. الرابط هيتاح بعد تجديد الحصة عند منتصف الليل بتوقيت القاهرة.' : 'You have used all of today’s upload attempts. The link becomes available after midnight Cairo time.')
+                    : paymentReady === 'daily_limit' ? (ar ? 'حصة الرفع خلصت. جرّب بعد منتصف الليل بتوقيت القاهرة.' : 'Your upload allowance resets at midnight Cairo time.')
                     : paymentReady === 'active' ? (ar ? 'عندك رفع قيد التنفيذ أو التحقق. كمّله الأول.' : 'You have an upload in progress. Complete it first.')
                     : paymentReady === 'paused' ? (ar ? 'رفع الإيصالات متوقف مؤقتًا.' : 'Receipt uploads are temporarily paused.')
-                    : paymentReady === 'error' ? (ar ? 'تعذّر التحقق من إتاحة الإرسال.' : 'Could not check submission availability.')
-                    : (ar ? 'احفظ رقم المتابعة عشان تفتح رابط إنستا باي.' : 'Save your contact number to open InstaPay.')}
-                  {paymentReady !== 'yes' && paymentReady !== 'checking' && <> <button type="button" onClick={() => setAvailabilityAttempt(value => value + 1)} className="underline">{ar ? 'تحقق تاني' : 'Check again'}</button></>}
-                </p>
-              </div>}
+                    : (ar ? 'تعذّر التحقق من إتاحة الإرسال.' : 'Could not check submission availability.')}
+                  {paymentReady !== 'checking' && <> <button type="button" onClick={() => setAvailabilityAttempt(value => value + 1)} className="underline">{ar ? 'تحقق تاني' : 'Check again'}</button></>}
+                </p>}
+              </>}
+
             </section>
 
-            <section className="space-y-3" aria-labelledby="ad-receipt-title">
+            {initialInvoice && mediaType !== 'none' && !mediaFile && <section className="space-y-2">
+              <label htmlFor="invoice-media" className="block text-sm font-bold">
+                {ar ? 'اختر ملف الإعلان الأصلي مرة أخرى' : 'Select the original ad media again'}
+              </label>
+              <input id="invoice-media" type="file" accept={mediaType === 'image' ? 'image/png,image/jpeg,image/webp' : 'video/mp4,video/webm,video/quicktime'}
+                disabled={restoringMedia || sending || !!paymentDraft.current?.prepared} onChange={async event => {
+                  const original = event.target.files?.[0];
+                  if (!original) return;
+                  setMediaError(false);
+                  setRestoringMedia(true);
+                  setRestoredMedia(null);
+                  try {
+                    setRestoredMedia(mediaType === 'image' ? await compressAdImage(original) : await compressAdVideo(original));
+                  } catch {
+                    setMediaError(true);
+                  } finally {
+                    setRestoringMedia(false);
+                  }
+                }} />
+              {restoringMedia && <p role="status">{ar ? 'جارٍ تجهيز الملف…' : 'Preparing media…'}</p>}
+              {mediaError && <p role="alert">{ar ? 'تعذّر تجهيز الملف. اختر ملفًا صالحًا.' : 'Could not prepare the media. Choose a valid file.'}</p>}
+            </section>}
+            {invoice && receiptRequired && <section className="space-y-3" aria-labelledby="ad-receipt-title">
               <h2 id="ad-receipt-title" className="flex items-center gap-2 text-sm font-extrabold">
                 <Upload className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
                 {ar ? 'إرفاق صورة إيصال الدفع' : 'Attach payment receipt image'}
@@ -348,12 +456,12 @@ export function AdPaymentCheckout({
                 </div>
               )}
               {receiptError && <p role="alert" className="text-xs font-bold text-rose-700">{receiptError}</p>}
-            </section>
+            </section>}
 
             <section className="space-y-3 border-t border-slate-200 pt-5 dark:border-slate-800">
-              <button type="button" onClick={() => void submit()} disabled={sending || !phoneSaved || !receiptFile || runDays === null}
+              <button type="button" onClick={() => void submit()} disabled={sending || !invoice || (receiptRequired && !receiptFile) || !mediaReady || restoringMedia}
                 className="flex min-h-13 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-4 text-sm font-extrabold text-white disabled:opacity-50">
-                {sendError ? (ar ? 'إعادة المحاولة' : 'Try again') : (ar ? 'إرسال الإعلان وإيصال الدفع للمراجعة' : 'Send ad and receipt for review')}
+                {sendError ? (ar ? 'إعادة المحاولة' : 'Try again') : (receiptRequired ? (ar ? 'إرسال الإعلان وإيصال الدفع للمراجعة' : 'Send ad and receipt for review') : (ar ? 'إرسال الإعلان للمراجعة' : 'Send ad for review'))}
               </button>
               {sending && <div role="status" className="grid justify-items-center gap-2 py-3 text-sm font-bold">
                 <LoaderCircle className="size-7 motion-safe:animate-spin" aria-hidden="true" />

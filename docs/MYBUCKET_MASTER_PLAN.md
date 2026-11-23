@@ -1,5 +1,12 @@
 # MyBucket — Master Implementation Plan
 
+## Paid ad pricing settings (#294)
+
+- Ad administration manages daily Featured and VIP rates in the existing Firestore ad policy. An absent pricing configuration uses EGP 100 and EGP 200, respectively.
+- Advertisers confirm the server-validated amount before opening InstaPay. A newer rate requires another confirmation before an invoice exists. An existing invoice retains its amount, and older submitted receipts keep their recorded amount.
+- A confirmed zero-rate ad goes straight to regular review without a transfer. The invoice link can be reopened by its owner, and expired temporary media upload cleanup preserves confirmed invoice amounts.
+- Unrecorded prior transfers can enter exceptional review with a receipt, reference, Cairo time and declared amount. Approval requires a match in the actual incoming-transfer records, and the server checks the first rate change and claims the reference atomically in the shared payment reference index. Unverified claims remain pending.
+
 ## Basic-only introductory access (#293)
 
 - The administrator configures a single Basic duration. Access is calculated from the original registration date. Legacy Pro duration fields are ignored and existing Firestore documents are preserved.

@@ -1,3 +1,4 @@
+import { type PaidAdPrices, type AdPriceLock, type LegacyAdTransfer } from '../../utils/adCheckout';
 import { AdTierInfoDialog } from './FeaturedAdInfoPage';
 import { followInternalLink } from '../../utils/navigationHistory';
 import { DEFAULT_FREE_OFFER_POLICY, type FreeOfferEligibility, type FreeOfferPolicy, type OfferTier, type PublicOfferAd } from '../../data/offerAds';
@@ -38,6 +39,34 @@ interface Props { lang: Language; onBack: () => void; onNavigate: (path: string)
 
 export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   const ar = lang === 'ar';
+  const [prices, setPrices] = useState<PaidAdPrices | null>(null);
+  const [priceFailure, setPriceFailure] = useState(false);
+  const [priceAttempt, setPriceAttempt] = useState(0);
+  const [invoiceId] = useState(() => window.location.pathname === '/offers/new/payment'
+    ? new URLSearchParams(window.location.search).get('invoice') : null);
+  const [resumed, setResumed] = useState<(PublicOfferAd & {
+    mediaType: 'image' | 'video' | null;
+    payment: Omit<AdPriceLock, 'createdAt' | 'legacyTransfer'> & { tier: keyof PaidAdPrices; phone: string };
+    createdAt: number;
+    legacyTransfer?: LegacyAdTransfer;
+  }) | null>(null);
+  const [invoiceFailed, setInvoiceFailed] = useState(false);
+  useEffect(() => {
+    let active = true;
+    setPriceFailure(false);
+    offerAdsRequest<PaidAdPrices>('ads.paidPrices', {}, true)
+      .then(value => { if (active) setPrices(value); })
+      .catch(() => { if (active) setPriceFailure(true); });
+    return () => { active = false; };
+  }, [priceAttempt]);
+  useEffect(() => {
+    if (!invoiceId) return;
+    let active = true;
+    offerAdsRequest<NonNullable<typeof resumed>>('ads.resumePayment', { id: invoiceId }, true)
+      .then(value => { if (active) setResumed(value); })
+      .catch(() => { if (active) setInvoiceFailed(true); });
+    return () => { active = false; };
+  }, [invoiceId]);
   const query = new URLSearchParams(window.location.search);
   const renewId = query.get('renew');
   const correctionId = query.get('correction') === '1' ? renewId : null;
@@ -292,7 +321,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     setPreview(false);
   };
   const goToPayment = () => {
-    if (!preview || (tier !== 'featured' && tier !== 'vip')) return;
+    if (!prices || !preview || (tier !== 'featured' && tier !== 'vip')) return;
     if (window.location.pathname !== '/offers/new/payment') {
       window.history.pushState({ myBucketTab: 'offers', offerPaymentPreview: true }, '', '/offers/new/payment');
     }
@@ -306,10 +335,24 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     }
     setCheckoutOpen(false);
   };
+  if (invoiceId) {
+    if (!resumed) return <main className="p-5 dark:bg-slate-950 dark:text-white">
+      <p role={invoiceFailed ? 'alert' : 'status'}>{invoiceFailed
+        ? (ar ? 'الفاتورة غير متاحة. لو تم التحويل، احتفظ بالإيصال وتواصل مع الإدارة.' : 'This invoice is unavailable. If you transferred money, keep the receipt and contact the administrator.')
+        : (ar ? 'جارٍ تحميل الفاتورة…' : 'Loading invoice…')}</p>
+    </main>;
+    return <AdPaymentCheckout tier={resumed.payment.tier} lang={lang} advertiserName={resumed.merchant}
+      adTitle={resumed.title} startsAt={new Date(resumed.startsAt)} endsAt={new Date(resumed.endsAt)}
+      mediaType={resumed.mediaType ?? 'none'} adDescription={resumed.description} categorySlug={resumed.categorySlug}
+      adContact={resumed.contact} dailyPriceEgp={resumed.payment.dailyPriceEgp}
+      initialInvoice={{ ...resumed.payment, id: invoiceId, createdAt: resumed.createdAt, legacyTransfer: resumed.legacyTransfer }} onPricesChange={setPrices}
+      onBack={onBack} onNavigate={onNavigate} />;
+  }
+
   if (checkoutOpen) {
     const start = adScheduleDate(startsAt);
     const end = adScheduleDate(endsAt);
-    if (!preview || (tier !== 'featured' && tier !== 'vip') || !start || !end || !title.trim() || !merchant.trim() || !category) {
+    if (!prices || !preview || (tier !== 'featured' && tier !== 'vip') || !start || !end || !title.trim() || !merchant.trim() || !category) {
       return (
         <main dir={ar ? 'rtl' : 'ltr'} className="min-h-screen bg-slate-50 px-4 py-12 text-slate-900">
           <section className="mx-auto max-w-xl space-y-4 rounded-2xl border border-emerald-100 bg-white p-6">
@@ -327,7 +370,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     }
     return <AdPaymentCheckout tier={tier} lang={lang} advertiserName={merchant} adTitle={title} startsAt={start} endsAt={end}
       mediaType={previewType ?? 'none'} adDescription={description} categorySlug={category} adContact={contact}
-      mediaFile={image ?? reusedMedia?.url} onBack={returnFromPayment} onNavigate={onNavigate} />;
+      mediaFile={image ?? reusedMedia?.url} dailyPriceEgp={prices[tier]} onPricesChange={setPrices} onBack={returnFromPayment} onNavigate={onNavigate} />;
   }
 
   const label = `block text-xs font-extrabold text-slate-700 mb-1.5 ${tier === 'free' ? 'dark:text-slate-300' : ''}`;
@@ -348,7 +391,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
           </div>
         </div>
       </header>
-      {infoTier && <AdTierInfoDialog lang={lang} tier={infoTier} freeDays={freeDays} durationDays={durationDays} onClose={closeTierInfo} />}
+      {infoTier && <AdTierInfoDialog lang={lang} tier={infoTier} freeDays={freeDays} durationDays={durationDays} prices={prices} onClose={closeTierInfo} />}
       <main className="max-w-xl mx-auto px-4 py-5 pb-20 space-y-5">
         {renewState !== 'ready' ? (
           <section className={`rounded-2xl border border-slate-200 bg-white p-5 ${freeSurface}`}>
@@ -376,7 +419,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
             </>}
             <button type="button" disabled={hasSubmission || cancellingSend} onClick={() => setPreview(false)} className={`w-full rounded-xl border border-emerald-600 text-emerald-700 py-3 text-sm font-bold disabled:opacity-50 ${tier === 'free' ? 'dark:text-emerald-300' : ''}`}>{ar ? 'تعديل الإعلان' : 'Edit advertisement'}</button>
             <div className={`space-y-2 rounded-xl bg-slate-50 p-3 text-center ${tier === 'free' ? 'dark:bg-slate-800' : ''}`}>
-              <button type="button" onClick={tier === 'free' ? () => void sendForReview() : goToPayment} disabled={sending || cancellingSend || cancelRequired || sendRecovery === 'changeVideo'}
+              <button type="button" onClick={tier === 'free' ? () => void sendForReview() : goToPayment} disabled={sending || cancellingSend || cancelRequired || sendRecovery === 'changeVideo' || (tier !== 'free' && !prices)}
                 className="w-full rounded-xl bg-emerald-700 px-3 py-3 text-sm font-extrabold text-white hover:bg-emerald-800 disabled:opacity-50">
                 {tier === 'free' ? (sending ? (ar ? 'جاري إرسال الإعلان...' : 'Sending ad…') : (sendRecovery === 'retry' || sendRecovery === 'restartUpload' ? (ar ? 'إعادة المحاولة' : 'Try again') : (ar ? 'إرسال للمراجعة' : 'Send for review'))) : (ar ? 'الانتقال إلى صفحة الدفع' : 'Continue to payment')}
               </button>
@@ -407,6 +450,10 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
             <section className={`bg-white rounded-2xl border border-slate-200 p-4 space-y-3 ${freeSurface}`}>
               <h2 className="font-extrabold text-sm">{ar ? '1. نوع الإعلان' : '1. Advertisement type'}</h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {!correctionId && priceFailure && <p role="alert" className="col-span-full text-sm text-rose-700 dark:text-rose-300">
+                  {ar ? 'تعذّر تحميل أسعار الإعلانات.' : 'Ad prices could not be loaded.'}{' '}
+                  <button className="underline" type="button" onClick={() => setPriceAttempt(n => n + 1)}>{ar ? 'إعادة المحاولة' : 'Retry'}</button>
+                </p>}
                 {(correctionId ? ['free'] as const : ['free', 'featured', 'vip'] as const).map(value => (
                   <div key={value} className="grid content-start gap-1">
                   <button type="button" aria-pressed={tier === value} onClick={() => {
@@ -423,7 +470,8 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                     </span>}
                   </button>
                   {value !== 'free' && <span className={`text-xs text-slate-600 ${freeMuted}`}>
-                    {ar ? (value === 'vip' ? '٢٠٠ جنيه / يوم' : '١٠٠ جنيه / يوم') : (value === 'vip' ? 'EGP 200 / day' : 'EGP 100 / day')}
+                    {prices ? (ar ? `${new Intl.NumberFormat('ar-EG').format(prices[value])} جنيه / يوم` : `EGP ${new Intl.NumberFormat('en-EG').format(prices[value])} / day`)
+                      : (ar ? 'السعر غير متاح حاليًا' : 'Price currently unavailable')}
                   </span>}
                   <button type="button" aria-haspopup="dialog" onClick={() => setInfoTier(value)}
                     className={`inline-flex min-h-11 items-center px-1 text-xs font-bold text-emerald-800 underline underline-offset-2 ${tier === 'free' ? 'dark:text-emerald-300' : ''}`}>

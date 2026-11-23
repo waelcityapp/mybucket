@@ -2,13 +2,14 @@ import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import type { OfferTier } from '../../data/offerAds';
 import type { Language } from '../../types';
-import { paidAdDailyPrice } from '../../utils/adCheckout';
+import type { PaidAdPrices } from '../../utils/adCheckout';
 
-export function AdTierInfoDialog({ lang, tier, freeDays, durationDays, onClose }: {
+export function AdTierInfoDialog({ lang, tier, freeDays, durationDays, prices, onClose }: {
   lang: Language;
   tier: OfferTier;
   freeDays: number;
   durationDays: number;
+  prices: PaidAdPrices | null;
   onClose: () => void;
 }) {
   const ar = lang === 'ar';
@@ -47,8 +48,9 @@ export function AdTierInfoDialog({ lang, tier, freeDays, durationDays, onClose }
         <p>{ar ? `النشر لمدة ${number.format(durationDays)} يوم من وقت الموافقة.` : `Published for ${durationDays} ${durationDays === 1 ? 'day' : 'days'} from approval.`}</p>
         <p>{ar ? `إعلان واحد كل ${number.format(freeDays)} يوم من آخر موافقة.` : `One ad every ${freeDays} ${freeDays === 1 ? 'day' : 'days'} from your last approval.`}</p>
       </> : <>
-        <p className="font-extrabold">{ar ? `${number.format(paidAdDailyPrice(tier))} جنيه لكل يوم` : `EGP ${paidAdDailyPrice(tier)} per day`}</p>
-        <p>{ar ? 'السعر تجريبي. الدفع بإنستا باي وإرفاق الإيصال للمراجعة.' : 'Trial rate. Pay through InstaPay and attach the receipt for review.'}</p>
+        <p className="font-extrabold">{prices ? (ar ? `${number.format(prices[tier])} جنيه لكل يوم` : `EGP ${number.format(prices[tier])} per day`)
+          : (ar ? 'السعر غير متاح حاليًا' : 'Price currently unavailable')}</p>
+        <p>{prices?.[tier] === 0 ? (ar ? 'الإعلان لا يحتاج تحويلًا بهذا السعر.' : 'No transfer is due at this rate.') : (ar ? 'الدفع بإنستا باي وإرفاق الإيصال للمراجعة.' : 'Pay through InstaPay and attach the receipt for review.')}</p>
       </>}
     </div>
   </dialog>;

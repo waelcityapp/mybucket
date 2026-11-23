@@ -394,7 +394,7 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
             </p>
             {Boolean(transferReference.trim()) && !normalizeAdTransferReference(transferReference) && <p role="alert" className="text-xs font-bold text-rose-700">
               {ar ? 'رقم العملية غير صالح. اكتب الرقم الحقيقي (5 إلى 48 حرفًا أو رقمًا).' : 'Invalid reference. Use the real 5–48-character transaction ID.'}
-            </p>
+            </p>}
             {ad.legacyTransfer && <label className="grid gap-1 text-xs font-bold">{ar ? 'وقت الاستلام من السجل، بتوقيت القاهرة' : 'Transfer time in the record, Cairo time'}
               <input type="datetime-local" step={1} value={receivedTime} onChange={event => setReceivedTime(event.target.value)} className="min-h-11 rounded-lg border bg-white px-2" />
             </label>}
@@ -420,7 +420,7 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
                   : ad.legacyTransfer && cairoAdTransferTime(receivedTime) === null
                     ? (ar ? 'اكتب وقت استلام التحويل كما يظهر في السجل.' : 'Enter the recorded incoming transfer time.')
                     : (ar ? 'راجع حساب الاستلام، وبعد التأكد علّم على مربع تأكيد وصول المبلغ.' : 'Verify the incoming payment, then check the confirmation box.')}
-            </p>
+            </p>}
         </div> : <div className="flex flex-wrap gap-2">
           <button type="button" disabled={busy || ad.requiresVideoCorrection} onClick={() => { setReason(''); setPaymentConfirmed(false); setVipPublishNow(false); setTransferReference(''); setReceivedTime(''); setDecision({ id: ad.id, status: 'approved' }); }} className={`${button} bg-emerald-700 text-white`}>{ar ? 'موافقة' : 'Approve'}</button>
           {!ad.legacyTransfer && <button type="button" disabled={busy} onClick={() => { setReason(''); setPaymentConfirmed(false); setVipPublishNow(false); setTransferReference(''); setReceivedTime(''); setDecision({ id: ad.id, status: 'rejected' }); }} className={`${button} bg-red-50 text-red-800`}>{ad.requiresVideoCorrection ? (ar ? 'إرجاع للتصحيح' : 'Return for correction') : (ar ? 'رفض' : 'Reject')}</button>}

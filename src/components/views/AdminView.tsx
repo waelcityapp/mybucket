@@ -5,6 +5,7 @@ import {
   ChevronUp, Clock3, PanelsTopLeft, PlayCircle, Palette,
 } from 'lucide-react';
 import type { AuthUser, Language } from '../../types';
+import { AdminSiteVisitsCard } from '../AdminSiteVisitsCard';
 import { AdminAiUsageCard } from '../AdminAiUsageCard';
 import { AdminAppUsersView } from './AdminAppUsersView';
 import { AdminSubscriptionsView, type AdminSubscriptionPage } from './AdminSubscriptionsView';
@@ -64,6 +65,8 @@ export function AdminView({
         <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
         <span className="text-[11px] font-semibold text-emerald-900 truncate">{ar ? 'حساب صاحب التطبيق:' : 'App owner:'} {user.email}</span>
       </div>
+
+      {!selected && <AdminSiteVisitsCard lang={lang} />}
 
       {!selected && <div className="grid grid-cols-2 gap-2.5">
         {sections.map(section => {

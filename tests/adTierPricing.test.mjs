@@ -1,13 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { APP_REVISION } from '../src/config/appRevision.ts';
 
-test('release 297 uses a dedicated comparison page and one entry point without losing the draft', () => {
+test('the ad form uses a dedicated comparison page and one entry point without losing the draft', () => {
   const create = readFileSync('src/components/views/CreateOfferPage.tsx', 'utf8');
   const app = readFileSync('src/App.tsx', 'utf8');
   const history = readFileSync('src/utils/navigationHistory.ts', 'utf8');
-  assert.equal(APP_REVISION, '#297');
   assert.match(create, /pricingOpen/);
   assert.match(create, /onChoose=\{choosePricingTier\}/);
   assert.match(create, /قارن المميزات والأسعار/);

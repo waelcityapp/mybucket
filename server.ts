@@ -48,6 +48,12 @@ async function startServer() {
   // Unified authenticated backend gateway for all product operations.
   app.post('/api/gateway', async (req, res) => {
     try {
+      if (req.body?.action === 'siteVisits.record') {
+        const { recordSiteVisit } = await import('./server/siteVisits.js');
+        const data = await recordSiteVisit(req.headers.origin, req.headers.host, req.body.payload?.browserId);
+        return res.status(200).json({ ok: true, data });
+      }
+
       if (req.body?.action === 'app.identity.get') {
         const { getAppIdentity } = await import('./server/appIdentity.js');
         return res.json({ ok: true, data: await getAppIdentity() });
@@ -227,6 +233,11 @@ async function startServer() {
         case 'fx.select': {
           const { changeExchangeRateWidget } = await import('./server/exchangeRates');
           return res.json({ ok: true, data: await changeExchangeRateWidget(user.uid, payload) });
+        }
+        case 'admin.siteVisits.get': {
+          if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+          const { readSiteVisits } = await import('./server/siteVisits.js');
+          return res.status(200).json({ ok: true, data: await readSiteVisits(payload.date) });
         }
         case 'admin.aiUsage': {
           if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') {

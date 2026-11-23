@@ -1,5 +1,10 @@
 # MyBucket — Master Implementation Plan
 
+## Daily site visits (#298)
+
+- The admin dashboard shows unique browsers by Cairo date, including visitors without a Google account. Multiple opens in the same browser count once per day. Different browsers or cleared browser storage can count separately.
+- The existing gateway records a daily hash of a randomly generated browser ID and restricts access to aggregate counts to the administrator. Collection starts when the new version is live.
+
 ## Opt-in VIP push notifications (#296)
 
 - The offers landing page requests permission only on an explicit click. Browsers enroll with a per-device credential through the existing gateway, with no Google account requirement. Opt-out removes the Firestore enrollment.

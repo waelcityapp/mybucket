@@ -141,7 +141,7 @@ export function AdPaymentCheckout({
       }, true);
       if (result.priceChanged === true) {
         onPricesChange(result.prices);
-        setPriceMessage(ar ? 'سعر الإعلان اتغيّر. راجع الإجمالي الجديد وثبّت السعر عشان تكمل.' : 'The ad rate changed. Review the new total and confirm the price to continue.');
+        setPriceMessage(ar ? 'سعر الإعلان اتغيّر. راجع الإجمالي الجديد واضغط «متابعة للدفع».' : 'The ad rate changed. Review the new total and select Continue to payment.');
         return;
       }
       setInvoice({ ...result, id: draft.id, phone: savedPhone });
@@ -149,7 +149,7 @@ export function AdPaymentCheckout({
       url.searchParams.set('invoice', draft.id);
       window.history.replaceState(window.history.state, '', url);
     } catch {
-      setPriceMessage(legacyMode ? (ar ? 'تعذّر تسجيل طلب المراجعة. تأكد من البيانات وحاول مرة أخرى.' : 'Could not create the review request. Check the details and try again.') : ar ? 'تعذّر تثبيت سعر الفاتورة. حاول مرة أخرى قبل التحويل.' : 'The invoice price could not be locked. Try again before transferring money.');
+      setPriceMessage(legacyMode ? (ar ? 'تعذّر تسجيل طلب المراجعة. تأكد من البيانات وحاول مرة أخرى.' : 'Could not create the review request. Check the details and try again.') : ar ? 'تعذّر تجهيز طلب الدفع. حاول مرة أخرى قبل التحويل.' : 'We could not prepare your payment request. Try again before transferring money.');
     } finally {
       sendLock.current = false;
       setSending(false);
@@ -262,9 +262,9 @@ export function AdPaymentCheckout({
               </span>
               <div>
                 <p className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">My Bucket</p>
-                <h1 className="text-lg font-black sm:text-xl">{ar ? 'صفحة الدفع لمراجعة وتأكيد الإعلان' : 'Payment Review & Checkout'}</h1>
+                <h1 className="text-lg font-black sm:text-xl">{ar ? 'مراجعة الإعلان والدفع' : 'Review Ad & Payment'}</h1>
                 <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                  {ar ? 'راجع ملخص الإعلان والفاتورة وأرفق إيصال التحويل.' : 'Review the advertisement, invoice and transfer receipt.'}
+                  {ar ? 'راجع سعر الإعلان ومدته، ثم أكمل الدفع وأرسل الإيصال للمراجعة.' : 'Review the ad price and duration, then complete payment and submit the receipt.'}
                 </p>
               </div>
             </div>
@@ -289,7 +289,7 @@ export function AdPaymentCheckout({
                   {ar ? 'ملخص الفاتورة' : 'Invoice Summary'}
                 </h2>
                 <span className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-800 dark:border-slate-700 dark:bg-slate-800 dark:text-emerald-300">
-                  {ar ? 'فاتورة غير مُصدرة' : 'Invoice not issued'}
+                  {invoice ? (invoice.legacyTransfer ? (ar ? 'مراجعة تحويل سابق' : 'Previous transfer review') : (ar ? 'جاهز للدفع' : 'Ready for payment')) : (ar ? 'قبل الدفع' : 'Before payment')}
                 </span>
               </div>
 
@@ -328,80 +328,90 @@ export function AdPaymentCheckout({
             <section className="space-y-2.5">
               <label htmlFor="ad-checkout-phone" className="flex items-center gap-2 text-sm font-bold">
                 <Phone className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
-                {ar ? 'رقم الموبايل لمتابعة الفاتورة' : 'Mobile number for invoice follow-up'}
+                {ar ? 'رقم الموبايل للتواصل بخصوص الإعلان' : 'Mobile number to contact you about your ad'}
               </label>
-              <div className="relative">
-                <input id="ad-checkout-phone" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" value={phone}
-                  onChange={event => setPhone(event.target.value)} maxLength={24} disabled={phoneState === 'loading' || phoneState === 'saving' || sending || !!invoice}
-                  placeholder={ar ? 'مثال: 01000000000' : 'Example: 01000000000'}
-                  aria-invalid={phoneTouched && !phoneValid}
-                  aria-describedby="ad-checkout-phone-help"
-                  className="min-h-12 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
-              </div>
-              {(phoneTouched || phone) && <p role="status" className={phoneValid ? 'flex items-center gap-1 text-xs font-bold text-emerald-700 dark:text-emerald-300' : 'text-xs font-bold text-rose-700 dark:text-rose-300'}>
-                {phoneValid ? <Check className="h-4 w-4" /> : null}
-                {phoneValid ? (ar ? 'صيغة الرقم صحيحة' : 'Valid number format') : (ar ? 'أدخل رقم موبايل مصري صحيح.' : 'Enter a valid Egyptian mobile number.')}
+              <input id="ad-checkout-phone" type="tel" inputMode="tel" autoComplete="tel" dir="ltr" value={phone}
+                onChange={event => setPhone(event.target.value)} maxLength={24} disabled={phoneState === 'loading' || phoneState === 'saving' || sending || !!invoice}
+                placeholder={ar ? 'مثال: 01000000000' : 'Example: 01000000000'}
+                aria-invalid={phoneTouched && !phoneValid}
+                aria-describedby="ad-checkout-phone-help"
+                className="min-h-12 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+              {phoneSaved ? <p id="ad-checkout-phone-help" role="status" className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                <Check className="h-4 w-4" aria-hidden="true" />
+                {ar ? 'رقمك محفوظ بالفعل. هنستخدمه لو احتجنا نتواصل معاك بخصوص الإعلان.' : 'Your number is saved. We may use it to contact you about this ad.'}
+              </p> : <p id="ad-checkout-phone-help" className="text-xs leading-5 text-slate-600 dark:text-slate-300">
+                {phoneValid ? (ar ? 'اضغط «حفظ الرقم» علشان تقدر تكمل الدفع.' : 'Save this number to continue to payment.')
+                  : (ar ? 'اكتب رقم موبايل مصري صحيح واحفظه للمتابعة.' : 'Enter a valid Egyptian mobile number and save it to continue.')}
               </p>}
-              <p id="ad-checkout-phone-help" className="text-xs leading-5 text-slate-500 dark:text-slate-400">{ar
-                ? 'اكتب رقم موبايلك، ثم احفظه. الرقم في الخانة مثال. احفظ الرقم في حسابك عشان يظهر تلقائيًا في الإعلانات المميزة القادمة. تقدر تغيّره في أي وقت.'
-                : 'Enter and save your own mobile number. The placeholder is an example. Your saved number will appear for future featured ads.'}</p>
-              {phoneState === 'loading' && <p role="status" className="text-xs">{ar ? 'جاري تحميل رقم المتابعة...' : 'Loading your contact number…'}</p>}
-              {phoneState === 'error' && <p role="alert" className="text-xs text-rose-700">{ar ? 'تعذّر تحميل أو حفظ الرقم. تقدر تدخله وتحفظه تاني.' : 'Could not load or save the number. Enter it and try saving again.'}</p>}
-              {phoneSaved && <p role="status" className="text-xs font-bold text-emerald-700">{ar ? 'الرقم محفوظ في حسابك.' : 'Number saved to your account.'}</p>}
-              <button type="button" onClick={() => void savePhone()} disabled={phoneSaved || !!invoice || phoneState === 'saving' || phoneState === 'loading'}
+              {phoneTouched && !phoneValid && <p role="alert" className="text-xs font-bold text-rose-700 dark:text-rose-300">
+                {ar ? 'تأكد من رقم الموبايل وحاول تاني.' : 'Check the mobile number and try again.'}
+              </p>}
+              {phoneState === 'loading' && <p role="status" className="text-xs">{ar ? 'جارٍ تحميل رقمك…' : 'Loading your number…'}</p>}
+              {phoneState === 'error' && <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">{ar ? 'تعذّر تحميل أو حفظ الرقم. حاول مرة أخرى.' : 'Could not load or save your number. Try again.'}</p>}
+              {!phoneSaved && !invoice && <button type="button" onClick={() => void savePhone()} disabled={phoneState === 'saving' || phoneState === 'loading' || sending}
                 className="min-h-11 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-50">
-                {phoneState === 'saving' ? (ar ? 'جاري الحفظ...' : 'Saving…') : (ar ? 'حفظ رقم المتابعة' : 'Save contact number')}
-              </button>
+                {phoneState === 'saving' ? (ar ? 'جارٍ الحفظ…' : 'Saving…') : (ar ? 'حفظ الرقم' : 'Save number')}
+              </button>}
             </section>
 
             <section className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:p-5 dark:border-emerald-900 dark:bg-emerald-950/30">
               <h2 className="flex items-center gap-2 text-sm font-extrabold text-emerald-900 dark:text-emerald-200">
                 <ShieldCheck className="h-5 w-5" />
-                {ar ? 'تعليمات الدفع' : 'Payment instructions'}
+                {ar ? 'الدفع ومراجعة الإعلان' : 'Payment and ad review'}
               </h2>
               {priceMessage && <p role="alert" className="text-sm font-bold text-rose-700 dark:text-rose-300">{priceMessage}</p>}
               {invoice ? (invoice.legacyTransfer ? <p role="status" className="text-sm">
-                {ar ? 'أرفق إيصال التحويل السابق. الإعلان يظل معلقًا لحد مطابقة التحويل بسجل الاستلام.' : 'Attach the previous transfer receipt. The ad stays pending until the administrator matches it to an incoming transfer.'}
+                {ar ? 'أرفق إيصال التحويل السابق. الإعلان يظل معلقًا لحد ما الإدارة تراجع التحويل وتطابقه.' : 'Attach your previous transfer receipt. The ad stays pending until the administrator verifies the transfer.'}
               </p> : receiptRequired ? <>
-                <p className="text-sm">{ar ? 'المبلغ مثبت. اكتب مبلغ الفاتورة في إنستا باي، وبعد التحويل ارجع لنفس الصفحة لإرفاق الإيصال.' : 'The amount is locked. Enter the invoice total in InstaPay, then return to this page to attach the receipt.'}</p>
+                <p className="text-sm">{ar ? 'المبلغ جاهز للدفع. افتح إنستا باي وحوّل الإجمالي الموضح بالأعلى، وبعدها ارجع هنا وارفع صورة الإيصال.' : 'Your total is ready. Open InstaPay, transfer the amount shown above, then return here and upload your receipt.'}</p>
                 <a href={INSTA_PAY_LINK} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-xl bg-emerald-700 px-4 font-bold text-white">
-                  {ar ? 'فتح إنستا باي' : 'Open InstaPay'}
+                  {ar ? 'فتح إنستا باي للدفع' : 'Open InstaPay to pay'}
                 </a>
-              </> : <p className="text-sm">{ar ? 'المبلغ المثبت صفر جنيه. تقدر ترسل الإعلان للمراجعة مباشرة.' : 'The locked total is EGP 0. You can send the ad directly for review.'}</p>) : <>
-                <button type="button" disabled={sending} className="block text-sm font-semibold underline" onClick={() => {
-                  setLegacyMode(value => !value);
-                  setPriceMessage('');
-                  paymentDraft.current = null;
-                }}>{legacyMode ? (ar ? 'العودة للدفع الجديد' : 'Back to new payment')
-                  : (ar ? 'حوّلت قبل تغيير الأسعار ومفيش طلب مسجّل' : 'I already transferred before the rate change and have no recorded request')}</button>
-                {legacyMode ? <div className="grid gap-2 sm:grid-cols-3">
-                  <label className="grid gap-1 text-xs font-bold">{ar ? 'مرجع التحويل' : 'Transfer reference'}
-                    <input value={legacyReference} maxLength={48} onChange={event => setLegacyReference(event.target.value)} dir="ltr" disabled={sending}
-                      className="min-h-11 min-w-0 rounded-lg border border-slate-300 bg-white px-2 dark:border-slate-700 dark:bg-slate-900" />
-                  </label>
-                  <label className="grid gap-1 text-xs font-bold">{ar ? 'وقت التحويل بتوقيت القاهرة' : 'Transfer time in Cairo'}
-                    <input type="datetime-local" step={1} value={legacyTime} onChange={event => setLegacyTime(event.target.value)} disabled={sending}
-                      className="min-h-11 min-w-0 rounded-lg border border-slate-300 bg-white px-2 dark:border-slate-700 dark:bg-slate-900" />
-                  </label>
-                  <label className="grid gap-1 text-xs font-bold">{ar ? 'المبلغ المحوّل (ج.م.)' : 'Amount sent (EGP)'}
-                    <input type="number" min={1} step={1} value={legacyAmount} onChange={event => setLegacyAmount(event.target.value)} disabled={sending}
-                      className="min-h-11 min-w-0 rounded-lg border border-slate-300 bg-white px-2 dark:border-slate-700 dark:bg-slate-900" />
-                  </label>
-                </div> : <p className="text-sm">{ar ? 'راجع المبلغ وثبّت سعر الفاتورة قبل الدفع.' : 'Review the total and confirm the invoice price before paying.'}</p>}
+              </> : <p className="text-sm">{ar ? 'مش مطلوب دفع في الحالة دي. تقدر ترسل الإعلان للمراجعة مباشرة.' : 'No payment is required. You can send the ad for review now.'}</p>) : <>
+                {legacyMode ? <>
+                  <p className="text-sm">{ar ? 'لو حوّلت مبلغ قبل تسجيل طلب الإعلان، اكتب بيانات التحويل علشان الإدارة تراجعها.' : 'If you transferred money before registering your ad request, enter the transfer details for review.'}</p>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <label className="grid gap-1 text-xs font-bold">{ar ? 'مرجع التحويل' : 'Transfer reference'}
+                      <input value={legacyReference} maxLength={48} onChange={event => setLegacyReference(event.target.value)} dir="ltr" disabled={sending}
+                        className="min-h-11 min-w-0 rounded-lg border border-slate-300 bg-white px-2 dark:border-slate-700 dark:bg-slate-900" />
+                    </label>
+                    <label className="grid gap-1 text-xs font-bold">{ar ? 'وقت التحويل بتوقيت القاهرة' : 'Transfer time in Cairo'}
+                      <input type="datetime-local" step={1} value={legacyTime} onChange={event => setLegacyTime(event.target.value)} disabled={sending}
+                        className="min-h-11 min-w-0 rounded-lg border border-slate-300 bg-white px-2 dark:border-slate-700 dark:bg-slate-900" />
+                    </label>
+                    <label className="grid gap-1 text-xs font-bold">{ar ? 'المبلغ المحوّل (ج.م.)' : 'Amount sent (EGP)'}
+                      <input type="number" min={1} step={1} value={legacyAmount} onChange={event => setLegacyAmount(event.target.value)} disabled={sending}
+                        className="min-h-11 min-w-0 rounded-lg border border-slate-300 bg-white px-2 dark:border-slate-700 dark:bg-slate-900" />
+                    </label>
+                  </div>
+                </> : <p className="text-sm">{ar ? 'راجع سعر الإعلان ومدته بالأعلى، وبعدها اضغط «متابعة للدفع».' : 'Review the ad price and duration above, then select Continue to payment.'}</p>}
                 <button type="button" disabled={sending || !phoneSaved || runDays === null || (needsUpload && paymentReady !== 'yes')}
                   onClick={() => void lockPrice()} className="min-h-11 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-50">
-                  {sending ? (ar ? 'جارٍ تسجيل الطلب…' : 'Saving request…') : legacyMode ? (ar ? 'متابعة لمراجعة التحويل القديم' : 'Continue with legacy transfer review') : (ar ? 'تثبيت سعر الفاتورة' : 'Confirm invoice price')}
+                  {sending ? (ar ? 'جارٍ تجهيز الطلب…' : 'Preparing request…') : legacyMode ? (ar ? 'متابعة لمراجعة التحويل السابق' : 'Continue previous transfer review') : (ar ? 'متابعة للدفع' : 'Continue to payment')}
                 </button>
+                {!phoneSaved && <p className="text-xs text-slate-600 dark:text-slate-300">{ar ? 'احفظ رقم الموبايل بالأعلى علشان تقدر تكمل.' : 'Save your mobile number above to continue.'}</p>}
                 {needsUpload && paymentReady !== 'yes' && <p role="status" className="text-xs font-semibold">
-                  {paymentReady === 'checking' ? (ar ? 'جاري التحقق من إتاحة الإرسال...' : 'Checking submission availability…')
+                  {paymentReady === 'checking' ? (ar ? 'جارٍ التحقق من إتاحة الإرسال…' : 'Checking submission availability…')
                     : paymentReady === 'daily_limit' ? (ar ? 'حصة الرفع خلصت. جرّب بعد منتصف الليل بتوقيت القاهرة.' : 'Your upload allowance resets at midnight Cairo time.')
                     : paymentReady === 'active' ? (ar ? 'عندك رفع قيد التنفيذ أو التحقق. كمّله الأول.' : 'You have an upload in progress. Complete it first.')
                     : paymentReady === 'paused' ? (ar ? 'رفع الإيصالات متوقف مؤقتًا.' : 'Receipt uploads are temporarily paused.')
                     : (ar ? 'تعذّر التحقق من إتاحة الإرسال.' : 'Could not check submission availability.')}
                   {paymentReady !== 'checking' && <> <button type="button" onClick={() => setAvailabilityAttempt(value => value + 1)} className="underline">{ar ? 'تحقق تاني' : 'Check again'}</button></>}
                 </p>}
+                {legacyMode ? <button type="button" disabled={sending} className="block text-xs font-semibold text-emerald-800 underline dark:text-emerald-200"
+                  onClick={() => { setLegacyMode(false); setPriceMessage(''); paymentDraft.current = null; }}>
+                  {ar ? 'العودة للدفع العادي' : 'Back to regular payment'}
+                </button> : <details className="border-t border-emerald-200/70 pt-3 text-xs dark:border-emerald-900">
+                  <summary className="w-fit cursor-pointer font-semibold text-emerald-800 underline dark:text-emerald-200">
+                    {ar ? 'هل حوّلت فلوس قبل إنشاء طلب الإعلان؟' : 'Already transferred before creating your ad request?'}
+                  </summary>
+                  <p className="mt-2 text-slate-600 dark:text-slate-300">{ar ? 'دي حالة خاصة لو حوّلت مبلغ قبل تسجيل الطلب ومفيش طلب مربوط بالتحويل.' : 'This option is only for a payment made before creating a request, with no recorded request for the transfer.'}</p>
+                  <button type="button" disabled={sending} className="mt-2 font-bold text-emerald-800 underline dark:text-emerald-200"
+                    onClick={() => { setLegacyMode(true); setPriceMessage(''); paymentDraft.current = null; }}>
+                    {ar ? 'مراجعة تحويل سابق' : 'Review previous transfer'}
+                  </button>
+                </details>}
               </>}
-
             </section>
 
             {initialInvoice && mediaType !== 'none' && !mediaFile && <section className="space-y-2">

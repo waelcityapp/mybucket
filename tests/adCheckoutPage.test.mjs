@@ -49,3 +49,16 @@ test('Featured and VIP have distinct trial prices', () => {
   assert.equal(paidAdDailyPrice('featured'), 100);
   assert.equal(paidAdDailyPrice('vip'), 200);
 });
+
+test('ad payment page makes the next step clear and hides exceptional transfer review until requested', () => {
+  const checkout = readFileSync('src/components/views/AdPaymentCheckout.tsx', 'utf8');
+  assert.match(checkout, /رقم الموبايل للتواصل بخصوص الإعلان/);
+  assert.match(checkout, /متابعة للدفع/);
+  assert.match(checkout, /الدفع ومراجعة الإعلان/);
+  assert.match(checkout, /!phoneSaved && !invoice/);
+  assert.match(checkout, /<details className=/);
+  assert.match(checkout, /مراجعة تحويل سابق/);
+  assert.match(checkout, /'ads\.lockPrice'/);
+  assert.match(checkout, /'ads\.submit'/);
+  assert.doesNotMatch(checkout, /تثبيت سعر الفاتورة|فاتورة غير مُصدرة/);
+});

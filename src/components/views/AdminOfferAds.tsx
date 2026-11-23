@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { OfferAdStatus, ReviewOfferAd } from '../../data/offerAds';
+import type { FreeOfferPolicy, OfferAdStatus, ReviewOfferAd } from '../../data/offerAds';
 import { offerAdsRequest } from '../../services/offerAdsClient';
 import type { Language } from '../../types';
 import { AdCreativeCard } from '../AdCreativeCard';
@@ -61,24 +61,37 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
     }
   };
   const [days, setDays] = useState('');
+  const [duration, setDuration] = useState('');
+  const [savedPolicy, setSavedPolicy] = useState<FreeOfferPolicy | null>(null);
   const [policyBusy, setPolicyBusy] = useState(false);
   const [policyMessage, setPolicyMessage] = useState('');
   useEffect(() => {
     let active = true;
-    offerAdsRequest<{ freeIntervalDays: number }>('admin.ads.policy', {}, true)
-      .then(policy => { if (active) setDays(String(policy.freeIntervalDays)); })
-      .catch(() => { if (active) setPolicyMessage(ar ? 'تعذّر تحميل مدة الإعلان المجاني.' : 'Could not load the free ad interval.'); });
+    offerAdsRequest<FreeOfferPolicy>('admin.ads.policy', {}, true)
+      .then(policy => {
+        if (!active) return;
+        setDays(String(policy.freeIntervalDays));
+        setDuration(String(policy.freeDurationDays));
+        setSavedPolicy(policy);
+      })
+      .catch(() => { if (active) setPolicyMessage(ar ? 'تعذّر تحميل إعدادات الإعلان المجاني.' : 'Could not load free ad settings.'); });
     return () => { active = false; };
   }, [ar]);
   const savePolicy = async () => {
+    if (!savedPolicy || policyBusy) return;
     setPolicyBusy(true);
     setPolicyMessage('');
     try {
-      const policy = await offerAdsRequest<{ freeIntervalDays: number }>('admin.ads.policy', { freeIntervalDays: Number(days) }, true);
+      const updates: Partial<FreeOfferPolicy> = {};
+      if (Number(days) !== savedPolicy.freeIntervalDays) updates.freeIntervalDays = Number(days);
+      if (Number(duration) !== savedPolicy.freeDurationDays) updates.freeDurationDays = Number(duration);
+      const policy = await offerAdsRequest<FreeOfferPolicy>('admin.ads.policy', updates, true);
+      setSavedPolicy(policy);
       setDays(String(policy.freeIntervalDays));
-      setPolicyMessage(ar ? 'تم حفظ المدة.' : 'Interval saved.');
+      setDuration(String(policy.freeDurationDays));
+      setPolicyMessage(ar ? 'تم حفظ الإعدادات.' : 'Settings saved.');
     } catch {
-      setPolicyMessage(ar ? 'تعذّر حفظ المدة.' : 'Could not save the interval.');
+      setPolicyMessage(ar ? 'تعذّر حفظ الإعدادات.' : 'Could not save settings.');
     } finally { setPolicyBusy(false); }
   };
 
@@ -101,9 +114,15 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
     try {
       await offerAdsRequest('admin.ads.review', { ...decision, reason, paymentConfirmed }, true);
       setAds(items => items?.filter(ad => ad.id !== decision.id) ?? null);
-      setNotice(decision.status === 'approved'
-        ? (ar ? 'تمت الموافقة. الإعلان يظهر للجمهور خلال موعد النشر المحدد.' : 'Approved. The ad appears during its publication window.')
-        : (ar ? 'تم رفض الإعلان.' : 'The ad was rejected.'));
+      const ad = ads?.find(item => item.id === decision.id);
+      const notice = decision.status === 'approved'
+        ? (ad?.payment
+          ? (ar ? 'تمت الموافقة. الإعلان يظهر للجمهور خلال موعد النشر المحدد.' : 'Approved. The ad appears during its publication window.')
+          : (ar ? 'تمت الموافقة ونشر الإعلان المجاني.' : 'The free ad was approved and published.'))
+        : (ad?.requiresVideoCorrection
+          ? (ar ? 'تم إرجاع الإعلان للمعلن للتصحيح.' : 'The ad was returned to the advertiser for correction.')
+          : (ar ? 'تم رفض الإعلان.' : 'The ad was rejected.'));
+      setNotice(notice);
       setDecision(null);
     } catch (failure) {
       const code = failure instanceof Error ? failure.message : '';
@@ -112,10 +131,13 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
         setRefresh(value => value + 1);
         setNotice(ar ? 'تم اتخاذ قرار لهذا الإعلان بالفعل.' : 'This ad has already been reviewed.');
       } else {
-        setError(code === 'ad_schedule_expired'
-          ? (ar ? 'موعد نشر الإعلان انتهى. تقدر ترفضه وتسجل السبب.' : 'The publication window has ended. You can reject the ad and record a reason.')
-          : code === 'ad_free_interval'
-            ? (ar ? 'لسه ما مرّتش المدة المطلوبة من آخر إعلان مجاني تمت الموافقة عليه لهذا الحساب.' : 'This account’s free ad interval has not passed since its last approval.')
+        const errors = {
+          ad_free_image_only: ar ? 'الإعلان المجاني فيه فيديو. ارجعه للمعلن للتصحيح.' : 'This free ad contains a video. Return it to the advertiser for correction.',
+          ad_active_exists: ar ? 'الحساب عنده إعلان مجاني نشط.' : 'This account already has an active free ad.',
+          ad_pending_exists: ar ? 'الحساب عنده طلب مجاني تاني قيد المراجعة.' : 'This account has another free ad awaiting review.',
+          ad_free_interval: ar ? 'فترة الانتظار من آخر موافقة على إعلان مجاني للحساب لسه ما خلصتش.' : 'The waiting period since this account’s last free ad approval has not passed.',
+        };
+        setError(Object.hasOwn(errors, code) ? errors[code as keyof typeof errors]
           : (ar ? 'تعذّر حفظ القرار. حاول مرة تانية.' : 'Could not save the decision. Try again.'));
       }
     } finally { setBusy(false); }
@@ -171,14 +193,21 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
         </button>
       </>}
     </section>
-    <form onSubmit={event => { event.preventDefault(); void savePolicy(); }} className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
-      <label className="block text-sm font-bold" htmlFor="free-ad-interval">{ar ? 'المدة بين الموافقات على الإعلانات المجانية (أيام)' : 'Days between free ad approvals'}</label>
-      <div className="flex flex-wrap gap-2">
-        <input id="free-ad-interval" type="number" min="1" max="90" required value={days} disabled={policyBusy}
-          onChange={event => setDays(event.target.value)} className="w-24 rounded-xl border border-slate-200 bg-white px-3 text-slate-900" />
-        <button type="submit" disabled={policyBusy || !days} className={`${button} bg-emerald-700 text-white`}>{ar ? 'حفظ' : 'Save'}</button>
+    <form onSubmit={event => { event.preventDefault(); void savePolicy(); }} className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="grid gap-1 text-sm font-bold" htmlFor="free-ad-duration">
+          {ar ? 'مدة نشر الإعلان المجاني (أيام)' : 'Free ad publication duration (days)'}
+          <input id="free-ad-duration" type="number" min="1" max="90" required value={duration} disabled={policyBusy || !savedPolicy}
+            onChange={event => setDuration(event.target.value)} className="min-h-11 w-24 rounded-xl border border-slate-200 bg-white px-3 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+        </label>
+        <label className="grid gap-1 text-sm font-bold" htmlFor="free-ad-interval">
+          {ar ? 'فترة الانتظار من آخر موافقة (أيام)' : 'Waiting period since last approval (days)'}
+          <input id="free-ad-interval" type="number" min="1" max="90" required value={days} disabled={policyBusy || !savedPolicy}
+            onChange={event => setDays(event.target.value)} className="min-h-11 w-24 rounded-xl border border-slate-200 bg-white px-3 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+        </label>
       </div>
-      {policyMessage && <p role="status" className="text-xs text-slate-700">{policyMessage}</p>}
+      <button type="submit" disabled={policyBusy || !days || !duration} className={`${button} bg-emerald-700 text-white`}>{ar ? 'حفظ' : 'Save'}</button>
+      {policyMessage && <p role="status" className="text-xs text-slate-700 dark:text-slate-300">{policyMessage}</p>}
     </form>
     <div className="flex flex-wrap gap-2" aria-label={ar ? 'حالة الإعلان' : 'Ad status'}>
       {(['pending', 'approved', 'rejected'] as const).map(value => <button type="button" key={value} disabled={busy}
@@ -211,7 +240,11 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
           mediaUrl={ad.media?.url} mediaType={ad.media?.type} poster={ad.media?.poster} />
         <dl className="space-y-1 text-xs text-slate-600">
           <div><dt className="inline font-bold">{ar ? 'وصل في' : 'Received'} </dt><dd className="inline">{date(ad.submittedAt)}</dd></div>
-          <div><dt className="inline font-bold">{ar ? 'مدة النشر بتوقيت القاهرة' : 'Publication window, Cairo time'} </dt><dd className="inline">{date(ad.startsAt)} — {date(ad.endsAt)}</dd></div>
+          {(ad.payment || status === 'approved') && <div><dt className="inline font-bold">{ar ? 'مدة النشر بتوقيت القاهرة' : 'Publication window, Cairo time'} </dt><dd className="inline">{date(ad.startsAt)} — {date(ad.endsAt)}</dd></div>}
+          {!ad.payment && status === 'pending' && <div>
+            <dt className="inline font-bold">{ar ? 'بداية النشر' : 'Publication start'} </dt>
+            <dd className="inline">{ar ? 'فور الموافقة' : 'Immediately upon approval'}</dd>
+          </div>}
         </dl>
         {ad.payment && <section className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-slate-900">
           <h3 className="font-extrabold">{ar ? 'إيصال إنستا باي' : 'InstaPay receipt'}</h3>
@@ -232,10 +265,15 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
         </section>}
         {ad.rejectionReason && <p className="whitespace-pre-wrap break-words text-sm text-slate-700">{ad.rejectionReason}</p>}
         {status === 'approved' && ad.startsAt <= Date.now() && ad.endsAt > Date.now() && <a className="inline-block text-sm font-bold text-emerald-700 underline" href={`/offers/ad/${ad.id}`}>{ar ? 'افتح الإعلان المنشور' : 'Open published ad'}</a>}
+        {status === 'pending' && ad.requiresVideoCorrection && <p role="alert" className="text-sm font-semibold text-red-700">
+          {ar ? 'الإعلان المجاني فيه فيديو. ارجعه للمعلن عشان يزيل الفيديو أو يستبدله بصورة واحدة.' : 'This free ad contains a video. Return it so the advertiser can remove the video or replace it with one image.'}
+        </p>}
         {status === 'pending' && (decision?.id === ad.id ? <div className="space-y-2 rounded-xl bg-slate-50 p-3">
           <p className="text-sm font-bold">{decision.status === 'approved'
-            ? (ar ? 'تأكيد الموافقة على نشر الإعلان في المدة المحددة؟' : 'Confirm approval for the selected publication window?')
-            : (ar ? 'تأكيد رفض الإعلان؟' : 'Confirm rejection?')}</p>
+            ? (ad.payment
+              ? (ar ? 'تأكيد الموافقة على نشر الإعلان في المدة المحددة؟' : 'Confirm approval for the selected publication window?')
+              : (ar ? 'تأكيد الموافقة والنشر الفوري؟' : 'Approve and publish now?'))
+            : (ad.requiresVideoCorrection ? (ar ? 'تأكيد إرجاع الإعلان للتصحيح؟' : 'Return the ad for correction?') : (ar ? 'تأكيد رفض الإعلان؟' : 'Confirm rejection?'))}</p>
           {decision.status === 'approved' && ad.payment && <label className="flex items-start gap-2 text-sm font-bold">
             <input type="checkbox" checked={paymentConfirmed} onChange={event => setPaymentConfirmed(event.target.checked)} />
             {ar ? 'راجعت الإيصال واتأكدت إن التحويل وصل بالمبلغ المطلوب.' : 'I checked the receipt and confirmed the expected transfer was received.'}
@@ -248,8 +286,8 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
             <button type="button" disabled={busy} onClick={() => setDecision(null)} className={`${button} bg-slate-200 text-slate-800`}>{ar ? 'إلغاء' : 'Cancel'}</button>
           </div>
         </div> : <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={busy || (!ad.payment && ad.endsAt <= Date.now())} onClick={() => { setReason(''); setPaymentConfirmed(false); setDecision({ id: ad.id, status: 'approved' }); }} className={`${button} bg-emerald-700 text-white`}>{ar ? 'موافقة' : 'Approve'}</button>
-          <button type="button" disabled={busy} onClick={() => { setReason(''); setPaymentConfirmed(false); setDecision({ id: ad.id, status: 'rejected' }); }} className={`${button} bg-red-50 text-red-800`}>{ar ? 'رفض' : 'Reject'}</button>
+          <button type="button" disabled={busy || ad.requiresVideoCorrection} onClick={() => { setReason(''); setPaymentConfirmed(false); setDecision({ id: ad.id, status: 'approved' }); }} className={`${button} bg-emerald-700 text-white`}>{ar ? 'موافقة' : 'Approve'}</button>
+          <button type="button" disabled={busy} onClick={() => { setReason(''); setPaymentConfirmed(false); setDecision({ id: ad.id, status: 'rejected' }); }} className={`${button} bg-red-50 text-red-800`}>{ad.requiresVideoCorrection ? (ar ? 'إرجاع للتصحيح' : 'Return for correction') : (ar ? 'رفض' : 'Reject')}</button>
         </div>)}
       </div>)}
     </div>

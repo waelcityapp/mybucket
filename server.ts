@@ -38,7 +38,7 @@ async function startServer() {
     const id = compact ? (await import('./src/utils/offerShare.js')).expandOfferId(req.params.id) : req.params.id;
     if (!id) return res.sendStatus(404);
     try {
-      const body = await renderOfferShare(id, lang, `${req.protocol}://${req.get('host')}`, image);
+      const { body } = await renderOfferShare(id, lang, `${req.protocol}://${req.get('host')}`, image);
       return res.status(body === null ? 404 : 200).type(image ? 'image/jpeg' : 'html').send(body ?? '');
     } catch {
       return res.status(503).json({ ok: false, error: 'offer_preview_unavailable' });

@@ -6,7 +6,7 @@ import {
   Gift, Smartphone, Store, Play, Eye, type LucideIcon
 } from 'lucide-react';
 import { Language } from '../../types';
-import type { OfferEngagement, OfferReaction, OfferReactionState, PublicOfferAd } from '../../data/offerAds';
+import { supportsOfferFavorites, type OfferEngagement, type OfferReaction, type OfferReactionState, type PublicOfferAd } from '../../data/offerAds';
 import { offerAdsRequest } from '../../services/offerAdsClient';
 import { DEMO_ADS } from '../../data/demoAds';
 import { offerShareExcerpt } from '../../utils/offerShare';
@@ -108,6 +108,29 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
       .catch(() => { if (active) setLoadError(true); });
     return () => { active = false; };
   }, [attempt, showViewCounts]);
+  useEffect(() => {
+    if (!published) return;
+    let timer: number | undefined;
+    const expireFreeAds = () => {
+      window.clearTimeout(timer);
+      const now = Date.now();
+      let next = Infinity;
+      for (const ad of published) {
+        if (ad.tier !== 'free' || ad.endsAt <= now) continue;
+        next = Math.min(next, ad.endsAt);
+      }
+      if (published.some(ad => ad.tier === 'free' && ad.endsAt <= now)) {
+        setPublished(current => current?.filter(ad => ad.tier !== 'free' || ad.endsAt > now) ?? null);
+      }
+      if (next < Infinity) timer = window.setTimeout(expireFreeAds, Math.min(next - now, 2_147_483_647));
+    };
+    expireFreeAds();
+    document.addEventListener('visibilitychange', expireFreeAds);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', expireFreeAds);
+    };
+  }, [published]);
   const category = CATEGORIES.find(item => item.slug === categorySlug);
   const list = useMemo(() => CATEGORIES.filter(item =>
     `${item.ar} ${item.en}`.toLowerCase().includes(search.trim().toLowerCase())
@@ -129,7 +152,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
     .sort((a, b) => rank[a.tier ?? 'free'] - rank[b.tier ?? 'free']) ?? [];
   const demoAds = allDemoAds.filter(ad => ad.categorySlug === categorySlug);
   const visibleAds = favoritesOnly
-    ? [...(published ?? []), ...allDemoAds].filter(ad => reactions?.[ad.id]?.saved === true)
+    ? (published ?? []).filter(ad => supportsOfferFavorites(ad.tier) && reactions?.[ad.id]?.saved === true)
     : showVip ? [...vipAds.slice(rotation), ...vipAds.slice(0, rotation)]
     : realAds.length ? realAds : demoAds;
   const showingDemos = !favoritesOnly && !showVip && realAds.length === 0;
@@ -315,7 +338,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                                   {isAr ? 'مزيد من التفاصيل' : 'More details'} <ForwardIcon className="size-4" aria-hidden="true" />
                                 </a>
                               </div>
-                              <OfferCardActions id={ad.id} isAr={isAr} state={reactions?.[ad.id]}
+                              <OfferCardActions id={ad.id} isAr={isAr} canSave={!demo && supportsOfferFavorites('tier' in ad ? ad.tier : undefined)} state={reactions?.[ad.id]}
                                 engagement={demo ? demoEngagement[ad.id] : 'engagement' in ad ? ad.engagement : undefined}
                                 onReact={reaction => reactToAd(ad.id, demo, reaction)} />
                             </div>

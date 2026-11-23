@@ -4,7 +4,7 @@ import { getAdminFirestore } from './firebaseAdmin.js';
 import { confirmAdminAdTestUpload, deleteAdminAdTestUpload, signAdminAdTestUpload } from './adminAdTestUpload.js';
 import { SubscriptionError } from './subscriptionService.js';
 import { DEMO_ADS } from '../src/data/demoAds.js';
-import { type OfferEngagement, type OfferReactionState, OFFER_CATEGORY_IDS, type MyOfferAd, type OfferAdStatus, type PublicOfferAd } from '../src/data/offerAds.js';
+import { DEFAULT_FREE_OFFER_POLICY, supportsOfferFavorites, type FreeOfferEligibility, type FreeOfferPolicy, type OfferEngagement, type OfferReactionState, OFFER_CATEGORY_IDS, type MyOfferAd, type OfferAdStatus, type PublicOfferAd } from '../src/data/offerAds.js';
 
 const DAY = 86400000;
 const MAX_UPLOADS = 3;
@@ -30,6 +30,8 @@ type StoredAd = AdFields & {
   uploadDay?: string;
   uploadCleanupAt?: number;
   rejectionReason: string;
+  correctionId?: string;
+  correctedBy?: string;
 };
 
 function fail(code: string, status = 400): never {
@@ -56,7 +58,7 @@ function expiry(payload: Payload, now: number, allowPast = false) {
   return { startsAt, endsAt };
 }
 
-function adFields(payload: Payload, allowPast = false): AdFields {
+function adFields(payload: Payload, paid: boolean): AdFields {
   const categorySlug = field(payload.categorySlug, 60);
   if (!OFFER_CATEGORY_IDS.some(category => category === categorySlug)) return fail('invalid_ad_details');
   return {
@@ -65,7 +67,7 @@ function adFields(payload: Payload, allowPast = false): AdFields {
     description: field(payload.description, 1000),
     merchant: field(payload.merchant, 100),
     contact: field(payload.contact, 200, false),
-    ...expiry(payload, Date.now(), allowPast),
+    ...(paid ? expiry(payload, Date.now(), true) : { startsAt: 0, endsAt: 0 }),
   };
 }
 
@@ -85,9 +87,17 @@ function mediaView(media: StoredMedia, thumbnail = false): PublicOfferAd['media'
   };
 }
 
+function offerTier(ad: StoredAd) {
+  return ad.payment ? ad.payment.tier ?? 'featured' : 'free';
+}
+
+function requiresVideoCorrection(ad: StoredAd) {
+  return !ad.payment && (ad.mediaType === 'video' || ad.media?.resourceType === 'video');
+}
+
 function offerView(id: string, ad: StoredAd): PublicOfferAd {
   const { title, description, merchant, categorySlug, contact, startsAt, endsAt, media } = ad;
-  return { id, title, description, merchant, categorySlug, contact, startsAt, endsAt, engagement: engagementOf(ad), tier: ad.payment ? ad.payment.tier ?? 'featured' : 'free', media: media ? mediaView(media) : undefined };
+  return { id, title, description, merchant, categorySlug, contact, startsAt, endsAt, engagement: engagementOf(ad), tier: offerTier(ad), media: media ? mediaView(media) : undefined };
 }
 
 export function isPublicOffer(ad: Pick<StoredAd, 'status' | 'startsAt' | 'endsAt'>, now: number) {
@@ -151,6 +161,9 @@ export async function setOfferReaction(uid: string, payload: Payload, db = getAd
     const [adSnapshot, userSnapshot] = await Promise.all([tx.get(adRef), tx.get(userRef)]);
     const ad = adSnapshot.data() as StoredAd | undefined;
     if (!demo && (!ad || !isPublicOffer(ad, Date.now()))) return fail('ad_not_available', 404);
+    if (reaction === 'saved' && (demo || !ad || !supportsOfferFavorites(offerTier(ad)))) {
+      return fail('ad_favorites_unavailable', 409);
+    }
     const previous = userSnapshot.data() as OfferReactionState | undefined;
     const state = { liked: previous?.liked === true, saved: previous?.saved === true };
     const engagement = engagementOf(ad);
@@ -190,17 +203,28 @@ export async function readMyOfferAds(uid: string, db = getAdminFirestore()): Pro
   const now = Date.now();
   const snapshot = await db.collection('offerAds').where('ownerId', '==', uid).get();
   return snapshot.docs.flatMap<MyOfferAd>(doc => {
-    const { title, merchant, status, submittedAt, startsAt, endsAt, rejectionReason, payment, media } = doc.data() as StoredAd;
+    const ad = doc.data() as StoredAd;
+    const { title, merchant, status, submittedAt, startsAt, endsAt, rejectionReason, media } = ad;
     if (status !== 'pending' && status !== 'approved' && status !== 'rejected' && status !== 'deleting') return [];
     const deleteAfter = status === 'approved' && now >= endsAt ? endsAt + EXPIRED_RETENTION : null;
     if (deleteAfter !== null && now >= deleteAfter) return [];
     const preview = media && status !== 'deleting' ? mediaView(media, true) : undefined;
     const thumbnailUrl = preview?.type === 'video' ? preview.poster : preview?.url;
-    return [{ id: doc.id, title, merchant, thumbnailUrl, tier: payment ? payment.tier ?? 'featured' : 'free', status, submittedAt, startsAt, endsAt, rejectionReason, deleteAfter }];
+    return [{ id: doc.id, title, merchant, thumbnailUrl, tier: offerTier(ad), status, submittedAt, startsAt, endsAt, rejectionReason, deleteAfter,
+      requiresVideoCorrection: !ad.correctedBy && requiresVideoCorrection(ad) }];
   }).sort((a, b) => b.submittedAt - a.submittedAt);
 }
 
 const policyRef = (db: ReturnType<typeof getAdminFirestore>) => db.collection('offerAdSettings').doc('policy');
+
+// The phase-one waiting period has a new storage key so an old saved interval
+// cannot override the initial 14 days. The admin and client API keep their field names.
+function freeOfferPolicy(settings?: FirebaseFirestore.DocumentData): FreeOfferPolicy {
+  return {
+    freeDurationDays: settings?.freeDurationDays ?? DEFAULT_FREE_OFFER_POLICY.freeDurationDays,
+    freeIntervalDays: settings?.freeWaitDays ?? DEFAULT_FREE_OFFER_POLICY.freeIntervalDays,
+  };
+}
 
 async function freeOfferEligibility(
   db: ReturnType<typeof getAdminFirestore>,
@@ -208,35 +232,48 @@ async function freeOfferEligibility(
   uid: string,
   id: string,
   now: number,
-  requireNoPending: boolean,
-) {
-  const [policy, ledger, existing] = await Promise.all([
+): Promise<FreeOfferEligibility> {
+  const [settings, ledger, existing] = await Promise.all([
     tx.get(policyRef(db)),
     tx.get(db.collection('offerAdApprovalLedger').doc(uid)),
     tx.get(db.collection('offerAds').where('ownerId', '==', uid)),
   ]);
-  const days = policy.data()?.freeIntervalDays ?? 7;
+  const policy = freeOfferPolicy(settings.data());
   let lastApproval = ledger.data()?.lastApproval ?? 0;
+  let pending = false;
   for (const doc of existing.docs) {
     const ad = doc.data() as StoredAd;
-    if (ad.payment) continue;
-    if (requireNoPending && ad.status === 'pending' && doc.id !== id) return { status: 'pending' } as const;
+    if (ad.payment || doc.id === id) continue;
+    // A legacy scheduled approval also occupies the free slot until its end.
+    if (ad.status === 'approved' && ad.endsAt > now) return { ...policy, status: 'active' };
+    if (ad.status === 'pending') pending = true;
     if (ad.status === 'approved' || ad.status === 'deleting') lastApproval = Math.max(lastApproval, ad.reviewedAt ?? 0);
   }
-  const availableAt = lastApproval + days * DAY;
-  if (lastApproval && availableAt > now) return { status: 'interval', availableAt } as const;
-  return { status: 'available' } as const;
+  if (pending) return { ...policy, status: 'pending' };
+  const availableAt = lastApproval + policy.freeIntervalDays * DAY;
+  if (lastApproval && availableAt > now) return { ...policy, status: 'interval', availableAt };
+  return { ...policy, status: 'available' };
 }
 
 async function assertFreeOfferAvailable(...args: Parameters<typeof freeOfferEligibility>) {
   const eligibility = await freeOfferEligibility(...args);
+  if (eligibility.status === 'active') fail('ad_active_exists', 409);
   if (eligibility.status === 'pending') fail('ad_pending_exists', 409);
   if (eligibility.status === 'interval') fail('ad_free_interval', 429);
+  return eligibility;
+}
+
+function correctableVideoAd(ad: StoredAd | undefined, uid: string): ad is StoredAd & { status: 'rejected' } {
+  return !!ad && ad.ownerId === uid && ad.status === 'rejected' && !ad.correctedBy && requiresVideoCorrection(ad);
 }
 
 export async function readOfferForRenewal(uid: string, payload: Payload, db = getAdminFirestore()) {
   const doc = await db.collection('offerAds').doc(adId(payload.id)).get();
   const ad = doc.data() as StoredAd | undefined;
+  if (payload.correction === true) {
+    if (!correctableVideoAd(ad, uid)) return fail('ad_correction_unavailable', 404);
+    return { ...offerView(doc.id, ad), media: undefined };
+  }
   const now = Date.now();
   if (!ad || ad.ownerId !== uid || ad.status !== 'approved' || ad.endsAt > now || now >= ad.endsAt + EXPIRED_RETENTION) {
     return fail('ad_renewal_unavailable', 404);
@@ -313,7 +350,7 @@ export async function purgeExpiredOffers(db = getAdminFirestore()) {
   return { removed: results.length - failed, failed };
 }
 
-export async function sendOfferAd(action: string, uid: string, payload: Payload, db = getAdminFirestore(), isOwner = false) {
+export async function sendOfferAd(action: string, uid: string, payload: Payload, db = getAdminFirestore(), isOwner = false, destroy = deleteAdminAdTestUpload) {
   const uploadLimit = isOwner ? OWNER_MAX_UPLOADS : MAX_UPLOADS;
   if (action === 'ads.paidAvailability') {
     const now = Date.now();
@@ -334,10 +371,10 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
     return { phone };
   }
   if (action === 'ads.freePolicy') {
-    return { freeIntervalDays: (await policyRef(db).get()).data()?.freeIntervalDays ?? 7 };
+    return freeOfferPolicy((await policyRef(db).get()).data());
   }
   if (action === 'ads.freeEligibility') {
-    return db.runTransaction(tx => freeOfferEligibility(db, tx, uid, '', Date.now(), true), { readOnly: true });
+    return db.runTransaction(tx => freeOfferEligibility(db, tx, uid, '', Date.now()), { readOnly: true });
   }
   if (action === 'ads.renewal') return readOfferForRenewal(uid, payload, db);
   const id = adId(payload.id);
@@ -382,13 +419,16 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
     const paidTier = payload.tier === 'featured' || payload.tier === 'vip' ? payload.tier : null;
     const featured = paidTier !== null;
     const fields = adFields(payload, featured);
+    const correctionId = payload.correctionId === undefined ? undefined : adId(payload.correctionId);
+    if (correctionId && (featured || correctionId === id)) return fail('invalid_ad_details');
     const phone = typeof payload.paymentPhone === 'string' && payload.paymentPhone.length <= 24 ? normalizePaymentContactPhone(payload.paymentPhone) : null;
     if (featured && !phone) return fail('invalid_payment_phone');
-    const days = adRunDays(new Date(fields.startsAt), new Date(fields.endsAt));
+    const days = featured ? adRunDays(new Date(fields.startsAt), new Date(fields.endsAt)) : null;
     const amountEgp = paidTier && days ? days * paidAdDailyPrice(paidTier) : null;
     if (featured && (amountEgp === null || payload.amountEgp !== amountEgp)) return fail('invalid_payment_amount');
     const mediaType = payload.resourceType;
     if (mediaType !== null && mediaType !== 'image' && mediaType !== 'video') return fail('invalid_media_type');
+    if (!featured && mediaType === 'video') return fail('ad_free_image_only');
     return db.runTransaction(async tx => {
       const now = Date.now();
       const day = cairoDay.format(now);
@@ -396,8 +436,13 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
       if (existing && existing.ownerId !== uid) return fail('invalid_ad_id', 403);
       if (existing?.status === 'cancelled') return fail('ad_cancelled', 409);
       if (existing && existing.status !== 'draft') return { submitted: true, signed: null };
-      if (!featured) await assertFreeOfferAvailable(db, tx, uid, id, now, true);
+      if (!featured) await assertFreeOfferAvailable(db, tx, uid, id, now);
       if (existing && (existing.payment ? existing.payment.tier ?? 'featured' : null) !== paidTier) return fail('invalid_ad_details');
+      if (existing && existing.correctionId !== correctionId) return fail('invalid_ad_details');
+      if (correctionId) {
+        const original = (await tx.get(db.collection('offerAds').doc(correctionId))).data() as StoredAd | undefined;
+        if (!correctableVideoAd(original, uid)) return fail('ad_correction_unavailable', 404);
+      }
       if (existing && existing.mediaType !== mediaType) return fail('invalid_media_type');
       let signed = null;
       let receiptSigned = null;
@@ -425,6 +470,7 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
       }
       tx.set(ref, {
         ...fields, ownerId: uid, status: 'draft', mediaType, media: null, submittedAt: 0, rejectionReason: '',
+        ...(correctionId && { correctionId }),
         ...(permits && { uploadDay: day, uploadCleanupAt: now + DAY }),
         ...(paidTier && { payment: { method: 'instapay', tier: paidTier, amountEgp, phone } }),
       });
@@ -436,7 +482,8 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
   if (!draft || draft.ownerId !== uid) return fail('invalid_ad_id', 403);
   if (draft.status === 'cancelled') return fail('ad_cancelled', 409);
   if (draft.status !== 'draft') return { submitted: true };
-  expiry(draft, Date.now(), !!draft.payment);
+  if (draft.payment) expiry(draft, Date.now(), true);
+  if (requiresVideoCorrection(draft)) return fail('ad_free_image_only');
 
   let media: StoredMedia | null = null;
   let verifiedBytes = 0;
@@ -458,13 +505,33 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
     verifiedBytes += confirmed.bytes;
     receipt = { publicId, resourceType: 'image', version: confirmed.version, format: confirmed.format };
   }
+  const originalRef = draft.correctionId ? db.collection('offerAds').doc(draft.correctionId) : null;
+  if (originalRef) {
+    const original = (await originalRef.get()).data() as StoredAd | undefined;
+    if (!correctableVideoAd(original, uid)) {
+      // A retried request may be observing its own successful correction.
+      if (original?.ownerId === uid && original.correctedBy === id) return { submitted: true };
+      return fail('ad_correction_unavailable', 404);
+    }
+    const publicId = original.media?.publicId ?? `mybucket/ads/submissions/${uid}/${originalRef.id}`;
+    // The original is already rejected and cannot be published. Repeated removal
+    // is safe, and a provider failure leaves both records available for retry.
+    await destroy(uid, { publicId, resourceType: 'video' }, undefined, undefined, 'submissions');
+  }
+
   await db.runTransaction(async tx => {
     const latest = (await tx.get(ref)).data() as StoredAd | undefined;
     if (!latest || latest.ownerId !== uid) return fail('invalid_ad_id', 403);
     if (latest.status === 'cancelled') return fail('ad_cancelled', 409);
     if (latest.status !== 'draft') return;
-    expiry(latest, Date.now(), !!latest.payment);
-    if (!latest.payment) await assertFreeOfferAvailable(db, tx, uid, id, Date.now(), true);
+    if (latest.payment) expiry(latest, Date.now(), true);
+    if (requiresVideoCorrection(latest)) return fail('ad_free_image_only');
+    if (!latest.payment) await assertFreeOfferAvailable(db, tx, uid, id, Date.now());
+    if (latest.correctionId !== draft.correctionId) return fail('invalid_ad_details');
+    if (originalRef) {
+      const original = (await tx.get(originalRef)).data() as StoredAd | undefined;
+      if (!correctableVideoAd(original, uid)) return fail('ad_correction_unavailable', 404);
+    }
     if (latest.uploadDay) {
       const usage = uploadUsage(db, latest.uploadDay).doc(uid);
       const lease = activeUpload(db, uid);
@@ -475,6 +542,7 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
     }
     // The per-account write serializes concurrent submissions and decisions, including empty query results.
     if (!latest.payment) tx.set(db.collection('offerAdApprovalLedger').doc(uid), { touchedAt: Date.now() }, { merge: true });
+    if (originalRef) tx.update(originalRef, { correctedBy: id, mediaType: null, media: null });
     tx.update(ref, { status: 'pending', submittedAt: Date.now(), media, uploadCleanupAt: 0, ...(receipt && { receipt }) });
   });
   return { submitted: true };
@@ -499,11 +567,15 @@ export async function reviewOfferAds(action: string, uid: string, payload: Paylo
   }
   if (action === 'admin.ads.policy') {
     const ref = policyRef(db);
-    if (payload.freeIntervalDays === undefined) return { freeIntervalDays: (await ref.get()).data()?.freeIntervalDays ?? 7 };
-    const days = payload.freeIntervalDays;
-    if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > 90) return fail('invalid_ad_interval');
-    await ref.set({ freeIntervalDays: days }, { merge: true });
-    return { freeIntervalDays: days };
+    const updates: Record<string, number> = {};
+    for (const [field, key] of [['freeIntervalDays', 'freeWaitDays'], ['freeDurationDays', 'freeDurationDays']] as const) {
+      const days = payload[field];
+      if (days === undefined) continue;
+      if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > 90) return fail('invalid_ad_policy');
+      updates[key] = days;
+    }
+    if (Object.keys(updates).length) await ref.set(updates, { merge: true });
+    return freeOfferPolicy((await ref.get()).data());
   }
   if (action === 'admin.ads.list') {
     const status = payload.status ?? 'pending';
@@ -512,6 +584,7 @@ export async function reviewOfferAds(action: string, uid: string, payload: Paylo
     return snapshot.docs.map(doc => {
       const ad = doc.data() as StoredAd;
       return { ...offerView(doc.id, ad), status, submittedAt: ad.submittedAt, rejectionReason: ad.rejectionReason,
+        requiresVideoCorrection: !ad.correctedBy && requiresVideoCorrection(ad),
         ...(ad.payment && { payment: { ...ad.payment, receiptUrl: ad.receipt ? mediaView(ad.receipt)?.url : undefined } }) };
     }).sort((a, b) => b.submittedAt - a.submittedAt);
   }
@@ -525,14 +598,20 @@ export async function reviewOfferAds(action: string, uid: string, payload: Paylo
     if (ad.status === status) return { status };
     if (ad.status !== 'pending') return fail('ad_already_reviewed', 409);
     const now = Date.now();
-    if (status === 'approved' && !ad.payment && ad.endsAt <= now) return fail('ad_schedule_expired', 409);
+    if (status === 'approved' && requiresVideoCorrection(ad)) return fail('ad_free_image_only', 409);
     if (status === 'approved' && ad.payment && (!ad.receipt || payload.paymentConfirmed !== true)) return fail('payment_confirmation_required');
-    if (status === 'approved' && !ad.payment) {
-      await assertFreeOfferAvailable(db, tx, ad.ownerId, ref.id, now, false);
-      tx.set(db.collection('offerAdApprovalLedger').doc(ad.ownerId), { lastApproval: now });
+    let { startsAt, endsAt } = ad;
+    if (status === 'approved') {
+      if (ad.payment) {
+        startsAt = Math.max(now, ad.startsAt);
+        endsAt += startsAt - ad.startsAt;
+      } else {
+        const policy = await assertFreeOfferAvailable(db, tx, ad.ownerId, ref.id, now);
+        startsAt = now;
+        endsAt = now + policy.freeDurationDays * DAY;
+        tx.set(db.collection('offerAdApprovalLedger').doc(ad.ownerId), { lastApproval: now }, { merge: true });
+      }
     }
-    const startsAt = ad.payment && status === 'approved' ? Math.max(now, ad.startsAt) : ad.startsAt;
-    const endsAt = ad.endsAt + startsAt - ad.startsAt;
     tx.update(ref, { status, rejectionReason, reviewerId: uid, reviewedAt: now, startsAt, endsAt,
       publishedUntil: status === 'approved' ? endsAt : 0, ...(ad.payment && status === 'approved' && { paymentConfirmedAt: now }) });
     return { status };

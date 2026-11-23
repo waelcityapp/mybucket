@@ -27,10 +27,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { renderOfferShare, offerShareOrigin } = await import('../server/offerShare.js');
       const image = req.query?.format === 'image';
       try {
-        const body = await renderOfferShare(id, typeof req.query?.lang === 'string' ? req.query.lang : 'ar',
+        const { body, cacheControl } = await renderOfferShare(id, typeof req.query?.lang === 'string' ? req.query.lang : 'ar',
           offerShareOrigin(typeof req.headers.host === 'string' ? req.headers.host : undefined), image);
         res.setHeader('Content-Type', image ? 'image/jpeg' : 'text/html; charset=utf-8');
-        res.setHeader('Cache-Control', body === null ? 'no-store' : 'public, max-age=0, s-maxage=60');
+        res.setHeader('Cache-Control', cacheControl);
         res.setHeader('X-Robots-Tag', 'noindex');
         res.status(body === null ? 404 : 200);
         return res.send(body ?? '');

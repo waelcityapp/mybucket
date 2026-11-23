@@ -83,7 +83,7 @@ test('public totals count each account once and removal updates the correct tota
       delete: ref => records.delete(ref.path),
     }),
   };
-  records.set(`offerAds/${id}`, activeAd);
+  records.set(`offerAds/${id}`, { ...activeAd, payment: { tier: 'featured' } });
   const react = (uid, reaction, active) => setOfferReaction(uid, { id, reaction, active }, db);
   assert.equal((await react('a', 'liked', true)).engagement.likeCount, 1);
   assert.equal((await react('a', 'liked', true)).engagement.likeCount, 1);

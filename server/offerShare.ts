@@ -29,7 +29,8 @@ async function loadOffer(id: string, lang: 'ar' | 'en') {
   const offer = await readPublicOfferAds('ads.detail', { id });
   if (!offer || Array.isArray(offer) || !('title' in offer)) return null;
   return { title: offer.title, description: offer.description, merchant: offer.merchant,
-    image: offer.media?.type === 'video' ? offer.media.poster : offer.media?.url };
+    image: offer.media?.type === 'video' ? offer.media.poster : offer.media?.url,
+    freeOfferEndsAt: offer.tier === 'free' ? offer.endsAt : undefined };
 }
 
 async function imageBytes(source: string): Promise<Buffer> {
@@ -82,10 +83,17 @@ export function offerShareHtml({ url, destination, image, app, title, descriptio
 <script>location.replace(document.getElementById('offer').href)</script></body></html>`;
 }
 
+export function offerShareCacheControl(freeOfferEndsAt?: number, now = Date.now()) {
+  const seconds = freeOfferEndsAt === undefined ? 60 : Math.min(60, Math.floor((freeOfferEndsAt - now) / 1000));
+  return seconds > 0 ? `public, max-age=0, s-maxage=${seconds}` : 'no-store';
+}
+
 export async function renderOfferShare(id: string, language: string, origin: string, image: boolean) {
   const lang = language === 'en' ? 'en' : 'ar';
   const offer = await loadOffer(id, lang);
-  if (!offer && image) return null;
+  const endsAt = offer && 'freeOfferEndsAt' in offer ? offer.freeOfferEndsAt : undefined;
+  const unavailable = { body: null, cacheControl: 'no-store' };
+  if (!offer && image) return unavailable;
   const identity = await getAppIdentity().catch(() => null);
   const app = (lang === 'ar' ? identity?.appNameAr : identity?.appNameEn) || 'My Bucket';
   if (image && offer) {
@@ -93,15 +101,19 @@ export async function renderOfferShare(id: string, language: string, origin: str
       offer.image ? imageBytes(offer.image).catch(() => null) : null,
       imageBytes(identity?.icon192Url || defaultIcon).catch(() => imageBytes(defaultIcon)),
     ]);
-    try { return await brandedOfferImage(photo, icon); }
-    catch { return brandedOfferImage(null, await imageBytes(defaultIcon)); }
+    const body = await brandedOfferImage(photo, icon)
+      .catch(async () => brandedOfferImage(null, await imageBytes(defaultIcon)));
+    if (endsAt !== undefined && endsAt <= Date.now()) return unavailable;
+    return { body, cacheControl: offerShareCacheControl(endsAt) };
   }
   const destination = new URL(`/offers/ad/${encodeURIComponent(id)}`, origin).href;
   const url = new URL(offerSharePath(id, lang), origin).href;
-  return offerShareHtml({
+  if (endsAt !== undefined && endsAt <= Date.now()) return unavailable;
+  const body = offerShareHtml({
     url, destination, lang, app,
     title: offer ? (lang === 'ar' ? `${offer.merchant} · ${offer.title}` : `${offer.title} · ${offer.merchant}`) : app,
     description: offer ? `${app} · ${offerShareExcerpt(offer.description)}` : app,
     image: offer ? `${url}/i` : new URL(`/${defaultIcon}`, origin).href,
   });
+  return { body, cacheControl: offerShareCacheControl(endsAt) };
 }

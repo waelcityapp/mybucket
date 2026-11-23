@@ -4,10 +4,11 @@ import type { OfferTier } from '../../data/offerAds';
 import type { Language } from '../../types';
 import { paidAdDailyPrice } from '../../utils/adCheckout';
 
-export function AdTierInfoDialog({ lang, tier, freeDays, onClose }: {
+export function AdTierInfoDialog({ lang, tier, freeDays, durationDays, onClose }: {
   lang: Language;
   tier: OfferTier;
   freeDays: number;
+  durationDays: number;
   onClose: () => void;
 }) {
   const ar = lang === 'ar';
@@ -43,7 +44,8 @@ export function AdTierInfoDialog({ lang, tier, freeDays, onClose }: {
     <div className="space-y-1 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-950 dark:bg-emerald-950 dark:text-emerald-100">
       {tier === 'free' ? <>
         <p className="font-extrabold">{ar ? 'مجانًا' : 'Free of charge'}</p>
-        <p>{ar ? `إعلان واحد كل ${number.format(freeDays)} يوم من آخر موافقة.` : `One ad every ${freeDays} days from your last approval.`}</p>
+        <p>{ar ? `النشر لمدة ${number.format(durationDays)} يوم من وقت الموافقة.` : `Published for ${durationDays} ${durationDays === 1 ? 'day' : 'days'} from approval.`}</p>
+        <p>{ar ? `إعلان واحد كل ${number.format(freeDays)} يوم من آخر موافقة.` : `One ad every ${freeDays} ${freeDays === 1 ? 'day' : 'days'} from your last approval.`}</p>
       </> : <>
         <p className="font-extrabold">{ar ? `${number.format(paidAdDailyPrice(tier))} جنيه لكل يوم` : `EGP ${paidAdDailyPrice(tier)} per day`}</p>
         <p>{ar ? 'السعر تجريبي. الدفع بإنستا باي وإرفاق الإيصال للمراجعة.' : 'Trial rate. Pay through InstaPay and attach the receipt for review.'}</p>

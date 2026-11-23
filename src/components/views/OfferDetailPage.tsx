@@ -25,6 +25,22 @@ export function OfferDetailPage({ lang, offerId, onBack }: { lang: Language; off
 
   const current = result?.id === offerId ? result : undefined;
   const live = current?.offer;
+  useEffect(() => {
+    if (live?.tier !== 'free') return;
+    let timer: number | undefined;
+    const expireFreeAd = () => {
+      window.clearTimeout(timer);
+      const remaining = live.endsAt - Date.now();
+      if (remaining <= 0) setResult(previous => previous?.offer === live ? { id: offerId, expired: true } : previous);
+      else timer = window.setTimeout(expireFreeAd, Math.min(remaining, 2_147_483_647));
+    };
+    expireFreeAd();
+    document.addEventListener('visibilitychange', expireFreeAd);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', expireFreeAd);
+    };
+  }, [live, offerId]);
   const [title, description, merchant] = demo ? (ar ? demo.ar : demo.en) : live
     ? [live.title, live.description, live.merchant]
     : [current?.failed ? (ar ? 'تعذّر تحميل العرض' : 'Could not load the offer')

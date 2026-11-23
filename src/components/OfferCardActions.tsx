@@ -3,9 +3,10 @@ import { Heart, Share2, ThumbsUp } from 'lucide-react';
 import { useState } from 'react';
 import type { OfferEngagement, OfferReaction, OfferReactionState } from '../data/offerAds';
 
-export function OfferCardActions({ id, isAr, state, engagement, onReact }: {
+export function OfferCardActions({ id, isAr, canSave, state, engagement, onReact }: {
   id: string;
   isAr: boolean;
+  canSave: boolean;
   state?: OfferReactionState;
   engagement?: OfferEngagement;
   onReact: (reaction: OfferReaction) => Promise<void>;
@@ -53,10 +54,10 @@ export function OfferCardActions({ id, isAr, state, engagement, onReact }: {
         <ThumbsUp aria-hidden="true" className={`size-4 ${state?.liked ? 'fill-current text-emerald-700 dark:text-emerald-400' : ''}`} />
         {isAr ? 'إعجاب' : 'Like'} <span>{number(engagement?.likeCount)}</span>
       </button>
-      <button type="button" className={buttonClass} disabled={pending} aria-pressed={state?.saved ?? false} onClick={() => void react('saved')}>
+      {canSave && <button type="button" className={buttonClass} disabled={pending} aria-pressed={state?.saved ?? false} onClick={() => void react('saved')}>
         <Heart aria-hidden="true" className={`size-4 ${state?.saved ? 'fill-current text-rose-600 dark:text-rose-400' : ''}`} />
         {isAr ? 'المفضلة' : 'Favorite'} <span>{number(engagement?.favoriteCount)}</span>
-      </button>
+      </button>}
       <button type="button" className={buttonClass} onClick={() => void share()}>
         <Share2 aria-hidden="true" className="size-4" />
         {isAr ? 'مشاركة' : 'Share'}

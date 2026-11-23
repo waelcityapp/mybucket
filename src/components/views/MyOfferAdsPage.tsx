@@ -87,7 +87,7 @@ export function MyOfferAdsPage({ uid, lang, onBack, onNavigate }: { uid: string;
       {orderedAds.map((ad, index) => {
         const published = ad.status === 'approved' && ad.startsAt <= now && now < ad.endsAt;
         const status = ad.status === 'pending' ? (ar ? 'بانتظار الموافقة' : 'Awaiting approval')
-          : ad.status === 'rejected' ? (ar ? 'تم الرفض' : 'Rejected')
+          : ad.status === 'rejected' ? (ad.requiresVideoCorrection ? (ar ? 'مطلوب تصحيح' : 'Correction needed') : (ar ? 'تم الرفض' : 'Rejected'))
           : ad.status === 'deleting' ? (ar ? 'جارٍ حذف الإعلان وملفاته' : 'Deleting ad and files')
           : published ? (ar ? 'تمت الموافقة ونشر الإعلان' : 'Approved and published')
           : ad.startsAt > now ? (ar ? 'تمت الموافقة — في انتظار موعد النشر' : 'Approved — scheduled')
@@ -109,6 +109,13 @@ export function MyOfferAdsPage({ uid, lang, onBack, onNavigate }: { uid: string;
           <p className="text-xs text-slate-600 dark:text-slate-300">{ar ? 'تاريخ الإرسال' : 'Submitted'} · {date(ad.submittedAt)}</p>
           {ad.status === 'approved' && <p className="text-xs text-slate-600 dark:text-slate-300">{ar ? 'مدة النشر بتوقيت القاهرة' : 'Publication window, Cairo time'} · {date(ad.startsAt)} — {date(ad.endsAt)}</p>}
           {ad.status === 'rejected' && ad.rejectionReason && <p className="whitespace-pre-wrap break-words text-sm">{ad.rejectionReason}</p>}
+          {ad.status === 'rejected' && ad.requiresVideoCorrection && <div className="space-y-1">
+            <p className="text-sm">{ar ? 'الطلب فيه فيديو. تقدر تعيد إرساله بصورة واحدة أو بدون صورة.' : 'This request contains a video. You can resubmit with one image or without an image.'}</p>
+            <a href={`/offers/new?renew=${ad.id}&correction=1`} onClick={event => followInternalLink(event, onNavigate)}
+              className="inline-flex min-h-11 items-center rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white">
+              {ar ? 'تصحيح الإعلان' : 'Correct ad'}
+            </a>
+          </div>}
           {(ad.status === 'approved' || ad.status === 'deleting') && <div className="space-y-1">
             {expired && <p className={`text-xs font-semibold ${deleteAfter - now < 2 * 86400000 ? 'text-amber-800 dark:text-amber-300' : 'text-slate-600 dark:text-slate-300'}`}>
               {ar ? 'هيتم حذف الإعلان وملفاته يوم' : 'The ad and its files will be deleted on'} {date(deleteAfter)}

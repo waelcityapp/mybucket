@@ -6,6 +6,17 @@ export const OFFER_CATEGORY_IDS = [
 
 export type OfferTier = 'free' | 'featured' | 'vip';
 
+export const DEFAULT_FREE_OFFER_POLICY = { freeDurationDays: 7, freeIntervalDays: 14 };
+
+export type FreeOfferPolicy = typeof DEFAULT_FREE_OFFER_POLICY;
+export type FreeOfferEligibility =
+  | ({ status: 'available' | 'pending' | 'active' } & FreeOfferPolicy)
+  | ({ status: 'interval'; availableAt: number } & FreeOfferPolicy);
+
+export function supportsOfferFavorites(tier?: OfferTier) {
+  return tier === 'featured' || tier === 'vip';
+}
+
 export type OfferAdStatus = 'pending' | 'approved' | 'rejected';
 
 export type OfferEngagement = { likeCount: number; favoriteCount: number };
@@ -30,7 +41,8 @@ export type ReviewOfferAd = PublicOfferAd & {
   status: OfferAdStatus | 'deleting';
   submittedAt: number;
   rejectionReason: string;
+  requiresVideoCorrection?: boolean;
   payment?: { amountEgp: number; phone: string; receiptUrl?: string };
 };
 
-export type MyOfferAd = Pick<ReviewOfferAd, 'id' | 'title' | 'merchant' | 'tier' | 'status' | 'submittedAt' | 'startsAt' | 'endsAt' | 'rejectionReason'> & { deleteAfter: number | null; thumbnailUrl?: string };
+export type MyOfferAd = Pick<ReviewOfferAd, 'id' | 'title' | 'merchant' | 'tier' | 'status' | 'submittedAt' | 'startsAt' | 'endsAt' | 'rejectionReason' | 'requiresVideoCorrection'> & { deleteAfter: number | null; thumbnailUrl?: string };

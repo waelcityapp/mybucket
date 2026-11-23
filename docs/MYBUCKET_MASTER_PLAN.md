@@ -1,5 +1,13 @@
 # MyBucket — Master Implementation Plan
 
+## Free ads policy, phase one (#292)
+
+- Free publication starts on admin approval and lasts seven days by default. Advertisers see the duration before submitting and do not enter dates. The server stores the publication window at approval.
+- A free account slot is occupied by an active or pending free ad. After approval, a separate fourteen-day waiting period applies. Admins can edit both values independently. The new waiting setting starts at fourteen days even if the previous policy had a saved interval.
+- A free ad accepts up to one image. Admins can return legacy videos for correction. The owner can edit the original details and resubmit with an optional image. A successful correction retains the original text and removes the old video.
+- Only Featured and VIP can be favorited. Free likes and the existing paid ad workflow remain available.
+- Free ads disappear at expiry, including on already-open public pages. The existing ten-day retention, renewal window and safe deletion policy continue.
+
 ## Compact My ads cards (#291)
 
 - Group advertiser details and actions beside the thumbnail to reduce card height.

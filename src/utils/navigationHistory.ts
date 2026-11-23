@@ -12,7 +12,7 @@ export function tabFromHistory(location: Location, state: unknown): ActiveTab {
   if (path === '/categories' || path.startsWith('/categories/')) return 'categories';
   if (path === '/guide') return 'guide';
   if (path === '/settings/ads' || path === '/settings/favorites' || path === '/settings/delete-transactions') return 'settings';
-  if (path === '/offers' || path.startsWith('/offers/category/') || path.startsWith('/offers/ad/') || path === '/offers/new' || path === '/offers/new/payment' || path === '/offers/new/featured') return 'offers';
+  if (path === '/offers' || path.startsWith('/offers/category/') || path.startsWith('/offers/ad/') || path === '/offers/new' || path === '/offers/new/payment' || path === '/offers/new/featured' || path === '/offers/new/pricing') return 'offers';
   const tab = state && typeof state === 'object' && 'myBucketTab' in state ? (state as { myBucketTab: unknown }).myBucketTab : undefined;
   return typeof tab === 'string' && historyTabs.includes(tab as ActiveTab) ? tab as ActiveTab : 'home';
 }

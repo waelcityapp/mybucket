@@ -1,7 +1,7 @@
 import { validVipDurationDays } from '../../utils/adCheckout';
 import { AD_NO_LINKS_AR, AD_NO_LINKS_EN, adContactError, adVideoLimit, containsExternalAdLink } from '../../utils/adContent';
 import { type PaidAdPrices, type AdPriceLock, type LegacyAdTransfer } from '../../utils/adCheckout';
-import { AdTierInfoDialog } from './FeaturedAdInfoPage';
+import { AdPricingPage } from './FeaturedAdInfoPage';
 import { followInternalLink } from '../../utils/navigationHistory';
 import { DEFAULT_FREE_OFFER_POLICY, type FreeOfferEligibility, type FreeOfferPolicy, type OfferTier, type PublicOfferAd } from '../../data/offerAds';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
@@ -179,18 +179,30 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   const preparation = useRef<AbortController | null>(null);
   useEffect(() => () => preparation.current?.abort(), []);
   const [preview, setPreview] = useState(false);
-  const [infoTier, setInfoTier] = useState<OfferTier | null>(() => window.location.pathname === '/offers/new/featured' ? 'featured' : null);
-  const closeTierInfo = () => {
-    if (window.location.pathname === '/offers/new/featured') {
-      window.history.replaceState({ myBucketTab: 'offers' }, '', '/offers/new' + window.location.search);
+  const [pricingOpen, setPricingOpen] = useState(() => window.location.pathname === '/offers/new/pricing' || window.location.pathname === '/offers/new/featured');
+  const openPricing = () => {
+    if (window.location.pathname !== '/offers/new/pricing') window.history.pushState({ myBucketTab: 'offers', adPricing: true }, '', '/offers/new/pricing' + window.location.search);
+    setPricingOpen(true);
+    window.scrollTo(0, 0);
+  };
+  const closePricing = () => {
+    if (window.history.state?.adPricing) window.history.back();
+    else window.history.replaceState({ myBucketTab: 'offers' }, '', '/offers/new' + window.location.search);
+    setPricingOpen(false);
+  };
+  const choosePricingTier = (choice: OfferTier) => {
+    if (choice === 'free' && tier !== 'free') {
+      setEligibility('checking');
+      if (previewType === 'video' || videoProgress !== null) removeMedia();
     }
-    setInfoTier(null);
+    setTier(choice);
+    closePricing();
   };
   const [checkoutOpen, setCheckoutOpen] = useState(() => window.location.pathname === '/offers/new/payment');
   useEffect(() => {
     const syncCheckoutRoute = () => {
       setCheckoutOpen(window.location.pathname === '/offers/new/payment');
-      setInfoTier(window.location.pathname === '/offers/new/featured' ? 'featured' : null);
+      setPricingOpen(window.location.pathname === '/offers/new/pricing' || window.location.pathname === '/offers/new/featured');
     };
     window.addEventListener('popstate', syncCheckoutRoute);
     return () => window.removeEventListener('popstate', syncCheckoutRoute);
@@ -389,6 +401,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     }
     setCheckoutOpen(false);
   };
+  if (pricingOpen) return <AdPricingPage lang={lang} onBack={closePricing} onChoose={choosePricingTier} onlyFree={Boolean(correctionId)} />;
   if (invoiceId) {
     if (!resumed) return <main className="p-5 dark:bg-slate-950 dark:text-white">
       <p role={invoiceFailed ? 'alert' : 'status'}>{invoiceFailed
@@ -447,7 +460,6 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
           </div>
         </div>
       </header>
-      {infoTier && <AdTierInfoDialog lang={lang} tier={infoTier} freeDays={freeDays} durationDays={durationDays} prices={prices} onClose={closeTierInfo} />}
       <main className="max-w-xl mx-auto px-4 py-5 pb-20 space-y-5">
         {renewState !== 'ready' ? (
           <section className={`rounded-2xl border border-slate-200 bg-white p-5 ${formSurface}`}>
@@ -531,13 +543,13 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                     {prices ? (ar ? `${new Intl.NumberFormat('ar-EG').format(prices[value])} جنيه / يوم` : `EGP ${new Intl.NumberFormat('en-EG').format(prices[value])} / day`)
                       : (ar ? 'السعر غير متاح حاليًا' : 'Price currently unavailable')}
                   </span>}
-                  <button type="button" aria-haspopup="dialog" onClick={() => setInfoTier(value)}
-                    className={`inline-flex min-h-11 items-center px-1 text-xs font-bold text-emerald-800 underline underline-offset-2 dark:text-emerald-300`}>
-                    {ar ? 'المميزات والأسعار' : 'Benefits and pricing'}
-                  </button>
                   </div>
                 ))}
               </div>
+              <button type="button" onClick={openPricing}
+                className="flex min-h-11 w-full items-center justify-center rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-extrabold text-emerald-900 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
+                {ar ? 'قارن المميزات والأسعار' : 'Compare benefits and pricing'}
+              </button>
             </section>
             {tier === 'free' && eligibility === 'checking' && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">
               {ar ? 'بنتأكد إن فيه إعلان مجاني متاح لحسابك...' : 'Checking whether you can submit a free ad…'}

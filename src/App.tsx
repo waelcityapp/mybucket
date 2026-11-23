@@ -263,7 +263,7 @@ export default function App() {
   }, []);
   useEffect(() => { applyAppIdentity(appIdentity, lang); }, [appIdentity, lang]);
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname.startsWith('/admin') ? 'admin-pin' : window.location.pathname === '/trial' ? 'trial-details' : (window.location.pathname === '/subscription' || window.location.pathname === '/try/subscription') ? 'subscription' : window.location.pathname.startsWith('/reminders/') ? 'reminders' : (tabFromHistory(window.location, window.history.state) === 'accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : window.location.pathname.startsWith('/categories/') ? 'categories' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/') || window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment') ? 'offers' : 'home');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname.startsWith('/admin') ? 'admin-pin' : window.location.pathname === '/trial' ? 'trial-details' : (window.location.pathname === '/subscription' || window.location.pathname === '/try/subscription') ? 'subscription' : window.location.pathname.startsWith('/reminders/') ? 'reminders' : (tabFromHistory(window.location, window.history.state) === 'accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : window.location.pathname.startsWith('/categories/') ? 'categories' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/') || window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment' || window.location.pathname === '/offers/new/pricing' || window.location.pathname === '/offers/new/featured') ? 'offers' : 'home');
   // Keep in-app tab changes in browser history so the device Back button can restore them.
   const [transactionQuickFilter, setTransactionQuickFilter] = useState<{ period: 'today' | 'month'; currency: string } | null>(null);
   const navigateTab = (tab: ActiveTab, quickFilter: { period: 'today' | 'month'; currency: string } | null = null) => {
@@ -639,7 +639,7 @@ export default function App() {
         setIsExpenseCategoriesModalOpen(false);
         setIsCategoryDetailPageOpen(Boolean(firebaseUser) && window.location.pathname.startsWith('/categories/'));
         setSelectedCategoryForDetail(null);
-        setActiveTab((window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/') || window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment') ? 'offers' : firebaseUser && window.location.pathname.startsWith('/admin') ? 'admin-pin': firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && window.location.pathname.startsWith('/reminders/') ? 'reminders' : firebaseUser && (tabFromHistory(window.location, window.history.state) === 'accounts') ? 'accounts' : firebaseUser && window.location.pathname.startsWith('/categories/') ? 'categories' : 'home');
+        setActiveTab((window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/') || window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment' || window.location.pathname === '/offers/new/pricing' || window.location.pathname === '/offers/new/featured') ? 'offers' : firebaseUser && window.location.pathname.startsWith('/admin') ? 'admin-pin': firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && window.location.pathname.startsWith('/reminders/') ? 'reminders' : firebaseUser && (tabFromHistory(window.location, window.history.state) === 'accounts') ? 'accounts' : firebaseUser && window.location.pathname.startsWith('/categories/') ? 'categories' : 'home');
         setToastMessage(null);
         aiLearnedMemory.clear();
       }
@@ -1591,7 +1591,7 @@ export default function App() {
     />;
   }
 
-  const creatingOffer = window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment' || window.location.pathname === '/offers/new/featured';
+  const creatingOffer = window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment' || window.location.pathname === '/offers/new/featured' || window.location.pathname === '/offers/new/pricing';
   const backFromCreateOffer = () => backFromOffer(new URLSearchParams(window.location.search).has('renew') ? '/settings/ads' : '/offers');
   if (creatingOffer && isAuthChecking) {
     return <AdSignInGate lang={lang} checking onBack={backFromCreateOffer} onSignIn={loginWithGoogle} />;

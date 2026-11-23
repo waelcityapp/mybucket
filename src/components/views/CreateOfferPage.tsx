@@ -71,7 +71,8 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     return () => { active = false; };
   }, [invoiceId]);
   const query = new URLSearchParams(window.location.search);
-  const renewId = query.get('renew');
+  const editId = window.location.pathname === '/offers/new' ? query.get('edit') : null;
+  const renewId = editId ? null : query.get('renew');
   const correctionId = query.get('correction') === '1' ? renewId : null;
   const [tier, setTier] = useState<OfferTier | null>(correctionId ? 'free' : null);
   const [freePolicy, setFreePolicy] = useState<FreeOfferPolicy>(DEFAULT_FREE_OFFER_POLICY);
@@ -90,9 +91,9 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   const freeSchedule = ar ? `النشر يبدأ فور موافقة الإدارة ويستمر لمدة ${duration} يوم.`
     : `Publication starts when an admin approves the ad and lasts ${duration} ${durationDays === 1 ? 'day' : 'days'}.`;
   const [eligibilityAttempt, setEligibilityAttempt] = useState(0);
-  const freeFieldsLocked = tier === 'free' && (typeof eligibility === 'string' || eligibility.status !== 'available');
+  const freeFieldsLocked = !editId && tier === 'free' && (typeof eligibility === 'string' || eligibility.status !== 'available');
   useEffect(() => {
-    if (tier !== 'free') return;
+    if (editId || tier !== 'free') return;
     let active = true;
     offerAdsRequest<FreeOfferEligibility>('ads.freeEligibility', {}, true)
       .then(result => {
@@ -101,7 +102,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
       })
       .catch(() => { if (active) setEligibility('error'); });
     return () => { active = false; };
-  }, [tier, eligibilityAttempt]);
+  }, [tier, eligibilityAttempt, editId]);
   const [category, setCategory] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -141,14 +142,22 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   const [startsAt, setStartsAt] = useState(emptyAdSchedule);
   const [endsAt, setEndsAt] = useState(emptyAdSchedule);
   const [dateError, setDateError] = useState<'invalid' | 'order' | 'past' | null>(null);
-  const [renewState, setRenewState] = useState<'loading' | 'ready' | 'error'>(renewId ? 'loading' : 'ready');
+  const [renewState, setRenewState] = useState<'loading' | 'ready' | 'error'>(renewId || editId ? 'loading' : 'ready');
+  const [editRevision, setEditRevision] = useState('');
+  const [removeExistingMedia, setRemoveExistingMedia] = useState(false);
+  const editUpload = useRef<{ id: string; media?: UploadedAdMedia } | null>(null);
   const [reusedMedia, setReusedMedia] = useState<PublicOfferAd['media']>();
   useEffect(() => {
-    if (!renewId) return;
+    if (!renewId && !editId) return;
     let active = true;
-    offerAdsRequest<PublicOfferAd>('ads.renewal', { id: renewId, ...(correctionId && { correction: true }) }, true)
+    offerAdsRequest<PublicOfferAd & { editRevision?: string }>(editId ? 'admin.ads.edit.read' : 'ads.renewal',
+      { id: editId ?? renewId, ...(correctionId && { correction: true }) }, true)
       .then(ad => {
         if (!active) return;
+        if (editId) {
+          setTier(ad.tier ?? 'free');
+          setEditRevision(ad.editRevision ?? '');
+        }
         setTitle(ad.title);
         setDescription(ad.description);
         setCategory(ad.categorySlug);
@@ -162,7 +171,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
       })
       .catch(() => { if (active) setRenewState('error'); });
     return () => { active = false; };
-  }, [renewId, correctionId]);
+  }, [renewId, correctionId, editId]);
   const [image, setImage] = useState<File | null>(null);
   const [imageStatus, setImageStatus] = useState<'idle' | 'compressing' | 'ready' | 'error'>('idle');
   const [videoProgress, setVideoProgress] = useState<number | 'checking' | null>(null);
@@ -231,6 +240,10 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     return captureAdVideoPoster(imageUrl, url => setVideoPoster({ source: imageUrl, url }));
   }, [imageUrl, isVideo]);
   const removeMedia = () => {
+    if (editId) {
+      setRemoveExistingMedia(true);
+      editUpload.current = null;
+    }
     ++imageSelection.current;
     preparation.current?.abort();
     if (fileInput.current) fileInput.current.value = '';
@@ -244,6 +257,11 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   const handleReview = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!tier || freeFieldsLocked || contentError || checkingVideo || imageStatus === 'compressing' || imageStatus === 'error') return;
+    if (editId) {
+      if (editUpload.current && !editUpload.current.media) editUpload.current = null;
+      if (title.trim() && description.trim() && category && merchant.trim()) setPreview(true);
+      return;
+    }
     if (tier === 'free') {
       if (previewType === 'video') return;
     } else {
@@ -270,6 +288,40 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     }
     setDateError(null);
     if (title.trim() && description.trim() && category && merchant.trim()) setPreview(true);
+  };
+  const saveEditedAd = async () => {
+    if (!editId || !tier || contentError || sendLock.current) return;
+    sendLock.current = true;
+    setSending(true);
+    setSendError('');
+    try {
+      const fields = { id: editId, editRevision, categorySlug: category, title, description, merchant,
+        ...(isPaid ? adContacts : { contact }) };
+      let operationId = editUpload.current?.id ?? crypto.randomUUID();
+      if (image && !editUpload.current?.media) {
+        const prepared = await offerAdsRequest<{ editId: string; signed: SignedAdUpload }>('admin.ads.edit.prepare',
+          { ...fields, resourceType: previewType, bytes: image.size }, true);
+        operationId = prepared.editId;
+        setSendProgress(0);
+        const media = await uploadAdMedia(image, prepared.signed, setSendProgress);
+        editUpload.current = { id: operationId, media };
+      } else if (!image) {
+        editUpload.current = { id: operationId };
+      }
+      await offerAdsRequest('admin.ads.edit.save', {
+        ...fields, ...editUpload.current?.media, editId: operationId,
+        mediaAction: image ? 'replace' : removeExistingMedia ? 'remove' : 'keep',
+      }, true);
+      onBack();
+    } catch (error) {
+      setSendError(error instanceof Error && error.message === 'ad_edit_conflict'
+        ? (ar ? 'الإعلان اتعدل من صفحة تانية. ارجع لإعلاناتي وافتحه من جديد.' : 'This ad was edited elsewhere. Reopen it from My ads.')
+        : (ar ? 'تعذّر حفظ التعديل. حاول تاني.' : 'Could not save the changes. Try again.'));
+    } finally {
+      sendLock.current = false;
+      setSending(false);
+      setSendProgress(null);
+    }
   };
   const discardSubmission = async () => {
     if (!submission.current) return true;
@@ -455,7 +507,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
             className={`w-11 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 inline-flex items-center justify-center shrink-0 dark:bg-slate-800 dark:hover:bg-slate-700`}
             aria-label={ar ? 'العودة' : 'Back'}><BackIcon className="w-5 h-5" /></button>
           <div className="min-w-0">
-            <h1 className="font-extrabold text-lg">{preview ? (ar ? 'مراجعة الإعلان' : 'Review advertisement') : (ar ? 'إنشاء إعلان' : 'Create advertisement')}</h1>
+            <h1 className="font-extrabold text-lg">{preview ? (ar ? 'مراجعة الإعلان' : 'Review advertisement') : editId ? (ar ? 'تعديل الإعلان' : 'Edit ad') : (ar ? 'إنشاء إعلان' : 'Create advertisement')}</h1>
             <p className={`text-xs text-slate-500 ${formMuted}`}>My Bucket</p>
           </div>
         </div>
@@ -465,6 +517,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
           <section className={`rounded-2xl border border-slate-200 bg-white p-5 ${formSurface}`}>
             <p role={renewState === 'error' ? 'alert' : 'status'}>{renewState === 'loading'
               ? (ar ? 'جاري تحميل بيانات الإعلان...' : 'Loading ad details…')
+              : editId ? (ar ? 'تعذّر فتح الإعلان للتعديل.' : 'Could not open this ad for editing.')
               : (ar ? 'تعذّر فتح الإعلان لإعادة الإرسال. راجع «إعلاناتي» وحاول تاني.' : 'Could not open this ad for resubmission. Check My ads and try again.')}</p>
             {renewState === 'error' && <a className="mt-3 inline-block font-bold text-emerald-800 underline" href="/settings/ads" onClick={event => followInternalLink(event, onNavigate)}>{ar ? 'إعلاناتي' : 'My ads'}</a>}
           </section>
@@ -479,23 +532,23 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
           </section>
         ) : preview ? (
           <section className={`rounded-2xl border border-slate-200 bg-white p-4 space-y-4 ${formSurface}`}>
-            <h2 className="font-extrabold">{ar ? 'معاينة الإعلان قبل الإرسال' : 'Preview before submission'}</h2>
+            <h2 className="font-extrabold">{editId ? (ar ? 'معاينة التعديل' : 'Preview changes') : (ar ? 'معاينة الإعلان قبل الإرسال' : 'Preview before submission')}</h2>
             <AdCreativeCard lang={lang} title={title} description={description} merchant={merchant} contact={isPaid ? callPhone : contact} mediaUrl={previewUrl} poster={poster} mediaType={previewType} videoQuotaId="local-ad-preview-demo" />
-            {tier === 'free' ? <p className="text-xs text-slate-600 dark:text-slate-300">{freeSchedule}</p> : tier === 'vip' ? <p className="text-sm dark:text-slate-300">
+            {editId ? null : tier === 'free' ? <p className="text-xs text-slate-600 dark:text-slate-300">{freeSchedule}</p> : tier === 'vip' ? <p className="text-sm dark:text-slate-300">
               {ar ? `النشر فور الموافقة لمدة ${vipDurationDays} يوم.` : `Publishes on approval for ${vipDurationDays} days.`}
             </p> : <>
             <p className={`text-xs text-slate-600 ${formMuted}`}>{ar ? 'بداية النشر بتوقيت القاهرة' : 'Publication starts (Cairo time)'} {adScheduleDate(startsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: AD_TIME_ZONE })}</p>
             <p className={`text-xs text-slate-600 ${formMuted}`}>{ar ? 'نهاية النشر بتوقيت القاهرة' : 'Publication ends (Cairo time)'} {adScheduleDate(endsAt)?.toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: AD_TIME_ZONE })}</p>
             </>}
-            <button type="button" disabled={hasSubmission || cancellingSend} onClick={() => setPreview(false)} className={`w-full rounded-xl border border-emerald-600 text-emerald-700 py-3 text-sm font-bold disabled:opacity-50 dark:text-emerald-300`}>{ar ? 'تعديل الإعلان' : 'Edit advertisement'}</button>
+            <button type="button" disabled={sending || hasSubmission || cancellingSend} onClick={() => setPreview(false)} className={`w-full rounded-xl border border-emerald-600 text-emerald-700 py-3 text-sm font-bold disabled:opacity-50 dark:text-emerald-300`}>{ar ? 'تعديل الإعلان' : 'Edit advertisement'}</button>
             <div className={`space-y-2 rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800`}>
-              <button type="button" onClick={tier === 'free' ? () => void sendForReview() : goToPayment} disabled={sending || cancellingSend || cancelRequired || sendRecovery === 'changeVideo' || (tier !== 'free' && !prices)}
+              <button type="button" onClick={editId ? () => void saveEditedAd() : tier === 'free' ? () => void sendForReview() : goToPayment} disabled={sending || cancellingSend || cancelRequired || sendRecovery === 'changeVideo' || (!editId && tier !== 'free' && !prices)}
                 className="w-full rounded-xl bg-emerald-700 px-3 py-3 text-sm font-extrabold text-white hover:bg-emerald-800 disabled:opacity-50">
-                {tier === 'free' ? (sending ? (ar ? 'جاري إرسال الإعلان...' : 'Sending ad…') : (sendRecovery === 'retry' || sendRecovery === 'restartUpload' ? (ar ? 'إعادة المحاولة' : 'Try again') : (ar ? 'إرسال للمراجعة' : 'Send for review'))) : (ar ? 'الانتقال إلى صفحة الدفع' : 'Continue to payment')}
+                {editId ? (sending ? (ar ? 'جاري الحفظ...' : 'Saving…') : (ar ? 'حفظ التعديلات' : 'Save changes')) : tier === 'free' ? (sending ? (ar ? 'جاري إرسال الإعلان...' : 'Sending ad…') : (sendRecovery === 'retry' || sendRecovery === 'restartUpload' ? (ar ? 'إعادة المحاولة' : 'Try again') : (ar ? 'إرسال للمراجعة' : 'Send for review'))) : (ar ? 'الانتقال إلى صفحة الدفع' : 'Continue to payment')}
               </button>
               {sending && !cancellingSend && <div role="status" className="grid justify-items-center gap-2 py-3 text-sm font-bold text-emerald-900 dark:text-emerald-200">
                 <LoaderCircle className="size-7 motion-safe:animate-spin" aria-hidden="true" />
-                <p>{ar ? 'جاري إرسال الإعلان، برجاء الانتظار' : 'Sending your ad. Please wait.'}</p>
+                <p>{editId ? (ar ? 'جاري حفظ التعديلات' : 'Saving changes') : (ar ? 'جاري إرسال الإعلان، برجاء الانتظار' : 'Sending your ad. Please wait.')}</p>
               </div>}
               {sendRecovery === 'changeVideo' && <button type="button" disabled={cancellingSend} onClick={() => void changeInvalidVideo()}
                 className="min-h-11 rounded-xl bg-emerald-100 px-3 text-sm font-bold text-emerald-900">{ar ? 'تغيير الفيديو' : 'Change video'}</button>}
@@ -510,14 +563,14 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                 <progress max={100} value={sendProgress} aria-label={ar ? 'تقدّم رفع الملف' : 'Media upload progress'} className="block h-2 w-full accent-emerald-700" />
               </div>}
               {sendError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{sendError}</p>}
-              <p className={`text-xs text-slate-600 ${formMuted}`}>{tier === 'free'
+              {!editId && <p className={`text-xs text-slate-600 ${formMuted}`}>{tier === 'free'
                 ? (ar ? 'الإعلان يظهر للجمهور بعد موافقة الإدارة.' : 'Your ad becomes public after the administrator approves it.')
-                : (ar ? 'ادفع عبر إنستا باي وأرسل الإيصال مع الإعلان للمراجعة.' : 'Pay via InstaPay and send the receipt with your ad for review.')}</p>
+                : (ar ? 'ادفع عبر إنستا باي وأرسل الإيصال مع الإعلان للمراجعة.' : 'Pay via InstaPay and send the receipt with your ad for review.')}</p>}
             </div>
           </section>
         ) : (
           <form onSubmit={handleReview} className="space-y-5">
-            <section className={`bg-white rounded-2xl border border-slate-200 p-4 space-y-3 ${formSurface}`}>
+            {!editId && <section className={`bg-white rounded-2xl border border-slate-200 p-4 space-y-3 ${formSurface}`}>
               <h2 className="font-extrabold text-sm">{ar ? '1. نوع الإعلان' : '1. Advertisement type'}</h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {!correctionId && priceFailure && <p role="alert" className="col-span-full text-sm text-rose-700 dark:text-rose-300">
@@ -550,15 +603,15 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                 className="flex min-h-11 w-full items-center justify-center rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-extrabold text-emerald-900 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
                 {ar ? 'قارن المميزات والأسعار' : 'Compare benefits and pricing'}
               </button>
-            </section>
-            {tier === 'free' && eligibility === 'checking' && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">
+            </section>}
+            {!editId && tier === 'free' && eligibility === 'checking' && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">
               {ar ? 'بنتأكد إن فيه إعلان مجاني متاح لحسابك...' : 'Checking whether you can submit a free ad…'}
             </p>}
-            {tier === 'free' && eligibility === 'error' && <div role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+            {!editId && tier === 'free' && eligibility === 'error' && <div role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
               {ar ? 'تعذّر التحقق من إتاحة الإعلان المجاني.' : 'Could not check free ad availability.'}{' '}
               <button type="button" className="font-bold underline" onClick={() => { setEligibility('checking'); setEligibilityAttempt(value => value + 1); }}>{ar ? 'حاول تاني' : 'Retry'}</button>
             </div>}
-            {tier === 'free' && typeof eligibility === 'object' && eligibility.status !== 'available' && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">
+            {!editId && tier === 'free' && typeof eligibility === 'object' && eligibility.status !== 'available' && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">
               {eligibility.status === 'active'
                 ? (ar ? 'عندك إعلان مجاني نشط. استنى لحد ما مدته تنتهي.' : 'You already have an active free ad. Wait for it to end.')
                 : eligibility.status === 'interval'
@@ -618,7 +671,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                  {linkErrors.contact && <p id="offer-contact-error" role="alert" className={fieldWarningClass}>{contentErrors.ad_external_link}</p>}
               </div>}
             </section>
-            <section className={`bg-white rounded-2xl border border-slate-200 p-4 space-y-3 ${formSurface}`}>
+            {!editId && <section className={`bg-white rounded-2xl border border-slate-200 p-4 space-y-3 ${formSurface}`}>
               <h2 className="font-extrabold text-sm">{ar ? '3. مدة النشر' : '3. Publication schedule'}</h2>
               {tier === 'free' ? <p className="text-xs text-slate-600 dark:text-slate-300">{freeSchedule}</p> : tier === 'vip' ? <div className="space-y-2">
                 <p className="text-sm">{ar ? 'ينشر إعلان VIP فور موافقة الإدارة.' : 'VIP ads publish immediately after approval.'}</p>
@@ -631,7 +684,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
               <AdScheduleFields id="end" lang={lang} value={endsAt} onChange={value => { setEndsAt(value); setDateError(null); }} />
               {dateError && <p role="alert" className="text-xs font-bold text-red-700">{dateError === 'invalid' ? (ar ? 'يرجى اختيار تاريخ ووقت صحيحين لبداية النشر ونهايته.' : 'Please choose valid start and end dates and times.') : dateError === 'order' ? (ar ? 'يجب أن يكون موعد نهاية النشر بعد موعد بدايته.' : 'The publication end must be after its start.') : (ar ? 'موعد نهاية النشر قد مضى. يرجى اختيار موعد في المستقبل.' : 'The publication end has passed. Please choose a future date and time.')}</p>}
               </>}
-            </section>
+            </section>}
             <section className={`bg-white rounded-2xl border border-slate-200 p-4 space-y-3 ${formSurface}`}>
               <h2 className="flex items-center gap-2 font-extrabold text-sm"><ImagePlus className="w-5 h-5 text-emerald-700" aria-hidden="true" />{tier === 'free'
                 ? (ar ? '4. صورة الإعلان (اختيارية)' : '4. Ad image (optional)')
@@ -649,7 +702,8 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                 preparation.current = controller;
                 submission.current = null;
                 setSendError('');
-                setReusedMedia(undefined);
+                editUpload.current = null;
+                if (!editId) setReusedMedia(undefined);
                 setVideoProgress(null);
                 setImage(null); setMediaError('generic'); setCompressionNotice(false);
                 const isVideo = next.type.startsWith('video/');
@@ -695,9 +749,10 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                   <X className="size-5" aria-hidden="true" />
                 </button>}
               </div>
-              <p className={`text-xs text-slate-500 ${formMuted}`}>{tier === 'free'
+              {editId && <p className={`text-xs text-slate-500 ${formMuted}`}>{ar ? 'رفع الملف الجديد يبدأ عند حفظ التعديلات.' : 'New media uploads when you save the changes.'}</p>}
+              {!editId && <p className={`text-xs text-slate-500 ${formMuted}`}>{tier === 'free'
                 ? (ar ? 'صورة واحدة بحد أقصى ٥ ميجابايت. الرفع يبدأ عند الإرسال للمراجعة.' : 'One image up to 5 MB. It uploads when you submit for review.')
-                : ar ? 'الصور حتى ٥ ميجابايت، والفيديو حتى ٢٥ ميجابايت. الملف بيتجهّز على جهازك، والرفع يبدأ عند الإرسال للمراجعة.' : 'Images up to 5 MB. Videos up to 25 MB. Files are prepared on your device and uploaded when you submit for review.'}</p>
+                : ar ? 'الصور حتى ٥ ميجابايت، والفيديو حتى ٢٥ ميجابايت. الملف بيتجهّز على جهازك، والرفع يبدأ عند الإرسال للمراجعة.' : 'Images up to 5 MB. Videos up to 25 MB. Files are prepared on your device and uploaded when you submit for review.'}</p>}
               {tier !== 'free' && <p className="text-xs text-slate-600 dark:text-slate-300">{videoLimitMessage}</p>}
               {imageStatus === 'compressing' && (videoProgress === null
                 ? <p role="status" className={`text-xs text-slate-600 ${formMuted}`}>{ar ? 'جاري تجهيز الصورة...' : 'Preparing the image…'}</p>
@@ -720,7 +775,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
 
 
             </section>
-            <button type="submit" disabled={imageStatus === 'compressing' || imageStatus === 'error' || (tier === 'vip' && !validVipDurationDays(vipDurationDays)) || checkingVideo || !!contentError} className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold py-3 flex justify-center items-center gap-2"><Megaphone className="w-5 h-5" />{ar ? 'مراجعة الإعلان' : 'Review advertisement'}</button>
+            <button type="submit" disabled={imageStatus === 'compressing' || imageStatus === 'error' || (!editId && tier === 'vip' && !validVipDurationDays(vipDurationDays)) || checkingVideo || !!contentError} className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold py-3 flex justify-center items-center gap-2"><Megaphone className="w-5 h-5" />{ar ? 'مراجعة الإعلان' : 'Review advertisement'}</button>
             </fieldset>}
           </form>
         )}

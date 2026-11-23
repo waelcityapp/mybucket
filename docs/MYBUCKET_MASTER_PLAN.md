@@ -1,5 +1,10 @@
 # MyBucket — Master Implementation Plan
 
+## Edit own ads from My ads (#299)
+
+- The administrator can edit submitted ads belonging to their signed-in account while they are available in My ads. The existing ad form loads the current content and lets the administrator keep, replace, or remove media.
+- The gateway updates the same ad and preserves its approval, publication window, engagement, payment, and receipt. Saving never queues a VIP push. The existing cleanup job removes unused uploads and replaced media.
+
 ## Daily site visits (#298)
 
 - The admin dashboard shows unique browsers by Cairo date, including visitors without a Google account. Multiple opens in the same browser count once per day. Different browsers or cleared browser storage can count separately.

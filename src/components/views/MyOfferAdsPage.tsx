@@ -5,7 +5,7 @@ import type { Language } from '../../types';
 import type { MyOfferAd } from '../../data/offerAds';
 import { offerAdsRequest } from '../../services/offerAdsClient';
 
-export function MyOfferAdsPage({ uid, lang, onBack, onNavigate }: { uid: string; lang: Language; onBack: () => void; onNavigate: (path: string) => void }) {
+export function MyOfferAdsPage({ uid, canEdit, lang, onBack, onNavigate }: { uid: string; canEdit: boolean; lang: Language; onBack: () => void; onNavigate: (path: string) => void }) {
   const ar = lang === 'ar';
   const Back = ar ? ArrowRight : ArrowLeft;
   const [result, setResult] = useState<{ uid: string; ads: MyOfferAd[] } | null>(null);
@@ -116,6 +116,7 @@ export function MyOfferAdsPage({ uid, lang, onBack, onNavigate }: { uid: string;
               {ar ? 'تصحيح الإعلان' : 'Correct ad'}
             </a>
           </div>}
+          {canEdit && ad.status !== 'deleting' && <a href={`/offers/new?edit=${ad.id}`} onClick={event => followInternalLink(event, onNavigate)} className="inline-flex min-h-11 items-center rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white">{ar ? 'تعديل الإعلان' : 'Edit ad'}</a>}
           {(ad.status === 'approved' || ad.status === 'deleting') && <div className="space-y-1">
             {expired && <p className={`text-xs font-semibold ${deleteAfter - now < 2 * 86400000 ? 'text-amber-800 dark:text-amber-300' : 'text-slate-600 dark:text-slate-300'}`}>
               {ar ? 'هيتم حذف الإعلان وملفاته يوم' : 'The ad and its files will be deleted on'} {date(deleteAfter)}

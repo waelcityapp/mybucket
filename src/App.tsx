@@ -1592,7 +1592,7 @@ export default function App() {
   }
 
   const creatingOffer = window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment' || window.location.pathname === '/offers/new/featured' || window.location.pathname === '/offers/new/pricing';
-  const backFromCreateOffer = () => backFromOffer(new URLSearchParams(window.location.search).has('renew') ? '/settings/ads' : '/offers');
+  const backFromCreateOffer = () => backFromOffer((new URLSearchParams(window.location.search).has('renew') || new URLSearchParams(window.location.search).has('edit')) ? '/settings/ads' : '/offers');
   if (creatingOffer && isAuthChecking) {
     return <AdSignInGate lang={lang} checking onBack={backFromCreateOffer} onSignIn={loginWithGoogle} />;
   }
@@ -1621,7 +1621,8 @@ export default function App() {
   // Browsing is public, but creating or preparing an advertisement requires sign-in.
   if (creatingOffer) {
     if (!authUser) return <AdSignInGate lang={lang} onBack={backFromCreateOffer} onSignIn={loginWithGoogle} />;
-    return <CreateOfferPage lang={lang} onBack={backFromCreateOffer} onNavigate={navigateOffer} />;
+    const editKey = new URLSearchParams(window.location.search).get('edit');
+    return <div key={editKey ?? authUser.uid}><CreateOfferPage lang={lang} onBack={backFromCreateOffer} onNavigate={navigateOffer} /></div>;
   }
 
   // 2. Dedicated sign-in, with a separate in-memory guest session.
@@ -1675,7 +1676,7 @@ export default function App() {
 
   if (window.location.pathname === '/settings/ads') {
     if (!authUser) return null;
-    return <MyOfferAdsPage uid={authUser.uid} lang={lang} onNavigate={navigateOffer} onBack={() => {
+    return <MyOfferAdsPage uid={authUser.uid} canEdit={isAdmin} lang={lang} onNavigate={navigateOffer} onBack={() => {
       if (window.history.state?.myAds || window.history.state?.offerBack === '/') window.history.back();
       else {
         window.history.replaceState({ myBucketTab: 'settings' }, '', '/');

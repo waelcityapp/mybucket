@@ -41,6 +41,9 @@ type StoredAd = AdFields & {
   uploadCleanupClaim?: { id: string; expiresAt: number };
   correctionId?: string;
   correctedBy?: string;
+  editRevision?: string;
+  editTarget?: string;
+  cleanupPublicId?: string;
 };
 
 function fail(code: string, status = 400): never {
@@ -67,7 +70,7 @@ function expiry(payload: Payload, now: number, allowPast = false) {
   return { startsAt, endsAt };
 }
 
-function adFields(payload: Payload, paid: boolean, vipDurationDays?: number): AdFields {
+function adTextFields(payload: Payload) {
   const categorySlug = field(payload.categorySlug, 60);
   if (!OFFER_CATEGORY_IDS.some(category => category === categorySlug)) return fail('invalid_ad_details');
   return {
@@ -79,12 +82,18 @@ function adFields(payload: Payload, paid: boolean, vipDurationDays?: number): Ad
     ...(payload.callPhone !== undefined && { callPhone: field(payload.callPhone, 50, false) }),
     ...(payload.whatsappPhone !== undefined && { whatsappPhone: field(payload.whatsappPhone, 50, false) }),
     ...(payload.mapsUrl !== undefined && { mapsUrl: field(payload.mapsUrl, 2048, false) }),
+  };
+}
+
+function adFields(payload: Payload, paid: boolean, vipDurationDays?: number): AdFields {
+  return {
+    ...adTextFields(payload),
     ...(vipDurationDays !== undefined ? { vipDurationDays, startsAt: 0, endsAt: vipDurationDays * DAY }
       : paid ? expiry(payload, Date.now(), true) : { startsAt: 0, endsAt: 0 }),
   };
 }
 
-function validateAdContent(fields: AdFields, paid: boolean) {
+function validateAdContent(fields: Omit<AdFields, 'startsAt' | 'endsAt'>, paid: boolean) {
   if ([fields.title, fields.merchant, fields.description, fields.contact].some(value => typeof value === 'string' && containsExternalAdLink(value))) {
     return fail('ad_external_link');
   }
@@ -370,11 +379,11 @@ async function purgeAbandonedUpload(doc: FirebaseFirestore.QueryDocumentSnapshot
     const leaseData = (await tx.get(lease)).data();
     if (leaseData?.id === doc.id) tx.delete(lease);
     tx.update(doc.ref, { status: 'cancelled', ...(claim && { uploadCleanupClaim: claim }) });
-    return { ownerId: ad.ownerId, type: ad.mediaType, paid: requiresPaidReceipt(ad.payment), claim };
+    return { ownerId: ad.ownerId, type: ad.mediaType, paid: requiresPaidReceipt(ad.payment), claim, cleanupPublicId: ad.cleanupPublicId };
   });
   if (!asset) return;
   if (asset.type) await deleteAdminAdTestUpload(asset.ownerId, {
-    publicId: `mybucket/ads/submissions/${asset.ownerId}/${doc.id}`, resourceType: asset.type,
+    publicId: asset.cleanupPublicId ?? `mybucket/ads/submissions/${asset.ownerId}/${doc.id}`, resourceType: asset.type,
   }, undefined, undefined, 'submissions');
   if (asset.paid) await deleteAdminAdTestUpload(asset.ownerId, {
     publicId: `mybucket/ads/receipts/${asset.ownerId}/${doc.id}`, resourceType: 'image',
@@ -406,6 +415,96 @@ export async function purgeExpiredOffers(db = getAdminFirestore()) {
   const failed = results.filter(result => result.status === 'rejected').length;
   if (failed) console.error('Expired advertisement cleanup failures:', failed);
   return { removed: results.length - failed, failed };
+}
+
+export async function editOwnOfferAd(action: string, uid: string, payload: Payload, db = getAdminFirestore(), confirmUpload = confirmAdminAdTestUpload) {
+  const ads = db.collection('offerAds');
+  const ref = ads.doc(adId(payload.id));
+  const editable = (snapshot: FirebaseFirestore.DocumentSnapshot) => {
+    const ad = snapshot.data() as StoredAd | undefined;
+    if (!ad || ad.ownerId !== uid || (ad.status !== 'pending' && ad.status !== 'approved' && ad.status !== 'rejected')) {
+      return fail('ad_edit_unavailable', 404);
+    }
+    return ad;
+  };
+  if (action === 'admin.ads.edit.read') {
+    const ad = editable(await ref.get());
+    return { ...offerView(ref.id, ad), editRevision: ad.editRevision ?? '' };
+  }
+  const getChanges = (ad: StoredAd) => {
+    const fields = adTextFields(payload);
+    validateAdContent(fields, !!ad.payment);
+    return {
+      ...fields,
+      contact: ad.payment ? ad.contact ?? '' : fields.contact,
+      callPhone: normalizeAdPhone(fields.callPhone ?? '') ?? '',
+      whatsappPhone: normalizeAdPhone(fields.whatsappPhone ?? '', true) ?? '',
+      mapsUrl: normalizeGoogleMapsUrl(fields.mapsUrl ?? '') ?? '',
+    };
+  };
+  const checkRevision = (ad: StoredAd) => {
+    if ((ad.editRevision ?? '') !== payload.editRevision) return fail('ad_edit_conflict', 409);
+  };
+  if (action === 'admin.ads.edit.prepare') {
+    return db.runTransaction(async tx => {
+      const ad = editable(await tx.get(ref));
+      checkRevision(ad);
+      getChanges(ad);
+      const mediaType = payload.resourceType;
+      if (mediaType !== 'image' && (mediaType !== 'video' || !ad.payment)) return fail('invalid_media_type');
+      if ((await tx.get(policyRef(db))).data()?.uploadsPaused === true) return fail('ad_upload_paused', 503);
+      const operationId = randomUUID();
+      const now = Date.now();
+      const signed = signAdminAdTestUpload(uid, payload, undefined, now, operationId, 'submissions');
+      tx.create(ads.doc(operationId), { ownerId: uid, status: 'cancelled', editTarget: ref.id, mediaType, uploadCleanupAt: now + DAY });
+      return { editId: operationId, signed };
+    });
+  }
+  if (action !== 'admin.ads.edit.save') return fail('ad_edit_unavailable', 404);
+  const operationId = adId(payload.editId);
+  if (operationId === ref.id) return fail('invalid_ad_id');
+  const upload = ads.doc(operationId);
+  const ad = editable(await ref.get());
+  if (ad.editRevision === operationId) return { saved: true };
+  checkRevision(ad);
+  const changes = getChanges(ad);
+  const replace = payload.mediaAction === 'replace';
+  if (!replace && payload.mediaAction !== 'keep' && payload.mediaAction !== 'remove') return fail('invalid_media_type');
+  const activeReplacement = (snapshot: FirebaseFirestore.DocumentSnapshot) => {
+    const staged = snapshot.data() as StoredAd | undefined;
+    if (staged?.ownerId !== uid || staged.editTarget !== ref.id || staged.status !== 'cancelled' ||
+        (staged.uploadCleanupAt ?? 0) <= Date.now() || staged.mediaType !== payload.resourceType ||
+        payload.publicId !== `mybucket/ads/submissions/${uid}/${operationId}`) return fail('invalid_upload_request');
+    return staged;
+  };
+  let media: StoredMedia | null = null;
+  if (replace) {
+    activeReplacement(await upload.get());
+    const { publicId, resourceType, version, format } = await confirmUpload(uid, payload, undefined, undefined, 'submissions', adVideoLimit(offerTier(ad)));
+    media = { publicId, resourceType, version, format };
+  }
+  const cleanup = ads.doc();
+  await db.runTransaction(async tx => {
+    const current = editable(await tx.get(ref));
+    if (current.editRevision === operationId) return;
+    checkRevision(current);
+    if (replace) {
+      activeReplacement(await tx.get(upload));
+      tx.delete(upload);
+    }
+    const changingMedia = payload.mediaAction !== 'keep';
+    if (changingMedia && current.media) {
+      tx.create(cleanup, {
+        ownerId: uid, status: 'cancelled', mediaType: current.media.resourceType,
+        cleanupPublicId: current.media.publicId, uploadCleanupAt: Date.now() + DAY,
+      });
+    }
+    tx.update(ref, {
+      ...changes, editRevision: operationId,
+      ...(changingMedia && { media, mediaType: media?.resourceType ?? null }),
+    });
+  });
+  return { saved: true };
 }
 
 export async function sendOfferAd(action: string, uid: string, payload: Payload, db = getAdminFirestore(), isOwner = false, destroy = deleteAdminAdTestUpload) {
@@ -454,6 +553,7 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
       const draft = (await tx.get(ref)).data() as StoredAd | undefined;
       if (!draft) return null;
       if (draft.ownerId !== uid) return fail('invalid_ad_id', 403);
+      if (draft.editTarget || draft.cleanupPublicId) return fail('ad_cancelled', 409);
       if (draft.status === 'cancelled') return { mediaType: draft.mediaType, paid: !!draft.payment };
       if (draft.status !== 'draft') return fail('ad_already_submitted', 409);
       if (draft.priceLockedAt) return fail('ad_invoice_locked', 409);

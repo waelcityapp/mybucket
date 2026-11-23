@@ -47,7 +47,6 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
   const [vipPublishNow, setVipPublishNow] = useState(false);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [transferReference, setTransferReference] = useState('');
-  const [receivedAmount, setReceivedAmount] = useState('');
   const [receivedTime, setReceivedTime] = useState('');
   const [reason, setReason] = useState('');
   const [uploadStats, setUploadStats] = useState<UploadStats | null>(null);
@@ -157,13 +156,15 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
     setBusy(true);
     setError('');
     setNotice('');
+    const ad = ads?.find(item => item.id === decision.id);
     try {
       await offerAdsRequest('admin.ads.review', { ...decision, reason, paymentConfirmed, publishVipNow: vipPublishNow,
-        transferReference, receivedAmountEgp: receivedAmount.trim() ? Number(receivedAmount) : null,
+        transferReference,
+        // Explicit checkbox confirmation replaces retyping the price-locked invoice total.
+        receivedAmountEgp: decision.status === 'approved' && paymentConfirmed ? ad?.payment?.amountEgp ?? null : null,
         receivedAt: cairoAdTransferTime(receivedTime),
       }, true);
-      setAds(items => items?.filter(ad => ad.id !== decision.id) ?? null);
-      const ad = ads?.find(item => item.id === decision.id);
+      setAds(items => items?.filter(item => item.id !== decision.id) ?? null);
       const notice = decision.status === 'approved'
         ? (ad?.payment
           ? (ar ? 'تمت الموافقة. الإعلان يظهر للجمهور خلال موعد النشر المحدد.' : 'Approved. The ad appears during its publication window.')
@@ -320,8 +321,8 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
           <div><dt className="inline font-bold">{ar ? 'وصل في' : 'Received'} </dt><dd className="inline">{date(ad.submittedAt)}</dd></div>
           {(status === 'approved' || (ad.payment && !ad.vipDurationDays)) && <div><dt className="inline font-bold">{ar ? 'مدة النشر بتوقيت القاهرة' : 'Publication window, Cairo time'} </dt><dd className="inline">{date(ad.startsAt)} — {date(ad.endsAt)}</dd></div>}
           {ad.vipDurationDays && status === 'pending' && <div>
-            <dt className="inline font-bold">{ar ? 'مدة VIP من وقت الموافقة' : 'VIP duration from approval'} </dt>
-            <dd className="inline">{ad.vipDurationDays} {ar ? 'يوم' : 'days'}</dd>
+            <dt className="inline font-bold">{ar ? 'عدد أيام النشر المطلوبة' : 'Requested publication days'} </dt>
+            <dd className="inline">{ad.vipDurationDays} {ar ? (ad.vipDurationDays === 1 ? 'يوم' : 'أيام') : 'days'}</dd>
           </div>}
           {ad.formerVipSchedule && <div>
             <dt className="inline font-bold">{ar ? 'الموعد الأصلي قبل الموافقة' : 'Original schedule before approval'} </dt>
@@ -376,30 +377,53 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
               : 'This request had a future start. Confirm publication now with the same duration and amount, keeping the original schedule on record.'}
           </label>}
           {decision.status === 'approved' && ad.payment && (ad.payment.amountEgp !== 0 || ad.payment.dailyPriceEgp !== 0) && <div className="space-y-2">
-            <label className="grid gap-1 text-xs font-bold">{ar ? 'المرجع في سجل الاستلام الفعلي' : 'Reference in the incoming transfer record'}
-              <input value={transferReference} maxLength={48} onChange={event => setTransferReference(event.target.value)} dir="ltr" className="min-h-11 rounded-lg border bg-white px-2" />
+            <p className="text-sm font-semibold">
+              {ar ? 'المبلغ المطلوب التأكد من وصوله:' : 'Amount to check in your receiving account:'}{' '}
+              <span className="font-extrabold">{new Intl.NumberFormat(ar ? 'ar-EG' : 'en-EG', { style: 'currency', currency: 'EGP' }).format(ad.payment.amountEgp)}</span>
+            </p>
+            <label className="grid gap-1 text-xs font-bold">
+              {ar ? 'رقم عملية التحويل المستلمة' : 'Incoming transfer transaction ID'}
+              <input value={transferReference} maxLength={48} onChange={event => setTransferReference(event.target.value)}
+                dir="ltr" aria-invalid={Boolean(transferReference.trim()) && !normalizeAdTransferReference(transferReference)}
+                aria-describedby="admin-received-transfer-help"
+                placeholder={ar ? 'من تفاصيل التحويل في حساب الاستلام' : 'From your receiving account'}
+                className="min-h-11 rounded-lg border border-slate-300 bg-white px-2 text-slate-900" />
             </label>
-            <label className="grid gap-1 text-xs font-bold">{ar ? 'المبلغ المستلم (ج.م.)' : 'Received amount (EGP)'}
-              <input type="number" min={0} step={1} value={receivedAmount} onChange={event => setReceivedAmount(event.target.value)} className="min-h-11 rounded-lg border bg-white px-2" />
-            </label>
+            <p id="admin-received-transfer-help" className="text-xs leading-5 text-slate-600">
+              {ar ? 'انسخ رقم العملية الحقيقي من تفاصيل المبلغ اللي استلمته، مش رقم من عندك. المطلوب 5 إلى 48 حرفًا أو رقمًا.' : 'Copy the real transaction reference from your incoming transfer. Never invent it. The reference must have 5–48 letters or digits.'}
+            </p>
+            {Boolean(transferReference.trim()) && !normalizeAdTransferReference(transferReference) && <p role="alert" className="text-xs font-bold text-rose-700">
+              {ar ? 'رقم العملية غير صالح. اكتب الرقم الحقيقي (5 إلى 48 حرفًا أو رقمًا).' : 'Invalid reference. Use the real 5–48-character transaction ID.'}
+            </p>
             {ad.legacyTransfer && <label className="grid gap-1 text-xs font-bold">{ar ? 'وقت الاستلام من السجل، بتوقيت القاهرة' : 'Transfer time in the record, Cairo time'}
               <input type="datetime-local" step={1} value={receivedTime} onChange={event => setReceivedTime(event.target.value)} className="min-h-11 rounded-lg border bg-white px-2" />
             </label>}
             <label className="flex items-start gap-2 text-sm font-bold">
               <input type="checkbox" checked={paymentConfirmed} onChange={event => setPaymentConfirmed(event.target.checked)} />
-              {ar ? 'طابقت البيانات مع سجل التحويلات المستلمة، وتأكدت أن التحويل لم يُستخدم في طلب سابق.' : 'I matched the incoming transfer and checked that it has not been used for an earlier order.'}
+              {ar ? 'راجعت حساب الاستلام بنفسي، وتأكدت إن المبلغ الموضح بالأعلى وصل فعلًا وإن التحويل لم يُستخدم في طلب سابق.' : 'I checked the receiving account myself, confirmed that the displayed amount arrived, and that the transaction was not used for an earlier order.'}
             </label>
           </div>}
           {decision.status === 'rejected' && <label className="block text-xs font-bold">{ar ? 'سبب الرفض (اختياري)' : 'Rejection reason (optional)'}
             <textarea maxLength={500} value={reason} onChange={event => setReason(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-2" />
           </label>}
           <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy || (decision.status === 'approved' && ad.tier === 'vip' && !ad.vipDurationDays && ad.startsAt > Date.now() && !vipPublishNow) || (decision.status === 'approved' && !!ad.payment && (ad.payment.amountEgp !== 0 || ad.payment.dailyPriceEgp !== 0) && (!paymentConfirmed || !ad.payment.receiptUrl || !normalizeAdTransferReference(transferReference) || !receivedAmount.trim() || (!!ad.legacyTransfer && cairoAdTransferTime(receivedTime) === null)))} onClick={() => void review()} className={`${button} ${decision.status === 'approved' ? 'bg-emerald-700' : 'bg-red-700'} text-white`}>{ar ? 'تأكيد القرار' : 'Confirm decision'}</button>
+            <button type="button" disabled={busy || (decision.status === 'approved' && ad.tier === 'vip' && !ad.vipDurationDays && ad.startsAt > Date.now() && !vipPublishNow) || (decision.status === 'approved' && !!ad.payment && (ad.payment.amountEgp !== 0 || ad.payment.dailyPriceEgp !== 0) && (!paymentConfirmed || !ad.payment.receiptUrl || !normalizeAdTransferReference(transferReference) || (!!ad.legacyTransfer && cairoAdTransferTime(receivedTime) === null)))} onClick={() => void review()} className={`${button} ${decision.status === 'approved' ? 'bg-emerald-700' : 'bg-red-700'} text-white`}>{ar ? 'تأكيد القرار' : 'Confirm decision'}</button>
             <button type="button" disabled={busy} onClick={() => setDecision(null)} className={`${button} bg-slate-200 text-slate-800`}>{ar ? 'إلغاء' : 'Cancel'}</button>
           </div>
+          {decision.status === 'approved' && !!ad.payment && (ad.payment.amountEgp !== 0 || ad.payment.dailyPriceEgp !== 0) &&
+            (!ad.payment.receiptUrl || !normalizeAdTransferReference(transferReference) || !paymentConfirmed || (!!ad.legacyTransfer && cairoAdTransferTime(receivedTime) === null)) &&
+            <p role="status" className="text-xs font-semibold text-amber-900">
+              {!ad.payment.receiptUrl
+                ? (ar ? 'إيصال الدفع غير متاح، ولا يمكن الموافقة قبل مراجعته.' : 'The receipt is unavailable. Review it before approving.')
+                : !normalizeAdTransferReference(transferReference)
+                  ? (ar ? 'الزر متوقف لحد ما تدخل رقم العملية الحقيقي من سجل الاستلام (5 خانات على الأقل).' : 'Enter a real transaction reference from the receiving account (at least 5 characters).')
+                  : ad.legacyTransfer && cairoAdTransferTime(receivedTime) === null
+                    ? (ar ? 'اكتب وقت استلام التحويل كما يظهر في السجل.' : 'Enter the recorded incoming transfer time.')
+                    : (ar ? 'راجع حساب الاستلام، وبعد التأكد علّم على مربع تأكيد وصول المبلغ.' : 'Verify the incoming payment, then check the confirmation box.')}
+            </p>
         </div> : <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={busy || ad.requiresVideoCorrection} onClick={() => { setReason(''); setPaymentConfirmed(false); setVipPublishNow(false); setTransferReference(''); setReceivedAmount(''); setReceivedTime(''); setDecision({ id: ad.id, status: 'approved' }); }} className={`${button} bg-emerald-700 text-white`}>{ar ? 'موافقة' : 'Approve'}</button>
-          {!ad.legacyTransfer && <button type="button" disabled={busy} onClick={() => { setReason(''); setPaymentConfirmed(false); setVipPublishNow(false); setTransferReference(''); setReceivedAmount(''); setReceivedTime(''); setDecision({ id: ad.id, status: 'rejected' }); }} className={`${button} bg-red-50 text-red-800`}>{ad.requiresVideoCorrection ? (ar ? 'إرجاع للتصحيح' : 'Return for correction') : (ar ? 'رفض' : 'Reject')}</button>}
+          <button type="button" disabled={busy || ad.requiresVideoCorrection} onClick={() => { setReason(''); setPaymentConfirmed(false); setVipPublishNow(false); setTransferReference(''); setReceivedTime(''); setDecision({ id: ad.id, status: 'approved' }); }} className={`${button} bg-emerald-700 text-white`}>{ar ? 'موافقة' : 'Approve'}</button>
+          {!ad.legacyTransfer && <button type="button" disabled={busy} onClick={() => { setReason(''); setPaymentConfirmed(false); setVipPublishNow(false); setTransferReference(''); setReceivedTime(''); setDecision({ id: ad.id, status: 'rejected' }); }} className={`${button} bg-red-50 text-red-800`}>{ad.requiresVideoCorrection ? (ar ? 'إرجاع للتصحيح' : 'Return for correction') : (ar ? 'رفض' : 'Reject')}</button>}
         </div>)}
       </div>)}
     </div>

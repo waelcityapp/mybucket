@@ -158,16 +158,18 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
     setNotice('');
     const ad = ads?.find(item => item.id === decision.id);
     try {
-      await offerAdsRequest('admin.ads.review', { ...decision, reason, paymentConfirmed, publishVipNow: vipPublishNow,
-        transferReference,
-        // Explicit checkbox confirmation replaces retyping the price-locked invoice total.
-        receivedAmountEgp: decision.status === 'approved' && paymentConfirmed ? ad?.payment?.amountEgp ?? null : null,
-        receivedAt: cairoAdTransferTime(receivedTime),
+      await offerAdsRequest('admin.ads.review', { ...decision, reason, publishVipNow: vipPublishNow,
+        // Old exceptional transfers still require matching. Regular ads are manually approved by admin.
+        ...(ad?.legacyTransfer ? {
+          paymentConfirmed, transferReference,
+          receivedAmountEgp: paymentConfirmed ? ad.payment?.amountEgp ?? null : null,
+          receivedAt: cairoAdTransferTime(receivedTime),
+        } : {}),
       }, true);
       setAds(items => items?.filter(item => item.id !== decision.id) ?? null);
       const notice = decision.status === 'approved'
         ? (ad?.payment
-          ? (ar ? 'تمت الموافقة. الإعلان يظهر للجمهور خلال موعد النشر المحدد.' : 'Approved. The ad appears during its publication window.')
+          ? (ar ? (ad?.tier === 'vip' ? 'تمت الموافقة ونشر إعلان VIP فورًا.' : 'تمت الموافقة على نشر الإعلان.') : (ad?.tier === 'vip' ? 'VIP ad approved and published immediately.' : 'Ad approved for publication.'))
           : (ar ? 'تمت الموافقة ونشر الإعلان المجاني.' : 'The free ad was approved and published.'))
         : (ad?.requiresVideoCorrection
           ? (ar ? 'تم إرجاع الإعلان للمعلن للتصحيح.' : 'The ad was returned to the advertiser for correction.')
@@ -376,7 +378,11 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
             {ar ? 'هذا الطلب له موعد نشر مستقبلي. أؤكد النشر الآن بنفس المدة والمبلغ، مع حفظ الموعد الأصلي.'
               : 'This request had a future start. Confirm publication now with the same duration and amount, keeping the original schedule on record.'}
           </label>}
-          {decision.status === 'approved' && ad.payment && (ad.payment.amountEgp !== 0 || ad.payment.dailyPriceEgp !== 0) && <div className="space-y-2">
+          {decision.status === 'approved' && ad.payment && !ad.legacyTransfer && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm leading-6 text-emerald-950">
+            {ar ? 'قرار الموافقة والنشر في إيدك. النظام لا يتحقق تلقائيًا من وصول فلوس، وتقدر توافق على إعلان تجريبي بصورة مرفقة من غير تحويل فعلي.' :
+              'You decide whether to publish. No automatic bank payment check is performed, and you may approve a test ad with an uploaded image without a real transfer.'}
+          </p>}
+          {decision.status === 'approved' && ad.payment && !!ad.legacyTransfer && (ad.payment.amountEgp !== 0 || ad.payment.dailyPriceEgp !== 0) && <div className="space-y-2">
             <p className="text-sm font-semibold">
               {ar ? 'المبلغ المطلوب التأكد من وصوله:' : 'Amount to check in your receiving account:'}{' '}
               <span className="font-extrabold">{new Intl.NumberFormat(ar ? 'ar-EG' : 'en-EG', { style: 'currency', currency: 'EGP' }).format(ad.payment.amountEgp)}</span>
@@ -407,11 +413,11 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
             <textarea maxLength={500} value={reason} onChange={event => setReason(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-2" />
           </label>}
           <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy || (decision.status === 'approved' && ad.tier === 'vip' && !ad.vipDurationDays && ad.startsAt > Date.now() && !vipPublishNow) || (decision.status === 'approved' && !!ad.payment && (ad.payment.amountEgp !== 0 || ad.payment.dailyPriceEgp !== 0) && (!paymentConfirmed || !ad.payment.receiptUrl || !normalizeAdTransferReference(transferReference) || (!!ad.legacyTransfer && cairoAdTransferTime(receivedTime) === null)))} onClick={() => void review()} className={`${button} ${decision.status === 'approved' ? 'bg-emerald-700' : 'bg-red-700'} text-white`}>{ar ? 'تأكيد القرار' : 'Confirm decision'}</button>
+            <button type="button" disabled={busy || (decision.status === 'approved' && ad.tier === 'vip' && !ad.vipDurationDays && ad.startsAt > Date.now() && !vipPublishNow) || (decision.status === 'approved' && !!ad.legacyTransfer && !!ad.payment && (ad.payment.amountEgp !== 0 || ad.payment.dailyPriceEgp !== 0) && (!paymentConfirmed || !ad.payment.receiptUrl || !normalizeAdTransferReference(transferReference) || cairoAdTransferTime(receivedTime) === null))} onClick={() => void review()} className={`${button} ${decision.status === 'approved' ? 'bg-emerald-700' : 'bg-red-700'} text-white`}>{decision.status === 'approved' ? (ar ? 'تأكيد الموافقة والنشر' : 'Confirm and publish') : (ar ? 'تأكيد الرفض' : 'Confirm rejection')}</button>
             <button type="button" disabled={busy} onClick={() => setDecision(null)} className={`${button} bg-slate-200 text-slate-800`}>{ar ? 'إلغاء' : 'Cancel'}</button>
           </div>
-          {decision.status === 'approved' && !!ad.payment && (ad.payment.amountEgp !== 0 || ad.payment.dailyPriceEgp !== 0) &&
-            (!ad.payment.receiptUrl || !normalizeAdTransferReference(transferReference) || !paymentConfirmed || (!!ad.legacyTransfer && cairoAdTransferTime(receivedTime) === null)) &&
+          {decision.status === 'approved' && !!ad.legacyTransfer && !!ad.payment && (ad.payment.amountEgp !== 0 || ad.payment.dailyPriceEgp !== 0) &&
+            (!ad.payment.receiptUrl || !normalizeAdTransferReference(transferReference) || !paymentConfirmed || cairoAdTransferTime(receivedTime) === null) &&
             <p role="status" className="text-xs font-semibold text-amber-900">
               {!ad.payment.receiptUrl
                 ? (ar ? 'إيصال الدفع غير متاح، ولا يمكن الموافقة قبل مراجعته.' : 'The receipt is unavailable. Review it before approving.')

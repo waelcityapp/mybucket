@@ -748,13 +748,17 @@ export async function reviewOfferAds(action: string, uid: string, payload: Paylo
     if (ad.legacyTransfer && status === 'rejected') return fail('ad_legacy_transfer_pending', 409);
     const now = Date.now();
     if (status === 'approved' && requiresVideoCorrection(ad)) return fail('ad_free_image_only', 409);
-    if (status === 'approved' && requiresPaidReceipt(ad.payment) && (!ad.receipt || payload.paymentConfirmed !== true)) return fail('payment_confirmation_required');
+    // Admin approves regular paid ads after reviewing the submitted image, including test receipts.
+    // This is not automated bank payment verification.
+    if (status === 'approved' && requiresPaidReceipt(ad.payment) && !ad.receipt) return fail('receipt_required');
+    // Existing exceptional old-transfer claims retain their separate reconciliation rules.
+    if (status === 'approved' && ad.legacyTransfer && payload.paymentConfirmed !== true) return fail('payment_confirmation_required');
     const approveVip = status === 'approved' && ad.payment?.tier === 'vip';
     const formerVipSchedule = approveVip && !ad.vipDurationDays && ad.startsAt > now
       ? { startsAt: ad.startsAt, endsAt: ad.endsAt } : undefined;
     if (formerVipSchedule && payload.publishVipNow !== true) return fail('ad_vip_immediate_confirmation_required', 409);
     let confirmedTransfer: StoredAd['confirmedTransfer'];
-    if (status === 'approved' && ad.payment && requiresPaidReceipt(ad.payment)) {
+    if (status === 'approved' && ad.legacyTransfer && ad.payment && requiresPaidReceipt(ad.payment)) {
       const reference = normalizeAdTransferReference(payload.transferReference);
       if (!reference) return fail('invalid_transfer_reference');
       if (payload.receivedAmountEgp !== ad.payment.amountEgp) return fail('ad_transfer_amount_mismatch', 409);

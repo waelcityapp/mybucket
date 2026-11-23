@@ -2,26 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-test('admin approval clearly presents VIP days and real payment verification', () => {
+test('regular paid ad approval is solely an admin decision with no banking fields', () => {
   const ui = readFileSync('src/components/views/AdminOfferAds.tsx', 'utf8');
   assert.match(ui, /عدد أيام النشر المطلوبة/);
   assert.match(ui, /Requested publication days/);
-  assert.match(ui, /رقم عملية التحويل المستلمة/);
-  assert.match(ui, /المبلغ المطلوب التأكد من وصوله/);
-  assert.match(ui, /راجعت حساب الاستلام بنفسي/);
-  assert.match(ui, /رقم العملية غير صالح/);
-  assert.match(ui, /الزر متوقف لحد ما تدخل رقم العملية الحقيقي/);
-  assert.doesNotMatch(ui, /المبلغ المستلم \(ج\.م\.\)|المرجع في سجل الاستلام الفعلي/);
+  assert.match(ui, /قرار الموافقة والنشر في إيدك/);
+  assert.match(ui, /تأكيد الموافقة والنشر/);
+  assert.match(ui, /ad\.payment && !ad\.legacyTransfer/);
+  assert.match(ui, /!!ad\.legacyTransfer && !!ad\.payment/);
+  assert.match(ui, /ad\?\.legacyTransfer \? \{/);
 });
 
-test('admin review derives amount from locked invoice but still requires human bank confirmation and valid reference', () => {
-  const ui = readFileSync('src/components/views/AdminOfferAds.tsx', 'utf8');
+test('server accepts admin reviewed trial image while retaining special old-transfer validation', () => {
   const server = readFileSync('server/offerAds.ts', 'utf8');
-  assert.match(ui, /paymentConfirmed \? ad\?\.payment\?\.amountEgp \?\? null : null/);
-  assert.doesNotMatch(ui, /setReceivedAmount|receivedAmount\.trim\(\)/);
-  assert.match(ui, /normalizeAdTransferReference\(transferReference\)/);
-  assert.match(ui, /!paymentConfirmed \|\| !ad\.payment\.receiptUrl/);
-  assert.match(server, /payload\.paymentConfirmed !== true/);
+  assert.match(server, /requiresPaidReceipt\(ad\.payment\) && !ad\.receipt/);
+  assert.match(server, /ad\.legacyTransfer && payload\.paymentConfirmed !== true/);
+  assert.match(server, /status === 'approved' && ad\.legacyTransfer && ad\.payment/);
   assert.match(server, /payload\.receivedAmountEgp !== ad\.payment\.amountEgp/);
   assert.match(server, /reference_already_used/);
 });

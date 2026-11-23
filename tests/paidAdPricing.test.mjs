@@ -95,7 +95,7 @@ test('zero-priced VIP can be reviewed without a receipt and stays VIP after a ra
   assert.equal(saved.receipt, undefined);
 });
 
-test('receipt verification and approval use the locked or legacy amount after prices change', async t => {
+test('admin can approve a paid ad with a test image without bank reference, preserving locked price', async t => {
   const config = {
     CLOUDINARY_CLOUD_NAME: 'example-cloud', CLOUDINARY_API_KEY: 'test-key',
     CLOUDINARY_API_SECRET: 'test-secret', CLOUDINARY_UPLOAD_PRESET: 'test-preset',
@@ -123,8 +123,12 @@ test('receipt verification and approval use the locked or legacy amount after pr
   });
   await request('ads.submit', { id: data.id, receipt: { publicId, version, responseSignature, resourceType: 'image' }, amountEgp: 1 });
   assert.equal((await ad(data.id).get()).get('payment.amountEgp'), 260);
-  await assert.rejects(admin('admin.ads.review', { id: data.id, status: 'approved' }), { code: 'payment_confirmation_required' });
-  await admin('admin.ads.review', { id: data.id, status: 'approved', paymentConfirmed: true, transferReference: 'PAID-260', receivedAmountEgp: 260 });
+  await admin('admin.ads.review', { id: data.id, status: 'approved' });
+  const approved = (await ad(data.id).get()).data();
+  assert.equal(approved.status, 'approved');
+  assert.equal(approved.payment.amountEgp, 260);
+  assert.equal(approved.confirmedTransfer, undefined);
+  assert.equal(approved.paymentConfirmedAt, undefined);
 
   const legacy = invoice({ id: randomUUID(), amountEgp: 200 });
   await ad(legacy.id).set({
@@ -132,7 +136,7 @@ test('receipt verification and approval use the locked or legacy amount after pr
     payment: { method: 'instapay', amountEgp: 200, phone: '01012345678' },
     receipt: { publicId: 'legacy-receipt', resourceType: 'image', version, format: 'png' },
   });
-  await admin('admin.ads.review', { id: legacy.id, status: 'approved', paymentConfirmed: true, transferReference: 'EXISTING-200', receivedAmountEgp: 200 });
+  await admin('admin.ads.review', { id: legacy.id, status: 'approved' });
   const stored = (await ad(legacy.id).get()).data();
   assert.equal(stored.payment.amountEgp, 200);
   assert.equal(stored.receipt.publicId, 'legacy-receipt');

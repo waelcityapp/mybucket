@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import { adContactError, adVideoLimit, containsExternalAdLink, normalizeAdPhone, normalizeGoogleMapsUrl } from '../src/utils/adContent.ts';
 
 test('Egyptian and international landlines and mobiles get canonical independent contact numbers', () => {
@@ -39,4 +40,28 @@ test('text blocks explicit, bare and Unicode links while allowing phone digits a
     assert.equal(containsExternalAdLink(value), false, value);
   }
   assert.deepEqual(['free', 'featured', 'vip'].map(adVideoLimit), [0, 30, 60]);
+});
+
+test('validation warnings appear directly below each offending advertisement field', () => {
+  const source = readFileSync(new URL('../src/components/views/CreateOfferPage.tsx', import.meta.url), 'utf8');
+  for (const [id, flag] of [
+    ['offer-title', 'linkErrors.title'],
+    ['offer-desc', 'linkErrors.description'],
+    ['offer-merchant', 'linkErrors.merchant'],
+    ['offer-contact', 'linkErrors.contact'],
+    ['offer-call-phone', 'phoneErrors.callPhone'],
+    ['offer-whatsapp-phone', 'phoneErrors.whatsappPhone'],
+    ['offer-maps-url', 'phoneErrors.mapsUrl'],
+  ]) {
+    const start = source.indexOf(`id="${id}"`);
+    assert.notEqual(start, -1, `Missing field ${id}`);
+    const end = source.indexOf('</div>', start);
+    assert.notEqual(end, -1, `Missing field container for ${id}`);
+    const localField = source.slice(start, end);
+    assert.ok(localField.includes(`${flag} && <p`), `Warning must be inside ${id} field container`);
+    assert.ok(localField.includes('role="alert"'), `Warning must be accessible in ${id}`);
+  }
+  assert.ok(!source.includes('{contentError && <p role="alert"'), 'Remove disconnected bottom-of-section warning');
+  assert.ok(source.includes('disabled={contentError === \'ad_external_link\' || checkingVideo}'), 'Links still block new media uploads');
+  assert.ok(source.includes('checkingVideo || !!contentError}'), 'Invalid content still blocks form submission');
 });

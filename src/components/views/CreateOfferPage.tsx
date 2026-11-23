@@ -113,7 +113,18 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   const adContacts = { callPhone, whatsappPhone, mapsUrl };
   const isPaid = tier === 'featured' || tier === 'vip';
   const videoLimit = adVideoLimit(tier ?? 'free');
-  const contentError = [title, description, merchant, isPaid ? '' : contact].some(containsExternalAdLink)
+  const linkErrors = {
+    title: containsExternalAdLink(title),
+    description: containsExternalAdLink(description),
+    merchant: containsExternalAdLink(merchant),
+    contact: !isPaid && containsExternalAdLink(contact),
+  };
+  const phoneErrors = {
+    callPhone: isPaid && adContactError({ callPhone }) === 'ad_invalid_call_phone',
+    whatsappPhone: isPaid && adContactError({ whatsappPhone }) === 'ad_invalid_whatsapp_phone',
+    mapsUrl: isPaid && adContactError({ mapsUrl }) === 'ad_invalid_maps_url',
+  };
+  const contentError = Object.values(linkErrors).some(Boolean)
     ? 'ad_external_link' : isPaid ? adContactError(adContacts) : null;
   const contentErrors = {
     ad_external_link: ar ? 'أزل الروابط الخارجية من نص الإعلان قبل رفع الملفات أو الإرسال.' : 'Remove external links from the ad text before uploading or submitting.',
@@ -121,6 +132,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
     ad_invalid_whatsapp_phone: ar ? 'أدخل رقم محمول صحيح لواتساب، أو اترك الحقل فارغًا.' : 'Enter a valid mobile number for WhatsApp, or leave it blank.',
     ad_invalid_maps_url: ar ? 'أدخل رابط مشاركة صحيح من خرائط Google، أو اترك الحقل فارغًا.' : 'Enter a valid Google Maps share link, or leave it blank.',
   };
+  const fieldWarningClass = 'mt-1 text-xs font-bold text-rose-700 dark:text-rose-300';
   const videoLimitMessage = ar ? `اختر فيديو مدته ${new Intl.NumberFormat('ar-EG').format(videoLimit)} ثانية أو أقل.`
     : `Choose a video no longer than ${videoLimit} seconds.`;
   const [startsAt, setStartsAt] = useState(emptyAdSchedule);
@@ -546,31 +558,44 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                 </select>
               </div>
               <div><label htmlFor="offer-title" className={label}>{ar ? 'عنوان الإعلان' : 'Title'}</label>
-                <input id="offer-title" required maxLength={120} value={title} onChange={event => setTitle(event.target.value)} className={field} placeholder={ar ? 'اكتب عنوانًا واضحًا للإعلان' : 'A clear advertisement title'} />
+                <input id="offer-title" required maxLength={120} value={title} onChange={event => setTitle(event.target.value)}
+                   aria-invalid={linkErrors.title} aria-describedby={linkErrors.title ? 'offer-title-error' : undefined}
+                   className={field} placeholder={ar ? 'اكتب عنوانًا واضحًا للإعلان' : 'A clear advertisement title'} />
+                 {linkErrors.title && <p id="offer-title-error" role="alert" className={fieldWarningClass}>{contentErrors.ad_external_link}</p>}
               </div>
               <div><label htmlFor="offer-desc" className={label}>{ar ? 'التفاصيل' : 'Description'}</label>
-                <textarea id="offer-desc" rows={5} required maxLength={1000} value={description} onChange={event => setDescription(event.target.value.slice(0,1000))} className={field} placeholder={ar ? AD_NO_LINKS_AR : AD_NO_LINKS_EN} /><p aria-live="polite" className={`text-end text-[11px] font-semibold ${1000 - description.length <= 15 ? 'text-red-600' : 'text-slate-500'}`}>{ar ? `المتبقي: ${1000 - description.length} حرف` : `Remaining: ${1000 - description.length} characters`}</p>
+                <textarea id="offer-desc" rows={5} required maxLength={1000} value={description} onChange={event => setDescription(event.target.value.slice(0,1000))}
+                   aria-invalid={linkErrors.description} aria-describedby={linkErrors.description ? 'offer-desc-error' : undefined}
+                   className={field} placeholder={ar ? AD_NO_LINKS_AR : AD_NO_LINKS_EN} />
+                 {linkErrors.description && <p id="offer-desc-error" role="alert" className={fieldWarningClass}>{contentErrors.ad_external_link}</p>}
+                 <p aria-live="polite" className={`text-end text-[11px] font-semibold ${1000 - description.length <= 15 ? 'text-red-600' : 'text-slate-500'}`}>{ar ? `المتبقي: ${1000 - description.length} حرف` : `Remaining: ${1000 - description.length} characters`}</p>
               </div>
               <div><label htmlFor="offer-merchant" className={label}>{ar ? 'اسم المعلن أو النشاط' : 'Advertiser or business name'}</label>
-                <input id="offer-merchant" required maxLength={100} value={merchant} onChange={event => setMerchant(event.target.value)} className={field} />
+                <input id="offer-merchant" required maxLength={100} value={merchant} onChange={event => setMerchant(event.target.value)}
+                   aria-invalid={linkErrors.merchant} aria-describedby={linkErrors.merchant ? 'offer-merchant-error' : undefined} className={field} />
+                 {linkErrors.merchant && <p id="offer-merchant-error" role="alert" className={fieldWarningClass}>{contentErrors.ad_external_link}</p>}
               </div>
               {isPaid ? <div className="grid gap-3 sm:grid-cols-2">
                 <div><label htmlFor="offer-call-phone" className={label}>{ar ? 'رقم الاتصال (اختياري)' : 'Phone number (optional)'}</label>
                   <input id="offer-call-phone" type="tel" dir="ltr" maxLength={50} value={callPhone} onChange={event => setCallPhone(event.target.value)}
-                    aria-invalid={contentError === 'ad_invalid_call_phone'} className={field} />
+                    aria-invalid={phoneErrors.callPhone} aria-describedby={phoneErrors.callPhone ? 'offer-call-error' : undefined} className={field} />
+                   {phoneErrors.callPhone && <p id="offer-call-error" role="alert" className={fieldWarningClass}>{contentErrors.ad_invalid_call_phone}</p>}
                 </div>
                 <div><label htmlFor="offer-whatsapp-phone" className={label}>{ar ? 'رقم واتساب (اختياري)' : 'WhatsApp number (optional)'}</label>
                   <input id="offer-whatsapp-phone" type="tel" dir="ltr" maxLength={50} value={whatsappPhone} onChange={event => setWhatsappPhone(event.target.value)}
-                    aria-invalid={contentError === 'ad_invalid_whatsapp_phone'} className={field} />
+                    aria-invalid={phoneErrors.whatsappPhone} aria-describedby={phoneErrors.whatsappPhone ? 'offer-whatsapp-error' : undefined} className={field} />
+                   {phoneErrors.whatsappPhone && <p id="offer-whatsapp-error" role="alert" className={fieldWarningClass}>{contentErrors.ad_invalid_whatsapp_phone}</p>}
                 </div>
                 <div className="sm:col-span-2"><label htmlFor="offer-maps-url" className={label}>{ar ? 'رابط خرائط Google (اختياري)' : 'Google Maps link (optional)'}</label>
                   <input id="offer-maps-url" type="url" dir="ltr" maxLength={2048} value={mapsUrl} onChange={event => setMapsUrl(event.target.value)}
-                    aria-invalid={contentError === 'ad_invalid_maps_url'} className={field} />
+                    aria-invalid={phoneErrors.mapsUrl} aria-describedby={phoneErrors.mapsUrl ? 'offer-maps-error' : undefined} className={field} />
+                   {phoneErrors.mapsUrl && <p id="offer-maps-error" role="alert" className={fieldWarningClass}>{contentErrors.ad_invalid_maps_url}</p>}
                 </div>
               </div> : <div><label htmlFor="offer-contact" className={label}>{ar ? 'وسيلة التواصل (اختياري)' : 'Contact details (optional)'}</label>
-                <input id="offer-contact" maxLength={200} value={contact} onChange={event => setContact(event.target.value)} className={field} />
+                <input id="offer-contact" maxLength={200} value={contact} onChange={event => setContact(event.target.value)}
+                   aria-invalid={linkErrors.contact} aria-describedby={linkErrors.contact ? 'offer-contact-error' : undefined} className={field} />
+                 {linkErrors.contact && <p id="offer-contact-error" role="alert" className={fieldWarningClass}>{contentErrors.ad_external_link}</p>}
               </div>}
-              {contentError && <p role="alert" className="text-sm font-bold text-rose-700 dark:text-rose-300">{contentErrors[contentError]}</p>}
             </section>
             <section className={`bg-white rounded-2xl border border-slate-200 p-4 space-y-3 ${formSurface}`}>
               <h2 className="font-extrabold text-sm">{ar ? '3. مدة النشر' : '3. Publication schedule'}</h2>

@@ -88,7 +88,9 @@ test('feedback fields cannot block native save form validation',()=>{
 test('raw speech transcript is passed separately from parsed text',()=>{
  const s=readFileSync('src/components/VoiceNaturalInput.tsx','utf8');
  assert.ok(s.includes("originalText:inputSource==='voice' ? (originalTranscript.trim() || text) : text"));
- assert.ok(s.includes("void processInputWithAI(text, 'voice', segmentBaseRef.current)"));
+ assert.ok(s.includes("analyzedText:text"), 'The AI-analyzed draft keeps the reviewed text');
+ assert.ok(s.includes("setPendingVoiceReview(Boolean(segmentBaseRef.current.trim()))"), 'A finished recording stays marked as voice input');
+ assert.ok(s.includes("void processInputWithAI(inputText, pendingVoiceReview ? 'voice' : 'text', segmentBaseRef.current)"), 'The send action passes the original recorded transcript separately from edited input');
 });
 test('new Firestore collections remain inaccessible from client rules',()=>{
  const rules=readFileSync('firestore.rules','utf8');

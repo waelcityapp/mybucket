@@ -275,7 +275,7 @@ async function startServer() {
           const id = payload.modelId;
           if (typeof id !== 'string' || !GEMINI_MODEL_OPTIONS.some(m => m.id === id)) return res.status(400).json({ ok: false, error: 'invalid_model_selection' });
           const test = await diagnoseGeminiConnection(id);
-          if (!test.success) return res.status(422).json({ ok: false, error: 'model_test_failed', data: test, message: 'Selected Gemini model failed its connectivity test. The active model was not changed.' });
+          if (!test.success) return res.status(422).json({ ok: false, error: 'model_test_failed', data: test, message: 'Selected AI model failed its connectivity test. The active model was not changed.' });
           return res.json({ ok: true, data: await setSelectedGeminiModel(id) });
         }
         case 'feedback.config': {
@@ -332,7 +332,7 @@ async function startServer() {
           }).catch(async error => {
             if (!(error instanceof Error) || error.message !== 'gemini_unavailable') throw error;
             if (reservation.operation === 'entry') await recordGeminiEntryFailure(user.uid, reservation.day);
-            throw new SubscriptionError(503, 'gemini_unavailable', 'Gemini is temporarily unavailable.');
+            throw new SubscriptionError(503, 'gemini_unavailable', 'AI is temporarily unavailable.');
           });
           if (reservation.operation === 'entry' && result.intent === 'CREATE_TRANSACTION' && result.transaction) {
             const { issueAiEntryTicket } = await import('./server/financialTransactions.js');

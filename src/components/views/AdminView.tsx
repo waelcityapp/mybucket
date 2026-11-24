@@ -39,7 +39,7 @@ export function AdminView({
     { id: 'marketers' as const, icon: Megaphone, title: ar ? 'المسوقون' : 'Marketers', desc: ar ? 'الأكواد والعمولات' : 'Codes and commissions', ready: false },
     { id: 'ads' as const, icon: PanelsTopLeft, title: ar ? 'إدارة الإعلانات' : 'Ads management', desc: ar ? 'مراجعة الإعلانات الواردة والموافقة أو الرفض' : 'Review, approve or reject submitted ads', ready: true },
     { id: 'reports' as const, icon: MessageSquareText, title: ar ? 'البلاغات' : 'Reports', desc: ar ? 'تقييمات المحلل المحلي والتحكم فيها' : 'Local analyzer feedback and controls', ready: true },
-    { id: 'ai' as const, icon: BrainCircuit, title: ar ? 'الذكاء الاصطناعي' : 'Artificial intelligence', desc: ar ? 'Gemini والاستهلاك واختيار النموذج' : 'Gemini, usage and model selection', ready: true },
+    { id: 'ai' as const, icon: BrainCircuit, title: ar ? 'الذكاء الاصطناعي' : 'Artificial intelligence', desc: ar ? 'الذكاء الاصطناعي والاستهلاك واختيار النموذج' : 'AI, usage and model selection', ready: true },
     { id: 'branding' as const, icon: Palette, title: ar ? 'التحكم في هوية التطبيق' : 'App identity', desc: ar ? 'تغيير الاسم والأيقونة عبر Cloudinary' : 'Edit the name and Cloudinary icon', ready: true },
   ];
 

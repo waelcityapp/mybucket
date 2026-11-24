@@ -1,3 +1,4 @@
+import { aiDisplayText } from '../utils/aiDisplayText';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Activity, AlertCircle, RefreshCw, ExternalLink, Wifi, WifiOff, Clock3, DollarSign } from 'lucide-react';
 import { auth } from '../lib/firebase';
@@ -26,6 +27,10 @@ export interface AdminAiUsageCardProps {
   lang?: Language;
   className?: string;
   onModelChange?: (modelId: string) => void;
+}
+
+function modelLabel(model?: string | null) {
+  return model?.replace(/^(?:models\/)?gemini[-\s]*/i, '').replaceAll('-', ' ') || '—';
 }
 
 export const AdminAiUsageCard: React.FC<AdminAiUsageCardProps> = ({ lang = 'ar', className = '' }) => {
@@ -72,7 +77,7 @@ export const AdminAiUsageCard: React.FC<AdminAiUsageCardProps> = ({ lang = 'ar',
       setSettings(value);
       setCandidate(current => current || value.activeModel);
     } catch (err) {
-      setModelNotice(ar ? 'تعذر قراءة إعدادات النموذج من الخادم.' : 'Could not load Gemini model settings.');
+      setModelNotice(ar ? 'تعذر قراءة إعدادات النموذج من الخادم.' : 'Could not load AI model settings.');
     }
   }, [ar]);
 
@@ -83,7 +88,7 @@ export const AdminAiUsageCard: React.FC<AdminAiUsageCardProps> = ({ lang = 'ar',
     try {
       const value = await callAdmin('admin.aiSetModel', { modelId: candidate }) as GeminiSettings;
       setSettings(value);
-      setModelNotice(ar ? 'تم اختبار النموذج الجديد وتفعيله فعليًا لجميع طلبات Gemini.' : 'Model verified and activated for Gemini requests.');
+      setModelNotice(ar ? 'تم اختبار النموذج الجديد وتفعيله فعليًا لجميع طلبات الذكاء الاصطناعي.' : 'Model verified and activated for AI requests.');
       setConnection('online');
       setLastCheckAt(new Date().toISOString());
       void refresh();
@@ -126,8 +131,8 @@ export const AdminAiUsageCard: React.FC<AdminAiUsageCardProps> = ({ lang = 'ar',
 
   const diagnosisMessage = (reason?: string) => {
     const arMessages: Record<string, string> = {
-      missing_key: 'مفتاح Gemini غير متاح لخادم Vercel.',
-      invalid_key: 'مفتاح Gemini غير صالح أو مرفوض.',
+      missing_key: 'مفتاح الذكاء الاصطناعي غير متاح لخادم Vercel.',
+      invalid_key: 'مفتاح الذكاء الاصطناعي غير صالح أو مرفوض.',
       billing_or_eligibility: 'قد تكون هناك متطلبات فوترة أو أهلية استخدام للمشروع لدى Google.',
       invalid_request: 'Google رفضت صيغة الطلب البسيط.',
       permission: 'Google رفضت صلاحيات الوصول للمشروع أو المفتاح.',
@@ -137,8 +142,8 @@ export const AdminAiUsageCard: React.FC<AdminAiUsageCardProps> = ({ lang = 'ar',
       unknown: 'فشل الطلب؛ السبب التفصيلي غير متاح بأمان.',
     };
     const enMessages: Record<string, string> = {
-      missing_key: 'Gemini API key is missing on the server.',
-      invalid_key: 'Gemini API key was rejected.',
+      missing_key: 'AI API key is missing on the server.',
+      invalid_key: 'AI API key was rejected.',
       billing_or_eligibility: 'Google billing or project eligibility may be required.',
       invalid_request: 'Google rejected the minimal request.',
       permission: 'Google rejected project or API key permissions.',
@@ -180,7 +185,7 @@ export const AdminAiUsageCard: React.FC<AdminAiUsageCardProps> = ({ lang = 'ar',
   return <section className={`rounded-2xl border border-slate-200 bg-white p-4 space-y-4 ${className}`}>
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div>
-        <h2 className="font-extrabold text-slate-900">{ar ? 'استهلاك Gemini AI الفعلي' : 'Actual Gemini AI usage'}</h2>
+        <h2 className="font-extrabold text-slate-900">{ar ? 'استهلاك الذكاء الاصطناعي الفعلي' : 'Actual AI usage'}</h2>
         <p className="text-xs text-slate-500">{ar ? 'بيانات الطلبات المسجلة على الخادم، وليست تقديرات تجريبية' : 'Recorded server-side usage, not simulated figures'}</p>
       </div>
       <button type="button" disabled={loading} onClick={() => void refresh()} className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 disabled:opacity-50">
@@ -192,7 +197,7 @@ export const AdminAiUsageCard: React.FC<AdminAiUsageCardProps> = ({ lang = 'ar',
         <div className="flex items-center gap-2">
           {connection === 'online' ? <Wifi className="w-5 h-5 text-emerald-600" /> : connection === 'offline' ? <WifiOff className="w-5 h-5 text-rose-600" /> : <Clock3 className="w-5 h-5 text-slate-500" />}
           <div>
-            <p className="text-sm font-extrabold text-slate-800">{ar ? 'حالة اتصال Gemini' : 'Gemini connection status'}</p>
+            <p className="text-sm font-extrabold text-slate-800">{ar ? 'حالة اتصال الذكاء الاصطناعي' : 'AI connection status'}</p>
             <p className={`text-xs font-semibold ${connection === 'online' ? 'text-emerald-700' : connection === 'offline' ? 'text-rose-700' : 'text-slate-600'}`}>
               {diagnosing ? (ar ? 'جاري فحص الاتصال...' : 'Checking connection...') : connection === 'online' ? (ar ? 'متصل - تم تأكيد الاستجابة' : 'Connected - response verified') : connection === 'offline' ? (ar ? 'تعذر الاتصال في آخر اختبار' : 'Last connection test failed') : (ar ? 'لم يتم فحص الاتصال في هذه الجلسة' : 'Not checked in this session')}
             </p>
@@ -204,25 +209,25 @@ export const AdminAiUsageCard: React.FC<AdminAiUsageCardProps> = ({ lang = 'ar',
       </div>
       {settings?.lastSuccessAt && <p className="text-[11px] text-slate-600">
         {ar ? 'آخر استجابة ناجحة على الخادم:' : 'Last confirmed server response:'} <span dir="ltr" className="inline-block">{new Date(settings.lastSuccessAt).toLocaleString(ar ? 'ar-EG' : 'en-US')}</span>
-        <span dir="ltr" className="ms-1 inline-block">({settings.lastSuccessModel})</span>
+        <span dir="ltr" className="ms-1 inline-block">({modelLabel(settings.lastSuccessModel)})</span>
       </p>}
       {lastCheckAt && <p className="text-[11px] text-slate-500">{ar ? 'آخر فحص من هذه الصفحة:' : 'Last test from this page:'} {new Date(lastCheckAt).toLocaleString(ar ? 'ar-EG' : 'en-US')}</p>}
       <p className="text-[11px] text-slate-500">{ar ? 'حالة الاتصال ليست مراقبة لحظية مستمرة؛ الأخضر يعني نجاح آخر اختبار، وليس ضمانًا لاستمرار الخدمة.' : 'This is not continuous monitoring. Green means the latest test succeeded, not guaranteed uptime.'}</p>
     </div>
     <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-3">
-      <h3 className="text-sm font-extrabold text-slate-900">{ar ? 'النموذج المستخدم في التطبيق' : 'Active Gemini model'}</h3>
+      <h3 className="text-sm font-extrabold text-slate-900">{ar ? 'النموذج المستخدم في التطبيق' : 'Active AI model'}</h3>
       {settings ? <>
-        <p className="text-xs text-slate-600">{ar ? 'النموذج الفعلي الحالي:' : 'Current server model:'} <strong dir="ltr">{settings.activeModel}</strong></p>
+        <p className="text-xs text-slate-600">{ar ? 'النموذج الفعلي الحالي:' : 'Current server model:'} <strong dir="ltr">{modelLabel(settings.activeModel)}</strong></p>
         <div className="flex flex-col sm:flex-row gap-2">
-          <select aria-label={ar ? 'اختيار نموذج Gemini' : 'Select Gemini model'} value={candidate} onChange={e => { setCandidate(e.target.value); setModelNotice(null); }} className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white text-slate-900" dir="ltr">
-            {settings.options.map(option => <option key={option.id} value={option.id}>{option.id}</option>)}
+          <select aria-label={ar ? 'اختيار نموذج الذكاء الاصطناعي' : 'Select AI model'} value={candidate} onChange={e => { setCandidate(e.target.value); setModelNotice(null); }} className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white text-slate-900" dir="ltr">
+            {settings.options.map(option => <option key={option.id} value={option.id}>{modelLabel(option.id)}</option>)}
           </select>
           <button type="button" disabled={savingModel || !candidate || candidate === settings.activeModel} onClick={() => void applyModel()} className="rounded-lg bg-indigo-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
             {savingModel ? (ar ? 'جاري الاختبار والتفعيل...' : 'Verifying...') : (ar ? 'اختبار وتفعيل' : 'Test and activate')}
           </button>
         </div>
         <div className="space-y-1 text-xs text-slate-600">
-          {settings.options.map(option => <p key={option.id} dir="ltr">{option.id}: ${option.inputPerMillion.toFixed(2)} input / ${option.outputPerMillion.toFixed(2)} output <span>USD / 1M tokens</span></p>)}
+          {settings.options.map(option => <p key={option.id} dir="ltr">{modelLabel(option.id)}: ${option.inputPerMillion.toFixed(2)} input / ${option.outputPerMillion.toFixed(2)} output <span>USD / 1M tokens</span></p>)}
         </div>
         <p className="text-[11px] text-slate-500">{ar ? 'الأسعار المعلنة للاستخدام المدفوع (نصي، قياسي). قد يكون استخدامك ضمن الفئة المجانية. لا تُغيّر النموذج إلا بعد نجاح اختباره.' : 'Published paid standard text rates. Your account may have free-tier usage. Switching requires a successful test.'}</p>
       </> : <p className="text-xs text-amber-700">{ar ? 'تعذر تأكيد إعدادات النموذج بعد. اضغط تحديث.' : 'Model settings not confirmed yet.'}</p>}
@@ -231,32 +236,32 @@ export const AdminAiUsageCard: React.FC<AdminAiUsageCardProps> = ({ lang = 'ar',
     <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-bold text-slate-900">{ar ? 'تفاصيل اختبار Gemini' : 'Gemini diagnostic details'}</p>
+          <p className="text-sm font-bold text-slate-900">{ar ? 'تفاصيل اختبار الذكاء الاصطناعي' : 'AI diagnostic details'}</p>
           <p className="text-xs text-slate-600">{ar ? 'اختبار بسيط من الخادم بدون أي معلومات مالية، للأدمن فقط.' : 'Minimal server-side test, without financial data. Admin only.'}</p>
         </div>
         <button type="button" disabled={diagnosing} onClick={() => void testConnection()}
           className="rounded-lg bg-indigo-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
-          {diagnosing ? (ar ? 'جاري الاختبار...' : 'Testing...') : (ar ? 'اختبار اتصال Gemini' : 'Test Gemini connection')}
+          {diagnosing ? (ar ? 'جاري الاختبار...' : 'Testing...') : (ar ? 'اختبار اتصال الذكاء الاصطناعي' : 'Test AI connection')}
         </button>
       </div>
-      {diagnosticError && <p role="alert" className="text-xs text-rose-700">{diagnosticError}</p>}
+      {diagnosticError && <p role="alert" className="text-xs text-rose-700">{aiDisplayText(diagnosticError, ar ? 'ar' : 'en')}</p>}
       {diagnostic && <div role="status" className={`rounded-lg border p-3 text-sm ${diagnostic.success ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
-        <p className="font-extrabold">{diagnostic.success ? (ar ? 'نجح اتصال Gemini' : 'Gemini connection succeeded') : (ar ? 'فشل اتصال Gemini' : 'Gemini connection failed')}</p>
+        <p className="font-extrabold">{diagnostic.success ? (ar ? 'نجح اتصال الذكاء الاصطناعي' : 'AI connection succeeded') : (ar ? 'فشل اتصال الذكاء الاصطناعي' : 'AI connection failed')}</p>
         <p className="mt-1">{diagnostic.success ? (ar ? 'ردت Google بنجاح على الطلب التجريبي.' : 'Google answered the test request.') : diagnosisMessage(diagnostic.reason)}</p>
-        <p className="mt-1 text-xs" dir="ltr">Stage: {diagnostic.stage || '—'} | Model: {diagnostic.model || '—'} {diagnostic.httpStatus ? ` | HTTP: ${diagnostic.httpStatus}` : ''} {diagnostic.googleStatus ? ` | Google: ${diagnostic.googleStatus}` : ''}</p>
+        <p className="mt-1 text-xs" dir="ltr">Stage: {diagnostic.stage || '—'} | Model: {modelLabel(diagnostic.model)} {diagnostic.httpStatus ? ` | HTTP: ${diagnostic.httpStatus}` : ''} {diagnostic.googleStatus ? ` | Google: ${diagnostic.googleStatus}` : ''}</p>
         {typeof diagnostic.modelCount === 'number' && <div className="mt-2 space-y-1">
           <p className="text-xs font-bold">{ar ? 'النماذج التي أعلنت Google إتاحتها لتوليد النص' : 'Text generation models listed by Google'}: {diagnostic.modelCount}</p>
           <div dir="ltr" className="max-h-32 overflow-y-auto rounded-lg bg-white/80 border border-slate-200 px-2 py-1 text-xs font-mono break-all">
-            {diagnostic.availableModels?.length ? diagnostic.availableModels.join(' · ') : '—'}
+            {diagnostic.availableModels?.length ? diagnostic.availableModels.map(modelLabel).join(' · ') : '—'}
           </div>
         </div>}
         {diagnostic.success && <p className="mt-1 text-xs">{ar ? 'التوكنات' : 'Tokens'}: {fmt(diagnostic.totalTokens ?? undefined)} · {diagnostic.trackingRecorded ? (ar ? 'تم تسجيلها في العداد' : 'Recorded in usage dashboard') : (ar ? 'تعذر تأكيد تسجيلها في العداد' : 'Usage recording could not be confirmed')}</p>}
       </div>}
     </div>
-    {error && <div role="alert" className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-900"><AlertCircle className="h-4 w-4 shrink-0" />{ar ? 'تعذر جلب بيانات الاستهلاك الحقيقية: ' : 'Could not load actual usage: '}{error}</div>}
+    {error && <div role="alert" className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-900"><AlertCircle className="h-4 w-4 shrink-0" />{ar ? 'تعذر جلب بيانات الاستهلاك الحقيقية: ' : 'Could not load actual usage: '}{aiDisplayText(error, ar ? 'ar' : 'en')}</div>}
     {!error && !data && <p className="text-sm text-slate-500">{loading ? (ar ? 'جاري قراءة البيانات...' : 'Loading usage...') : (ar ? 'لا توجد بيانات مؤكدة' : 'No confirmed data')}</p>}
     <div className="space-y-2 rounded-xl border border-slate-200 p-3 text-xs leading-relaxed text-slate-600">
-      <h3 className="text-sm font-extrabold text-slate-900">{ar ? 'حصة Gemini لدى Google' : 'Gemini quota at Google'}</h3>
+      <h3 className="text-sm font-extrabold text-slate-900">{ar ? 'حصة الذكاء الاصطناعي لدى Google' : 'AI quota at Google'}</h3>
       <p>{ar
         ? 'الأرقام الشهرية هنا تجمع الطلبات اللي سجّلها التطبيق. حصة Google الفعلية ونسبة استخدامها تظهر في AI Studio حسب المشروع والموديل.'
         : 'Monthly totals here come from requests recorded by the app. AI Studio shows Google’s limits and usage for each project and model.'}</p>
@@ -280,13 +285,13 @@ export const AdminAiUsageCard: React.FC<AdminAiUsageCardProps> = ({ lang = 'ar',
         <div className="flex items-center gap-2 text-sm font-bold text-slate-800"><DollarSign className="w-4 h-4" />{ar ? 'تكلفة تقديرية لو الاستهلاك مدفوع' : 'Estimated paid-tier usage cost'}</div>
         {data.models.map(m => {
           const rate = settings.options.find(o => o.id === m.model);
-          if (!rate) return <p key={m.model} className="text-xs text-slate-600" dir="ltr">{m.model}: {ar ? 'لا توجد أسعار معتمدة لهذا النموذج' : 'No configured price'}</p>;
+          if (!rate) return <p key={m.model} className="text-xs text-slate-600" dir="ltr">{modelLabel(m.model)}: {ar ? 'لا توجد أسعار معتمدة لهذا النموذج' : 'No configured price'}</p>;
           const estimated = ((m.inputTokens || 0) * rate.inputPerMillion + (m.outputTokens || 0) * rate.outputPerMillion) / 1_000_000;
-          return <p key={m.model} className="text-xs text-slate-700" dir="ltr">{m.model}: ${estimated.toFixed(5)} USD</p>;
+          return <p key={m.model} className="text-xs text-slate-700" dir="ltr">{modelLabel(m.model)}: ${estimated.toFixed(5)} USD</p>;
         })}
         <p className="text-[11px] text-slate-500">{ar ? 'تقدير من عدد توكنات الإدخال والإخراج المسجلة وأسعار Google القياسية؛ ليس فاتورة أو رصيدًا متبقيًا، وقد لا يشمل تفاصيل التسعير الخاصة.' : 'Estimate from recorded input/output tokens and standard Google prices; not a bill or remaining quota.'}</p>
       </div>}
-      {data.models.length > 0 && <div className="space-y-2"><h3 className="text-sm font-bold text-slate-800">{ar ? 'النماذج المستخدمة فعليًا' : 'Models actually used'}</h3>{data.models.map(m => <div key={m.model} className="flex flex-wrap justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs"><span dir="ltr">{m.model}</span><span>{fmt(m.totalTokens)} {ar ? 'توكن' : 'tokens'} · {fmt(m.requests)} {ar ? 'طلب' : 'requests'}</span></div>)}</div>}
+      {data.models.length > 0 && <div className="space-y-2"><h3 className="text-sm font-bold text-slate-800">{ar ? 'النماذج المستخدمة فعليًا' : 'Models actually used'}</h3>{data.models.map(m => <div key={m.model} className="flex flex-wrap justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs"><span dir="ltr">{modelLabel(m.model)}</span><span>{fmt(m.totalTokens)} {ar ? 'توكن' : 'tokens'} · {fmt(m.requests)} {ar ? 'طلب' : 'requests'}</span></div>)}</div>}
       <p className="text-xs leading-6 text-slate-500">{ar ? 'القياس يبدأ من تفعيل التسجيل على الخادم. لا يشمل الطلبات السابقة أو الطلبات الفاشلة. التكلفة والفاتورة الفعلية تُراجع من Google Cloud.' : 'Tracking begins when server telemetry is deployed. Earlier and failed requests are not included. Check Google Cloud for actual billing.'}</p>
     </>}
     <a href="https://console.cloud.google.com/billing" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-bold text-indigo-700 underline"><Activity className="h-4 w-4" />{ar ? 'الفواتير الفعلية في Google Cloud' : 'Actual Google Cloud billing'}<ExternalLink className="h-3.5 w-3.5" /></a>

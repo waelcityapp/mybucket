@@ -22,7 +22,7 @@ export function AdminSubscriptionsView({ lang, page, onOpen }: {
     { id: 'payments', icon: CreditCard, title: ar ? 'طلبات الدفع' : 'Payment requests', detail: ar ? 'مراجعة الإيصالات وتفعيل الاشتراكات' : 'Review receipts and activate subscriptions' },
     { id: 'plans', icon: SlidersHorizontal, title: ar ? 'إعدادات الخطط' : 'Plan settings', detail: ar ? 'حدود Basic وPro ومحتوى صفحة الاشتراكات' : 'Basic and Pro limits and subscription page content' },
     { id: 'trial', icon: Clock3, title: ar ? 'مدة الاستخدام المجاني' : 'Free access duration', detail: ar ? 'مدة Basic وسجل تعديلات المدة' : 'Basic duration and its change history' },
-    { id: 'analysis', icon: BrainCircuit, title: ar ? 'حدود التحليل والتكلفة' : 'Analysis and cost limits', detail: ar ? 'محاولات Gemini والمحلل المحلي' : 'Gemini and local analyzer attempts' },
+    { id: 'analysis', icon: BrainCircuit, title: ar ? 'حدود التحليل والتكلفة' : 'Analysis and cost limits', detail: ar ? 'محاولات الذكاء الاصطناعي والمحلل المحلي' : 'AI and local analyzer attempts' },
   ] as const;
 
   if (page === 'payments') return <AdminSubscriptionPayments lang={lang} />;

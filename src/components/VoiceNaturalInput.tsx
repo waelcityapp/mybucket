@@ -1,3 +1,4 @@
+import { aiDisplayText } from '../utils/aiDisplayText';
 import { useAppNotice } from './AppNotice';
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Send, Sparkles, Loader2, HelpCircle } from 'lucide-react';
@@ -168,8 +169,8 @@ export function VoiceNaturalInput({
       analyzed = true;
       const engineNotice = result.engineUsed === 'local-fallback'
         ? (result.geminiFallbackReason === 'limit'
-          ? (isAr ? 'انتهت حصة Gemini اليوم. تم التحليل بالمحلل المحلي.' : 'Gemini’s daily allowance is used up. The local analyzer handled this request.')
-          : (isAr ? 'Gemini غير متاح مؤقتًا. تم التحليل بالمحلل المحلي.' : 'Gemini is temporarily unavailable. The local analyzer handled this request.'))
+          ? (isAr ? 'انتهت حصة الذكاء الاصطناعي اليوم. تم التحليل بالمحلل المحلي.' : 'AI’s daily allowance is used up. The local analyzer handled this request.')
+          : (isAr ? 'الذكاء الاصطناعي غير متاح مؤقتًا. تم التحليل بالمحلل المحلي.' : 'AI is temporarily unavailable. The local analyzer handled this request.'))
         : null;
 
       // Handle Result based on classified INTENT
@@ -212,13 +213,13 @@ export function VoiceNaturalInput({
           (isAr
             ? 'لم أتمكن من فهم العملية بدقة، يمكنك كتابة مثل: "دفعت 150 سوبرماركت من الكاش" أو "صرفت كام الأسبوع ده؟"'
             : 'Could not understand clearly. Try e.g. "Paid 150 grocery from Cash" or "How much did I spend this week?"');
-        showNotice(clarification, lang, 'warning');
+        showNotice(aiDisplayText(clarification, lang), lang, 'warning');
       }
     } catch (err) {
       console.error('AI processing error:', err);
       showNotice(
         isAr
-          ? (err instanceof Error && err.message ? err.message : 'تعذر تحليل النص، يرجى مراجعة البيانات والمحاولة مرة أخرى')
+          ? (err instanceof Error && err.message ? aiDisplayText(err.message, lang) : 'تعذر تحليل النص، يرجى مراجعة البيانات والمحاولة مرة أخرى')
           : 'Could not analyze text; review your input and try again',
         lang,
         'warning',

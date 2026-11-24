@@ -1,3 +1,4 @@
+import { aiDisplayText } from '../utils/aiDisplayText';
 import type { PlanLimits } from './planLimits.js';
 
 export const PLAN_FEATURE_IDS = ['entries', 'inquiries', 'accounts', 'categories', 'openItems', 'reminders', 'exports'] as const;
@@ -31,7 +32,7 @@ export function planLimitFeatures(lang: 'ar' | 'en', limits: PlanLimits, copy: P
       id: 'entries',
       label: ar ? 'تسجيل العمليات' : 'Recording transactions',
       basic: ar ? `${format(limits.basicEntries)} عملية يوميًا إجمالًا، بالصوت أو يدويًا` : `${format(limits.basicEntries)} transactions a day in total, by voice or manually`,
-      pro: ar ? `${format(limits.proAiEntries)} محاولة تحليل عمليات بـGemini يوميًا، ثم ${format(limits.proAdditionalEntries)} إضافية بالصوت أو يدويًا` : `${format(limits.proAiEntries)} Gemini transaction analysis attempts a day, then ${format(limits.proAdditionalEntries)} more by voice or manually`,
+      pro: ar ? `${format(limits.proAiEntries)} محاولة تحليل عمليات بالذكاء الاصطناعي يوميًا، ثم ${format(limits.proAdditionalEntries)} إضافية بالصوت أو يدويًا` : `${format(limits.proAiEntries)} AI transaction analysis attempts a day, then ${format(limits.proAdditionalEntries)} more by voice or manually`,
     },
     {
       id: 'inquiries',
@@ -75,8 +76,8 @@ export function planLimitFeatures(lang: 'ar' | 'en', limits: PlanLimits, copy: P
   return features
     .map((feature, index) => ({
       ...feature,
-      label: copy[feature.id]?.[lang].title || feature.label,
-      detail: copy[feature.id]?.[lang].detail || '',
+      label: aiDisplayText(copy[feature.id]?.[lang].title || feature.label, lang),
+      detail: aiDisplayText(copy[feature.id]?.[lang].detail || '', lang),
       order: copy[feature.id]?.order ?? index + 1,
     }))
     .sort((a, b) => a.order - b.order);

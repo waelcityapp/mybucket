@@ -106,15 +106,15 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
           {usage && <>
             <p className="font-bold text-slate-800">{usage.plan === 'expired' ? (isAr ? 'انتهت صلاحية الاستخدام' : 'Access expired') : (isAr ? `الخطة الحالية: ${usage.plan === 'pro' ? 'Pro' : 'Basic'}` : `Current plan: ${usage.plan === 'pro' ? 'Pro' : 'Basic'}`)}</p>
             {usage.savedEntries?.geminiAttempts && <p className="font-bold text-slate-800">
-              {isAr ? `المتبقي من محاولات Gemini للعمليات: ${usage.savedEntries.geminiAttempts.remaining}`
-                : `Gemini transaction attempts left: ${usage.savedEntries.geminiAttempts.remaining}`}
+              {isAr ? `المتبقي من محاولات الذكاء الاصطناعي للعمليات: ${usage.savedEntries.geminiAttempts.remaining}`
+                : `AI transaction attempts left: ${usage.savedEntries.geminiAttempts.remaining}`}
             </p>}
             {usage.savedEntries && <section className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-950">
               <h3 className="font-extrabold">{isAr ? 'العمليات المحفوظة اليوم' : 'Transactions saved today'}</h3>
               <dl className="space-y-1.5">
                 {([
                   ['basic', isAr ? 'إجمالي الحفظ' : 'Total saved'],
-                  ['proAi', isAr ? 'الحفظ بعد تحليل Gemini' : 'Saved after Gemini analysis'],
+                  ['proAi', isAr ? 'الحفظ بعد تحليل الذكاء الاصطناعي' : 'Saved after AI analysis'],
                   ['proAdditional', isAr ? 'العمليات الإضافية' : 'Additional transactions'],
                 ] as const).map(([key, label]) => {
                   const count = usage.savedEntries?.[key];
@@ -123,7 +123,7 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
                     !usage.geminiEntryUnavailable && (usage.savedEntries?.geminiAttempts?.remaining ?? 0) > 0;
                   return <div key={key} className="flex flex-wrap justify-between gap-x-2">
                     <dt>{label}</dt>
-                    <dd className="font-bold">{locked ? (isAr ? 'تتاح بعد انتهاء محاولات Gemini' : 'Unlocks after Gemini attempts are used') : count.limit === null
+                    <dd className="font-bold">{locked ? (isAr ? 'تتاح بعد انتهاء محاولات الذكاء الاصطناعي' : 'Unlocks after AI attempts are used') : count.limit === null
                       ? (isAr ? `${count.used} محفوظة` : `${count.used} saved`)
                       : (isAr ? `${count.used} من ${count.limit} · المتبقي ${count.remaining}` : `${count.used} of ${count.limit} · ${count.remaining} left`)}</dd>
                   </div>;
@@ -136,7 +136,7 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
             {usage.plan !== 'expired' && <details className="space-y-2">
               <summary className="cursor-pointer py-2 font-bold">{isAr ? 'محاولات التحليل اليوم' : 'Analysis attempts today'}</summary>
             {([['gemini', usage.gemini], ['local', usage.local]] as const).map(([engine, counts]) => counts && <div key={engine} className="rounded-lg border border-slate-200 bg-white p-2">
-              <p className="font-bold text-slate-700">{engine === 'gemini' ? (isAr ? 'Gemini' : 'Gemini') : usage.plan === 'pro' ? (isAr ? 'المحلل المحلي عند عدم توفر Gemini أو انتهاء حصته' : 'Local analyzer when Gemini is unavailable or exhausted') : (isAr ? 'المحلل المحلي' : 'Local analyzer')}</p>
+              <p className="font-bold text-slate-700">{engine === 'gemini' ? (isAr ? 'الذكاء الاصطناعي' : 'AI') : usage.plan === 'pro' ? (isAr ? 'المحلل المحلي عند عدم توفر الذكاء الاصطناعي أو انتهاء حصته' : 'Local analyzer when AI is unavailable or exhausted') : (isAr ? 'المحلل المحلي' : 'Local analyzer')}</p>
               {(engine !== 'gemini' || !usage.savedEntries?.geminiAttempts) && <p>{isAr ? `محاولات تحليل العمليات: ${counts.entries.used} من ${counts.entries.limit} · المتبقي ${counts.entries.remaining}` : `Entry analysis attempts: ${counts.entries.used} of ${counts.entries.limit} · ${counts.entries.remaining} left`}</p>}
               <p>{isAr ? `محاولات تحليل الاستعلامات: ${counts.inquiries.used} من ${counts.inquiries.limit} · المتبقي ${counts.inquiries.remaining}` : `Inquiry analysis attempts: ${counts.inquiries.used} of ${counts.inquiries.limit} · ${counts.inquiries.remaining} left`}</p>
             </div>)}

@@ -81,7 +81,7 @@ export function AnalyzerFeedbackAdmin({lang,onBack}:Props){
       </button>
       <div className="flex-1">
         <h1 className="text-xl font-black text-slate-900">{ar?'تقييمات المحلل المحلي':'Local analyzer feedback'}</h1>
-        <p className="text-xs text-slate-500 mt-1">{ar?'صفحة للإدارة فقط · تحسين المحلل بدون Gemini':'Admin only · Improve the local analyzer without Gemini'}</p>
+        <p className="text-xs text-slate-500 mt-1">{ar?'صفحة للإدارة فقط · تحسين المحلل بدون الذكاء الاصطناعي':'Admin only · Improve the local analyzer without AI'}</p>
       </div>
       <button onClick={()=>void reload()} disabled={busy} className={btn} type="button" title={ar?'تحديث':'Refresh'}><RefreshCw className={'h-4 w-4 '+(busy?'animate-spin':'')}/></button>
     </header>

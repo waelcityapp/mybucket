@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Provider-neutral AI wording (#304)
+
+- The app uses «الذكاء الاصطناعي» and “AI” in user-facing screens, plan descriptions and errors. The admin model picker displays readable model labels while preserving the original identifiers used for configuration and monitoring.
+
 ## Pro entry fallback (#303)
 
 - A server-confirmed Gemini failure during entry analysis unlocks that account’s existing Pro additional-entry allowance for the Cairo day. Failed inquiries do not unlock transaction saves. The original quota counters still apply, and the app distinguishes unavailable service from exhausted Gemini attempts.

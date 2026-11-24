@@ -171,7 +171,7 @@ export async function reserveAiQuota(uid: string, rawText: unknown, forceLocal =
     const phase = stageFor(effective, deps?.now() ?? Date.now(), trials);
     if (phase === 'expired') throw new SubscriptionError(403, 'subscription_expired', 'انتهت صلاحية الاستخدام. بياناتك محفوظة ويمكنك اختيار خطة للمتابعة.');
     const plan: 'basic' | 'pro' = phase === 'paid' || phase === 'pro-trial' ? 'pro' : 'basic';
-    if (plan === 'basic' && !forceLocal) throw new SubscriptionError(403, 'pro_plan_required', 'Gemini is available on Pro; Basic uses the local analyzer.');
+    if (plan === 'basic' && !forceLocal) throw new SubscriptionError(403, 'pro_plan_required', 'AI is available on Pro; Basic uses the local analyzer.');
     const current = snapshot.exists ? snapshot.data() || {} : {};
     const policy = !deps && (operation === 'inquiry' || (plan === 'pro' && !forceLocal))
       ? publishedPlanLimits(await tx.get(db.doc(PUBLISHED_PLAN_LIMITS_PATH)))
@@ -227,6 +227,6 @@ export async function reserveAiQuota(uid: string, rawText: unknown, forceLocal =
     }
 
     throw new SubscriptionError(429, 'ai_daily_limit_reached',
-      forceLocal || plan === 'basic' ? 'انتهى الحد اليومي للمحلل المحلي، ويتجدد غدًا.' : 'انتهى حد Gemini اليومي.');
+      forceLocal || plan === 'basic' ? 'انتهى الحد اليومي للمحلل المحلي، ويتجدد غدًا.' : 'انتهى حد الذكاء الاصطناعي اليومي.');
   });
 }

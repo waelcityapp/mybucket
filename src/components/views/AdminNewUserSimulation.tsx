@@ -308,8 +308,8 @@ export function AdminNewUserSimulation({ lang, onExit, realOnboarding = false, g
             <button type="submit" className="w-full rounded-xl bg-emerald-700 py-3 text-sm font-extrabold text-white hover:bg-emerald-800">{ar ? 'أضف العملية التجريبية' : 'Add sample transaction'}</button>
           </form>
           <p className="text-center text-xs text-slate-500">
-            {guestPreview ? (ar ? 'العمليات التجريبية بتفضل في الصفحة فقط.' : 'Sample entries stay in this page only.') : realOnboarding ? (ar ? 'أنت مسجّل بـ Google بالفعل. العمليات التجريبية لا تستهلك Gemini ولا تُحفظ في Firebase.' : 'You are signed in with Google. Sample entries use no Gemini and are not saved to Firebase.')
-              : (ar ? 'المحاكاة لا تنشئ مستخدمًا ولا تستهلك Gemini أو Firestore.' : 'The simulator creates no user and uses no Gemini or Firestore writes.')}
+            {guestPreview ? (ar ? 'العمليات التجريبية بتفضل في الصفحة فقط.' : 'Sample entries stay in this page only.') : realOnboarding ? (ar ? 'أنت مسجّل بـ Google بالفعل. العمليات التجريبية لا تستهلك الذكاء الاصطناعي ولا تُحفظ في Firebase.' : 'You are signed in with Google. Sample entries use no AI and are not saved to Firebase.')
+              : (ar ? 'المحاكاة لا تنشئ مستخدمًا ولا تستهلك الذكاء الاصطناعي أو Firestore.' : 'The simulator creates no user and uses no AI or Firestore writes.')}
           </p>
         </main>
       )}

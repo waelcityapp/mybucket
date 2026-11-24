@@ -56,10 +56,14 @@ export async function interpretNaturalLanguageWithGemini(
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('gemini_unavailable');
 
+  const startedAt = performance.now();
   let responseText: string | undefined;
   // Use the exact REST API and working model proven by the admin connection
   // test. Avoid the SDK's previously failing request serialization.
   const model = await getSelectedGeminiModel();
+  const logOutcome = (outcome: string) => {
+    console.info('[AI Router] Analysis outcome', { model, outcome, durationMs: Math.round(performance.now() - startedAt) });
+  };
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), geminiAnalysisTimeout(model));
   try {
@@ -89,7 +93,6 @@ export async function interpretNaturalLanguageWithGemini(
       };
       responseText = result.candidates?.[0]?.content?.parts?.map(part => part.text || '').join('').trim();
       const usage = result.usageMetadata;
-      try { await recordGeminiSuccess(model); } catch { /* Status is best-effort. */ }
       if (usage) {
         try {
           await recordGeminiUsage({
@@ -116,12 +119,16 @@ export async function interpretNaturalLanguageWithGemini(
   if (responseText) {
     try {
       parsed = JSON.parse(responseText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''));
-    } catch (parseErr) {
-      console.warn('Failed to parse Gemini response JSON:', parseErr);
-    }
+    } catch { /* Do not log provider output, which can contain financial data. */ }
   }
 
-  if (!parsed) {
+  const isRecord = (value: unknown): boolean => Boolean(value && typeof value === 'object' && !Array.isArray(value));
+  if (!isRecord(parsed) || !['CREATE_TRANSACTION', 'FINANCIAL_QUERY', 'CORRECT_PROPOSAL', 'SAVE_REQUEST', 'UNKNOWN'].includes(parsed.intent) ||
+      (parsed.intent === 'CREATE_TRANSACTION' && (!isRecord(parsed.transaction) ||
+        (parsed.transaction.missingFields != null && !Array.isArray(parsed.transaction.missingFields)))) ||
+      (parsed.query != null && !isRecord(parsed.query)) ||
+      (parsed.correction != null && !isRecord(parsed.correction))) {
+    logOutcome(responseText ? 'invalid_response' : 'unavailable');
     // The client must reserve its separate local allowance before fallback.
     throw new Error('gemini_unavailable');
   }
@@ -130,6 +137,7 @@ export async function interpretNaturalLanguageWithGemini(
   const rawText = req.text.trim();
   const isSaveRequest = /احفظ|سجل|أكد|اكد|تمام احفظ|تأكيد|حفظ العملية|احفظها|سجلها|اعتمد|اعتمدها|save|confirm/i.test(rawText);
   if (isSaveRequest || parsed.intent === 'SAVE_REQUEST') {
+    logOutcome('confirmation_required');
     const msg = req.lang === 'ar' ? 'من فضلك اضغط على زر تأكيد وحفظ' : 'Please click on the Confirm & Save button';
     return {
       intent: 'SAVE_REQUEST',
@@ -317,5 +325,11 @@ export async function interpretNaturalLanguageWithGemini(
     }
   }
 
+  const usable = parsed.intent === 'CREATE_TRANSACTION' || parsed.intent === 'FINANCIAL_QUERY' ||
+    (parsed.intent === 'CORRECT_PROPOSAL' && isRecord(parsed.correction));
+  logOutcome(usable ? 'usable_response' : 'clarification_required');
+  if (usable) {
+    try { await recordGeminiSuccess(model); } catch { /* Status is best-effort. */ }
+  }
   return parsed as AIInterpretationResult;
 }

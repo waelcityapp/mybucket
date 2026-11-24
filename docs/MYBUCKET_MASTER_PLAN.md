@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## AI analysis diagnostics (#306)
+
+- Record model, elapsed analysis time, and outcome in server logs without financial text. Update the last successful analysis only after accepting a usable response. Provider token usage continues to track returned usage metadata.
+
 ## Provider-neutral AI wording (#304)
 
 - The app uses «الذكاء الاصطناعي» and “AI” in user-facing screens, plan descriptions and errors. The admin model picker displays readable model labels while preserving the original identifiers used for configuration and monitoring.

@@ -2,7 +2,7 @@ import { followInternalLink } from '../../utils/navigationHistory';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, Megaphone, RefreshCw } from 'lucide-react';
 import type { Language } from '../../types';
-import type { MyOfferAd } from '../../data/offerAds';
+import { OFFER_EDIT_REQUEST_LIMIT, type MyOfferAd } from '../../data/offerAds';
 import { offerAdsRequest } from '../../services/offerAdsClient';
 
 export function MyOfferAdsPage({ uid, canEdit, lang, onBack, onNavigate }: { uid: string; canEdit: boolean; lang: Language; onBack: () => void; onNavigate: (path: string) => void }) {
@@ -27,7 +27,7 @@ export function MyOfferAdsPage({ uid, canEdit, lang, onBack, onNavigate }: { uid
       offerAdsRequest<MyOfferAd[]>('ads.mine', {}, true)
         .then(items => {
           if (!active) return;
-          hasPending = items.some(ad => ad.status === 'pending');
+          hasPending = items.some(ad => ad.status === 'pending' || ad.editRequestStatus === 'pending');
           setResult({ uid, ads: items });
           setNow(Date.now());
         })
@@ -93,6 +93,13 @@ export function MyOfferAdsPage({ uid, canEdit, lang, onBack, onNavigate }: { uid
           : ad.startsAt > now ? (ar ? 'تمت الموافقة — في انتظار موعد النشر' : 'Approved — scheduled')
           : (ar ? 'تمت الموافقة — انتهت مدة النشر' : 'Approved — publication ended');
         const expired = isExpired(ad);
+        const remainingEdits = Math.max(0, OFFER_EDIT_REQUEST_LIMIT - (ad.editRequestsUsed ?? 0));
+        const awaitingEdit = ad.editRequestStatus === 'pending';
+        const formatCount = (value: number) => value.toLocaleString(ar ? 'ar-EG' : 'en');
+        const editStatus = awaitingEdit
+          ? (expired ? (ar ? 'مدة الإعلان انتهت قبل مراجعة التعديل' : 'Ad ended before the edit was reviewed') : (ar ? 'طلب التعديل قيد المراجعة' : 'Edit request under review'))
+          : ad.editRequestStatus === 'approved' ? (ar ? 'تم قبول آخر تعديل' : 'Last edit approved')
+          : ad.editRequestStatus === 'rejected' ? (ar ? 'تم رفض آخر تعديل' : 'Last edit rejected') : '';
         const deleteAfter = ad.deleteAfter ?? ad.endsAt + 10 * 86400000;
         const badge = ad.status === 'rejected' ? 'bg-red-100 text-red-900' : ad.status === 'pending' ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-900';
         return <div key={ad.id} className="space-y-3">
@@ -116,6 +123,11 @@ export function MyOfferAdsPage({ uid, canEdit, lang, onBack, onNavigate }: { uid
               {ar ? 'تصحيح الإعلان' : 'Correct ad'}
             </a>
           </div>}
+          {!canEdit && (published || editStatus) && <div className="space-y-1 text-xs">
+            {published && <p>{ar ? 'طلبات التعديل المتبقية' : 'Edit requests remaining'} · {formatCount(remainingEdits)} / {formatCount(OFFER_EDIT_REQUEST_LIMIT)}</p>}
+            {editStatus && <p className="font-bold">{editStatus}</p>}
+            {ad.editRejectionReason && <p className="whitespace-pre-wrap break-words">{ad.editRejectionReason}</p>}
+          </div>}
           {canEdit && ad.status !== 'deleting' && <a href={`/offers/new?edit=${ad.id}`} onClick={event => followInternalLink(event, onNavigate)} className="inline-flex min-h-11 items-center rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white">{ar ? 'تعديل الإعلان' : 'Edit ad'}</a>}
           {(ad.status === 'approved' || ad.status === 'deleting') && <div className="space-y-1">
             {expired && <p className={`text-xs font-semibold ${deleteAfter - now < 2 * 86400000 ? 'text-amber-800 dark:text-amber-300' : 'text-slate-600 dark:text-slate-300'}`}>
@@ -128,6 +140,10 @@ export function MyOfferAdsPage({ uid, canEdit, lang, onBack, onNavigate }: { uid
                 <button type="button" disabled={deleting} onClick={() => setConfirmDelete(null)} className="min-h-11 px-3 text-sm font-bold">{ar ? 'إلغاء' : 'Cancel'}</button>
               </div>
             </div> : <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {!canEdit && published && remainingEdits > 0 && !awaitingEdit && <a href={`/offers/new?edit=${ad.id}`}
+                onClick={event => followInternalLink(event, onNavigate)} className="inline-flex min-h-11 items-center rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white">
+                {ar ? 'طلب تعديل' : 'Request an edit'}
+              </a>}
               {published && <a href={`/offers/ad/${ad.id}`} onClick={event => followInternalLink(event, onNavigate)} className="inline-flex min-h-11 items-center text-sm font-bold text-emerald-800 underline dark:text-emerald-300">{ar ? 'شوف الإعلان المنشور' : 'View published ad'}</a>}
               {expired && <a href={`/offers/new?renew=${ad.id}`} onClick={event => followInternalLink(event, onNavigate)} className="inline-flex min-h-11 items-center rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white">{ar ? 'إعادة الإرسال للمراجعة' : 'Resubmit for review'}</a>}
               <button type="button" disabled={deleting} onClick={() => { setConfirmDelete(ad.id); setDeleteError(false); }} className="min-h-11 px-2 text-sm font-bold text-red-700 dark:text-red-300">{ar ? 'حذف الإعلان' : 'Delete ad'}</button>

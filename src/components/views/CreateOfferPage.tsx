@@ -3,7 +3,7 @@ import { AD_NO_LINKS_AR, AD_NO_LINKS_EN, adContactError, adVideoLimit, containsE
 import { type PaidAdPrices, type AdPriceLock, type LegacyAdTransfer } from '../../utils/adCheckout';
 import { AdPricingPage } from './FeaturedAdInfoPage';
 import { followInternalLink } from '../../utils/navigationHistory';
-import { DEFAULT_FREE_OFFER_POLICY, type FreeOfferEligibility, type FreeOfferPolicy, type OfferTier, type PublicOfferAd } from '../../data/offerAds';
+import { DEFAULT_FREE_OFFER_POLICY, OFFER_CATEGORY_LABELS, type FreeOfferEligibility, type FreeOfferPolicy, type OfferTier, type PublicOfferAd } from '../../data/offerAds';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, ArrowLeft, ImagePlus, Megaphone, CheckCircle2, LoaderCircle, Video, X } from 'lucide-react';
 import type { Language } from '../../types';
@@ -23,23 +23,9 @@ const mediaAccept = {
   video: 'video/mp4,video/webm,video/quicktime',
 };
 
-const categories = [
-  { id: 'banks-finance', ar: 'البنوك والمؤسسات المالية', en: 'Banks & Financial Services' },
-  { id: 'restaurants-cafes-outings', ar: 'المطاعم والكافيهات والخروجات', en: 'Restaurants, Cafes & Outings' },
-  { id: 'food-beverages', ar: 'الأطعمة والمشروبات', en: 'Food & Beverages' },
-  { id: 'fashion', ar: 'الملابس والأحذية والإكسسوارات', en: 'Fashion & Accessories' },
-  { id: 'travel-events', ar: 'الرحلات والفعاليات', en: 'Travel & Events' },
-  { id: 'sports-fitness', ar: 'الجيم والرياضة', en: 'Sports & Fitness' },
-  { id: 'cars-transport', ar: 'السيارات والمواصلات', en: 'Cars & Transport' },
-  { id: 'health-beauty', ar: 'الصحة والجمال', en: 'Health & Beauty' },
-  { id: 'home-shopping', ar: 'المنزل والتسوق', en: 'Home & Shopping' },
-  { id: 'education-services', ar: 'التعليم والخدمات', en: 'Education & Services' },
-  { id: 'technology', ar: 'الإلكترونيات والتكنولوجيا', en: 'Electronics & Technology' },
-] as const;
+interface Props { lang: Language; canEditDirectly?: boolean; onBack: () => void; onNavigate: (path: string) => void }
 
-interface Props { lang: Language; onBack: () => void; onNavigate: (path: string) => void }
-
-export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
+export function CreateOfferPage({ lang, canEditDirectly = false, onBack, onNavigate }: Props) {
   const ar = lang === 'ar';
   const [prices, setPrices] = useState<PaidAdPrices | null>(null);
   const [priceFailure, setPriceFailure] = useState(false);
@@ -72,6 +58,16 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   }, [invoiceId]);
   const query = new URLSearchParams(window.location.search);
   const editId = window.location.pathname === '/offers/new' ? query.get('edit') : null;
+  const requestingEdit = Boolean(editId && !canEditDirectly);
+  const editAction = canEditDirectly ? 'admin.ads.edit' : 'ads.edit';
+  const editErrors: Record<string, string> = {
+    ad_edit_request_pending: ar ? 'عندك طلب تعديل قيد المراجعة لنفس الإعلان.' : 'An edit request for this ad is awaiting review.',
+    ad_edit_request_limit: ar ? 'استخدمت طلبي التعديل المتاحين لهذا الإعلان.' : 'You have used both edit requests for this ad.',
+    ad_edit_unavailable: ar ? 'الإعلان غير متاح للتعديل حاليًا.' : 'This ad is no longer available for editing.',
+    ad_edit_conflict: ar ? 'الإعلان اتعدل من صفحة تانية. ارجع لإعلاناتي وافتحه من جديد.' : 'This ad was edited elsewhere. Reopen it from My ads.',
+    ad_upload_daily_limit: ar ? 'استخدمت محاولات رفع الملفات المتاحة النهارده. تقدر تحاول بعد منتصف الليل بتوقيت القاهرة.' : 'You have used your media upload attempts for today. Try again after midnight Cairo time.',
+  };
+  const [editLoadError, setEditLoadError] = useState('');
   const renewId = editId ? null : query.get('renew');
   const correctionId = query.get('correction') === '1' ? renewId : null;
   const [tier, setTier] = useState<OfferTier | null>(correctionId ? 'free' : null);
@@ -150,7 +146,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
   useEffect(() => {
     if (!renewId && !editId) return;
     let active = true;
-    offerAdsRequest<PublicOfferAd & { editRevision?: string }>(editId ? 'admin.ads.edit.read' : 'ads.renewal',
+    offerAdsRequest<PublicOfferAd & { editRevision?: string }>(editId ? `${editAction}.read` : 'ads.renewal',
       { id: editId ?? renewId, ...(correctionId && { correction: true }) }, true)
       .then(ad => {
         if (!active) return;
@@ -169,9 +165,13 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
         setReusedMedia(ad.media);
         setRenewState('ready');
       })
-      .catch(() => { if (active) setRenewState('error'); });
+      .catch(error => {
+        if (!active) return;
+        if (editId && error instanceof Error) setEditLoadError(error.message);
+        setRenewState('error');
+      });
     return () => { active = false; };
-  }, [renewId, correctionId, editId]);
+  }, [renewId, correctionId, editId, editAction]);
   const [image, setImage] = useState<File | null>(null);
   const [imageStatus, setImageStatus] = useState<'idle' | 'compressing' | 'ready' | 'error'>('idle');
   const [videoProgress, setVideoProgress] = useState<number | 'checking' | null>(null);
@@ -299,7 +299,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
         ...(isPaid ? adContacts : { contact }) };
       let operationId = editUpload.current?.id ?? crypto.randomUUID();
       if (image && !editUpload.current?.media) {
-        const prepared = await offerAdsRequest<{ editId: string; signed: SignedAdUpload }>('admin.ads.edit.prepare',
+        const prepared = await offerAdsRequest<{ editId: string; signed: SignedAdUpload }>(`${editAction}.prepare`,
           { ...fields, resourceType: previewType, bytes: image.size }, true);
         operationId = prepared.editId;
         setSendProgress(0);
@@ -308,15 +308,16 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
       } else if (!image) {
         editUpload.current = { id: operationId };
       }
-      await offerAdsRequest('admin.ads.edit.save', {
+      await offerAdsRequest(`${editAction}.save`, {
         ...fields, ...editUpload.current?.media, editId: operationId,
         mediaAction: image ? 'replace' : removeExistingMedia ? 'remove' : 'keep',
       }, true);
       onBack();
     } catch (error) {
-      setSendError(error instanceof Error && error.message === 'ad_edit_conflict'
-        ? (ar ? 'الإعلان اتعدل من صفحة تانية. ارجع لإعلاناتي وافتحه من جديد.' : 'This ad was edited elsewhere. Reopen it from My ads.')
-        : (ar ? 'تعذّر حفظ التعديل. حاول تاني.' : 'Could not save the changes. Try again.'));
+      const code = error instanceof Error ? error.message : '';
+      setSendError(editErrors[code] ?? (requestingEdit
+        ? (ar ? 'تعذّر إرسال طلب التعديل. حاول تاني.' : 'Could not submit the edit request. Try again.')
+        : (ar ? 'تعذّر حفظ التعديل. حاول تاني.' : 'Could not save the changes. Try again.')));
     } finally {
       sendLock.current = false;
       setSending(false);
@@ -507,7 +508,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
             className={`w-11 h-11 rounded-xl bg-slate-100 hover:bg-slate-200 inline-flex items-center justify-center shrink-0 dark:bg-slate-800 dark:hover:bg-slate-700`}
             aria-label={ar ? 'العودة' : 'Back'}><BackIcon className="w-5 h-5" /></button>
           <div className="min-w-0">
-            <h1 className="font-extrabold text-lg">{preview ? (ar ? 'مراجعة الإعلان' : 'Review advertisement') : editId ? (ar ? 'تعديل الإعلان' : 'Edit ad') : (ar ? 'إنشاء إعلان' : 'Create advertisement')}</h1>
+            <h1 className="font-extrabold text-lg">{preview ? (ar ? 'مراجعة الإعلان' : 'Review advertisement') : requestingEdit ? (ar ? 'طلب تعديل الإعلان' : 'Request an ad edit') : editId ? (ar ? 'تعديل الإعلان' : 'Edit ad') : (ar ? 'إنشاء إعلان' : 'Create advertisement')}</h1>
             <p className={`text-xs text-slate-500 ${formMuted}`}>My Bucket</p>
           </div>
         </div>
@@ -517,7 +518,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
           <section className={`rounded-2xl border border-slate-200 bg-white p-5 ${formSurface}`}>
             <p role={renewState === 'error' ? 'alert' : 'status'}>{renewState === 'loading'
               ? (ar ? 'جاري تحميل بيانات الإعلان...' : 'Loading ad details…')
-              : editId ? (ar ? 'تعذّر فتح الإعلان للتعديل.' : 'Could not open this ad for editing.')
+              : editId ? (editErrors[editLoadError] ?? (ar ? 'تعذّر فتح الإعلان للتعديل.' : 'Could not open this ad for editing.'))
               : (ar ? 'تعذّر فتح الإعلان لإعادة الإرسال. راجع «إعلاناتي» وحاول تاني.' : 'Could not open this ad for resubmission. Check My ads and try again.')}</p>
             {renewState === 'error' && <a className="mt-3 inline-block font-bold text-emerald-800 underline" href="/settings/ads" onClick={event => followInternalLink(event, onNavigate)}>{ar ? 'إعلاناتي' : 'My ads'}</a>}
           </section>
@@ -544,11 +545,12 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
             <div className={`space-y-2 rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800`}>
               <button type="button" onClick={editId ? () => void saveEditedAd() : tier === 'free' ? () => void sendForReview() : goToPayment} disabled={sending || cancellingSend || cancelRequired || sendRecovery === 'changeVideo' || (!editId && tier !== 'free' && !prices)}
                 className="w-full rounded-xl bg-emerald-700 px-3 py-3 text-sm font-extrabold text-white hover:bg-emerald-800 disabled:opacity-50">
-                {editId ? (sending ? (ar ? 'جاري الحفظ...' : 'Saving…') : (ar ? 'حفظ التعديلات' : 'Save changes')) : tier === 'free' ? (sending ? (ar ? 'جاري إرسال الإعلان...' : 'Sending ad…') : (sendRecovery === 'retry' || sendRecovery === 'restartUpload' ? (ar ? 'إعادة المحاولة' : 'Try again') : (ar ? 'إرسال للمراجعة' : 'Send for review'))) : (ar ? 'الانتقال إلى صفحة الدفع' : 'Continue to payment')}
+                {requestingEdit ? (sending ? (ar ? 'جاري إرسال الطلب...' : 'Submitting…') : (ar ? 'إرسال التعديل للمراجعة' : 'Submit edit for review'))
+                  : editId ? (sending ? (ar ? 'جاري الحفظ...' : 'Saving…') : (ar ? 'حفظ التعديلات' : 'Save changes')) : tier === 'free' ? (sending ? (ar ? 'جاري إرسال الإعلان...' : 'Sending ad…') : (sendRecovery === 'retry' || sendRecovery === 'restartUpload' ? (ar ? 'إعادة المحاولة' : 'Try again') : (ar ? 'إرسال للمراجعة' : 'Send for review'))) : (ar ? 'الانتقال إلى صفحة الدفع' : 'Continue to payment')}
               </button>
               {sending && !cancellingSend && <div role="status" className="grid justify-items-center gap-2 py-3 text-sm font-bold text-emerald-900 dark:text-emerald-200">
                 <LoaderCircle className="size-7 motion-safe:animate-spin" aria-hidden="true" />
-                <p>{editId ? (ar ? 'جاري حفظ التعديلات' : 'Saving changes') : (ar ? 'جاري إرسال الإعلان، برجاء الانتظار' : 'Sending your ad. Please wait.')}</p>
+                <p>{requestingEdit ? (ar ? 'جاري إرسال طلب التعديل' : 'Submitting edit request') : editId ? (ar ? 'جاري حفظ التعديلات' : 'Saving changes') : (ar ? 'جاري إرسال الإعلان، برجاء الانتظار' : 'Sending your ad. Please wait.')}</p>
               </div>}
               {sendRecovery === 'changeVideo' && <button type="button" disabled={cancellingSend} onClick={() => void changeInvalidVideo()}
                 className="min-h-11 rounded-xl bg-emerald-100 px-3 text-sm font-bold text-emerald-900">{ar ? 'تغيير الفيديو' : 'Change video'}</button>}
@@ -563,6 +565,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                 <progress max={100} value={sendProgress} aria-label={ar ? 'تقدّم رفع الملف' : 'Media upload progress'} className="block h-2 w-full accent-emerald-700" />
               </div>}
               {sendError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{sendError}</p>}
+              {requestingEdit && <p className={`text-xs text-slate-600 ${formMuted}`}>{ar ? 'هيتحسب طلب من الطلبين المتاحين. الإعلان الحالي يفضل ظاهر لحد ما الإدارة توافق على التعديل، طالما مدة النشر لسه سارية.' : 'This uses one of your two requests. The current ad stays visible while it is active and awaiting approval.'}</p>}
               {!editId && <p className={`text-xs text-slate-600 ${formMuted}`}>{tier === 'free'
                 ? (ar ? 'الإعلان يظهر للجمهور بعد موافقة الإدارة.' : 'Your ad becomes public after the administrator approves it.')
                 : (ar ? 'ادفع عبر إنستا باي وأرسل الإيصال مع الإعلان للمراجعة.' : 'Pay via InstaPay and send the receipt with your ad for review.')}</p>}
@@ -628,7 +631,7 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
               <div><label htmlFor="offer-category" className={label}>{ar ? 'القسم' : 'Category'}</label>
                 <select id="offer-category" required value={category} onChange={event => setCategory(event.target.value)} className={field}>
                   <option value="">{ar ? 'اختر القسم' : 'Choose category'}</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{ar ? c.ar : c.en}</option>)}
+                  {OFFER_CATEGORY_LABELS.map(c => <option key={c.id} value={c.id}>{ar ? c.ar : c.en}</option>)}
                 </select>
               </div>
               <div><label htmlFor="offer-title" className={label}>{ar ? 'عنوان الإعلان' : 'Title'}</label>
@@ -749,7 +752,9 @@ export function CreateOfferPage({ lang, onBack, onNavigate }: Props) {
                   <X className="size-5" aria-hidden="true" />
                 </button>}
               </div>
-              {editId && <p className={`text-xs text-slate-500 ${formMuted}`}>{ar ? 'رفع الملف الجديد يبدأ عند حفظ التعديلات.' : 'New media uploads when you save the changes.'}</p>}
+              {editId && <p className={`text-xs text-slate-500 ${formMuted}`}>{requestingEdit
+                ? (ar ? 'الملف الجديد هيترفع لما تبعت طلب التعديل.' : 'New media uploads when you submit the edit request.')
+                : (ar ? 'رفع الملف الجديد يبدأ عند حفظ التعديلات.' : 'New media uploads when you save the changes.')}</p>}
               {!editId && <p className={`text-xs text-slate-500 ${formMuted}`}>{tier === 'free'
                 ? (ar ? 'صورة واحدة بحد أقصى ٥ ميجابايت. الرفع يبدأ عند الإرسال للمراجعة.' : 'One image up to 5 MB. It uploads when you submit for review.')
                 : ar ? 'الصور حتى ٥ ميجابايت، والفيديو حتى ٢٥ ميجابايت. الملف بيتجهّز على جهازك، والرفع يبدأ عند الإرسال للمراجعة.' : 'Images up to 5 MB. Videos up to 25 MB. Files are prepared on your device and uploaded when you submit for review.'}</p>}

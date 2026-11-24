@@ -1622,7 +1622,7 @@ export default function App() {
   if (creatingOffer) {
     if (!authUser) return <AdSignInGate lang={lang} onBack={backFromCreateOffer} onSignIn={loginWithGoogle} />;
     const editKey = new URLSearchParams(window.location.search).get('edit');
-    return <div key={editKey ?? authUser.uid}><CreateOfferPage lang={lang} onBack={backFromCreateOffer} onNavigate={navigateOffer} /></div>;
+    return <div key={editKey ?? authUser.uid}><CreateOfferPage lang={lang} canEditDirectly={isAdmin} onBack={backFromCreateOffer} onNavigate={navigateOffer} /></div>;
   }
 
   // 2. Dedicated sign-in, with a separate in-memory guest session.

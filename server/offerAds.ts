@@ -6,7 +6,7 @@ import { getAdminFirestore } from './firebaseAdmin.js';
 import { confirmAdminAdTestUpload, deleteAdminAdTestUpload, signAdminAdTestUpload } from './adminAdTestUpload.js';
 import { SubscriptionError } from './subscriptionService.js';
 import { DEMO_ADS } from '../src/data/demoAds.js';
-import { DEFAULT_FREE_OFFER_POLICY, supportsOfferFavorites, type FreeOfferEligibility, type FreeOfferPolicy, type OfferEngagement, type OfferReactionState, OFFER_CATEGORY_IDS, type MyOfferAd, type OfferAdStatus, type PublicOfferAd } from '../src/data/offerAds.js';
+import { DEFAULT_FREE_OFFER_POLICY, supportsOfferFavorites, type FreeOfferEligibility, type FreeOfferPolicy, type OfferEngagement, type OfferReactionState, OFFER_CATEGORY_IDS, OFFER_EDIT_REQUEST_LIMIT, type OfferAdEditReview, type MyOfferAd, type OfferAdStatus, type PublicOfferAd } from '../src/data/offerAds.js';
 
 const DAY = 86400000;
 const MAX_UPLOADS = 3;
@@ -17,6 +17,9 @@ const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{1
 type Payload = Record<string, unknown>;
 type AdFields = Omit<PublicOfferAd, 'id' | 'media' | 'engagement'>;
 type StoredMedia = Pick<Awaited<ReturnType<typeof confirmAdminAdTestUpload>>, 'publicId' | 'resourceType' | 'version' | 'format'>;
+type OfferTextFields = ReturnType<typeof adTextFields>;
+type OfferEditRequest = { id: string; status: 'pending'; submittedAt: number; changes: OfferTextFields; mediaChange?: StoredMedia | null }
+  | { id: string; status: 'approved' | 'rejected'; reason: string };
 type StoredAd = AdFields & {
   viewCount?: number;
   likeCount?: number;
@@ -42,6 +45,8 @@ type StoredAd = AdFields & {
   correctionId?: string;
   correctedBy?: string;
   editRevision?: string;
+  editRequestsUsed?: number;
+  editRequest?: OfferEditRequest;
   editTarget?: string;
   cleanupPublicId?: string;
 };
@@ -243,7 +248,10 @@ export async function readMyOfferAds(uid: string, db = getAdminFirestore()): Pro
     const preview = media && status !== 'deleting' ? mediaView(media, true) : undefined;
     const thumbnailUrl = preview?.type === 'video' ? preview.poster : preview?.url;
     return [{ id: doc.id, title, merchant, thumbnailUrl, tier: offerTier(ad), status, submittedAt, startsAt, endsAt, rejectionReason, deleteAfter,
-      requiresVideoCorrection: !ad.correctedBy && requiresVideoCorrection(ad) }];
+      requiresVideoCorrection: !ad.correctedBy && requiresVideoCorrection(ad),
+      editRequestsUsed: ad.editRequestsUsed ?? 0,
+      ...(ad.editRequest && { editRequestStatus: ad.editRequest.status }),
+      ...(ad.editRequest?.status === 'rejected' && { editRejectionReason: ad.editRequest.reason }) }];
   }).sort((a, b) => b.submittedAt - a.submittedAt);
 }
 
@@ -349,7 +357,8 @@ export async function removeExpiredOffer(uid: string, id: string, db = getAdminF
     const current = (await tx.get(ledger)).data()?.lastApproval ?? 0;
     if (!ad.payment && (ad.reviewedAt ?? 0) > current) tx.set(ledger, { lastApproval: ad.reviewedAt });
     if (ad.status !== 'deleting') tx.update(ref, { status: 'deleting' });
-    return { media: ad.media, receipt: ad.receipt };
+    const proposedMedia = ad.editRequest?.status === 'pending' ? ad.editRequest.mediaChange : null;
+    return { media: ad.media, receipt: ad.receipt, proposedMedia };
   });
   if (!asset) return { removed: true };
   if (asset.media) {
@@ -357,6 +366,7 @@ export async function removeExpiredOffer(uid: string, id: string, db = getAdminF
       publicId: asset.media.publicId, resourceType: asset.media.resourceType,
     }, undefined, undefined, 'submissions');
   }
+  if (asset.proposedMedia) await destroy(uid, asset.proposedMedia, undefined, undefined, 'submissions');
   if (asset.receipt) await destroy(uid, { publicId: asset.receipt.publicId, resourceType: 'image' }, undefined, undefined, 'receipts');
   // Delete the document only after Cloudinary confirms removal. The scheduled job can retry failed removals.
   await db.recursiveDelete(ref);
@@ -417,7 +427,58 @@ export async function purgeExpiredOffers(db = getAdminFirestore()) {
   return { removed: results.length - failed, failed };
 }
 
+function scheduleRetiredAdMedia(tx: FirebaseFirestore.Transaction, db: ReturnType<typeof getAdminFirestore>, uid: string, media: StoredMedia) {
+  tx.create(db.collection('offerAds').doc(), {
+    ownerId: uid, status: 'cancelled', mediaType: media.resourceType,
+    cleanupPublicId: media.publicId, uploadCleanupAt: Date.now() + DAY,
+  });
+}
+
+export async function reviewOfferAdEdits(action: string, payload: Payload, db = getAdminFirestore()) {
+  const ads = db.collection('offerAds');
+  if (action === 'admin.ads.editRequests.list') {
+    const result = await ads.where('editRequest.status', '==', 'pending').get();
+    const reviews: OfferAdEditReview[] = [];
+    for (const doc of result.docs) {
+      const ad = doc.data() as StoredAd;
+      const request = ad.editRequest;
+      if (request?.status !== 'pending' || !isPublicOffer(ad, Date.now())) continue;
+      reviews.push({
+        original: offerView(doc.id, ad),
+        proposed: offerView(doc.id, { ...ad, ...request.changes, media: request.mediaChange === undefined ? ad.media : request.mediaChange }),
+        requestId: request.id, submittedAt: request.submittedAt,
+      });
+    }
+    return reviews.sort((a, b) => a.submittedAt - b.submittedAt);
+  }
+  const ref = ads.doc(adId(payload.id));
+  const requestId = adId(payload.requestId);
+  const status = payload.status;
+  if (status !== 'approved' && status !== 'rejected') return fail('invalid_ad_status');
+  const reason = status === 'rejected' ? field(payload.reason ?? '', 500, false) : '';
+  return db.runTransaction(async tx => {
+    const ad = (await tx.get(ref)).data() as StoredAd | undefined;
+    const request = ad?.editRequest;
+    if (!ad || !request || request.id !== requestId) return fail('ad_edit_request_unavailable', 409);
+    if (request.status === status) return { status };
+    if (request.status !== 'pending' || !isPublicOffer(ad, Date.now())) return fail('ad_edit_request_unavailable', 409);
+    const retired = status === 'approved' && request.mediaChange !== undefined ? ad.media
+      : status === 'rejected' ? request.mediaChange : null;
+    if (retired) scheduleRetiredAdMedia(tx, db, ad.ownerId, retired);
+    tx.update(ref, {
+      editRequest: { id: requestId, status, reason },
+      ...(status === 'approved' && {
+        ...request.changes, editRevision: requestId,
+        ...(request.mediaChange !== undefined && { media: request.mediaChange, mediaType: request.mediaChange?.resourceType ?? null }),
+      }),
+    });
+    return { status };
+  });
+}
+
 export async function editOwnOfferAd(action: string, uid: string, payload: Payload, db = getAdminFirestore(), confirmUpload = confirmAdminAdTestUpload) {
+  const direct = action.startsWith('admin.ads.edit.');
+  const operation = action.split('.').at(-1);
   const ads = db.collection('offerAds');
   const ref = ads.doc(adId(payload.id));
   const editable = (snapshot: FirebaseFirestore.DocumentSnapshot) => {
@@ -425,10 +486,17 @@ export async function editOwnOfferAd(action: string, uid: string, payload: Paylo
     if (!ad || ad.ownerId !== uid || (ad.status !== 'pending' && ad.status !== 'approved' && ad.status !== 'rejected')) {
       return fail('ad_edit_unavailable', 404);
     }
+    if (!direct && !isPublicOffer(ad, Date.now())) return fail('ad_edit_unavailable', 404);
     return ad;
   };
-  if (action === 'admin.ads.edit.read') {
+  const checkRequest = (ad: StoredAd) => {
+    if (direct) return;
+    if (ad.editRequest?.status === 'pending') fail('ad_edit_request_pending', 409);
+    if ((ad.editRequestsUsed ?? 0) >= OFFER_EDIT_REQUEST_LIMIT) fail('ad_edit_request_limit', 409);
+  };
+  if (operation === 'read') {
     const ad = editable(await ref.get());
+    checkRequest(ad);
     return { ...offerView(ref.id, ad), editRevision: ad.editRevision ?? '' };
   }
   const getChanges = (ad: StoredAd) => {
@@ -445,9 +513,10 @@ export async function editOwnOfferAd(action: string, uid: string, payload: Paylo
   const checkRevision = (ad: StoredAd) => {
     if ((ad.editRevision ?? '') !== payload.editRevision) return fail('ad_edit_conflict', 409);
   };
-  if (action === 'admin.ads.edit.prepare') {
+  if (operation === 'prepare') {
     return db.runTransaction(async tx => {
       const ad = editable(await tx.get(ref));
+      checkRequest(ad);
       checkRevision(ad);
       getChanges(ad);
       const mediaType = payload.resourceType;
@@ -456,16 +525,27 @@ export async function editOwnOfferAd(action: string, uid: string, payload: Paylo
       const operationId = randomUUID();
       const now = Date.now();
       const signed = signAdminAdTestUpload(uid, payload, undefined, now, operationId, 'submissions');
-      tx.create(ads.doc(operationId), { ownerId: uid, status: 'cancelled', editTarget: ref.id, mediaType, uploadCleanupAt: now + DAY });
+      if (!direct) {
+        const usage = uploadUsage(db, cairoDay.format(now)).doc(uid);
+        const issued = (await tx.get(usage)).data()?.issued ?? 0;
+        if (issued >= MAX_UPLOADS) return fail('ad_upload_daily_limit', 429);
+        tx.set(usage, { issued: issued + 1, limit: MAX_UPLOADS }, { merge: true });
+      }
+      tx.create(ads.doc(operationId), {
+        ownerId: uid, status: 'cancelled', editTarget: ref.id, mediaType, uploadCleanupAt: now + DAY,
+        ...(!direct && { uploadDay: cairoDay.format(now) }),
+      });
       return { editId: operationId, signed };
     });
   }
-  if (action !== 'admin.ads.edit.save') return fail('ad_edit_unavailable', 404);
+  if (operation !== 'save') return fail('ad_edit_unavailable', 404);
   const operationId = adId(payload.editId);
   if (operationId === ref.id) return fail('invalid_ad_id');
   const upload = ads.doc(operationId);
   const ad = editable(await ref.get());
-  if (ad.editRevision === operationId) return { saved: true };
+  const alreadySaved = (ad: StoredAd) => direct ? ad.editRevision === operationId : ad.editRequest?.id === operationId;
+  if (alreadySaved(ad)) return { saved: true };
+  checkRequest(ad);
   checkRevision(ad);
   const changes = getChanges(ad);
   const replace = payload.mediaAction === 'replace';
@@ -478,27 +558,37 @@ export async function editOwnOfferAd(action: string, uid: string, payload: Paylo
     return staged;
   };
   let media: StoredMedia | null = null;
+  let verifiedBytes = 0;
   if (replace) {
     activeReplacement(await upload.get());
-    const { publicId, resourceType, version, format } = await confirmUpload(uid, payload, undefined, undefined, 'submissions', adVideoLimit(offerTier(ad)));
+    const { publicId, resourceType, version, format, bytes } = await confirmUpload(uid, payload, undefined, undefined, 'submissions', adVideoLimit(offerTier(ad)));
     media = { publicId, resourceType, version, format };
+    verifiedBytes = bytes;
   }
-  const cleanup = ads.doc();
   await db.runTransaction(async tx => {
     const current = editable(await tx.get(ref));
-    if (current.editRevision === operationId) return;
+    if (alreadySaved(current)) return;
+    checkRequest(current);
     checkRevision(current);
     if (replace) {
-      activeReplacement(await tx.get(upload));
+      const staged = activeReplacement(await tx.get(upload));
+      if (staged.uploadDay) {
+        const usage = uploadUsage(db, staged.uploadDay).doc(uid);
+        const stats = (await tx.get(usage)).data();
+        tx.set(usage, { verified: (stats?.verified ?? 0) + 1, bytes: (stats?.bytes ?? 0) + verifiedBytes }, { merge: true });
+      }
       tx.delete(upload);
     }
     const changingMedia = payload.mediaAction !== 'keep';
-    if (changingMedia && current.media) {
-      tx.create(cleanup, {
-        ownerId: uid, status: 'cancelled', mediaType: current.media.resourceType,
-        cleanupPublicId: current.media.publicId, uploadCleanupAt: Date.now() + DAY,
-      });
+    if (!direct) {
+      const editRequest: OfferEditRequest = {
+        id: operationId, status: 'pending', submittedAt: Date.now(), changes,
+        ...(changingMedia && { mediaChange: media }),
+      };
+      tx.update(ref, { editRequest, editRequestsUsed: (current.editRequestsUsed ?? 0) + 1 });
+      return;
     }
+    if (changingMedia && current.media) scheduleRetiredAdMedia(tx, db, uid, current.media);
     tx.update(ref, {
       ...changes, editRevision: operationId,
       ...(changingMedia && { media, mediaType: media?.resourceType ?? null }),

@@ -1,11 +1,21 @@
 import type { AdContactDetails } from '../utils/adContent';
 import type { LegacyAdTransfer } from '../utils/adCheckout';
 
-export const OFFER_CATEGORY_IDS = [
-  'banks-finance', 'restaurants-cafes-outings', 'food-beverages', 'fashion',
-  'travel-events', 'sports-fitness', 'cars-transport', 'health-beauty',
-  'home-shopping', 'education-services', 'technology',
+export const OFFER_CATEGORY_LABELS = [
+  { id: 'banks-finance', ar: 'البنوك والمؤسسات المالية', en: 'Banks & Financial Services' },
+  { id: 'restaurants-cafes-outings', ar: 'المطاعم والكافيهات والخروجات', en: 'Restaurants, Cafes & Outings' },
+  { id: 'food-beverages', ar: 'الأطعمة والمشروبات', en: 'Food & Beverages' },
+  { id: 'fashion', ar: 'الملابس والأحذية والإكسسوارات', en: 'Fashion & Accessories' },
+  { id: 'travel-events', ar: 'الرحلات والفعاليات', en: 'Travel & Events' },
+  { id: 'sports-fitness', ar: 'الجيم والرياضة', en: 'Sports & Fitness' },
+  { id: 'cars-transport', ar: 'السيارات والمواصلات', en: 'Cars & Transport' },
+  { id: 'health-beauty', ar: 'الصحة والجمال', en: 'Health & Beauty' },
+  { id: 'home-shopping', ar: 'المنزل والتسوق', en: 'Home & Shopping' },
+  { id: 'education-services', ar: 'التعليم والخدمات', en: 'Education & Services' },
+  { id: 'technology', ar: 'الإلكترونيات والتكنولوجيا', en: 'Electronics & Technology' },
 ] as const;
+
+export const OFFER_CATEGORY_IDS = OFFER_CATEGORY_LABELS.map(category => category.id);
 
 export type OfferTier = 'free' | 'featured' | 'vip';
 
@@ -59,4 +69,15 @@ export type ReviewOfferAd = PublicOfferAd & {
   payment?: { amountEgp: number; dailyPriceEgp?: number; phone: string; receiptUrl?: string };
 };
 
-export type MyOfferAd = Pick<ReviewOfferAd, 'id' | 'title' | 'merchant' | 'tier' | 'status' | 'submittedAt' | 'startsAt' | 'endsAt' | 'rejectionReason' | 'requiresVideoCorrection'> & { deleteAfter: number | null; thumbnailUrl?: string };
+export const OFFER_EDIT_REQUEST_LIMIT = 2;
+
+export type OfferAdEditReview = {
+  original: PublicOfferAd;
+  proposed: PublicOfferAd;
+  requestId: string;
+  submittedAt: number;
+};
+
+export type MyOfferAd = Pick<ReviewOfferAd, 'id' | 'title' | 'merchant' | 'tier' | 'status' | 'submittedAt' | 'startsAt' | 'endsAt' | 'rejectionReason' | 'requiresVideoCorrection'> & { deleteAfter: number | null; thumbnailUrl?: string; editRequestsUsed?: number;
+  editRequestStatus?: 'pending' | 'approved' | 'rejected';
+  editRejectionReason?: string };

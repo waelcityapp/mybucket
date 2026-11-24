@@ -1,5 +1,11 @@
 # MyBucket — Master Implementation Plan
 
+## Advertiser edit requests (#300)
+
+- A signed-in advertiser can submit two edit requests per live ad. A rejected request still counts. One request can await review at a time.
+- The live version remains public through the original end date until the administrator approves the proposal. Approval applies editable text and media to the same ad and preserves its tier, payment, schedule, engagement and VIP push record.
+- The administrator retains unlimited direct edits on their own ads.
+
 ## Edit own ads from My ads (#299)
 
 - The administrator can edit submitted ads belonging to their signed-in account while they are available in My ads. The existing ad form loads the current content and lets the administrator keep, replace, or remove media.

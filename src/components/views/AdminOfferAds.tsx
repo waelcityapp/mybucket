@@ -1,6 +1,6 @@
 import { cairoAdTransferTime, normalizeAdTransferReference, isPaidAdPrice, MAX_AD_DAILY_PRICE_EGP, type PaidAdPrices } from '../../utils/adCheckout';
 import { useEffect, useState } from 'react';
-import type { FreeOfferPolicy, OfferAdStatus, ReviewOfferAd, VipPushCampaign } from '../../data/offerAds';
+import { OFFER_CATEGORY_LABELS, type FreeOfferPolicy, type OfferAdEditReview, type OfferAdStatus, type ReviewOfferAd, type VipPushCampaign } from '../../data/offerAds';
 import { offerAdsRequest } from '../../services/offerAdsClient';
 import type { Language } from '../../types';
 import { AdCreativeCard } from '../AdCreativeCard';
@@ -23,6 +23,103 @@ function readHiddenAds(): Set<string> {
   } catch {
     return new Set();
   }
+}
+
+function AdEditRequests({ lang }: { lang: Language }) {
+  const ar = lang === 'ar';
+  const [requests, setRequests] = useState<OfferAdEditReview[] | null>(null);
+  const [refresh, setRefresh] = useState(0);
+  const [decision, setDecision] = useState<{ requestId: string; status: 'approved' | 'rejected' } | null>(null);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [message, setMessage] = useState<{ error: boolean; text: string } | null>(null);
+  useEffect(() => {
+    let active = true;
+    setLoadError(false);
+    offerAdsRequest<OfferAdEditReview[]>('admin.ads.editRequests.list', {}, true)
+      .then(result => { if (active) setRequests(result); })
+      .catch(() => { if (active) setLoadError(true); });
+    return () => { active = false; };
+  }, [refresh]);
+
+  const review = async (request: OfferAdEditReview) => {
+    if (!decision || decision.requestId !== request.requestId || busy) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await offerAdsRequest('admin.ads.editRequests.review', { id: request.original.id, ...decision, reason }, true);
+      setRequests(items => items?.filter(item => item.requestId !== request.requestId) ?? []);
+      setDecision(null);
+      setMessage({ error: false, text: decision.status === 'approved'
+        ? (ar ? 'تم قبول التعديل وتحديث الإعلان المنشور.' : 'Edit approved and applied to the published ad.')
+        : (ar ? 'تم رفض التعديل. النسخة المنشورة كما هي.' : 'Edit rejected. The published version is unchanged.') });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'ad_edit_request_unavailable') {
+        setDecision(null);
+        setRefresh(value => value + 1);
+        setMessage({ error: true, text: ar ? 'طلب التعديل لم يعد متاحًا للمراجعة.' : 'This edit request is no longer available.' });
+      } else {
+        setMessage({ error: true, text: ar ? 'تعذّر حفظ القرار. حاول تاني.' : 'Could not save the decision. Try again.' });
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const control = 'min-h-11 rounded-xl px-3 text-sm font-bold disabled:opacity-50';
+  return <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <h2 className="font-extrabold">{ar ? 'طلبات تعديل الإعلانات' : 'Ad edit requests'}{requests && ` · ${requests.length.toLocaleString(ar ? 'ar-EG' : 'en')}`}</h2>
+      <button type="button" disabled={busy} onClick={() => setRefresh(value => value + 1)}
+        className={`${control} text-emerald-800 underline dark:text-emerald-300`}>{ar ? 'تحديث' : 'Refresh'}</button>
+    </div>
+    {loadError && <p role="alert" className="text-sm text-rose-700 dark:text-rose-300">{ar ? 'تعذّر تحميل طلبات التعديل.' : 'Could not load edit requests.'}</p>}
+    {!loadError && !requests && <p role="status" className="text-sm">{ar ? 'جاري تحميل الطلبات...' : 'Loading requests…'}</p>}
+    {!loadError && requests?.length === 0 && <p className="text-sm">{ar ? 'مفيش طلبات تعديل قيد المراجعة.' : 'No edit requests awaiting review.'}</p>}
+    {message && <p role={message.error ? 'alert' : 'status'} className={message.error ? 'text-sm text-rose-700 dark:text-rose-300' : 'text-sm'}>{message.text}</p>}
+    {requests?.map(request => <article key={request.requestId} className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+      <p className="text-xs font-bold">{request.original.tier === 'vip' ? 'VIP' : request.original.tier === 'featured'
+        ? (ar ? 'مميز' : 'Featured') : (ar ? 'مجاني' : 'Free')} · {new Date(request.submittedAt).toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: 'Africa/Cairo' })}</p>
+      <div className="grid gap-3 lg:grid-cols-2">
+        {[request.original, request.proposed].map((ad, index) => {
+          const category = OFFER_CATEGORY_LABELS.find(item => item.id === ad.categorySlug);
+          return <div key={index} className="min-w-0 space-y-2">
+            <h3 className="text-sm font-bold">{index === 0 ? (ar ? 'النسخة المنشورة' : 'Published version') : (ar ? 'التعديل المقترح' : 'Proposed changes')}</h3>
+            <div className="text-slate-900">
+              <AdCreativeCard lang={lang} title={ad.title} description={ad.description} merchant={ad.merchant} contact={ad.contact}
+                mediaUrl={ad.media?.url} mediaType={ad.media?.type} poster={ad.media?.poster} />
+            </div>
+            <dl className="space-y-1 text-xs">
+              <div><dt className="inline font-bold">{ar ? 'القسم' : 'Category'} </dt><dd className="inline">{category ? (ar ? category.ar : category.en) : ad.categorySlug}</dd></div>
+              {[[ar ? 'الاتصال' : 'Phone', ad.callPhone], ['WhatsApp', ad.whatsappPhone], ['Google Maps', ad.mapsUrl]].map(([label, value]) =>
+                value && <div key={label}><dt className="inline font-bold">{label} </dt><dd className="inline break-all"><bdi>{value}</bdi></dd></div>)}
+            </dl>
+          </div>;
+        })}
+      </div>
+      {decision?.requestId === request.requestId ? <div className="space-y-2">
+        {decision.status === 'rejected' && <label className="grid gap-1 text-xs font-bold">
+          {ar ? 'سبب الرفض (اختياري)' : 'Rejection reason (optional)'}
+          <textarea value={reason} onChange={event => setReason(event.target.value)} maxLength={500} rows={2}
+            className="rounded-xl border border-slate-300 bg-white p-2 dark:border-slate-700 dark:bg-slate-800" />
+        </label>}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" disabled={busy || loadError} onClick={() => void review(request)}
+            className={`${control} ${decision.status === 'approved' ? 'bg-emerald-700' : 'bg-rose-700'} text-white`}>
+            {decision.status === 'approved' ? (ar ? 'تأكيد ونشر التعديل' : 'Confirm and publish edit') : (ar ? 'تأكيد الرفض' : 'Confirm rejection')}
+          </button>
+          <button type="button" disabled={busy} onClick={() => setDecision(null)} className={control}>{ar ? 'إلغاء' : 'Cancel'}</button>
+        </div>
+      </div> : <div className="flex flex-wrap gap-2">
+        {(['approved', 'rejected'] as const).map(status => <button type="button" key={status} disabled={busy || loadError}
+          onClick={() => { setReason(''); setDecision({ requestId: request.requestId, status }); }}
+          className={`${control} ${status === 'approved' ? 'bg-emerald-700 text-white' : 'text-rose-700 dark:text-rose-300'}`}>
+          {status === 'approved' ? (ar ? 'قبول التعديل' : 'Approve edit') : (ar ? 'رفض التعديل' : 'Reject edit')}
+        </button>)}
+      </div>}
+    </article>)}
+  </section>;
 }
 
 export function AdminOfferAds({ lang }: { lang: Language }) {
@@ -224,6 +321,7 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
   };
 
   return <div className="space-y-4">
+    <AdEditRequests lang={lang} />
     <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-extrabold">{ar ? 'رفع ملفات الإعلانات اليوم بتوقيت القاهرة' : 'Ad media uploads today, Cairo time'}</h2>

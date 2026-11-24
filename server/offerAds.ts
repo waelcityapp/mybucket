@@ -525,15 +525,16 @@ export async function editOwnOfferAd(action: string, uid: string, payload: Paylo
       const operationId = randomUUID();
       const now = Date.now();
       const signed = signAdminAdTestUpload(uid, payload, undefined, now, operationId, 'submissions');
-      if (!direct) {
-        const usage = uploadUsage(db, cairoDay.format(now)).doc(uid);
-        const issued = (await tx.get(usage)).data()?.issued ?? 0;
-        if (issued >= MAX_UPLOADS) return fail('ad_upload_daily_limit', 429);
-        tx.set(usage, { issued: issued + 1, limit: MAX_UPLOADS }, { merge: true });
-      }
+      const uploadDay = cairoDay.format(now);
+      const usage = uploadUsage(db, uploadDay).doc(uid);
+      const stats = (await tx.get(usage)).data();
+      const issued = stats?.issued ?? 0;
+      if (!direct && issued >= MAX_UPLOADS) return fail('ad_upload_daily_limit', 429);
+      tx.set(usage, direct
+        ? { directEditIssued: (stats?.directEditIssued ?? 0) + 1 }
+        : { issued: issued + 1, limit: MAX_UPLOADS }, { merge: true });
       tx.create(ads.doc(operationId), {
-        ownerId: uid, status: 'cancelled', editTarget: ref.id, mediaType, uploadCleanupAt: now + DAY,
-        ...(!direct && { uploadDay: cairoDay.format(now) }),
+        ownerId: uid, status: 'cancelled', editTarget: ref.id, mediaType, uploadCleanupAt: now + DAY, uploadDay,
       });
       return { editId: operationId, signed };
     });
@@ -888,7 +889,7 @@ export async function reviewOfferAds(action: string, uid: string, payload: Paylo
     const totals = { issued: 0, verified: 0, bytes: 0, cancellations: 0, limitedAccounts: 0 };
     for (const doc of snapshot.docs) {
       const data = doc.data();
-      totals.issued += data.issued ?? 0;
+      totals.issued += (data.issued ?? 0) + (data.directEditIssued ?? 0);
       totals.verified += data.verified ?? 0;
       totals.bytes += data.bytes ?? 0;
       totals.cancellations += data.cancellations ?? 0;

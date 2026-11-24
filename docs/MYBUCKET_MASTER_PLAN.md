@@ -1,5 +1,10 @@
 # MyBucket — Master Implementation Plan
 
+## Ad upload activity (#301)
+
+- The admin summary includes media uploaded during direct administrator edits without charging those edits against the upload allowance. Totals follow the Cairo date when the upload was authorized and include payment receipts.
+- The summary distinguishes requested uploads, verified files, cancellations, and accounts at the daily limit. The upload control shows its current state and prevents new authorizations while paused.
+
 ## Advertiser edit requests (#300)
 
 - A signed-in advertiser can submit two edit requests per live ad. A rejected request still counts. One request can await review at a time.

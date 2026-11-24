@@ -322,33 +322,42 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
 
   return <div className="space-y-4">
     <AdEditRequests lang={lang} />
-    <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+    <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-extrabold">{ar ? 'رفع ملفات الإعلانات اليوم بتوقيت القاهرة' : 'Ad media uploads today, Cairo time'}</h2>
+        <h2 className="font-extrabold">{ar ? 'متابعة رفع ملفات الإعلانات' : 'Ad upload activity'}</h2>
         <button type="button" disabled={statsBusy} onClick={() => setRefresh(value => value + 1)}
-          className="text-xs font-bold text-emerald-800 underline">{ar ? 'تحديث الأرقام' : 'Refresh totals'}</button>
+          className={`${button} text-emerald-800 underline dark:text-emerald-300`}>{ar ? 'تحديث الأرقام' : 'Refresh totals'}</button>
       </div>
-      {statsError && <p role="alert" className="text-sm text-red-700">{ar ? 'تعذّر تحديث بيانات الرفع. حاول تاني.' : 'Could not update upload information. Try again.'}</p>}
-      {!statsError && !uploadStats && <p role="status" className="text-sm text-slate-600">{ar ? 'جاري تحميل ملخص الرفع...' : 'Loading upload summary…'}</p>}
+      {statsError && <p role="alert" className="text-sm text-rose-700 dark:text-rose-300">{ar ? 'تعذّر تحديث بيانات الرفع. اضغط «تحديث الأرقام» للمحاولة تاني.' : 'Could not refresh upload data. Select Refresh totals to retry.'}</p>}
+      {!statsError && !uploadStats && <p role="status" className="text-sm">{ar ? 'جاري تحميل بيانات الرفع...' : 'Loading upload activity…'}</p>}
       {uploadStats && <>
+        <p className="text-xs text-slate-600 dark:text-slate-300">{ar ? 'الأرقام تخص الملفات اللي اتفتح لها إذن رفع النهارده بتوقيت القاهرة، بما فيها إيصالات الدفع.' : 'Counts include ad files and payment receipts authorized for upload today in Cairo time.'}</p>
+        {uploadStats.issued === 0 && !statsError && <p className="text-sm font-semibold">{ar ? 'لسه مفيش ملفات اتفتح لها إذن رفع النهارده.' : 'No uploads have been authorized today.'}</p>}
         <dl className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
           {[
-            [ar ? 'أذونات الرفع' : 'Upload permits', uploadStats.issued],
-            [ar ? 'ملفات مؤكدة' : 'Verified files', uploadStats.verified],
-            [ar ? 'إلغاءات' : 'Cancellations', uploadStats.cancellations],
-            [ar ? 'حسابات استنفدت الحصة' : 'Accounts at limit', uploadStats.limitedAccounts],
-            [ar ? 'حجم الملفات المؤكدة (م.ب)' : 'Verified media (MB)', uploadStats.bytes / 1_000_000],
-          ].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-slate-50 p-2.5">
-            <dt className="text-xs text-slate-600">{label}</dt>
-            <dd className="mt-1 font-extrabold">{new Intl.NumberFormat(ar ? 'ar-EG' : 'en-GB', { maximumFractionDigits: 2 }).format(Number(value))}</dd>
+            [ar ? 'ملفات سُمح برفعها' : 'Files authorized for upload', uploadStats.issued],
+            [ar ? 'ملفات اكتمل رفعها وتأكيدها' : 'Files uploaded and verified', uploadStats.verified],
+            [ar ? 'طلبات رفع ملغاة' : 'Cancelled upload requests', uploadStats.cancellations],
+            [ar ? 'حسابات وصلت لحد الرفع اليومي' : 'Accounts at the daily limit', uploadStats.limitedAccounts],
+            [ar ? 'حجم الملفات المؤكدة (ميجابايت)' : 'Verified files (MB)', uploadStats.bytes / 1_000_000],
+          ].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-slate-50 p-2.5 dark:bg-slate-800">
+            <dt className="text-xs text-slate-600 dark:text-slate-300">{label}</dt>
+            <dd className="mt-1 text-base font-extrabold tabular-nums">{new Intl.NumberFormat(ar ? 'ar-EG-u-nu-latn' : 'en-GB', { maximumFractionDigits: 2 }).format(Number(value))}</dd>
           </div>)}
         </dl>
-        {(uploadStats.issued >= 30 || (uploadStats.issued >= 10 && uploadStats.cancellations * 2 >= uploadStats.issued)) &&
-          <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-900">{ar ? 'نشاط رفع مرتفع اليوم. راجع أعداد الرفع والإلغاء.' : 'High upload activity today. Check upload and cancellation totals.'}</p>}
-        <button type="button" disabled={statsBusy} onClick={() => void setUploadsPaused(!uploadStats.uploadsPaused)}
-          className={`${button} ${uploadStats.uploadsPaused ? 'bg-emerald-700 text-white' : 'bg-rose-50 text-rose-800'}`}>
-          {uploadStats.uploadsPaused ? (ar ? 'استئناف الرفع الجديد' : 'Resume new uploads') : (ar ? 'إيقاف الرفع الجديد مؤقتًا' : 'Pause new uploads')}
-        </button>
+        {!statsError && (uploadStats.issued >= 30 || (uploadStats.issued >= 10 && uploadStats.cancellations * 2 >= uploadStats.issued)) &&
+          <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-900">{ar ? 'نشاط رفع مرتفع اليوم. راجع عدد الملفات والإلغاءات.' : 'High upload activity today. Check file and cancellation totals.'}</p>}
+        <div className="flex flex-wrap items-center gap-2">
+          <p role="status" className="text-sm font-bold">{uploadStats.uploadsPaused
+            ? (ar ? 'رفع ملفات جديدة متوقف مؤقتًا' : 'New uploads are paused')
+            : (ar ? 'رفع ملفات جديدة متاح' : 'New uploads are allowed')}</p>
+          <button type="button" disabled={statsBusy || statsError} onClick={() => void setUploadsPaused(!uploadStats.uploadsPaused)}
+            className={`${button} ${uploadStats.uploadsPaused ? 'bg-emerald-700 text-white' : 'bg-rose-50 text-rose-800'}`}>
+            {statsBusy ? (ar ? 'جاري حفظ الحالة…' : 'Saving status…')
+              : uploadStats.uploadsPaused ? (ar ? 'استئناف الرفع' : 'Resume uploads') : (ar ? 'إيقاف الرفع الجديد مؤقتًا' : 'Pause new uploads')}
+          </button>
+        </div>
+        <p className="text-xs text-slate-600 dark:text-slate-300">{ar ? 'الإيقاف يمنع فتح أذونات رفع جديدة. الإعلانات المنشورة تفضل ظاهرة.' : 'Pausing blocks new upload permissions. Published ads remain visible.'}</p>
       </>}
     </section>
     <form onSubmit={event => { event.preventDefault(); void savePrices(); }}

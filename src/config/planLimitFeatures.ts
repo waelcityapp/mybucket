@@ -1,4 +1,4 @@
-import { aiDisplayText } from '../utils/aiDisplayText';
+import { aiDisplayText } from '../utils/aiDisplayText.js';
 import type { PlanLimits } from './planLimits.js';
 
 export const PLAN_FEATURE_IDS = ['entries', 'inquiries', 'accounts', 'categories', 'openItems', 'reminders', 'exports'] as const;

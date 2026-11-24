@@ -33,6 +33,7 @@ import { VoiceNaturalInput } from './components/VoiceNaturalInput';
 import type { AnalyzerFeedbackContext } from './services/ai/analyzerFeedbackClient';
 import { APP_REVISION } from './config/appRevision';
 import { activeGrant } from './config/grantPolicy';
+import { recordDemoTransaction, startExpenseReturnTracking } from './services/siteVisitsClient';
 import { closePresenceBeforeSignOut, startPresence } from './services/presenceClient';
 import { QuickActions } from './components/QuickActions';
 import { MoneySources } from './components/MoneySources';
@@ -662,7 +663,9 @@ export default function App() {
   // Each visible tab tracks its own connection; disconnects are handled by Firebase.
   useEffect(() => {
     if (!authUser?.uid) return;
-    return startPresence(authUser.uid);
+    const stopPresence = startPresence(authUser.uid);
+    const stopReturnTracking = startExpenseReturnTracking(authUser.uid);
+    return () => { stopReturnTracking(); stopPresence(); };
   }, [authUser?.uid]);
 
   // Record installed-PWA usage only once per signed-in account on this device.
@@ -1024,6 +1027,7 @@ export default function App() {
         : type === 'transfer' && account.id === toAccountId
           ? { ...account, balance: Math.round((account.balance + amount) * 100) / 100 } : account));
       setGuestTransactions(previous => [{ ...newTxData, id: `sim_${crypto.randomUUID()}`, createdAt: new Date().toISOString() }, ...previous]);
+      void recordDemoTransaction();
       setToastMessage(lang === 'ar' ? 'تم تسجيل العملية التجريبية' : 'Sample transaction recorded');
 
       return { ok: true };

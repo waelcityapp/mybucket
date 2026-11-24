@@ -9,6 +9,7 @@ import { getAdminFirestore } from './firebaseAdmin.js';
 import { PUBLISHED_PLAN_LIMITS_PATH, publishedPlanLimits } from './planLimits.js';
 import { isoDate } from './recurrence.js';
 import { getOrCreateSubscription, SubscriptionError } from './subscriptionService.js';
+import { markFirstExpense } from './siteVisits.js';
 import { readTrialSettings } from './trialSettings.js';
 
 const validId = (value: unknown): value is string => typeof value === 'string' && /^[\w-]{1,128}$/.test(value);
@@ -124,6 +125,7 @@ export async function saveFinancialTransaction(uid: string, payload: Record<stri
       checked(() => validateBalance(account, balance));
       return { id, balance };
     });
+    if (entry.type === 'expense') await markFirstExpense(tx, user, day, db);
     for (const update of updates) tx.update(accounts.doc(update.id), { balance: update.balance });
     tx.create(entryRef, {
       ...entry, userId: uid, balanceAccountId: movement.balanceAccountId,

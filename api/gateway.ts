@@ -63,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Public read-only branding is safe before Google sign-in and uses the existing gateway.
     if (req.body?.action === 'siteVisits.record') {
       const { recordSiteVisit } = await import('../server/siteVisits.js');
-      const data = await recordSiteVisit(req.headers.origin, req.headers.host, req.body.payload?.browserId);
+      const data = await recordSiteVisit(req.headers.origin, req.headers.host, req.body.payload?.browserId, undefined, req.body.payload?.demoUsed === true);
       return res.status(200).json({ ok: true, data });
     }
 
@@ -275,6 +275,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'fx.select': {
         const { changeExchangeRateWidget } = await import('../server/exchangeRates.js');
         return res.status(200).json({ ok: true, data: await changeExchangeRateWidget(user.uid, payload) });
+      }
+      case 'siteVisits.return': {
+        if (user.signInProvider !== 'google.com') return res.status(403).json({ ok: false, error: 'google_sign_in_required' });
+        const { recordExpenseReturn } = await import('../server/siteVisits.js');
+        return res.status(200).json({ ok: true, data: await recordExpenseReturn(user.uid) });
       }
       case 'admin.siteVisits.get': {
         if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });

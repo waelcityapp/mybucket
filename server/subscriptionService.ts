@@ -18,7 +18,7 @@ export class SubscriptionError extends Error {
   }
 }
 
-export async function verifyAuthenticatedUser(req: Request): Promise<{ uid: string; email: string | null }> {
+export async function verifyAuthenticatedUser(req: Request): Promise<{ uid: string; email: string | null; signInProvider: string }> {
   const authorization = req.header('authorization') || '';
   const match = authorization.match(/^Bearer\s+(.+)$/i);
   if (!match) {
@@ -61,7 +61,7 @@ export async function verifyAuthenticatedUser(req: Request): Promise<{ uid: stri
 
   try {
     const decoded = await getAdminAuth().verifyIdToken(match[1], true);
-    return { uid: decoded.uid, email: decoded.email_verified === true ? (decoded.email || null) : null };
+    return { uid: decoded.uid, email: decoded.email_verified === true ? (decoded.email || null) : null, signInProvider: decoded.firebase.sign_in_provider };
   } catch {
     throw new SubscriptionError(401, 'invalid_authentication', 'The Firebase ID token is invalid or expired.');
   }

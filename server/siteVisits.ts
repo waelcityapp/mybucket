@@ -10,7 +10,7 @@ function dailyBrowsers(date: string, db: FirebaseFirestore.Firestore) {
 }
 
 export async function recordSiteVisit(
-  origin: unknown, host: unknown, browserId: unknown, db?: FirebaseFirestore.Firestore,
+  origin: unknown, host: unknown, browserId: unknown, db?: FirebaseFirestore.Firestore, demoUsed = false,
 ) {
   const localHost = typeof host === 'string' && /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host);
   if (typeof host !== 'string' || !origin || (origin !== `https://${host}` && !(localHost && origin === `http://${host}`))) {
@@ -22,13 +22,47 @@ export async function recordSiteVisit(
 
   const date = siteVisitDay();
   const key = createHash('sha256').update(`${date}:${browserId}`).digest('hex');
+  const browser = dailyBrowsers(date, db ?? getAdminFirestore()).doc(key);
+  if (demoUsed) {
+    await browser.set({ counted: true, demoUsed: true }, { merge: true });
+    return { date };
+  }
   try {
-    await dailyBrowsers(date, db ?? getAdminFirestore()).doc(key).create({ counted: true });
+    await browser.create({ counted: true });
   } catch (error) {
     // Firestore already created this browser's record today, possibly in another tab.
     if ((error as { code?: number }).code !== 6) throw error;
   }
   return { date };
+}
+
+function expenseActivity(db: FirebaseFirestore.Firestore) {
+  return db.collection('siteExpenseActivity');
+}
+
+function expenseAccount(uid: string, db: FirebaseFirestore.Firestore) {
+  return expenseActivity(db).doc(createHash('sha256').update(uid).digest('hex'));
+}
+
+export async function markFirstExpense(
+  tx: FirebaseFirestore.Transaction, user: FirebaseFirestore.DocumentReference, day: string, db: FirebaseFirestore.Firestore,
+) {
+  const activity = expenseAccount(user.id, db);
+  if ((await tx.get(activity)).exists) return;
+  const pastExpenses = await tx.get(user.collection('transactions').where('type', '==', 'expense').select().limit(1));
+  tx.create(activity, pastExpenses.empty ? { firstExpenseDay: day } : { legacy: true });
+}
+
+export async function recordExpenseReturn(uid: string, db = getAdminFirestore(), now = new Date()) {
+  const date = siteVisitDay(now);
+  const ref = expenseAccount(uid, db);
+  const activity = await ref.get();
+  const firstDay = activity.get('firstExpenseDay');
+  if (typeof firstDay === 'string' && firstDay < date && !activity.get('returnedFromDay')) {
+    await ref.update({ returnedFromDay: firstDay });
+    return { date, finished: true };
+  }
+  return { date, finished: Boolean(activity.get('returnedFromDay')) || activity.get('legacy') === true };
 }
 
 export async function readSiteVisits(date: unknown, db?: FirebaseFirestore.Firestore) {
@@ -39,6 +73,13 @@ export async function readSiteVisits(date: unknown, db?: FirebaseFirestore.Fires
   if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
     throw new SubscriptionError(400, 'invalid_visit_date', 'Invalid visit date.');
   }
-  const snapshot = await dailyBrowsers(date, db ?? getAdminFirestore()).count().get();
-  return { date, visitors: snapshot.data().count };
+  const firestore = db ?? getAdminFirestore();
+  const browsers = dailyBrowsers(date, firestore);
+  const firstExpenses = expenseActivity(firestore).where('firstExpenseDay', '==', date);
+  const [visitors, demoUsers, started, returned] = await Promise.all([
+    browsers.count().get(), browsers.where('demoUsed', '==', true).count().get(),
+    firstExpenses.count().get(), expenseActivity(firestore).where('returnedFromDay', '==', date).count().get(),
+  ]);
+  return { date, visitors: visitors.data().count, demoUsers: demoUsers.data().count,
+    firstExpenseAccounts: started.data().count, returningExpenseAccounts: returned.data().count };
 }

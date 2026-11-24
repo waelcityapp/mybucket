@@ -1,5 +1,11 @@
 # MyBucket — Master Implementation Plan
 
+## Visitor trial and first expense activity (#302)
+
+- Count a browser once per Cairo day when it successfully adds a transaction in the guest demo. Sample data and admin simulations are excluded. The event shares the daily visit record and carries no financial fields.
+- Record the first saved expense atomically with the real expense. Accounts with an expense already on file at their first tracked save are excluded. Record an authenticated return only on a later Cairo date.
+- The admin site-visits card shows the guest trial count and first-expense cohort on the selected date, including how many in that cohort returned at any later date. Refresh is manual. Tracking starts at release and does not reconstruct earlier activity.
+
 ## Ad upload activity (#301)
 
 - The admin summary includes media uploaded during direct administrator edits without charging those edits against the upload allowance. Totals follow the Cairo date when the upload was authorized and include payment receipts.

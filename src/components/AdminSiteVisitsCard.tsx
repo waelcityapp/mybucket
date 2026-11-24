@@ -1,17 +1,15 @@
 import { useEffect, useState } from 'react';
 import { BarChart3, RefreshCw } from 'lucide-react';
-import { fetchSiteVisits } from '../services/siteVisitsClient';
+import { fetchSiteVisits, type SiteVisits } from '../services/siteVisitsClient';
 import type { Language } from '../types';
 import { siteVisitDay } from '../utils/siteVisitDay';
-
-type Visits = { date: string; visitors: number };
 
 export function AdminSiteVisitsCard({ lang }: { lang: Language }) {
   const ar = lang === 'ar';
   const today = siteVisitDay();
   const [date, setDate] = useState(today);
   const [refresh, setRefresh] = useState(0);
-  const [result, setResult] = useState<Visits | null>(null);
+  const [result, setResult] = useState<SiteVisits | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -54,6 +52,16 @@ export function AdminSiteVisitsCard({ lang }: { lang: Language }) {
           {failed ? (ar ? 'تعذّر تحميل العدد. جرّب التحديث.' : 'Could not load the count. Try refreshing.') : (ar ? 'جارٍ تحميل العدد…' : 'Loading visit count…')}
         </span>}
       </div>
+      {result?.date === date && <dl className="grid gap-2 sm:grid-cols-3">
+        {[
+          [ar ? 'متصفحات أضافت عملية في التجربة' : 'Browsers that added a demo transaction', result.demoUsers],
+          [ar ? 'حسابات حفظت أول مصروف في اليوم ده' : 'Accounts that saved their first expense on this date', result.firstExpenseAccounts],
+          [ar ? 'منهم رجعوا في يوم لاحق' : 'Of those accounts, returned on a later day', result.returningExpenseAccounts],
+        ].map(([label, value]) => <div key={label} className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
+          <dt className="text-xs text-slate-600 dark:text-slate-300">{label}</dt>
+          <dd className="text-xl font-bold tabular-nums">{new Intl.NumberFormat(ar ? 'ar-EG' : 'en').format(Number(value))}</dd>
+        </div>)}
+      </dl>}
       <p className="text-sm text-slate-600 dark:text-slate-300">
         {ar ? 'كل متصفح بيتحسب مرة واحدة في اليوم، حتى لو الزائر ما سجّلش الدخول.' : 'Each browser is counted once per day, including visits without sign-in.'}
       </p>

@@ -50,7 +50,7 @@ async function startServer() {
     try {
       if (req.body?.action === 'siteVisits.record') {
         const { recordSiteVisit } = await import('./server/siteVisits.js');
-        const data = await recordSiteVisit(req.headers.origin, req.headers.host, req.body.payload?.browserId);
+        const data = await recordSiteVisit(req.headers.origin, req.headers.host, req.body.payload?.browserId, undefined, req.body.payload?.demoUsed === true);
         return res.status(200).json({ ok: true, data });
       }
 
@@ -244,6 +244,11 @@ async function startServer() {
           const { changeExchangeRateWidget } = await import('./server/exchangeRates');
           return res.json({ ok: true, data: await changeExchangeRateWidget(user.uid, payload) });
         }
+        case 'siteVisits.return': {
+          if (user.signInProvider !== 'google.com') return res.status(403).json({ ok: false, error: 'google_sign_in_required' });
+          const { recordExpenseReturn } = await import('./server/siteVisits.js');
+          return res.json({ ok: true, data: await recordExpenseReturn(user.uid) });
+        }
         case 'admin.siteVisits.get': {
           if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
           const { readSiteVisits } = await import('./server/siteVisits.js');
@@ -295,6 +300,10 @@ async function startServer() {
           if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ok:false,error:'admin_only'});
           const { updateFeedbackStatus } = await import('./server/analyzerFeedback');
           return res.json({ ok:true, data:await updateFeedbackStatus(payload) });
+        }
+        case 'financial.transaction.create': {
+          const { saveFinancialTransaction } = await import('./server/financialTransactions.js');
+          return res.json({ ok: true, data: await saveFinancialTransaction(user.uid, payload) });
         }
         case 'subscription.get': {
           const subscription = await getOrCreateSubscription(user.uid);

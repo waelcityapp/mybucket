@@ -54,7 +54,7 @@ export async function interpretNaturalLanguageWithGemini(
   req: AIInterpretationRequest
 ): Promise<AIInterpretationResult> {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY is not configured on the server');
+  if (!apiKey) throw new Error('gemini_unavailable');
 
   let responseText: string | undefined;
   // Use the exact REST API and working model proven by the admin connection

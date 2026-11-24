@@ -55,7 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { applyAffiliateCode, getOrCreateSubscription, verifyAuthenticatedUser } = await import('../server/subscriptionService.js');
+    const { applyAffiliateCode, getOrCreateSubscription, SubscriptionError, verifyAuthenticatedUser } = await import('../server/subscriptionService.js');
     const authorizationHeader = req.headers.authorization;
     const authorization = Array.isArray(authorizationHeader)
       ? authorizationHeader[0] || ''
@@ -395,7 +395,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ ok: false, error: 'invalid_ai_input', message: 'Missing or invalid text.' });
         }
 
-        const { reserveAiQuota } = await import('../server/aiQuota.js');
+        const { reserveAiQuota, recordGeminiEntryFailure } = await import('../server/aiQuota.js');
         const reservation = await reserveAiQuota(user.uid, text, false, undefined, payload.inquiryRequestId);
 
         const { interpretNaturalLanguageWithGemini } = await import('../server/geminiService.js');
@@ -408,6 +408,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           lang: lang === 'en' ? 'en' : 'ar',
           currentProposal: payload.currentProposal as never,
           learnedMemory: Array.isArray(learnedMemory) ? learnedMemory : [],
+        }).catch(async error => {
+          if (!(error instanceof Error) || error.message !== 'gemini_unavailable') throw error;
+          if (reservation.operation === 'entry') await recordGeminiEntryFailure(user.uid, reservation.day);
+          throw new SubscriptionError(503, 'gemini_unavailable', 'Gemini is temporarily unavailable.');
         });
         if (reservation.operation === 'entry' && result.intent === 'CREATE_TRANSACTION' && result.transaction) {
           const { issueAiEntryTicket } = await import('../server/financialTransactions.js');

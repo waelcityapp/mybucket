@@ -167,7 +167,9 @@ export function VoiceNaturalInput({
       });
       analyzed = true;
       const engineNotice = result.engineUsed === 'local-fallback'
-        ? (isAr ? 'تم استخدام المحلل المحلي لأن Gemini غير متاح أو انتهى حده اليومي.' : 'The local analyzer was used because Gemini was unavailable or its daily limit was reached.')
+        ? (result.geminiFallbackReason === 'limit'
+          ? (isAr ? 'انتهت حصة Gemini اليوم. تم التحليل بالمحلل المحلي.' : 'Gemini’s daily allowance is used up. The local analyzer handled this request.')
+          : (isAr ? 'Gemini غير متاح مؤقتًا. تم التحليل بالمحلل المحلي.' : 'Gemini is temporarily unavailable. The local analyzer handled this request.'))
         : null;
 
       // Handle Result based on classified INTENT

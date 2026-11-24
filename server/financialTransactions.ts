@@ -90,7 +90,7 @@ export async function saveFinancialTransaction(uid: string, payload: Record<stri
       ]);
       const used = attempts.get('proGeminiEntries') ?? 0;
       if (!Number.isSafeInteger(used) || used < 0) return fail('invalid_quota_counter', 503);
-      if (used < proGeminiEntryLimit(technicalLimits, limits.proAiEntries)) {
+      if (attempts.get('geminiEntryUnavailable') !== true && used < proGeminiEntryLimit(technicalLimits, limits.proAiEntries)) {
         return fail(ticketRef ? 'invalid_entry_ticket' : 'pro_ai_allowance_first', 409);
       }
     }

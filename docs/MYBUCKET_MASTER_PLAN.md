@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Pro entry fallback (#303)
+
+- A server-confirmed Gemini failure during entry analysis unlocks that account’s existing Pro additional-entry allowance for the Cairo day. Failed inquiries do not unlock transaction saves. The original quota counters still apply, and the app distinguishes unavailable service from exhausted Gemini attempts.
+
 ## Visitor trial and first expense activity (#302)
 
 - Count a browser once per Cairo day when it successfully adds a transaction in the guest demo. Sample data and admin simulations are excluded. The event shares the daily visit record and carries no financial fields.

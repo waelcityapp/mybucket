@@ -34,41 +34,39 @@ async function reserveLocalQuota(text: string, inquiryRequestId?: string): Promi
 export class GeminiAIClient implements AIInterpretationProvider {
   async interpret(request: AIInterpretationRequest): Promise<AIInterpretationResult> {
     const inquiryRequestId = crypto.randomUUID();
-    try {
-      const payload: AIInterpretationRequest = {
-        ...request,
-        learnedMemory: request.learnedMemory || aiLearnedMemory.getLearnedList().slice(0, 50),
-      };
-
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        throw new Error('Google authentication is required for AI operations');
-      }
-      const idToken = await currentUser.getIdToken();
-
-      const response = await fetch('/api/gateway', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ action: 'ai.interpret', payload: { ...payload, inquiryRequestId } }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server returned status ${response.status}`);
-      }
-
-      const gatewayResponse = await response.json();
-      if (!gatewayResponse?.ok || !gatewayResponse?.data) {
-        throw new Error(gatewayResponse?.message || 'Gateway returned an invalid response');
-      }
-      return { ...this.validateAndSanitize(gatewayResponse.data as AIInterpretationResult, request), engineUsed: 'gemini', entryTicket: gatewayResponse.data.entryTicket };
-    } catch (err) {
-      console.warn('Gemini unavailable; checking local allowance before fallback:', err);
+    const localFallback = async (reason: 'limit' | 'unavailable'): Promise<AIInterpretationResult> => {
       await reserveLocalQuota(request.text, inquiryRequestId);
-      return { ...this.fallbackInterpretation(request), engineUsed: 'local-fallback' };
+      return { ...this.fallbackInterpretation(request), engineUsed: 'local-fallback', geminiFallbackReason: reason };
+    };
+    const payload: AIInterpretationRequest = {
+      ...request,
+      learnedMemory: request.learnedMemory || aiLearnedMemory.getLearnedList().slice(0, 50),
+    };
+
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('Google authentication is required for AI operations');
     }
+    const idToken = await currentUser.getIdToken();
+
+    const response = await fetch('/api/gateway', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ action: 'ai.interpret', payload: { ...payload, inquiryRequestId } }),
+    });
+
+    const gatewayResponse = await response.json();
+    if (gatewayResponse?.error === 'ai_daily_limit_reached') return await localFallback('limit');
+    if (gatewayResponse?.error === 'gemini_unavailable') return await localFallback('unavailable');
+    if (!response.ok) throw new Error(gatewayResponse?.message || `Server returned status ${response.status}`);
+
+    if (!gatewayResponse?.ok || !gatewayResponse?.data) {
+      throw new Error(gatewayResponse?.message || 'Gateway returned an invalid response');
+    }
+    return { ...this.validateAndSanitize(gatewayResponse.data as AIInterpretationResult, request), engineUsed: 'gemini', entryTicket: gatewayResponse.data.entryTicket };
   }
 
   /**

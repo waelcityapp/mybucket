@@ -8,7 +8,7 @@ import { stageFor } from '../config/subscriptionPolicy';
 
 type Bucket = { used: number; limit: number; remaining: number };
 type SavedBucket = { used: number; limit: number | null; remaining: number | null };
-type UsageStatus = { day: string; plan: 'basic' | 'pro' | 'expired'; savedEntries?: Partial<Record<'basic' | 'proAi' | 'proAdditional' | 'geminiAttempts', SavedBucket>>; local?: { entries: Bucket; inquiries: Bucket }; gemini?: { entries: Bucket; inquiries: Bucket } };
+type UsageStatus = { day: string; plan: 'basic' | 'pro' | 'expired'; geminiEntryUnavailable?: boolean; savedEntries?: Partial<Record<'basic' | 'proAi' | 'proAdditional' | 'geminiAttempts', SavedBucket>>; local?: { entries: Bucket; inquiries: Bucket }; gemini?: { entries: Bucket; inquiries: Bucket } };
 
 interface SubscriptionCardProps {
   subscription: UserSubscription | null;
@@ -120,7 +120,7 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
                   const count = usage.savedEntries?.[key];
                   if (!count) return null;
                   const locked = key === 'proAdditional' && count.limit !== null &&
-                    (usage.savedEntries?.geminiAttempts?.remaining ?? 0) > 0;
+                    !usage.geminiEntryUnavailable && (usage.savedEntries?.geminiAttempts?.remaining ?? 0) > 0;
                   return <div key={key} className="flex flex-wrap justify-between gap-x-2">
                     <dt>{label}</dt>
                     <dd className="font-bold">{locked ? (isAr ? 'تتاح بعد انتهاء محاولات Gemini' : 'Unlocks after Gemini attempts are used') : count.limit === null

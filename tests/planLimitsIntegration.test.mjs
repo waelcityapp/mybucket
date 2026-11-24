@@ -8,7 +8,7 @@ import { getAdminFirestore } from '../server/firebaseAdmin.ts';
 import { savePlanLimitsDraft, publishPlanLimits, readPublishedPlanLimits } from '../server/planLimits.ts';
 import { saveFinancialTransaction, issueAiEntryTicket } from '../server/financialTransactions.ts';
 import { saveFinancialCollection } from '../server/financialCollections.ts';
-import { readOwnAiQuota, reserveAiQuota } from '../server/aiQuota.ts';
+import { readOwnAiQuota, recordGeminiEntryFailure, reserveAiQuota } from '../server/aiQuota.ts';
 import { reserveReportExport } from '../server/reportExport.ts';
 import { DEFAULT_PLAN_LIMITS } from '../src/config/planLimits.ts';
 
@@ -30,13 +30,13 @@ test('published limits coordinate the gateway, the Firestore write boundary and 
   try {
     await env.clearFirestore();
     await db.doc('appSettings/subscriptionTrials').set({ basicDays: 75 });
-    for (const uid of ['basic', 'pro']) {
+    for (const uid of ['basic', 'pro', 'pro-fallback']) {
       const user = db.collection('users').doc(uid);
       await user.collection('billing').doc('subscription').set({ trialStartedAt: register.toISOString(), isPaid: false });
       await user.collection('billing').doc('access').set({
         registeredAt: Timestamp.fromDate(register),
         paidUntil: null,
-        ...(uid === 'pro' ? {
+        ...(uid.startsWith('pro') ? {
           grantPlan: 'pro', grantStartsAt: Timestamp.fromDate(register),
           grantUntil: Timestamp.fromMillis(now.getTime() + 86400000),
         } : {}),
@@ -47,7 +47,7 @@ test('published limits coordinate the gateway, the Firestore write boundary and 
     const client = env.authenticatedContext('basic').firestore();
     const transactionRef = id => doc(client, `users/basic/transactions/${id}`);
     await assertSucceeds(setDoc(transactionRef('old'), entry('old')));
-    const limits = { ...DEFAULT_PLAN_LIMITS, basicEntries: 1, basicAccounts: 1, proAiEntries: 1, proAdditionalEntries: 1, proExports: 1, proInquiries: 1 };
+    const limits = { ...DEFAULT_PLAN_LIMITS, basicEntries: 1, basicAccounts: 1, proAiEntries: 2, proAdditionalEntries: 1, proExports: 1, proInquiries: 1 };
     const copy = { entries: { order: 1, ar: { title: 'تسجيل', detail: '' }, en: { title: 'Entries', detail: '' } } };
     const draft = await savePlanLimitsDraft({ limits, copy, revision: 0 }, 'owner');
     assert.equal((await readPublishedPlanLimits()).limits.basicEntries, 15);
@@ -73,8 +73,19 @@ test('published limits coordinate the gateway, the Firestore write boundary and 
     await assert.rejects(reserveReportExport('basic', 'csv'), { code: 'pro_plan_required' });
 
     await assert.rejects(saveFinancialTransaction('pro', { transaction: entry('manual') }), { code: 'pro_ai_allowance_first' });
+    await assert.rejects(saveFinancialTransaction('pro-fallback', { transaction: entry('manual') }), { code: 'pro_ai_allowance_first' });
+    const failedGemini = await reserveAiQuota('pro-fallback', 'صرفت عشرة جنيه');
+    assert.equal(failedGemini.remaining, 1);
+    await assert.rejects(saveFinancialTransaction('pro-fallback', { transaction: entry('manual') }), { code: 'pro_ai_allowance_first' });
+    await recordGeminiEntryFailure('pro-fallback', failedGemini.day, db);
+    await saveFinancialTransaction('pro-fallback', { transaction: entry('manual') });
+    await assert.rejects(saveFinancialTransaction('pro-fallback', { transaction: entry('another') }), { code: 'plan_entry_limit' });
+    assert.equal((await readOwnAiQuota('pro-fallback')).geminiEntryUnavailable, true);
+
     const reservation = await reserveAiQuota('pro', 'صرفت عشرة جنيه');
-    assert.equal(reservation.remaining, 0);
+    assert.equal(reservation.remaining, 1);
+    const lastAttempt = await reserveAiQuota('pro', 'صرفت عشرة جنيه');
+    assert.equal(lastAttempt.remaining, 0);
     await assert.rejects(reserveAiQuota('pro', 'صرفت عشرة جنيه'), { code: 'ai_daily_limit_reached' });
     const ticket = await issueAiEntryTicket('pro', day);
     await saveFinancialTransaction('pro', { transaction: entry('manual') });
@@ -88,7 +99,7 @@ test('published limits coordinate the gateway, the Firestore write boundary and 
     assert.deepEqual((await readOwnAiQuota('basic')).savedEntries.basic, { used: 1, limit: 1, remaining: 0 });
     assert.deepEqual((await readOwnAiQuota('pro')).savedEntries, {
       proAi: { used: 1, limit: null, remaining: null },
-      geminiAttempts: { used: 1, limit: 1, remaining: 0 },
+      geminiAttempts: { used: 2, limit: 2, remaining: 0 },
       proAdditional: { used: 1, limit: 1, remaining: 0 },
     });
     await reserveReportExport('pro', 'csv');

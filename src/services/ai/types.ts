@@ -55,6 +55,7 @@ export interface AICorrection {
 
 export interface AIInterpretationResult {
   entryTicket?: string;
+  geminiFallbackReason?: 'limit' | 'unavailable';
   engineUsed?: 'gemini' | 'local' | 'local-fallback';
   intent: AIIntent;
   confidence: number;

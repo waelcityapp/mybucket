@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { executeDeterministicQuery } from '../src/services/ai/deterministicQueryEngine.ts';
 import { classifyLocalIntent } from '../src/services/ai/localIntentRouter.ts';
 import { interpretLocalFinancialRequest as interpret } from '../src/services/ai/localFinancialInterpreter.ts';
 import { readFileSync } from 'node:fs';
@@ -49,6 +50,29 @@ test('financial inquiries are never registered',()=>{
  for(const raw of ['صرفت كام الشهر ده؟','كام مصاريفي امبارح','how much did I spend this month?']){
   const r=interpret(request(raw));assert.equal(r.intent,'FINANCIAL_QUERY');assert.equal(r.transaction,null);
  }
+});
+test('spoken account expenses only include transactions paid through the named account',()=>{
+ const insta={id:'insta',name:'InstaPay',nameAr:'إنستاباي',type:'wallet',currency:'EGP'};
+ const bank={id:'bank',name:'Bank',nameAr:'البنك',type:'bank',currency:'EGP'};
+ const raw='قل لي الحاجات اللي انا صرفتها بالانستا بي';
+ const testAccounts=[...accounts,insta,bank];
+ const r=interpret(request(raw,{accounts:testAccounts}));
+ assert.equal(r.intent,'FINANCIAL_QUERY');
+ assert.equal(r.query?.accountId,'insta');
+ assert.equal(r.transaction,null);
+ const base={type:'expense',amount:40,currency:'EGP',categoryId:'food1',date:'2026-11-01'};
+ const result=executeDeterministicQuery(r.query,raw,[
+  {...base,id:'paid',accountId:'insta',balanceAccountId:'bank'},
+  {...base,id:'cash',accountId:'cash1',amount:80},
+  {...base,id:'bank',accountId:'bank',amount:100},
+  {...base,id:'income',accountId:'insta',type:'income',amount:500},
+ ],testAccounts,categories,'ar');
+ assert.equal(result.amount,40);
+ assert.equal(result.transactionCount,1);
+ assert.deepEqual(result.breakdown[0].transactions.map(t=>t.id),['paid']);
+ assert.match(result.details,/إنستاباي/);
+ assert.equal(interpret(request(raw)).intent,'UNKNOWN');
+ assert.equal(interpret(request(raw,{accounts:[...testAccounts,{...insta,id:'insta2'}]})).intent,'UNKNOWN');
 });
 test('income queries report income',()=>{
  const r=interpret(request('كام دخلي الشهر ده؟'));

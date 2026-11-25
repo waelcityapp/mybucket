@@ -139,7 +139,8 @@ export function executeDeterministicQuery(
     } else {
       txTime = new Date(tx.createdAt).getTime();
     }
-    return txTime >= startTimestamp && txTime <= endTimestamp;
+    return txTime >= startTimestamp && txTime <= endTimestamp &&
+      (!query.accountId || query.metric === 'account_balance' || tx.accountId === query.accountId);
   });
 
   // Default currency
@@ -333,6 +334,8 @@ export function executeDeterministicQuery(
       // Default: Total spent in the specified period (e.g. "أنا صرفت كام الأسبوع ده؟")
       const expenses = inRangeTx.filter((tx) => tx.type === 'expense');
       const totalSpent = expenses.reduce((sum, tx) => sum + tx.amount, 0);
+      const account = accounts.find(item => item.id === query.accountId);
+      const scope = account ? (isAr ? ` · الحساب: ${account.nameAr || account.name}` : ` · Account: ${account.name || account.nameAr}`) : '';
 
       // Group by Category to show spending breakdown
       const catMap = new Map<string, Transaction[]>();
@@ -367,8 +370,8 @@ export function executeDeterministicQuery(
         amount: totalSpent,
         currency: mainCurrency,
         details: isAr
-          ? `إجمالي ${expenses.length} عملية صرف خلال هذه الفترة`
-          : `${expenses.length} expense transactions in this period`,
+          ? `إجمالي ${expenses.length} عملية صرف خلال هذه الفترة${scope}`
+          : `${expenses.length} expense transactions in this period${scope}`,
         periodText: periodLabel,
         transactionCount: expenses.length,
         breakdown,

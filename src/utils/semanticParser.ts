@@ -112,6 +112,11 @@ export function isFinancialQueryText(rawText: string): boolean {
     return true;
   }
 
+  if (/^(?:لو سمحت\s+)?(?:[قك]ل|قول|قولي|قوللي|قللي)(?:\s+ل[ييى])?(?=\s|$)/.test(norm) &&
+      /(?:صرف|دفعت|اشتريت|مصاريف|مصروف|رصيد|دخل|عمليات)/.test(norm)) {
+    return true;
+  }
+
   // 4. Aggregation & statistical inquiry terms
   // "إجمالي", "اجمالي", "مجموع", "أكتر", "اكتر", "أقل", "اقل", "أعلى", "اعلى"
   if (/(?:إجمالي|اجمالي|مجموع|أكتر|اكتر|أقل|اقل|أعلى|اعلى)\s*(?:ما\s*صرفته|صرفت|مصاريف|دخل)?/.test(norm)) {

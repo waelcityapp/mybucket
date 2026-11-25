@@ -858,3 +858,5 @@ Financial question answers appear immediately after the home quick actions and r
 Server-side account matching uses explicit ESM import extensions through the transaction description utilities so Vercel can load the financial gateway.
 
 Expense breakdown rows expand in place to show the exact transactions behind their subtotals, including historical account names, amounts, notes, and date and time.
+
+Local requests such as “قل لي الحاجات اللي انا صرفتها بالانستا بي” are recognized as spending queries, resolve spoken InstaPay aliases, and filter the breakdown by the recorded payment account.

@@ -231,6 +231,12 @@ export function matchAccountFromText<T extends MatchableAccount>(text: string, a
   return null;
 }
 
+const instaPayMention = new RegExp(`(?:^|[\\s،,.!?؟])(?:ب)?(?:ال)?${INSTAPAY_NAME}(?=[\\s،,.!?؟]|$)`, 'i');
+
+export function mentionsInstaPay(text: string): boolean {
+  return instaPayMention.test(normalizeArabic(text));
+}
+
 /** Resolve an explicitly named account without using learned guesses or silently picking among duplicates. */
 export function matchExplicitAccountFromText<T extends MatchableAccount>(text: string, accounts: T[]): T | null {
   const norm = normalizeArabic(text);
@@ -243,10 +249,9 @@ export function matchExplicitAccountFromText<T extends MatchableAccount>(text: s
   if (named.length > 1) {
     return named[0].score > named[1].score && named[0].name.includes(named[1].name) ? named[0].account : null;
   }
-  const instaPayName = new RegExp(`(?:^|\\s)(?:ال)?${INSTAPAY_NAME}(?=\\s|$)`, 'i');
-  if (instaPayName.test(norm)) {
+  if (instaPayMention.test(norm)) {
     const matchingChannels = accounts.filter(account =>
-      [account.name, account.nameAr].some(name => instaPayName.test(normalizeArabic(name || '')))
+      [account.name, account.nameAr].some(name => mentionsInstaPay(name || ''))
     );
     return matchingChannels.length === 1 ? matchingChannels[0] : null;
   }

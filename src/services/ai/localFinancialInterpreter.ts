@@ -7,7 +7,7 @@ import { parseNaturalLanguageInput } from '../../utils/naturalLanguageParser';
 import { isFinancialQueryText, parseSemanticNumberRoles } from '../../utils/semanticParser';
 import { FinancialAccount, Category } from '../../types';
 import {
-  matchCategoryFromText, matchAccountFromText, matchExplicitAccountFromText,
+  matchCategoryFromText, matchAccountFromText, matchExplicitAccountFromText, mentionsInstaPay,
   matchDescriptionEdit, matchAmountEdit, matchTransactionType,
   matchTransferAccountsFromText,
 } from '../../utils/entityMatcher';
@@ -197,7 +197,15 @@ export function interpretLocalFinancialRequest(request: AIInterpretationRequest)
       }
 
       let metric: any = 'total_spent';
-      let targetAccount: string | null = null;
+      const account = matchExplicitAccountFromText(raw, request.accounts);
+      if (!account && mentionsInstaPay(raw)) {
+        const clarificationNeeded = request.lang === 'ar'
+          ? 'حدّد اسم حساب إنستاباي بالضبط عشان أعرض مصروفاته.'
+          : 'Specify the exact InstaPay account so I can show its expenses.';
+        return { intent: 'UNKNOWN', confidence: 0, transaction: null, query: null, correction: null,
+          clarificationNeeded, rawInterpretationSummary: 'InstaPay account not resolved' };
+      }
+      let targetAccount = account?.id ?? null;
       let targetCategoryId: string | null = null;
       let targetCategoryName: string | null = null;
 
@@ -217,11 +225,11 @@ export function interpretLocalFinancialRequest(request: AIInterpretationRequest)
         targetCategoryName = 'طعام';
       } else if (lower.includes('رصيد') || lower.includes('معايا كام') || lower.includes('balance')) {
         metric = 'account_balance';
-        if (lower.includes('كاش') || lower.includes('نقدي')) {
+        if (!targetAccount && (lower.includes('كاش') || lower.includes('نقدي'))) {
           targetAccount = request.accounts.find((a) => a.type === 'cash')?.id || null;
-        } else if (lower.includes('بنك')) {
+        } else if (!targetAccount && lower.includes('بنك')) {
           targetAccount = request.accounts.find((a) => a.type === 'bank')?.id || null;
-        } else if (lower.includes('فيزا')) {
+        } else if (!targetAccount && lower.includes('فيزا')) {
           targetAccount = request.accounts.find((a) => a.type === 'card')?.id || null;
         }
       } else if (lower.includes('دخل') || lower.includes('قبضت') || lower.includes('مرتب') || lower.includes('income')) {

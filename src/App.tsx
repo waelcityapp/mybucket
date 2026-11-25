@@ -1605,10 +1605,6 @@ export default function App() {
 
   const creatingOffer = window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment' || window.location.pathname === '/offers/new/featured' || window.location.pathname === '/offers/new/pricing';
   const backFromCreateOffer = () => backFromOffer((new URLSearchParams(window.location.search).has('renew') || new URLSearchParams(window.location.search).has('edit')) ? '/settings/ads' : '/offers');
-  if (creatingOffer && isAuthChecking) {
-    return <AdSignInGate lang={lang} checking onBack={backFromCreateOffer} onSignIn={loginWithGoogle} />;
-  }
-
   // The launch screen in index.html stays visible until the app renders.
   if (isAuthChecking) return null;
 
@@ -1696,9 +1692,7 @@ export default function App() {
 
   // Do not mistake an incomplete Firestore snapshot for a newly empty account.
   if (!guestDemo && (!financialLoaded.accounts || (needsInitialSetup && !financialLoaded.transactions && !transactionReadError))) {
-    return <div className="min-h-screen bg-slate-50 flex items-center justify-center p-5 text-sm font-bold text-emerald-800">
-      {lang === 'ar' ? 'جاري تحميل بيانات حسابك...' : 'Loading your account data...'}
-    </div>;
+    return null;
   }
   if (!guestDemo && needsInitialSetup && transactionReadError) {
     return <div dir={lang === 'ar' ? 'rtl' : 'ltr'} className="min-h-screen bg-slate-50 flex items-center justify-center p-5">

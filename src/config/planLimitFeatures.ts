@@ -36,9 +36,9 @@ export function planLimitFeatures(lang: 'ar' | 'en', limits: PlanLimits, copy: P
     },
     {
       id: 'inquiries',
-      label: ar ? 'الاستعلام عن فلوسك' : 'Financial queries',
+      label: ar ? 'اسأل عن رصيدك ومصروفاتك' : 'Ask about your balance and spending',
       basic: ar ? `${format(limits.basicInquiries)} يوميًا، بالصوت أو الكتابة` : `${format(limits.basicInquiries)} a day, by voice or text`,
-      pro: ar ? 'ضمن حصة محاولات الذكاء الاصطناعي' : 'Included in the AI attempt allowance',
+      pro: ar ? 'مثال: صرفت كام الشهر ده؟ كل سؤال بالذكاء الاصطناعي بيتحسب محاولة.' : 'Example: How much did I spend this month? Each AI question uses one attempt.',
     },
     {
       id: 'accounts',

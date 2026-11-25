@@ -832,3 +832,5 @@ Pro manual saves and saves following local analysis use the daily additional tra
 Pro uses one admin-configured daily save allowance shared by manual, local, and AI-assisted saves. Analysis attempts retain their separate limits. Older published settings and drafts derive the initial save cap from the previous two configured allowances, and daily usage includes both existing save counters.
 
 Pro cloud AI attempts share one published daily allowance across transactions and inquiries. Earlier published allowances add the former default five inquiry attempts on read. Historical attempts count toward the shared allowance. The subscription card shows completed saves and cloud attempts only. Local analysis limits remain technical settings.
+
+The subscription comparison describes financial queries as questions about balance and spending, with a concrete example and the shared AI attempt cost for Pro.

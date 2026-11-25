@@ -31,7 +31,7 @@
         color: #edffea;
         background: radial-gradient(ellipse at 50% 75%, #075339, transparent 60%), #021e16;
       }
-      #root:not(:empty) + .startup-splash,
+      #root:not(:empty) + .startup-splash:not(.startup-typing),
       html:not([lang="en"]) .startup-en,
       html[lang="en"] .startup-ar {
         display: none;
@@ -40,6 +40,23 @@
         display: grid;
         justify-items: center;
         gap: clamp(15px, 4vh, 28px);
+      }
+      .startup-name {
+        direction: ltr;
+        color: #edffea;
+        font: 800 clamp(27px, 7vmin, 42px)/1.2 ui-monospace, monospace;
+        letter-spacing: -.04em;
+      }
+      .startup-typing .startup-name {
+        animation: startup-write 540ms steps(9, end) both;
+      }
+      @keyframes startup-write {
+        from { clip-path: inset(0 100% 0 0); }
+        to { clip-path: inset(0); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .startup-typing .startup-name { animation: none; }
+        #root:not(:empty) + .startup-splash { display: none; }
       }
       .startup-orb {
         position: relative;
@@ -115,6 +132,7 @@
     <div id="root"></div>
     <div class="startup-splash" role="status">
       <div class="startup-art">
+        <strong class="startup-name" lang="en">My Bucket</strong>
         <div class="startup-orb" aria-hidden="true"><div class="startup-mic"></div></div>
         <div class="startup-wave" aria-hidden="true">
           <i style="--bar: 12%"></i><i style="--bar: 23%"></i><i style="--bar: 45%"></i>
@@ -126,6 +144,15 @@
         <p class="startup-en">Loading…</p>
       </div>
     </div>
+    <script>
+      const splash = document.querySelector('.startup-splash');
+      if (window.matchMedia('(prefers-reduced-motion: no-preference)').matches) {
+        const finishTyping = () => splash.classList.remove('startup-typing');
+        splash.querySelector('.startup-name').addEventListener('animationend', finishTyping, { once: true });
+        splash.classList.add('startup-typing');
+        setTimeout(finishTyping, 650);
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

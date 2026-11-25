@@ -846,3 +846,5 @@ Transaction draft amounts use decimal text entry to prevent scroll and arrow-key
 The startup screen uses the ad’s green microphone and waveform motif with a localized loading label. It is present in the initial HTML and disappears when the app renders its first screen.
 
 Keep the same launch screen through authentication and the initial account data check so there is no second loading screen before the first usable page.
+
+The launch screen writes the My Bucket name in nine steps over 540 ms and remains visible until initial app readiness. Reduced-motion mode shows the complete name immediately.

@@ -126,79 +126,115 @@ function AdEditRequests({ lang, categories }: { lang: Language; categories: Offe
 function AdCategoriesSettings({ lang, catalog }: { lang: Language; catalog: ReturnType<typeof useOfferCategories> }) {
   const ar = lang === 'ar';
   const { categories, setCategories, categoryError, reloadCategories } = catalog;
-  const [selectedId, setSelectedId] = useState('');
-  const selected = categories?.find(item => item.id === selectedId);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [names, setNames] = useState({ ar: '', en: '' });
-  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [archiveId, setArchiveId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<{ error: boolean; text: string } | null>(null);
 
-  const select = (id: string) => {
-    const item = categories?.find(category => category.id === id);
-    setSelectedId(id);
+  const startEditing = (item?: OfferCategorySettings) => {
+    setEditingId(item?.id ?? '');
     setNames({ ar: item?.ar ?? '', en: item?.en ?? '' });
-    setConfirmArchive(false);
+    setArchiveId(null);
     setFeedback(null);
   };
 
-  const save = async (operation: 'add' | 'rename' | 'archive' | 'restore') => {
+  const save = async (operation: 'add' | 'rename' | 'archive' | 'restore', id?: string) => {
+    if (busy) return;
     setBusy(true);
     setFeedback(null);
     try {
-      const items = await offerAdsRequest<OfferCategorySettings[]>('admin.ads.categories.manage', { operation, id: selectedId, ...names }, true);
+      const items = await offerAdsRequest<OfferCategorySettings[]>('admin.ads.categories.manage', { operation, id, ...names }, true);
       setCategories(items);
-      if (operation === 'add') {
-        setSelectedId(items.at(-1)?.id ?? '');
-        setNames({ ar: names.ar.trim(), en: names.en.trim() });
-      }
-      setConfirmArchive(false);
-      setFeedback({ error: false, text: ar ? 'تم حفظ القسم.' : 'Category saved.' });
+      setEditingId(null);
+      setArchiveId(null);
+      const messages = {
+        add: ar ? 'تم إضافة القسم.' : 'Category added.',
+        rename: ar ? 'تم تعديل الاسم.' : 'Category renamed.',
+        archive: ar ? 'تم إلغاء القسم.' : 'Category archived.',
+        restore: ar ? 'تم استعادة القسم.' : 'Category restored.',
+      };
+      setFeedback({ error: false, text: messages[operation] });
     } catch (error) {
       const limitReached = error instanceof Error && error.message === 'ad_category_limit';
       setFeedback({ error: true, text: limitReached
         ? (ar ? 'وصلت للحد الأقصى لعدد الأقسام.' : 'The category limit has been reached.')
-        : (ar ? 'تعذّر حفظ القسم. حاول تاني.' : 'Could not save the category. Try again.') });
+        : (ar ? 'تعذّر حفظ التغيير. حاول تاني.' : 'Could not save the change. Try again.') });
     } finally { setBusy(false); }
   };
 
   const field = 'min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 dark:border-slate-600 dark:bg-slate-800';
   const button = 'min-h-11 rounded-xl px-3 text-sm font-bold disabled:opacity-50';
-  return <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
-    <h2 className="font-extrabold">{ar ? 'أقسام الإعلانات' : 'Ad categories'}</h2>
-    {categoryError ? <button type="button" onClick={reloadCategories} className="text-sm font-bold underline">{ar ? 'تعذّر تحميل الأقسام. حاول تاني' : 'Could not load categories. Retry'}</button>
-      : !categories ? <p role="status" className="text-sm">{ar ? 'جاري تحميل الأقسام…' : 'Loading categories…'}</p>
-      : <form className="space-y-3" onSubmit={event => { event.preventDefault(); void save(selectedId ? 'rename' : 'add'); }}>
-        <label className="grid gap-1 text-sm font-bold">
-          {ar ? 'القسم' : 'Category'}
-          <select className={field} value={selectedId} disabled={busy} onChange={event => select(event.target.value)}>
-            <option value="">{ar ? 'إضافة قسم جديد' : 'Add a category'}</option>
-            {categories.slice().sort((a, b) => a[lang].localeCompare(b[lang], lang)).map(item =>
-              <option key={item.id} value={item.id}>{item[lang]}{item.archived ? (ar ? ' (ملغى)' : ' (archived)') : ''}</option>)}
-          </select>
-        </label>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {(['ar', 'en'] as const).map(language => <label key={language} className="grid gap-1 text-sm font-bold">
-            {language === 'ar' ? (ar ? 'الاسم بالعربي' : 'Arabic name') : (ar ? 'الاسم بالإنجليزي' : 'English name')}
-            <input className={field} dir={language === 'ar' ? 'rtl' : 'ltr'} value={names[language]} disabled={busy}
-              required maxLength={80} onChange={event => setNames(previous => ({ ...previous, [language]: event.target.value }))} />
-          </label>)}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button type="submit" disabled={busy || !names.ar.trim() || !names.en.trim()} className={`${button} bg-emerald-700 text-white`}>
-            {selectedId ? (ar ? 'حفظ الاسم' : 'Save names') : (ar ? 'إضافة القسم' : 'Add category')}
-          </button>
-          {selected && !confirmArchive && <button type="button" disabled={busy} className={`${button} border border-slate-300 dark:border-slate-600`}
-            onClick={() => selected.archived ? void save('restore') : setConfirmArchive(true)}>
-            {selected.archived ? (ar ? 'استعادة القسم' : 'Restore category') : (ar ? 'إلغاء القسم' : 'Archive category')}
+  const primary = `${button} bg-emerald-700 text-white`;
+  const ordered = categories?.slice().sort((a, b) => a[lang].localeCompare(b[lang], lang)) ?? [];
+  const active = ordered.filter(item => !item.archived);
+  const archived = ordered.filter(item => item.archived);
+
+  const nameForm = (id: string) => (
+    <form className="space-y-3" onSubmit={event => { event.preventDefault(); void save(id ? 'rename' : 'add', id || undefined); }}>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {(['ar', 'en'] as const).map(language => <label key={language} className="grid gap-1 text-sm font-bold">
+          {language === 'ar' ? (ar ? 'الاسم بالعربي' : 'Arabic name') : (ar ? 'الاسم بالإنجليزي' : 'English name')}
+          <input className={field} dir={language === 'ar' ? 'rtl' : 'ltr'} value={names[language]} disabled={busy}
+            required maxLength={80} onChange={event => setNames(previous => ({ ...previous, [language]: event.target.value }))} />
+        </label>)}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button type="submit" disabled={busy || !names.ar.trim() || !names.en.trim()} className={primary}>
+          {id ? (ar ? 'حفظ الاسم' : 'Save names') : (ar ? 'إضافة القسم' : 'Add category')}
+        </button>
+        <button type="button" disabled={busy} className={button} onClick={() => setEditingId(null)}>{ar ? 'تراجع' : 'Cancel'}</button>
+      </div>
+    </form>
+  );
+
+  const rows = (items: OfferCategorySettings[]) => <ul className="divide-y divide-slate-200 dark:divide-slate-700">
+    {items.map(item => <li key={item.id} className="space-y-2 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="min-w-0 break-words text-sm font-bold">{item[lang]}</span>
+        <div className="flex flex-wrap gap-1">
+          <button type="button" disabled={busy} className={button} onClick={() => startEditing(item)}
+            aria-label={ar ? `تعديل اسم ${item.ar}` : `Rename ${item.en}`}>{ar ? 'تعديل الاسم' : 'Rename'}</button>
+          {item.archived ? <button type="button" disabled={busy} className={button} onClick={() => void save('restore', item.id)}>
+            {ar ? 'استعادة' : 'Restore'}
+          </button> : <button type="button" disabled={busy} className={`${button} text-red-700 dark:text-red-300`}
+            aria-label={ar ? `إلغاء قسم ${item.ar}` : `Archive ${item.en}`}
+            onClick={() => { setEditingId(null); setArchiveId(item.id); setFeedback(null); }}>
+            {ar ? 'إلغاء القسم' : 'Archive'}
           </button>}
         </div>
-        {confirmArchive && <div className="space-y-2 text-sm">
-          <p>{ar ? 'القسم مش هيظهر عند إنشاء إعلان جديد. الإعلانات المنشورة فيه هتفضل ظاهرة لحد انتهاء مدتها.' : 'New ads cannot use this category. Published ads stay visible until they expire.'}</p>
-          <button type="button" disabled={busy} className={`${button} bg-red-700 text-white`} onClick={() => void save('archive')}>{ar ? 'تأكيد إلغاء القسم' : 'Confirm archive'}</button>
-          <button type="button" disabled={busy} className={button} onClick={() => setConfirmArchive(false)}>{ar ? 'تراجع' : 'Cancel'}</button>
-        </div>}
+      </div>
+      {editingId === item.id && nameForm(item.id)}
+      {archiveId === item.id && <div className="space-y-2 rounded-xl bg-red-50 p-3 text-sm text-red-950 dark:bg-red-950 dark:text-red-100">
+        <p className="font-bold">{ar ? `تلغي قسم «${item.ar}»؟` : `Archive “${item.en}”?`}</p>
+        <p>{ar ? 'القسم مش هيظهر عند إنشاء إعلان جديد. الإعلانات المنشورة فيه هتفضل ظاهرة لحد انتهاء مدتها.' : 'New ads cannot use this category. Published ads stay visible until they expire.'}</p>
+        <button type="button" disabled={busy} className={`${button} bg-red-700 text-white`} onClick={() => void save('archive', item.id)}>{ar ? 'تأكيد إلغاء القسم' : 'Confirm archive'}</button>
+        <button type="button" disabled={busy} className={button} onClick={() => setArchiveId(null)}>{ar ? 'تراجع' : 'Cancel'}</button>
+      </div>}
+    </li>)}
+  </ul>;
+
+  return <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <h2 className="font-extrabold">{ar ? 'أقسام الإعلانات' : 'Ad categories'}</h2>
+      {categories && !categoryError && <button type="button" disabled={busy} className={primary} onClick={() => startEditing()}>
+        {ar ? 'إضافة قسم جديد' : 'Add a category'}
+      </button>}
+    </div>
+    {categoryError ? <button type="button" onClick={reloadCategories} className="text-sm font-bold underline">{ar ? 'تعذّر تحميل الأقسام. حاول تاني' : 'Could not load categories. Retry'}</button>
+      : !categories ? <p role="status" className="text-sm">{ar ? 'جاري تحميل الأقسام…' : 'Loading categories…'}</p>
+      : <>
+        {editingId === '' && nameForm('')}
         {feedback && <p role={feedback.error ? 'alert' : 'status'} className="text-sm">{feedback.text}</p>}
-      </form>}
+        <div>
+          <h3 className="text-sm font-bold">{ar ? 'الأقسام الموجودة' : 'Active categories'}</h3>
+          {active.length ? rows(active) : <p className="text-sm">{ar ? 'مفيش أقسام نشطة.' : 'There are no active categories.'}</p>}
+        </div>
+        {archived.length > 0 && <div>
+          <h3 className="text-sm font-bold">{ar ? 'الأقسام الملغاة' : 'Archived categories'}</h3>
+          {rows(archived)}
+        </div>}
+      </>}
   </section>;
 }
 

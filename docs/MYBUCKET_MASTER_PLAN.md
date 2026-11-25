@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Ad category controls (#309)
+
+- Separate the add form from the category list. Rename or archive an active category directly from its row. Display the selected name in the archive confirmation and show archived categories with a restore action. Both localized names remain required.
+
 ## Offer category management and ordering (#308)
 
 - Public offer categories rank by live ad count, then by the latest live ad start date, and alphabetically in the current language for empty categories.

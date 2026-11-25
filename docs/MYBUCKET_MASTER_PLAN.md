@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Removing accounts from active use (#312)
+
+- Owners can remove an eligible account regardless of its balance or transaction history. Keep the record for historical names and bookkeeping while excluding it from active balances, new movements, and the plan account count.
+
 ## Bank link balance choices (#311)
 
 - An existing independent account can become a bank-linked payment method with the same currency even if it has transaction history. Show the bank balance and require a choice to add a positive independent balance to the bank or confirm it was already included. Apply the selected balance and link atomically.

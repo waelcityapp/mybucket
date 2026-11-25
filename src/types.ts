@@ -33,6 +33,7 @@ export interface FinancialAccount {
   balance: number;
   currency: CurrencyCode;
   color?: string;
+  archived?: boolean;
   linkedBankId?: string;
   creditLimit?: number;
 }

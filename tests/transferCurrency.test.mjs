@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bindMovement } from '../src/utils/accountLinking.ts';
+import { bindMovement, movementDeltas, totalCashByCurrency } from '../src/utils/accountLinking.ts';
 import { bankBalanceAfterLink, isIndependentMethodLink } from '../src/utils/accountDetails.ts';
 
 test('transfers require distinct balance accounts with the same currency', () => {
@@ -46,4 +46,15 @@ test('linking a nonempty account requires an explicit balance decision using the
   assert.throws(() => bankBalanceAfterLink(-200, 1000, { mode: 'add', bankBalance: 1000 }), /link-balance-unavailable/);
   const cash = { id: 'cash', type: 'cash', currency: 'EGP', balance: 200 };
   assert.equal(isIndependentMethodLink(cash, { ...cash, type: 'wallet', linkedBankId: 'bank' }), true);
+});
+
+test('archived accounts retain historical balance targets and are excluded from new bookings and totals', () => {
+  const cash = { id: 'cash', type: 'cash', currency: 'EGP', balance: 100 };
+  const old = { id: 'old', type: 'wallet', currency: 'EGP', balance: 200, archived: true };
+  const accounts = [cash, old];
+  const expense = { type: 'expense', amount: 10, accountId: 'old' };
+  assert.deepEqual(totalCashByCurrency(accounts), { EGP: 100 });
+  assert.throws(() => bindMovement(accounts, expense), /account-not-found/);
+  assert.equal(bindMovement(accounts, expense, expense).balanceAccountId, 'old');
+  assert.deepEqual([...movementDeltas(expense, -1)], [['old', 10]]);
 });

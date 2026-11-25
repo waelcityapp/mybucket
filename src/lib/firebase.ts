@@ -223,41 +223,24 @@ export async function saveAllAccountsToFirestore(userId: string, accounts: Finan
   await callFinancialWrite(userId, 'financial.accounts.save', { items: accounts });
 }
 
-// Delete an unused account only. Existing transactions and linked payment methods
-// must never be orphaned or silently deleted.
-export async function deleteUnusedAccountFromFirestore(userId: string, accountId: string): Promise<void> {
+// Preserve account identity and balance for historical transactions.
+export async function archiveAccountFromFirestore(userId: string, accountId: string): Promise<void> {
   requireFinancialWriteAccess();
   if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
-
-  const accountsSnapshot = await getDocsFromServer(collection(db, 'users', userId, 'accounts'));
-  const accountDocs = accountsSnapshot.docs;
-  if (accountDocs.length <= 1) throw new Error('last-account');
-  const accountSnapshot = accountDocs.find(item => item.id === accountId);
-  if (!accountSnapshot) throw new Error('account-missing');
-
-  const account = accountSnapshot.data() as FinancialAccount;
-  if (isProtectedCashAccount({ ...account, id: accountId })) throw new Error('protected-cash-account');
-  if (account.balance !== 0) throw new Error('nonzero-balance');
-  if (accountDocs.some(item => item.id !== accountId && (item.data() as FinancialAccount).linkedBankId === accountId)) {
-    throw new Error('linked-account');
-  }
-
-  const transactionsSnapshot = await getDocsFromServer(collection(db, 'users', userId, 'transactions'));
-  if (transactionsSnapshot.docs.some(item => {
-    const tx = item.data() as Transaction;
-    // The movement may reference a linked method or its actual balance source.
-    return tx.accountId === accountId || tx.toAccountId === accountId
-      || tx.balanceAccountId === accountId || tx.toBalanceAccountId === accountId;
-  })) throw new Error('has-transactions');
-
-  const accountRef = doc(db, 'users', userId, 'accounts', accountId);
+  const accounts = collection(db, 'users', userId, 'accounts');
+  const ref = doc(accounts, accountId);
+  const snapshot = await getDocsFromServer(accounts);
   await runTransaction(db, async transaction => {
-    const current = await transaction.get(accountRef);
+    const current = await transaction.get(ref);
     if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
     if (!current.exists()) throw new Error('account-missing');
-    if (isProtectedCashAccount({ ...(current.data() as FinancialAccount), id: accountId })) throw new Error('protected-cash-account');
-    if ((current.data() as FinancialAccount).balance !== 0) throw new Error('nonzero-balance');
-    transaction.delete(accountRef);
+    const account = current.data() as FinancialAccount;
+    if (account.archived) return;
+    if (isProtectedCashAccount({ ...account, id: accountId })) throw new Error('protected-cash-account');
+    if (snapshot.docs.some(item => item.id !== accountId && item.get('archived') !== true && item.get('linkedBankId') === accountId)) {
+      throw new Error('linked-account');
+    }
+    transaction.update(ref, { archived: true });
   });
 }
 
@@ -272,7 +255,7 @@ export async function zeroAccountBalances(userId: string): Promise<void> {
     if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
     for (const account of current) {
       if (!account.exists()) throw new Error('account-changed');
-      transaction.update(account.ref, { balance: 0 });
+      if (account.get('archived') !== true) transaction.update(account.ref, { balance: 0 });
     }
   });
 }
@@ -480,7 +463,7 @@ export async function updateAccountDetails(userId: string, expected: FinancialAc
     if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
     if (!snapshot.exists()) throw new Error('account-missing');
     const current = snapshot.data() as FinancialAccount;
-    if (current.balance !== expected.balance || current.name !== expected.name || current.nameAr !== expected.nameAr ||
+    if (current.archived || current.balance !== expected.balance || current.name !== expected.name || current.nameAr !== expected.nameAr ||
         current.type !== expected.type || current.currency !== expected.currency ||
         current.linkedBankId !== expected.linkedBankId || current.creditLimit !== expected.creditLimit) {
       throw new Error('account-changed');
@@ -489,7 +472,7 @@ export async function updateAccountDetails(userId: string, expected: FinancialAc
       if (updated.linkedBankId === expected.id || !['card', 'wallet'].includes(updated.type)) throw new Error('invalid-link');
       const bankRef = doc(db, 'users', userId, 'accounts', updated.linkedBankId);
       const bank = (await transaction.get(bankRef)).data() as FinancialAccount | undefined;
-      if (!bank || bank.type !== 'bank' || bank.linkedBankId || bank.currency !== updated.currency) throw new Error('invalid-link');
+      if (!bank || bank.archived || bank.type !== 'bank' || bank.linkedBankId || bank.currency !== updated.currency) throw new Error('invalid-link');
       if (!current.linkedBankId) {
         if (current.currency !== updated.currency) throw new Error('currency-mismatch');
         const nextBalance = bankBalanceAfterLink(current.balance, bank.balance, linkChoice);

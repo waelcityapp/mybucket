@@ -5,6 +5,7 @@ export interface LinkedAccount {
   type: AccountKind;
   currency: string;
   balance: number;
+  archived?: boolean;
   linkedBankId?: string;
   creditLimit?: number;
 }
@@ -22,11 +23,11 @@ export interface Movement {
 /** A linked payment method is a view of one bank balance, not another asset. */
 export function resolveAccount(accounts: LinkedAccount[], id: string): ResolvedAccount {
   const method = accounts.find(account => account.id === id);
-  if (!method) throw new Error('account-not-found');
+  if (!method || method.archived) throw new Error('account-not-found');
   if (!method.linkedBankId) return { method, account: method };
   if (method.type !== 'card' && method.type !== 'wallet') throw new Error('invalid-link');
   const bank = accounts.find(account => account.id === method.linkedBankId);
-  if (!bank || bank.type !== 'bank' || bank.linkedBankId || bank.currency !== method.currency) throw new Error('invalid-link');
+  if (!bank || bank.archived || bank.type !== 'bank' || bank.linkedBankId || bank.currency !== method.currency) throw new Error('invalid-link');
   return { method, account: bank };
 }
 
@@ -74,7 +75,7 @@ export function validateBalance(account: LinkedAccount, balance: number): void {
 export function totalCashByCurrency(accounts: LinkedAccount[]): Record<string, number> {
   const result: Record<string, number> = {};
   for (const account of accounts) {
-    if (account.linkedBankId || account.type === 'credit') continue;
+    if (account.archived || account.linkedBankId || account.type === 'credit') continue;
     if (!Number.isFinite(account.balance)) throw new Error('invalid-balance');
     result[account.currency] = (result[account.currency] || 0) + account.balance;
   }

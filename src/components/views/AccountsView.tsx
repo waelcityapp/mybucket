@@ -252,7 +252,7 @@ export function AccountsView({ accounts, lang, canAddAccounts, onOpenProPlan, on
                 <button
                   type="button"
                   disabled={deletingId !== null}
-                  title={lang === 'ar' ? 'مسح الحساب غير المستخدم' : 'Delete unused account'}
+                  title={lang === 'ar' ? 'حذف الحساب' : 'Delete account'}
                   aria-label={lang === 'ar' ? `مسح حساب ${acc.nameAr}` : `Delete account ${acc.name}`}
                   onClick={() => setConfirmDeleteId(acc.id)}
                   className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-50 text-rose-600 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-30"
@@ -266,10 +266,16 @@ export function AccountsView({ accounts, lang, canAddAccounts, onOpenProPlan, on
             {!isProtectedCashAccount(acc) && confirmDeleteId === acc.id && (
               <div className="mt-3 w-full rounded-xl border border-rose-200 bg-rose-50 p-3 text-start">
                 <p className="text-xs font-bold text-rose-900">
-                  {lang === 'ar' ? `هل تريد مسح حساب «${acc.nameAr}»؟ لن يتم حذف أي عمليات مالية، ولا يُسمح بمسح حساب له رصيد أو عمليات أو حسابات مرتبطة.` : `Delete “${acc.name}”? Transactions are never deleted; accounts with balances, transactions or linked methods cannot be removed.`}
+                  {lang === 'ar' ? `تحذف حساب «${acc.nameAr}»؟ هيختفي من قائمة الحسابات والاختيارات الجديدة، والعمليات القديمة هتفضل محفوظة باسمه.` : `Delete “${acc.name}”? It will be removed from account lists and new transactions. Its name will remain in past transactions.`}
                 </p>
+                {accounts.some(item => item.linkedBankId === acc.id) && <p className="mt-2 text-xs font-semibold text-rose-900">
+                  {lang === 'ar' ? 'فيه وسائل دفع مرتبطة بالحساب ده. افصلها قبل حذفه.' : 'Unlink the payment methods that use this account before removing it.'}
+                </p>}
+                {!acc.linkedBankId && acc.balance !== 0 && <p className="mt-2 text-xs text-rose-900">
+                  {lang === 'ar' ? `رصيده الحالي ${formatNumber(acc.balance)} ${acc.currency}. بعد الحذف، الرصيد ده مش هيظهر في الإجمالي.` : `Its current balance is ${formatNumber(acc.balance)} ${acc.currency}. It will be removed from the total.`}
+                </p>}
                 <div className="mt-2 flex gap-2">
-                  <button type="button" disabled={deletingId !== null}
+                  <button type="button" disabled={deletingId !== null || accounts.some(item => item.linkedBankId === acc.id)}
                     onClick={async () => {
                       if (deletingId !== null) return;
                       setDeletingId(acc.id);

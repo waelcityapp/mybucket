@@ -6,7 +6,7 @@ import { LockScreen, lockRequest, type LockStatus } from './components/AppLock';
 import { TrialSubscriptionPages } from './components/views/TrialSubscriptionPages';
 import { currencyName, SUPPORTED_CURRENCIES } from './types';
 import { ArrowLeftRight, ArrowUpDown, ShoppingBag, RefreshCw } from 'lucide-react';
-import { Fragment, useState, useEffect, useRef } from 'react';
+import { Fragment, useState, useEffect, useRef, useMemo } from 'react';
 import {
   FinancialAccount,
   Category,
@@ -101,7 +101,7 @@ import {
   resetFinancialStart,
   updateFinancialTransaction,
   deleteTransactionFromFirestore,
-  deleteUnusedAccountFromFirestore,
+  archiveAccountFromFirestore,
   updateAccountDetails,
   saveAllCategoriesToFirestore,
   saveLearnedMemoryToFirestore,
@@ -304,6 +304,7 @@ export default function App() {
   const migrateLegacyAccounts = (accs: FinancialAccount[]): { updated: FinancialAccount[]; migrated: boolean } => {
     let migrated = false;
     let mapped = accs.map((acc) => {
+      if (acc.archived) return acc;
       if (acc.id === 'acc_savings_usd' || acc.nameAr === 'مدخرات دولار' || acc.name === 'USD Savings') {
         migrated = true;
         return {
@@ -397,7 +398,8 @@ export default function App() {
     void readDuration();
     return () => controller.abort();
   }, [showPublicBasicTrial]);
-  const accounts = guestDemo ? guestAccounts : cloudAccounts;
+  const historicalAccounts = guestDemo ? guestAccounts : cloudAccounts;
+  const accounts = useMemo(() => historicalAccounts.filter(account => !account.archived), [historicalAccounts]);
   const transactions = guestDemo ? guestTransactions : cloudTransactions;
   const categories = guestDemo ? guestCategories : cloudCategories;
   const setAccounts = guestDemo ? setGuestAccounts : setCloudAccounts;
@@ -719,11 +721,11 @@ export default function App() {
     // 1. Subscribe to User's Accounts
     const unsubAccounts = subscribeUserAccounts(authUser.uid, (cloudAccounts) => {
       if (auth.currentUser?.uid !== authUser.uid) return;
-      if (cloudAccounts.length > 0) {
+      if (cloudAccounts.some(account => !account.archived)) {
         setCloudAccounts(migrateLegacyAccounts(cloudAccounts).updated);
         setNeedsInitialSetup(false);
       } else {
-        setCloudAccounts([]);
+        setCloudAccounts(cloudAccounts);
         setNeedsInitialSetup(true);
       }
       setFinancialLoaded(prev => ({ ...prev, accounts: true }));
@@ -1204,23 +1206,20 @@ export default function App() {
   };
 
   const handleDeleteAccount = async (accountId: string): Promise<boolean> => {
-    if (!authUser || !financialLoaded.accounts || !financialLoaded.transactions || transactionReadError) {
+    if (!authUser || !financialLoaded.accounts) {
       setToastMessage(lang === 'ar' ? 'تعذر التحقق من حساباتك وعملياتك. أعد المحاولة بعد اكتمال التحميل.' : 'Could not verify accounts and transactions. Retry after loading.');
       return false;
     }
     try {
-      await deleteUnusedAccountFromFirestore(authUser.uid, accountId);
-      setToastMessage(lang === 'ar' ? 'تم حذف الحساب غير المستخدم بنجاح.' : 'Unused account deleted.');
+      await archiveAccountFromFirestore(authUser.uid, accountId);
+      setToastMessage(lang === 'ar' ? 'تم حذف الحساب من القائمة. عملياته القديمة محفوظة.' : 'Account removed. Past transactions were preserved.');
       return true;
     } catch (error) {
       const reason = error instanceof Error ? error.message : '';
       const messages: Record<string, [string, string]> = {
-        'has-transactions': ['لا يمكن مسح حساب له عمليات مسجلة. ستظل بياناتك محفوظة.', 'Cannot delete an account with recorded transactions.'],
-        'nonzero-balance': ['لا يمكن مسح حساب برصيد غير صفري. راجع الرصيد أولًا.', 'Account balance must be zero before deletion.'],
         'linked-account': ['لا يمكن مسح حساب مرتبط بحساب أو بطاقة أخرى.', 'This account has linked payment methods.'],
         'account-missing': ['الحساب غير موجود بالفعل؛ حدّث الصفحة.', 'Account no longer exists. Refresh the page.'],
         'protected-cash-account': ['حساب الكاش لا يمكن حذفه.', 'The cash account cannot be deleted.'],
-        'last-account': ['يجب الاحتفاظ بحساب واحد على الأقل.', 'Keep at least one account.'],
       };
       const message = messages[reason];
       setToastMessage(message ? message[lang === 'ar' ? 0 : 1] : (lang === 'ar' ? 'تعذر مسح الحساب. تحقق من الاتصال ثم حاول مرة أخرى.' : 'Could not delete account. Check connection and retry.'));
@@ -1314,7 +1313,7 @@ export default function App() {
       }
       return acc;
     });
-    setAccounts(updated);
+    setAccounts(previous => [...updated, ...previous.filter(account => account.archived)]);
 
     if (authUser) {
       const target = updated.find((a) => a.id === accountId);
@@ -1386,7 +1385,7 @@ export default function App() {
       }
       return acc;
     });
-    setAccounts(updated);
+    setAccounts(previous => [...updated, ...previous.filter(account => account.archived)]);
 
     if (authUser) {
       const target = updated.find((a) => a.id === accountId);
@@ -1420,7 +1419,7 @@ export default function App() {
       }
       return acc;
     });
-    setAccounts(updated);
+    setAccounts(previous => [...updated, ...previous.filter(account => account.archived)]);
 
     if (authUser) {
       const target = updated.find((a) => a.id === accountId);
@@ -1454,7 +1453,7 @@ export default function App() {
       }
       return acc;
     });
-    setAccounts(updated);
+    setAccounts(previous => [...updated, ...previous.filter(account => account.archived)]);
 
     if (authUser) {
       const target = updated.find((a) => a.id === accountId);
@@ -1473,7 +1472,7 @@ export default function App() {
     const updated = accounts.map((acc) =>
       acc.id === accountId ? { ...acc, balance: newBalance } : acc
     );
-    setAccounts(updated);
+    setAccounts(previous => [...updated, ...previous.filter(account => account.archived)]);
 
     if (authUser) {
       const target = updated.find((a) => a.id === accountId);
@@ -1496,7 +1495,7 @@ export default function App() {
       }
       return acc;
     });
-    setAccounts(updated);
+    setAccounts(previous => [...updated, ...previous.filter(account => account.archived)]);
 
     if (authUser) {
       await saveAllAccountsToFirestore(authUser.uid, updated);
@@ -1662,7 +1661,7 @@ export default function App() {
   }
 
   if (window.location.pathname === '/settings/delete-transactions' && authUser) {
-    return <DeleteTransactionsPage lang={lang} uid={authUser.uid} accounts={accounts} transactions={transactions}
+    return <DeleteTransactionsPage lang={lang} uid={authUser.uid} accounts={historicalAccounts} transactions={transactions}
       ready={financialLoaded.accounts && financialLoaded.transactions && !transactionReadError}
       onBack={() => {
         if (window.history.state?.fromAccountSettings) window.history.back();
@@ -2051,7 +2050,7 @@ export default function App() {
             {/* 5. "أحدث العمليات" - Recent Transactions List */}
             <RecentTransactions
               transactions={transactions}
-              accounts={accounts}
+              accounts={historicalAccounts}
               categories={categories}
               lang={lang}
               onViewAll={() => navigateTab('transactions')}
@@ -2070,7 +2069,7 @@ export default function App() {
           <TransactionsView
             initialFilter={transactionQuickFilter}
             transactions={transactions}
-            accounts={accounts}
+            accounts={historicalAccounts}
             categories={categories}
             lang={lang}
             loadState={guestDemo ? 'ready' : transactionReadError ? 'error' : financialLoaded.transactions ? 'ready' : 'loading'}
@@ -2102,7 +2101,7 @@ export default function App() {
           <SearchView
             transactions={transactions}
             categories={categories}
-            accounts={accounts}
+            accounts={historicalAccounts}
             lang={lang}
             authUser={authUser}
           />
@@ -2112,7 +2111,7 @@ export default function App() {
           <CategoryDetailPage
             category={detailCategory}
             categories={categories}
-            accounts={accounts}
+            accounts={historicalAccounts}
             transactions={transactions}
             lang={lang}
             authUser={authUser}

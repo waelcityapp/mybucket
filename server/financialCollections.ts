@@ -85,13 +85,14 @@ export async function saveFinancialCollection(uid: string, action: string, paylo
     if (initialize && prior.size) return { saved: 0 };
 
     const counts = (record: { type?: unknown }) => group === 'accounts' || record.type === 'expense';
-    let count = existing.docs.filter(record => counts({ type: record.get('type') })).length;
+    let count = existing.docs.filter(record => record.get('archived') !== true && counts({ type: record.get('type') })).length;
     const max = group === 'accounts'
       ? (pro ? limits.proAccounts : limits.basicAccounts)
       : (pro ? limits.proCategories : limits.basicCategories);
     const writes = [];
     for (const item of items) {
       const stored = prior.get(item.id);
+      if (group === 'accounts' && stored?.archived === true) return invalid();
       if (stored && group === 'categories' && stored.type !== item.type) return invalid();
       if (!stored && counts(item)) {
         if (initialize && count >= max) continue;
@@ -104,7 +105,7 @@ export async function saveFinancialCollection(uid: string, action: string, paylo
 
       if ('linkedBankId' in item && item.linkedBankId) {
         const bank = prior.get(item.linkedBankId);
-        if (!bank || bank.type !== 'bank' || bank.currency !== item.currency || item.balance !== 0) return invalid();
+        if (!bank || bank.archived === true || bank.type !== 'bank' || bank.currency !== item.currency || item.balance !== 0) return invalid();
       }
       writes.push(item);
     }

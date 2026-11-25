@@ -72,6 +72,10 @@ async function startServer() {
         await recordOfferCardView(req.body.payload || {});
         return res.json({ ok: true });
       }
+      if (req.body?.action === 'ads.categories') {
+        const { readOfferCategories } = await import('./server/offerCategories.js');
+        return res.status(200).json({ ok: true, data: await readOfferCategories() });
+      }
       if (req.body?.action === 'ads.list' || req.body?.action === 'ads.detail') {
         const { readPublicOfferAds } = await import('./server/offerAds.js');
         return res.json({ ok: true, data: await readPublicOfferAds(req.body.action, req.body.payload || {}) });
@@ -109,6 +113,11 @@ async function startServer() {
         const { recordOfferCardView, readDemoOfferEngagement } = await import('./server/offerAds.js');
         const data = action === 'admin.ads.view' ? await recordOfferCardView(payload) : await readDemoOfferEngagement(true);
         return res.json({ ok: true, data });
+      }
+      if (action === 'admin.ads.categories.manage') {
+        if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });
+        const { manageOfferCategories } = await import('./server/offerCategories.js');
+        return res.status(200).json({ ok: true, data: await manageOfferCategories(payload) });
       }
       if (action === 'admin.ads.listWithViews') {
         if (user.email?.trim().toLowerCase() !== 'waelvts@gmail.com') return res.status(403).json({ ok: false, error: 'admin_only' });

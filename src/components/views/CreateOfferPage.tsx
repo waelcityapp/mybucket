@@ -3,7 +3,7 @@ import { AD_NO_LINKS_AR, AD_NO_LINKS_EN, adContactError, adVideoLimit, containsE
 import { type PaidAdPrices, type AdPriceLock, type LegacyAdTransfer } from '../../utils/adCheckout';
 import { AdPricingPage } from './FeaturedAdInfoPage';
 import { followInternalLink } from '../../utils/navigationHistory';
-import { DEFAULT_FREE_OFFER_POLICY, OFFER_CATEGORY_LABELS, type FreeOfferEligibility, type FreeOfferPolicy, type OfferTier, type PublicOfferAd } from '../../data/offerAds';
+import { DEFAULT_FREE_OFFER_POLICY, type FreeOfferEligibility, type FreeOfferPolicy, type OfferTier, type PublicOfferAd } from '../../data/offerAds';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, ArrowLeft, ImagePlus, Megaphone, CheckCircle2, LoaderCircle, Video, X } from 'lucide-react';
 import type { Language } from '../../types';
@@ -15,6 +15,7 @@ import { AdPaymentCheckout } from './AdPaymentCheckout';
 import { AdCreativeCard } from '../AdCreativeCard';
 import { AdScheduleFields } from '../AdScheduleFields';
 import { AD_TIME_ZONE, adScheduleDate, emptyAdSchedule } from '../../utils/adSchedule';
+import { useOfferCategories } from '../../services/offerCategoriesClient';
 import { offerAdsRequest } from '../../services/offerAdsClient';
 import { uploadAdMedia, type SignedAdUpload, type UploadedAdMedia } from '../../services/adMediaUpload';
 
@@ -27,6 +28,7 @@ interface Props { lang: Language; canEditDirectly?: boolean; onBack: () => void;
 
 export function CreateOfferPage({ lang, canEditDirectly = false, onBack, onNavigate }: Props) {
   const ar = lang === 'ar';
+  const { categories, categoryError, reloadCategories } = useOfferCategories();
   const [prices, setPrices] = useState<PaidAdPrices | null>(null);
   const [priceFailure, setPriceFailure] = useState(false);
   const [priceAttempt, setPriceAttempt] = useState(0);
@@ -61,6 +63,7 @@ export function CreateOfferPage({ lang, canEditDirectly = false, onBack, onNavig
   const requestingEdit = Boolean(editId && !canEditDirectly);
   const editAction = canEditDirectly ? 'admin.ads.edit' : 'ads.edit';
   const editErrors: Record<string, string> = {
+    ad_category_unavailable: ar ? 'القسم غير متاح. اختار قسم تاني.' : 'This category is unavailable. Choose another one.',
     ad_edit_request_pending: ar ? 'عندك طلب تعديل قيد المراجعة لنفس الإعلان.' : 'An edit request for this ad is awaiting review.',
     ad_edit_request_limit: ar ? 'استخدمت طلبي التعديل المتاحين لهذا الإعلان.' : 'You have used both edit requests for this ad.',
     ad_edit_unavailable: ar ? 'الإعلان غير متاح للتعديل حاليًا.' : 'This ad is no longer available for editing.',
@@ -100,6 +103,7 @@ export function CreateOfferPage({ lang, canEditDirectly = false, onBack, onNavig
     return () => { active = false; };
   }, [tier, eligibilityAttempt, editId]);
   const [category, setCategory] = useState('');
+  const [originalCategory, setOriginalCategory] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [merchant, setMerchant] = useState('');
@@ -157,6 +161,7 @@ export function CreateOfferPage({ lang, canEditDirectly = false, onBack, onNavig
         setTitle(ad.title);
         setDescription(ad.description);
         setCategory(ad.categorySlug);
+        setOriginalCategory(ad.categorySlug);
         setMerchant(ad.merchant);
         setContact(ad.contact);
         setCallPhone(ad.callPhone ?? '');
@@ -408,6 +413,7 @@ export function CreateOfferPage({ lang, canEditDirectly = false, onBack, onNavig
         ...contentErrors,
         ad_active_exists: ar ? 'عندك إعلان مجاني نشط. استنى لحد ما مدته تنتهي.' : 'You already have an active free ad. Wait for it to end.',
         ad_free_image_only: ar ? 'الإعلان المجاني يسمح بصورة واحدة اختيارية بدون فيديو.' : 'Free ads allow one optional image and no video.',
+        ad_category_unavailable: ar ? 'القسم غير متاح. ارجع واختار قسم تاني.' : 'This category is unavailable. Go back and choose another one.',
         ad_correction_unavailable: ar ? 'الطلب ده مش متاح للتصحيح حاليًا. راجع إعلاناتي.' : 'This ad is no longer available for correction. Check My ads.',
         ad_pending_exists: ar ? 'عندك إعلان مجاني بانتظار الموافقة.' : 'You already have a free ad awaiting review.',
         ad_daily_limit: ar ? 'وصلت للحد اليومي لإرسال الإعلانات. حاول يوم تاني.' : 'You reached the daily ad limit. Try again another day.',
@@ -631,8 +637,12 @@ export function CreateOfferPage({ lang, canEditDirectly = false, onBack, onNavig
               <div><label htmlFor="offer-category" className={label}>{ar ? 'القسم' : 'Category'}</label>
                 <select id="offer-category" required value={category} onChange={event => setCategory(event.target.value)} className={field}>
                   <option value="">{ar ? 'اختر القسم' : 'Choose category'}</option>
-                  {OFFER_CATEGORY_LABELS.map(c => <option key={c.id} value={c.id}>{ar ? c.ar : c.en}</option>)}
+                  {categories?.filter(c => !c.archived || (editId && c.id === originalCategory)).map(c =>
+                    <option key={c.id} value={c.id}>{ar ? c.ar : c.en}</option>)}
                 </select>
+                {categoryError && <button type="button" onClick={reloadCategories} className="mt-2 text-sm font-bold underline">
+                  {ar ? 'تعذّر تحميل الأقسام. حاول تاني' : 'Could not load categories. Retry'}
+                </button>}
               </div>
               <div><label htmlFor="offer-title" className={label}>{ar ? 'عنوان الإعلان' : 'Title'}</label>
                 <input id="offer-title" required maxLength={120} value={title} onChange={event => setTitle(event.target.value)}

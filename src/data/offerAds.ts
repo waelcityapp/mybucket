@@ -81,3 +81,18 @@ export type OfferAdEditReview = {
 export type MyOfferAd = Pick<ReviewOfferAd, 'id' | 'title' | 'merchant' | 'tier' | 'status' | 'submittedAt' | 'startsAt' | 'endsAt' | 'rejectionReason' | 'requiresVideoCorrection'> & { deleteAfter: number | null; thumbnailUrl?: string; editRequestsUsed?: number;
   editRequestStatus?: 'pending' | 'approved' | 'rejected';
   editRejectionReason?: string };
+
+export type OfferCategorySettings = { id: string; ar: string; en: string; archived?: boolean };
+
+export function rankOfferCategories(categories: readonly OfferCategorySettings[], ads: readonly PublicOfferAd[], lang: 'ar' | 'en') {
+  const activity = new Map<string, { count: number; latest: number }>();
+  for (const ad of ads) {
+    const previous = activity.get(ad.categorySlug);
+    activity.set(ad.categorySlug, { count: (previous?.count ?? 0) + 1, latest: Math.max(previous?.latest ?? 0, ad.startsAt) });
+  }
+  const empty = { count: 0, latest: 0 };
+  const alphabet = new Intl.Collator(lang);
+  return categories.filter(category => !category.archived || activity.has(category.id)).map(category =>
+    ({ ...category, ...(activity.get(category.id) ?? empty) }))
+    .sort((a, b) => b.count - a.count || b.latest - a.latest || alphabet.compare(a[lang], b[lang]) || a.id.localeCompare(b.id));
+}

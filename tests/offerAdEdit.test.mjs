@@ -8,7 +8,7 @@ const editId = 'cc4c59df-2c5e-44cc-86a3-0ac89d5d990b';
 const ownerId = 'admin';
 const fields = { id, editId, editRevision: '', categorySlug: OFFER_CATEGORY_IDS[0],
   title: 'New title', description: 'New details', merchant: 'Business', mediaAction: 'keep' };
-const original = { ownerId, title: 'Old title', status: 'approved', startsAt: 1000, endsAt: 2000,
+const original = { ownerId, categorySlug: fields.categorySlug, title: 'Old title', status: 'approved', startsAt: 1000, endsAt: 2000,
   publishedUntil: 2000, payment: { tier: 'vip', amountEgp: 200 }, vipDurationDays: 1,
   receipt: { publicId: 'receipt' }, media: { publicId: 'original-media', resourceType: 'image' },
   mediaType: 'image', likeCount: 3 };

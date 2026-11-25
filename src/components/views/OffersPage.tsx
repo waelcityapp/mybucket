@@ -8,7 +8,8 @@ import {
   Gift, Smartphone, Store, Play, Eye, type LucideIcon
 } from 'lucide-react';
 import { Language } from '../../types';
-import { supportsOfferFavorites, type OfferEngagement, type OfferReaction, type OfferReactionState, type PublicOfferAd } from '../../data/offerAds';
+import { rankOfferCategories, supportsOfferFavorites, type OfferEngagement, type OfferReaction, type OfferReactionState, type PublicOfferAd } from '../../data/offerAds';
+import { useOfferCategories } from '../../services/offerCategoriesClient';
 import { offerAdsRequest } from '../../services/offerAdsClient';
 import { DEMO_ADS } from '../../data/demoAds';
 import { offerShareExcerpt } from '../../utils/offerShare';
@@ -26,27 +27,19 @@ interface OffersPageProps {
   onNavigate: (path: string) => void;
 }
 
-interface OfferCategory {
-  slug: string;
-  ar: string;
-  en: string;
-  Icon: LucideIcon;
-}
-
-const CATEGORIES: OfferCategory[] = [
-  { slug: 'banks-finance', ar: 'البنوك والمؤسسات المالية', en: 'Banks & Financial Services', Icon: Landmark },
-  { slug: 'restaurants-cafes-outings', ar: 'المطاعم والكافيهات والخروجات', en: 'Restaurants, Cafes & Outings', Icon: UtensilsCrossed },
-  { slug: 'food-beverages', ar: 'الأطعمة والمشروبات', en: 'Food & Beverages', Icon: ShoppingBasket },
-  { slug: 'fashion', ar: 'الملابس والأحذية والإكسسوارات', en: 'Fashion & Accessories', Icon: Shirt },
-  { slug: 'travel-events', ar: 'الرحلات والفعاليات', en: 'Travel & Events', Icon: Plane },
-  { slug: 'sports-fitness', ar: 'الجيم والرياضة', en: 'Sports & Fitness', Icon: Dumbbell },
-  { slug: 'cars-transport', ar: 'السيارات والمواصلات', en: 'Cars & Transport', Icon: Car },
-  { slug: 'health-beauty', ar: 'الصحة والجمال', en: 'Health & Beauty', Icon: HeartPulse },
-  { slug: 'home-shopping', ar: 'المنزل والتسوق', en: 'Home & Shopping', Icon: House },
-  { slug: 'education-services', ar: 'التعليم والخدمات', en: 'Education & Services', Icon: GraduationCap },
-  { slug: 'technology', ar: 'الإلكترونيات والتكنولوجيا', en: 'Electronics & Technology', Icon: Smartphone },
-];
-
+const categoryIcons: Record<string, LucideIcon> = {
+  'banks-finance': Landmark,
+  'restaurants-cafes-outings': UtensilsCrossed,
+  'food-beverages': ShoppingBasket,
+  fashion: Shirt,
+  'travel-events': Plane,
+  'sports-fitness': Dumbbell,
+  'cars-transport': Car,
+  'health-beauty': HeartPulse,
+  'home-shopping': House,
+  'education-services': GraduationCap,
+  technology: Smartphone,
+};
 
 type OfferCard = PublicOfferAd & { viewCount?: number };
 const viewedAdIds = new Set<string>();
@@ -69,6 +62,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
   const isAr = lang === 'ar';
   const BackIcon = isAr ? ArrowRight : ArrowLeft;
   const ForwardIcon = isAr ? ArrowLeft : ArrowRight;
+  const { categories, categoryError, reloadCategories } = useOfferCategories();
   const [search, setSearch] = useState('');
   const [published, setPublished] = useState<OfferCard[] | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -113,32 +107,31 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
   useEffect(() => {
     if (!published) return;
     let timer: number | undefined;
-    const expireFreeAds = () => {
+    const expireAds = () => {
       window.clearTimeout(timer);
       const now = Date.now();
       let next = Infinity;
       for (const ad of published) {
-        if (ad.tier !== 'free' || ad.endsAt <= now) continue;
+        if (ad.endsAt <= now) continue;
         next = Math.min(next, ad.endsAt);
       }
-      if (published.some(ad => ad.tier === 'free' && ad.endsAt <= now)) {
-        setPublished(current => current?.filter(ad => ad.tier !== 'free' || ad.endsAt > now) ?? null);
+      if (published.some(ad => ad.endsAt <= now)) {
+        setPublished(current => current?.filter(ad => ad.endsAt > now) ?? null);
       }
-      if (next < Infinity) timer = window.setTimeout(expireFreeAds, Math.min(next - now, 2_147_483_647));
+      if (next < Infinity) timer = window.setTimeout(expireAds, Math.min(next - now, 2_147_483_647));
     };
-    expireFreeAds();
-    document.addEventListener('visibilitychange', expireFreeAds);
+    expireAds();
+    document.addEventListener('visibilitychange', expireAds);
     return () => {
       window.clearTimeout(timer);
-      document.removeEventListener('visibilitychange', expireFreeAds);
+      document.removeEventListener('visibilitychange', expireAds);
     };
   }, [published]);
-  const category = CATEGORIES.find(item => item.slug === categorySlug);
-  const list = useMemo(() => CATEGORIES.filter(item =>
+  const category = categories?.find(item => item.id === categorySlug);
+  const list = useMemo(() => rankOfferCategories(categories ?? [], published ?? [], lang).filter(item =>
     `${item.ar} ${item.en}`.toLowerCase().includes(search.trim().toLowerCase())
-  ), [search]);
+  ), [categories, published, lang, search]);
 
-  const categoryCount = (slug: string) => published?.filter(offer => offer.categorySlug === slug).length;
   const allDemoAds = DEMO_ADS.map(ad => {
     const [title, description, merchant] = isAr ? ad.ar : ad.en;
     const media = 'video' in ad ? { type: 'video' as const, poster: `/demo-ads/${ad.poster}`, url: `/demo-ads/${ad.video}` }
@@ -152,7 +145,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
   const rank = { vip: 0, featured: 1, free: 2 };
   const realAds = published?.filter(ad => ad.categorySlug === categorySlug)
     .sort((a, b) => rank[a.tier ?? 'free'] - rank[b.tier ?? 'free']) ?? [];
-  const demoAds = allDemoAds.filter(ad => ad.categorySlug === categorySlug);
+  const demoAds = category?.archived ? [] : allDemoAds.filter(ad => ad.categorySlug === categorySlug);
   const visibleAds = favoritesOnly
     ? (published ?? []).filter(ad => supportsOfferFavorites(ad.tier) && reactions?.[ad.id]?.saved === true)
     : showVip ? [...vipAds.slice(rotation), ...vipAds.slice(0, rotation)]
@@ -256,6 +249,11 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
 
       <main className={`mx-auto px-4 py-6 pb-16 ${categorySlug || showVip ? "max-w-7xl" : "max-w-xl"}`}>
         {!categorySlug && !favoritesPage && <VipPushSettings lang={lang} />}
+        {categoryError && <p role="alert" className="mb-4 text-sm text-red-700 dark:text-red-300">
+          {isAr ? 'تعذّر تحميل أقسام العروض.' : 'Could not load offer categories.'}{' '}
+          <button type="button" className="font-bold underline" onClick={reloadCategories}>{isAr ? 'حاول تاني' : 'Retry'}</button>
+        </p>}
+        {!categories && !categoryError && <p role="status" className="mb-4 text-sm">{isAr ? 'جاري تحميل الأقسام…' : 'Loading categories…'}</p>}
         {loadError ? <p role="alert" className="mb-4 text-sm text-red-700">
           {isAr ? 'تعذّر تحميل العروض المنشورة.' : 'Could not load published ads.'}{' '}
           <button type="button" className="font-bold underline" onClick={() => setAttempt(value => value + 1)}>{isAr ? 'حاول تاني' : 'Retry'}</button>
@@ -279,7 +277,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
         </p>}
         {categorySlug || showVip || favoritesOnly ? (
           <section className="space-y-4">
-            {category || showVip || favoritesOnly ? (
+            {!categories && categorySlug && !showVip && !favoritesOnly ? null : category || showVip || favoritesOnly ? (
               <>
                 {showVip && !favoritesOnly && <div className="flex flex-wrap items-center justify-between gap-3">
                   <h2 className="text-lg font-extrabold">{isAr ? 'عروض VIP' : 'VIP offers'}</h2>
@@ -298,7 +296,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                         const badge = demo ? (isAr ? 'إعلان تجريبي' : 'Demo ad')
                           : tier === 'vip' ? 'VIP' : tier === 'featured' ? (isAr ? 'مميز' : 'Featured') : null;
                         const { title: adTitle, description, merchant, media } = ad;
-                        const cardCategory = showVip ? CATEGORIES.find(item => item.slug === ad.categorySlug) : undefined;
+                        const cardCategory = showVip ? categories?.find(item => item.id === ad.categorySlug) : undefined;
                         const listedViews = 'viewCount' in ad && typeof ad.viewCount === 'number' ? ad.viewCount : undefined;
                         const confirmed = confirmedViews[ad.id];
                         const viewCount = confirmed === undefined ? listedViews : Math.max(listedViews ?? 0, confirmed);
@@ -320,7 +318,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                               {badge}
                             </span>}
                             <div className="flex flex-1 flex-col gap-2 p-3.5">
-                              {cardCategory && <a href={`/offers/category/${cardCategory.slug}`} onClick={event => followInternalLink(event, onNavigate)}
+                              {cardCategory && <a href={`/offers/category/${cardCategory.id}`} onClick={event => followInternalLink(event, onNavigate)}
                                 className="w-fit max-w-full break-words rounded text-xs font-bold text-emerald-800 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-emerald-600 dark:text-emerald-300">
                                 {isAr ? cardCategory.ar : cardCategory.en}
                               </a>}
@@ -383,20 +381,20 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
             </label>
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-sm font-extrabold">{isAr ? 'الأقسام الرئيسية' : 'Main categories'}</h3>
-              <span className="text-xs text-slate-500">{list.length} {isAr ? 'قسم' : 'categories'}</span>
+              {categories && <span className="text-xs text-slate-500">{list.length} {isAr ? 'قسم' : 'categories'}</span>}
             </div>
-            {list.length === 0 ? (
+            {!categories ? null : list.length === 0 ? (
               <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-sm text-slate-500">
-                {isAr ? 'مفيش أقسام مطابقة للبحث' : 'No categories match your search'}
+                {search.trim() ? (isAr ? 'مفيش أقسام مطابقة للبحث' : 'No categories match your search') : (isAr ? 'مفيش أقسام متاحة حاليًا' : 'No categories are currently available')}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {list.map(item => {
-                  const Icon = item.Icon;
+                  const Icon = categoryIcons[item.id] ?? Store;
                   return (
                     <a
-                      key={item.slug}
-                      href={`/offers/category/${item.slug}`}
+                      key={item.id}
+                      href={`/offers/category/${item.id}`}
                       onClick={event => followInternalLink(event, onNavigate)}
                       className="bg-white border border-slate-200 rounded-2xl px-4 py-4 min-h-[100px] flex items-center gap-3 hover:border-emerald-300 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-emerald-500 transition-all"
                     >
@@ -405,7 +403,7 @@ export const OffersPage: React.FC<OffersPageProps> = ({ lang, onBack, categorySl
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-extrabold leading-snug">{isAr ? item.ar : item.en}</h4>
-                        {published && <p className="text-xs text-slate-500 mt-1">{isAr ? `عروض منشورة: ${categoryCount(item.slug)}` : `Published ads: ${categoryCount(item.slug)}`}</p>}
+                        {published && <p className="text-xs text-slate-500 mt-1">{isAr ? `عروض منشورة: ${item.count}` : `Published ads: ${item.count}`}</p>}
                       </div>
                       <ForwardIcon className="w-4 h-4 text-slate-400 shrink-0" />
                     </a>

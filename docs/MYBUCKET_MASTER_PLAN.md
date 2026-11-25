@@ -1,5 +1,10 @@
 # MyBucket — Master Implementation Plan
 
+## Offer category management and ordering (#308)
+
+- Public offer categories rank by live ad count, then by the latest live ad start date, and alphabetically in the current language for empty categories.
+- Admins add, rename, archive and restore bilingual categories. Stable category IDs preserve existing ad links. Archived categories stop accepting new selections and remain discoverable while they have live ads.
+
 ## Rejected ads in My Ads (#307)
 
 - Show the rejection status and reason together. Owners can delete a rejected ad and its uploads after confirmation. Removing a rejected free ad does not update the approval waiting-period ledger.

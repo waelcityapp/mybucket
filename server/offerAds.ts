@@ -1,3 +1,4 @@
+import { assertActiveOfferCategory } from './offerCategories.js';
 import { queueVipPush, readVipPushCampaigns } from './vipPush.js';
 import { adContactError, adVideoLimit, containsExternalAdLink, normalizeAdPhone, normalizeGoogleMapsUrl } from '../src/utils/adContent.js';
 import { DEFAULT_PAID_AD_PRICES, isPaidAdPrice, paidAdDailyPrice, adRunDays, normalizePaymentContactPhone, normalizeAdTransferReference, type LegacyAdTransfer, validVipDurationDays } from '../src/utils/adCheckout.js';
@@ -6,7 +7,7 @@ import { getAdminFirestore } from './firebaseAdmin.js';
 import { confirmAdminAdTestUpload, deleteAdminAdTestUpload, signAdminAdTestUpload } from './adminAdTestUpload.js';
 import { SubscriptionError } from './subscriptionService.js';
 import { DEMO_ADS } from '../src/data/demoAds.js';
-import { DEFAULT_FREE_OFFER_POLICY, supportsOfferFavorites, type FreeOfferEligibility, type FreeOfferPolicy, type OfferEngagement, type OfferReactionState, OFFER_CATEGORY_IDS, OFFER_EDIT_REQUEST_LIMIT, type OfferAdEditReview, type MyOfferAd, type OfferAdStatus, type PublicOfferAd } from '../src/data/offerAds.js';
+import { DEFAULT_FREE_OFFER_POLICY, supportsOfferFavorites, type FreeOfferEligibility, type FreeOfferPolicy, type OfferEngagement, type OfferReactionState, OFFER_EDIT_REQUEST_LIMIT, type OfferAdEditReview, type MyOfferAd, type OfferAdStatus, type PublicOfferAd } from '../src/data/offerAds.js';
 
 const DAY = 86400000;
 const MAX_UPLOADS = 3;
@@ -77,7 +78,6 @@ function expiry(payload: Payload, now: number, allowPast = false) {
 
 function adTextFields(payload: Payload) {
   const categorySlug = field(payload.categorySlug, 60);
-  if (!OFFER_CATEGORY_IDS.some(category => category === categorySlug)) return fail('invalid_ad_details');
   return {
     categorySlug,
     title: field(payload.title, 120),
@@ -520,7 +520,8 @@ export async function editOwnOfferAd(action: string, uid: string, payload: Paylo
       const ad = editable(await tx.get(ref));
       checkRequest(ad);
       checkRevision(ad);
-      getChanges(ad);
+      const changes = getChanges(ad);
+      await assertActiveOfferCategory(db, tx, changes.categorySlug, ad.categorySlug);
       const mediaType = payload.resourceType;
       if (mediaType !== 'image' && (mediaType !== 'video' || !ad.payment)) return fail('invalid_media_type');
       if ((await tx.get(policyRef(db))).data()?.uploadsPaused === true) return fail('ad_upload_paused', 503);
@@ -573,6 +574,7 @@ export async function editOwnOfferAd(action: string, uid: string, payload: Paylo
     if (alreadySaved(current)) return;
     checkRequest(current);
     checkRevision(current);
+    await assertActiveOfferCategory(db, tx, changes.categorySlug, current.categorySlug);
     if (replace) {
       const staged = activeReplacement(await tx.get(upload));
       if (staged.uploadDay) {
@@ -709,6 +711,7 @@ export async function sendOfferAd(action: string, uid: string, payload: Payload,
         if (lockPrice) return fail('ad_already_submitted', 409);
         return { submitted: true, signed: null };
       }
+      await assertActiveOfferCategory(db, tx, fields.categorySlug, existing?.categorySlug);
       const applyContentPolicy = !existing?.payment || existing.adContentVersion === 1;
       if (applyContentPolicy) {
         validateAdContent(fields, featured);

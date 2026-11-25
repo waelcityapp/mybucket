@@ -1,6 +1,7 @@
 import { cairoAdTransferTime, normalizeAdTransferReference, isPaidAdPrice, MAX_AD_DAILY_PRICE_EGP, type PaidAdPrices } from '../../utils/adCheckout';
 import { useEffect, useState } from 'react';
-import { OFFER_CATEGORY_LABELS, type FreeOfferPolicy, type OfferAdEditReview, type OfferAdStatus, type ReviewOfferAd, type VipPushCampaign } from '../../data/offerAds';
+import { type OfferCategorySettings, type FreeOfferPolicy, type OfferAdEditReview, type OfferAdStatus, type ReviewOfferAd, type VipPushCampaign } from '../../data/offerAds';
+import { useOfferCategories } from '../../services/offerCategoriesClient';
 import { offerAdsRequest } from '../../services/offerAdsClient';
 import type { Language } from '../../types';
 import { AdCreativeCard } from '../AdCreativeCard';
@@ -25,7 +26,7 @@ function readHiddenAds(): Set<string> {
   }
 }
 
-function AdEditRequests({ lang }: { lang: Language }) {
+function AdEditRequests({ lang, categories }: { lang: Language; categories: OfferCategorySettings[] | null }) {
   const ar = lang === 'ar';
   const [requests, setRequests] = useState<OfferAdEditReview[] | null>(null);
   const [refresh, setRefresh] = useState(0);
@@ -83,7 +84,7 @@ function AdEditRequests({ lang }: { lang: Language }) {
         ? (ar ? 'مميز' : 'Featured') : (ar ? 'مجاني' : 'Free')} · {new Date(request.submittedAt).toLocaleString(ar ? 'ar-EG' : 'en-GB', { timeZone: 'Africa/Cairo' })}</p>
       <div className="grid gap-3 lg:grid-cols-2">
         {[request.original, request.proposed].map((ad, index) => {
-          const category = OFFER_CATEGORY_LABELS.find(item => item.id === ad.categorySlug);
+          const category = categories?.find(item => item.id === ad.categorySlug);
           return <div key={index} className="min-w-0 space-y-2">
             <h3 className="text-sm font-bold">{index === 0 ? (ar ? 'النسخة المنشورة' : 'Published version') : (ar ? 'التعديل المقترح' : 'Proposed changes')}</h3>
             <div className="text-slate-900">
@@ -122,7 +123,87 @@ function AdEditRequests({ lang }: { lang: Language }) {
   </section>;
 }
 
+function AdCategoriesSettings({ lang, catalog }: { lang: Language; catalog: ReturnType<typeof useOfferCategories> }) {
+  const ar = lang === 'ar';
+  const { categories, setCategories, categoryError, reloadCategories } = catalog;
+  const [selectedId, setSelectedId] = useState('');
+  const selected = categories?.find(item => item.id === selectedId);
+  const [names, setNames] = useState({ ar: '', en: '' });
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState<{ error: boolean; text: string } | null>(null);
+
+  const select = (id: string) => {
+    const item = categories?.find(category => category.id === id);
+    setSelectedId(id);
+    setNames({ ar: item?.ar ?? '', en: item?.en ?? '' });
+    setConfirmArchive(false);
+    setFeedback(null);
+  };
+
+  const save = async (operation: 'add' | 'rename' | 'archive' | 'restore') => {
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const items = await offerAdsRequest<OfferCategorySettings[]>('admin.ads.categories.manage', { operation, id: selectedId, ...names }, true);
+      setCategories(items);
+      if (operation === 'add') {
+        setSelectedId(items.at(-1)?.id ?? '');
+        setNames({ ar: names.ar.trim(), en: names.en.trim() });
+      }
+      setConfirmArchive(false);
+      setFeedback({ error: false, text: ar ? 'تم حفظ القسم.' : 'Category saved.' });
+    } catch (error) {
+      const limitReached = error instanceof Error && error.message === 'ad_category_limit';
+      setFeedback({ error: true, text: limitReached
+        ? (ar ? 'وصلت للحد الأقصى لعدد الأقسام.' : 'The category limit has been reached.')
+        : (ar ? 'تعذّر حفظ القسم. حاول تاني.' : 'Could not save the category. Try again.') });
+    } finally { setBusy(false); }
+  };
+
+  const field = 'min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 dark:border-slate-600 dark:bg-slate-800';
+  const button = 'min-h-11 rounded-xl px-3 text-sm font-bold disabled:opacity-50';
+  return <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+    <h2 className="font-extrabold">{ar ? 'أقسام الإعلانات' : 'Ad categories'}</h2>
+    {categoryError ? <button type="button" onClick={reloadCategories} className="text-sm font-bold underline">{ar ? 'تعذّر تحميل الأقسام. حاول تاني' : 'Could not load categories. Retry'}</button>
+      : !categories ? <p role="status" className="text-sm">{ar ? 'جاري تحميل الأقسام…' : 'Loading categories…'}</p>
+      : <form className="space-y-3" onSubmit={event => { event.preventDefault(); void save(selectedId ? 'rename' : 'add'); }}>
+        <label className="grid gap-1 text-sm font-bold">
+          {ar ? 'القسم' : 'Category'}
+          <select className={field} value={selectedId} disabled={busy} onChange={event => select(event.target.value)}>
+            <option value="">{ar ? 'إضافة قسم جديد' : 'Add a category'}</option>
+            {categories.slice().sort((a, b) => a[lang].localeCompare(b[lang], lang)).map(item =>
+              <option key={item.id} value={item.id}>{item[lang]}{item.archived ? (ar ? ' (ملغى)' : ' (archived)') : ''}</option>)}
+          </select>
+        </label>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {(['ar', 'en'] as const).map(language => <label key={language} className="grid gap-1 text-sm font-bold">
+            {language === 'ar' ? (ar ? 'الاسم بالعربي' : 'Arabic name') : (ar ? 'الاسم بالإنجليزي' : 'English name')}
+            <input className={field} dir={language === 'ar' ? 'rtl' : 'ltr'} value={names[language]} disabled={busy}
+              required maxLength={80} onChange={event => setNames(previous => ({ ...previous, [language]: event.target.value }))} />
+          </label>)}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="submit" disabled={busy || !names.ar.trim() || !names.en.trim()} className={`${button} bg-emerald-700 text-white`}>
+            {selectedId ? (ar ? 'حفظ الاسم' : 'Save names') : (ar ? 'إضافة القسم' : 'Add category')}
+          </button>
+          {selected && !confirmArchive && <button type="button" disabled={busy} className={`${button} border border-slate-300 dark:border-slate-600`}
+            onClick={() => selected.archived ? void save('restore') : setConfirmArchive(true)}>
+            {selected.archived ? (ar ? 'استعادة القسم' : 'Restore category') : (ar ? 'إلغاء القسم' : 'Archive category')}
+          </button>}
+        </div>
+        {confirmArchive && <div className="space-y-2 text-sm">
+          <p>{ar ? 'القسم مش هيظهر عند إنشاء إعلان جديد. الإعلانات المنشورة فيه هتفضل ظاهرة لحد انتهاء مدتها.' : 'New ads cannot use this category. Published ads stay visible until they expire.'}</p>
+          <button type="button" disabled={busy} className={`${button} bg-red-700 text-white`} onClick={() => void save('archive')}>{ar ? 'تأكيد إلغاء القسم' : 'Confirm archive'}</button>
+          <button type="button" disabled={busy} className={button} onClick={() => setConfirmArchive(false)}>{ar ? 'تراجع' : 'Cancel'}</button>
+        </div>}
+        {feedback && <p role={feedback.error ? 'alert' : 'status'} className="text-sm">{feedback.text}</p>}
+      </form>}
+  </section>;
+}
+
 export function AdminOfferAds({ lang }: { lang: Language }) {
+  const catalog = useOfferCategories();
   const ar = lang === 'ar';
   const campaignLabels: Record<VipPushCampaign['status'], string> = {
     queued: ar ? 'بانتظار بدء الإرسال' : 'Waiting to send',
@@ -321,7 +402,8 @@ export function AdminOfferAds({ lang }: { lang: Language }) {
   };
 
   return <div className="space-y-4">
-    <AdEditRequests lang={lang} />
+    <AdCategoriesSettings lang={lang} catalog={catalog} />
+    <AdEditRequests lang={lang} categories={catalog.categories} />
     <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-extrabold">{ar ? 'متابعة رفع ملفات الإعلانات' : 'Ad upload activity'}</h2>

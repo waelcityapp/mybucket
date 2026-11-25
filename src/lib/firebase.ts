@@ -21,7 +21,7 @@ import {
 } from 'firebase/firestore';
 import { FinancialAccount, Transaction, Category } from '../types';
 import firebaseConfig from './firebaseConfig';
-import { isProtectedCashAccount, referencesAccount } from '../utils/accountDetails';
+import { isIndependentMethodLink, isProtectedCashAccount, referencesAccount } from '../utils/accountDetails';
 import { isNonNegativeBalance } from '../utils/formatBalance';
 import { bindMovement, movementDeltas, validateBalance, type LinkedAccount } from '../utils/accountLinking';
 
@@ -323,11 +323,9 @@ async function applyFinancialChange(userId: string, expected: Transaction | null
         const targetMethod = await load(proposed.toAccountId);
         if (targetMethod.linkedBankId) await load(targetMethod.linkedBankId);
       }
-      const bound = bindMovement(Array.from(cache.values()), proposed);
-      // If the selected method hasn't changed, retain the balance account captured originally.
-      if (expected?.balanceAccountId && expected.accountId === proposed.accountId) bound.balanceAccountId = expected.balanceAccountId;
-      if (expected?.toBalanceAccountId && expected.toAccountId === proposed.toAccountId) bound.toBalanceAccountId = expected.toBalanceAccountId;
-      if (bound.type === 'transfer' && bound.balanceAccountId === bound.toBalanceAccountId) throw new Error('invalid-transfer');
+      if (expected?.balanceAccountId) await load(expected.balanceAccountId);
+      if (expected?.toBalanceAccountId) await load(expected.toBalanceAccountId);
+      const bound = bindMovement(Array.from(cache.values()), proposed, expected ?? undefined);
       finalTx = { ...proposed, balanceAccountId: bound.balanceAccountId, ...(bound.toBalanceAccountId ? { toBalanceAccountId: bound.toBalanceAccountId } : {}) };
     }
     const deltas = new Map<string, number>();
@@ -340,6 +338,8 @@ async function applyFinancialChange(userId: string, expected: Transaction | null
     for (const [accountId, delta] of deltas) {
       const account = await load(accountId);
       if (account.currency !== (finalTx || expected)!.currency) throw new Error('currency-mismatch');
+      if (delta === 0) continue;
+      if (account.linkedBankId) throw new Error('historical-linked-balance');
       const balance = account.balance + delta;
       try { validateBalance(account, balance); }
       catch (error) {
@@ -468,7 +468,8 @@ export async function updateAccountDetails(userId: string, expected: FinancialAc
       getDocsFromServer(collection(db, 'users', userId, 'accounts')),
       getDocsFromServer(collection(db, 'users', userId, 'transactions')),
     ]);
-    if (transactions.docs.some(record => referencesAccount(record.data() as Transaction, expected.id)) ||
+    if ((!isIndependentMethodLink(expected, updated) &&
+        transactions.docs.some(record => referencesAccount(record.data() as Transaction, expected.id))) ||
         accounts.docs.some(record => record.data().linkedBankId === expected.id)) {
       throw new Error('account-changed');
     }

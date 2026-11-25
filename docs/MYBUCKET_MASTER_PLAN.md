@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Linking existing payment methods (#310)
+
+- Allow zero-balance independent wallets and debit cards with history to link to a bank in the same currency, including conversion of an existing Other Method to a linked wallet. New transactions use the current bank link. Historical transactions retain their original balance targets, and changes that would affect a former independent balance are blocked.
+
 ## Ad category controls (#309)
 
 - Separate the add form from the category list. Rename or archive an active category directly from its row. Display the selected name in the archive confirmation and show archived categories with a restore action. Both localized names remain required.

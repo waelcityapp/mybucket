@@ -13,15 +13,18 @@ interface AccountsViewProps {
   onAddAccount: (acc: Omit<FinancialAccount, 'id'>) => Promise<boolean>;
   editingAccount?: FinancialAccount;
   canChangeAccountDetails: boolean;
+  canLinkExistingMethod: boolean;
   onSaveAccount: (expected: FinancialAccount, account: FinancialAccount) => Promise<boolean>;
   onCloseEdit: () => void;
   onDeleteAccount: (accountId: string) => Promise<boolean>;
   onEditBalance?: (accId: string | null) => void;
 }
 
-export function AccountsView({ accounts, lang, canAddAccounts, onOpenProPlan, onAddAccount, editingAccount, canChangeAccountDetails, onSaveAccount, onCloseEdit, onDeleteAccount, onEditBalance }: AccountsViewProps) {
+export function AccountsView({ accounts, lang, canAddAccounts, onOpenProPlan, onAddAccount, editingAccount, canChangeAccountDetails, canLinkExistingMethod, onSaveAccount, onCloseEdit, onDeleteAccount, onEditBalance }: AccountsViewProps) {
   const t = translations[lang];
   const lockDetails = Boolean(editingAccount) && !canChangeAccountDetails;
+  const canConvertOther = lockDetails && canLinkExistingMethod && editingAccount?.type === 'other';
+  const lockLink = lockDetails && !canLinkExistingMethod;
   const [originalAccount] = useState(editingAccount);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [lockedCard, setLockedCard] = useState<string | null>(null);
@@ -80,6 +83,14 @@ export function AccountsView({ accounts, lang, canAddAccounts, onOpenProPlan, on
     if (saving || !name.trim() || name.trim().length > 40) return;
     const linked = (type === 'card' || type === 'wallet') && linkMode === 'linked';
     const bank = linked ? accounts.find(account => account.id === linkedBankId && account.type === 'bank') : null;
+    if (linked && editingAccount && !editingAccount.linkedBankId && editingAccount.balance !== 0) {
+      setError(lang === 'ar' ? 'سوّي الرصيد المستقل الأول. لازم يكون صفر قبل الربط بالبنك.' : 'Settle the independent balance first. It must be zero before linking to the bank.');
+      return;
+    }
+    if (canConvertOther && type === 'wallet' && !linked) {
+      setError(lang === 'ar' ? 'اختار الربط بحساب بنكي لإكمال التحويل.' : 'Choose a linked bank account to finish converting this method.');
+      return;
+    }
     const amount = Number(initialBalance || 0);
     const limit = Number(creditLimit);
     if (((type === 'card' || type === 'wallet') && !linkMode) || (linked && !bank) || !Number.isFinite(amount) || amount < 0 || (type === 'credit' && (!Number.isFinite(limit) || limit <= 0 || amount > limit))) {
@@ -335,18 +346,18 @@ export function AccountsView({ accounts, lang, canAddAccounts, onOpenProPlan, on
                   </label>
                   <select
                     value={type}
-                    disabled={lockDetails}
+                    disabled={lockDetails && !canConvertOther}
                     onChange={(e) => setType(e.target.value as AccountType)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold"
                   >
-                    <option value="cash">{lang === 'ar' ? 'كاش' : 'Cash'}</option>
-                    <option value="bank">{lang === 'ar' ? 'بنك' : 'Bank'}</option>
-                    <option value="credit" disabled={Boolean(editingAccount) && !canAddAccounts && editingAccount?.type !== 'credit'}>{lang === 'ar' ? 'بطاقة ائتمان' : 'Credit card'}</option>
-                    <option value="card" disabled={Boolean(editingAccount) && !canAddAccounts && editingAccount?.type !== 'card'}>{lang === 'ar' ? 'بطاقة خصم مباشر / فيزا' : 'Debit card'}</option>
+                    <option value="cash" disabled={canConvertOther}>{lang === 'ar' ? 'كاش' : 'Cash'}</option>
+                    <option value="bank" disabled={canConvertOther}>{lang === 'ar' ? 'بنك' : 'Bank'}</option>
+                    <option value="credit" disabled={canConvertOther || (Boolean(editingAccount) && !canAddAccounts && editingAccount?.type !== 'credit')}>{lang === 'ar' ? 'بطاقة ائتمان' : 'Credit card'}</option>
+                    <option value="card" disabled={canConvertOther || (Boolean(editingAccount) && !canAddAccounts && editingAccount?.type !== 'card')}>{lang === 'ar' ? 'بطاقة خصم مباشر / فيزا' : 'Debit card'}</option>
                     <option value="wallet">{lang === 'ar' ? 'إنستاباي / محفظة إلكترونية' : 'InstaPay / wallet'}</option>
                     <option value="other">{lang === 'ar' ? 'وسائل دفع واستلام أخرى' : 'Other Methods'}</option>
-                    <option value="custom">{lang === 'ar' ? 'حسابات أخرى' : 'Other Accounts'}</option>
-                    <option value="savings">{lang === 'ar' ? 'ادخار' : 'Savings'}</option>
+                    <option value="custom" disabled={canConvertOther}>{lang === 'ar' ? 'حسابات أخرى' : 'Other Accounts'}</option>
+                    <option value="savings" disabled={canConvertOther}>{lang === 'ar' ? 'ادخار' : 'Savings'}</option>
                   </select>
                 </div>
 
@@ -367,10 +378,10 @@ export function AccountsView({ accounts, lang, canAddAccounts, onOpenProPlan, on
 
               {(type === 'card' || type === 'wallet') && <div className="space-y-2">
                 <label className="block text-xs font-bold text-slate-700">{lang === 'ar' ? 'طريقة الحساب' : 'Account setup'}</label>
-                <select required disabled={lockDetails} value={linkMode} onChange={e => setLinkMode(e.target.value as '' | 'independent' | 'linked')} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold">
+                <select required disabled={lockLink} value={linkMode} onChange={e => setLinkMode(e.target.value as '' | 'independent' | 'linked')} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold">
                   <option value="">{lang === 'ar' ? 'اختر نوع الحساب' : 'Choose account setup'}</option><option value="independent">{lang === 'ar' ? 'مستقلة برصيد خاص' : 'Independent balance'}</option><option value="linked">{lang === 'ar' ? 'مرتبطة بحساب بنكي' : 'Linked to a bank account'}</option>
                 </select>
-                {linkMode === 'linked' && <select disabled={lockDetails} value={linkedBankId} onChange={e => setLinkedBankId(e.target.value)} required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold"><option value="">{lang === 'ar' ? 'اختر الحساب البنكي' : 'Choose a bank account'}</option>{accounts.filter(a => a.type === 'bank' && a.id !== editingAccount?.id).map(a => <option key={a.id} value={a.id}>{a.nameAr} ({a.currency})</option>)}</select>}
+                {linkMode === 'linked' && <select disabled={lockLink} value={linkedBankId} onChange={e => setLinkedBankId(e.target.value)} required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold"><option value="">{lang === 'ar' ? 'اختر الحساب البنكي' : 'Choose a bank account'}</option>{accounts.filter(a => a.type === 'bank' && a.id !== editingAccount?.id && (!lockDetails || a.currency === editingAccount?.currency)).map(a => <option key={a.id} value={a.id}>{a.nameAr} ({a.currency})</option>)}</select>}
               </div>}
               {(type === 'card' || type === 'wallet') && linkMode === 'linked' && <p className="text-xs text-slate-500">{lang === 'ar' ? 'تستخدم الوسيلة رصيد البنك وعملته، ولا يُحسب رصيدها مرة أخرى في الإجمالي.' : 'This method uses the bank account balance and currency.'}</p>}
               {type === 'credit' && <div><label className="block text-xs font-bold text-slate-700 mb-1">{lang === 'ar' ? 'الحد الائتماني' : 'Credit limit'}</label><input type="number" min="0.01" step="any" required value={creditLimit} onChange={e => setCreditLimit(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2" /></div>}

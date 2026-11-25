@@ -31,14 +31,22 @@ export function resolveAccount(accounts: LinkedAccount[], id: string): ResolvedA
 }
 
 /** Resolve and freeze actual balance account identifiers when creating a movement. */
-export function bindMovement(accounts: LinkedAccount[], movement: Movement): Movement {
+export function bindMovement(accounts: LinkedAccount[], movement: Movement, previous?: Movement): Movement {
   if (!['expense', 'income', 'transfer'].includes(movement.type) || !movement.accountId || !Number.isFinite(movement.amount) || movement.amount <= 0) throw new Error('invalid-amount');
-  const from = resolveAccount(accounts, movement.accountId);
-  const to = movement.type === 'transfer' && movement.toAccountId ? resolveAccount(accounts, movement.toAccountId) : null;
+  const resolveBalance = (methodId: string, originalMethod?: string, originalBalance?: string) => {
+    if (methodId !== originalMethod) return resolveAccount(accounts, methodId).account;
+    const account = accounts.find(item => item.id === (originalBalance || originalMethod));
+    if (!account) throw new Error('account-not-found');
+    return account;
+  };
+  const from = resolveBalance(movement.accountId, previous?.accountId, previous?.balanceAccountId);
+  const oldTransfer = previous?.type === 'transfer' ? previous : undefined;
+  const to = movement.type === 'transfer' && movement.toAccountId
+    ? resolveBalance(movement.toAccountId, oldTransfer?.toAccountId, oldTransfer?.toBalanceAccountId) : null;
   if (movement.type === 'transfer' && !to) throw new Error('missing-destination');
-  if (to && from.account.id === to.account.id) throw new Error('invalid-transfer');
-  if (to && from.account.currency !== to.account.currency) throw new Error('currency-mismatch');
-  return { ...movement, balanceAccountId: from.account.id, ...(to ? { toBalanceAccountId: to.account.id } : {}) };
+  if (to && from.id === to.id) throw new Error('invalid-transfer');
+  if (to && from.currency !== to.currency) throw new Error('currency-mismatch');
+  return { ...movement, balanceAccountId: from.id, ...(to ? { toBalanceAccountId: to.id } : {}) };
 }
 
 /** Positive deltas add to an account, negative deltas subtract from it. */

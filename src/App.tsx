@@ -111,7 +111,7 @@ import {
 import { aiLearnedMemory } from './services/ai/aiLearnedMemory';
 import { isNonNegativeBalance } from './utils/formatBalance';
 import { recordTabNavigation, tabFromHistory } from './utils/navigationHistory';
-import { referencesAccount } from './utils/accountDetails';
+import { canLinkIndependentMethod, referencesAccount } from './utils/accountDetails';
 import { validateBalance } from './utils/accountLinking';
 
 import { redeemMarketerCode, subscribeUserSubscription, type SubscriptionReadIssue } from './services/prototypeSubscriptionClient';
@@ -1134,6 +1134,8 @@ export default function App() {
         ? (lang === 'ar'
           ? `لا يمكن حذف العملية: رصيد ${error.accountNameAr} الحالي ${new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency} ولا يكفي لعكس العملية.`
           : `Cannot delete: ${error.accountName} has ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency}, which is insufficient to reverse the transaction.`)
+        : error instanceof Error && error.message === 'historical-linked-balance'
+        ? (lang === 'ar' ? 'العملية اتسجلت قبل ربط الوسيلة بالبنك. حذفها هيغيّر رصيدها القديم.' : 'This transaction predates the bank link. Deleting it would change the former balance.')
         : error instanceof Error && error.message === 'credit-overpayment'
         ? (lang === 'ar' ? 'لا يمكن حذف العملية لأن عكسها سيتجاوز المبلغ المستحق على بطاقة الائتمان.' : 'Cannot delete because reversing it would exceed the credit card amount owed.')
         : (lang === 'ar' ? 'تعذر حذف العملية وتحديث الأرصدة. تحقق من الاتصال والحسابات ثم حاول مجددًا.' : 'Could not delete the transaction and update balances. Check your connection and accounts.'));
@@ -1158,6 +1160,8 @@ export default function App() {
         ? (lang === 'ar' ? `لا يمكن حفظ التعديل: رصيد ${error.accountNameAr} الحالي ${new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(error.balance)} ${error.currency} لا يكفي لإتمامه.` : `Cannot save: ${error.accountName} has insufficient funds.`)
         : error instanceof Error && error.message === 'credit-overpayment'
         ? (lang === 'ar' ? 'المبلغ أكبر من المستحق على بطاقة الائتمان.' : 'The amount exceeds the outstanding credit balance.')
+        : error instanceof Error && error.message === 'historical-linked-balance'
+        ? (lang === 'ar' ? 'العملية اتسجلت قبل ربط الوسيلة بالبنك. التعديل ده هيغيّر رصيدها القديم.' : 'This transaction predates the bank link. This edit would change the former balance.')
         : error instanceof Error && error.message === 'transaction-changed'
         ? (lang === 'ar' ? 'العملية تغيرت على جهاز آخر. أغلق التعديل وافتحها مجددًا.' : 'This transaction changed elsewhere. Reopen it to edit.')
         : (lang === 'ar' ? 'تعذر حفظ التعديل وتحديث الأرصدة. تحقق من الاتصال والحسابات.' : 'Could not update the transaction and balances. Check your connection and accounts.');
@@ -1254,9 +1258,11 @@ export default function App() {
   // Open Edit Balance Modal
   const accountEditId = window.location.pathname.match(/^\/accounts\/([A-Za-z0-9_-]+)\/edit$/)?.[1];
   const editingAccount = accounts.find(account => account.id === accountEditId);
-  const canChangeAccountDetails = Boolean(editingAccount && financialLoaded.accounts && financialLoaded.transactions &&
-    !transactionReadError && !transactions.some(tx => referencesAccount(tx, editingAccount.id)) &&
-    !accounts.some(account => account.linkedBankId === editingAccount.id));
+  const accountDetailsLoaded = financialLoaded.accounts && financialLoaded.transactions && !transactionReadError;
+  const hasDependentMethods = accounts.some(account => account.linkedBankId === editingAccount?.id && Boolean(editingAccount));
+  const canChangeAccountDetails = Boolean(editingAccount && accountDetailsLoaded && !hasDependentMethods &&
+    !transactions.some(tx => referencesAccount(tx, editingAccount.id)));
+  const canLinkExistingMethod = Boolean(editingAccount && accountDetailsLoaded && !hasDependentMethods && canLinkIndependentMethod(editingAccount));
   const closeAccountEdit = () => backFromOffer(window.history.state?.offerBack || '/accounts');
 
   const saveEditedAccount = async (expected: FinancialAccount, updated: FinancialAccount) => {
@@ -2076,6 +2082,7 @@ export default function App() {
           <AccountsView
             editingAccount={editingAccount}
             canChangeAccountDetails={canChangeAccountDetails}
+            canLinkExistingMethod={canLinkExistingMethod}
             onSaveAccount={saveEditedAccount}
             onCloseEdit={closeAccountEdit}
             accounts={accounts}

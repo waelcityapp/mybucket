@@ -1,4 +1,4 @@
-import { INSTAPAY_NAME } from './transactionDescription';
+import { INSTAPAY_NAME } from './transactionDescription.js';
 import { ARABIC_FINANCIAL_SLANG_BASE } from '../services/ai/aiKnowledgeBase.js';
 import { aiLearnedMemory } from '../services/ai/aiLearnedMemory.js';
 

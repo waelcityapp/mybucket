@@ -854,3 +854,5 @@ The site visits card distinguishes anonymous browser IDs, first-ever expense sav
 Daily authenticated activity counts each account once per Cairo day for a saved expense, income or transfer, a newly created financial account, completed query, or explicit search. Activity records do not contain search terms, query text, or financial details. Existing daily expense markers still count.
 
 Financial question answers appear immediately after the home quick actions and receive focus after a query. Breakdowns show four rows initially and let users expand the remaining rows without changing the total.
+
+Server-side account matching uses explicit ESM import extensions through the transaction description utilities so Vercel can load the financial gateway.

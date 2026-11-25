@@ -1,5 +1,5 @@
-import { removeRelativeDayPhrase } from './relativeDayPhrase';
-import { removeTodayDateExpression } from './todayDateExpression';
+import { removeRelativeDayPhrase } from './relativeDayPhrase.js';
+import { removeTodayDateExpression } from './todayDateExpression.js';
 
 export const INSTAPAY_NAME = '(?:[إأا]نستا[ -]*(?:با?[يى]|بين)|insta[ -]*pay)';
 const instaPayName = new RegExp(INSTAPAY_NAME, 'i');

@@ -25,6 +25,7 @@ export function DeleteTransactionsPage({ lang, uid, accounts, transactions, read
   const [review, setReview] = useState<Transaction[] | null>(null);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState('');
+  const [completed, setCompleted] = useState(false);
   const today = new Date();
   const dateKey = (date: Date) => [
     date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0'),
@@ -59,6 +60,7 @@ export function DeleteTransactionsPage({ lang, uid, accounts, transactions, read
   async function remove() {
     if (!review || running) return;
     setRunning(true);
+    setCompleted(false);
     setResult('');
     let deleted = 0;
     let already = 0;
@@ -68,7 +70,8 @@ export function DeleteTransactionsPage({ lang, uid, accounts, transactions, read
         if (outcome === 'deleted') deleted++;
         else already++;
       }
-      setResult(ar ? `تم حذف ${number(deleted)} عملية. ${already ? `كانت ${number(already)} عملية محذوفة بالفعل.` : ''}` : `Deleted ${deleted} transactions. ${already ? `${already} were already deleted.` : ''}`);
+      setCompleted(true);
+      setResult(ar ? `اكتمل الحذف. تم حذف ${number(deleted)} عملية. ${already ? `كانت ${number(already)} عملية محذوفة بالفعل.` : ''}` : `Deletion completed. Deleted ${deleted} transactions. ${already ? `${already} were already deleted.` : ''}`);
       setReview(null);
     } catch {
       setResult(ar
@@ -85,7 +88,7 @@ export function DeleteTransactionsPage({ lang, uid, accounts, transactions, read
       <button disabled={running} onClick={onBack} className="grid size-10 place-items-center rounded-xl border border-slate-200 bg-white dark:bg-slate-900 dark:border-slate-700" aria-label={ar ? 'رجوع' : 'Back'}><Back className="size-5" /></button>
       <h1 className="text-xl font-extrabold">{ar ? 'حذف العمليات' : 'Delete transactions'}</h1>
     </header>
-    {result && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{result}</p>}
+    {result && <p role="status" className={`rounded-xl p-3 text-sm ${completed ? "bg-emerald-50 text-emerald-900" : "bg-amber-50 text-amber-900"}`}>{result}</p>}
     {!review ? <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
       <label className="block space-y-2 text-sm font-bold">{ar ? 'نوع العمليات' : 'Transaction type'}
         <select value={kind} onChange={event => { setKind(event.target.value as Kind); setCurrency(''); }} className="w-full rounded-xl border border-slate-300 bg-transparent p-3">
@@ -130,8 +133,15 @@ export function DeleteTransactionsPage({ lang, uid, accounts, transactions, read
         </label>
         <label className="flex gap-2 text-sm"><input type="radio" name="balance" checked={!adjust} onChange={() => setAdjust(false)} />{ar ? 'الاحتفاظ بالأرصدة الحالية' : 'Keep current balances'}</label>
       </fieldset>
-      <p className="text-sm font-bold">{!periodReady ? '' : ready ? (ar ? `العمليات المطابقة: ${number(selected.length)}` : `Matching transactions: ${selected.length}`) : (ar ? 'جاري تحميل العمليات...' : 'Loading transactions…')}</p>
-      <button disabled={!ready || !periodReady || !selected.length} onClick={() => { setResult(''); setReview([...selected]); }} className="min-h-12 w-full rounded-xl bg-emerald-700 px-4 font-bold text-white disabled:opacity-40">{ar ? 'معاينة الحذف' : 'Review deletion'}</button>
+      {!ready ? <p role="status" className="text-sm">{ar ? 'جاري تحميل العمليات...' : 'Loading transactions…'}</p>
+        : periodReady && (selected.length === 0
+          ? <p role="status" className="rounded-xl bg-slate-100 p-3 text-sm font-semibold text-slate-800 dark:bg-slate-800 dark:text-slate-100">
+              {ar ? 'مفيش عمليات مطابقة للاختيار ده.' : 'No transactions match this selection.'}
+            </p>
+          : <>
+              <p className="text-sm font-bold">{ar ? `العمليات المطابقة: ${number(selected.length)}` : `Matching transactions: ${selected.length}`}</p>
+              <button onClick={() => { setResult(''); setReview([...selected]); }} className="min-h-12 w-full rounded-xl bg-emerald-700 px-4 font-bold text-white">{ar ? 'معاينة الحذف' : 'Review deletion'}</button>
+            </>)}
     </section> : <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
       <h2 className="font-extrabold">{ar ? 'راجع اختيارك' : 'Review your selection'}</h2>
       <p className="text-sm">{ar ? `سيتم حذف ${number(review.length)} عملية.` : `${review.length} transactions will be deleted.`}</p>

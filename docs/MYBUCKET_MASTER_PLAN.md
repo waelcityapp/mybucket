@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Transaction deletion feedback (#313)
+
+- Show a distinct completion status and replace the disabled review button with an empty-selection message when no transactions match.
+
 ## Removing accounts from active use (#312)
 
 - Owners can remove an eligible account regardless of its balance or transaction history. Keep the record for historical names and bookkeeping while excluding it from active balances, new movements, and the plan account count.

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { bindMovement } from '../src/utils/accountLinking.ts';
-import { isIndependentMethodLink } from '../src/utils/accountDetails.ts';
+import { bankBalanceAfterLink, isIndependentMethodLink } from '../src/utils/accountDetails.ts';
 
 test('transfers require distinct balance accounts with the same currency', () => {
   const accounts = [
@@ -35,4 +35,15 @@ test('the history exception is limited to first links with the same currency', (
   assert.equal(isIndependentMethodLink({ ...previous, type: 'wallet' }, linked), true);
   assert.equal(isIndependentMethodLink(previous, { ...linked, currency: 'USD' }), false);
   assert.equal(isIndependentMethodLink(linked, { ...linked, linkedBankId: 'another' }), false);
+});
+
+test('linking a nonempty account requires an explicit balance decision using the reviewed bank balance', () => {
+  assert.equal(bankBalanceAfterLink(200, 1000, { mode: 'add', bankBalance: 1000 }), 1200);
+  assert.equal(bankBalanceAfterLink(200, 1000, { mode: 'already-included', bankBalance: 1000 }), 1000);
+  assert.equal(bankBalanceAfterLink(0, 1000), 1000);
+  assert.throws(() => bankBalanceAfterLink(200, 1000), /link-balance-choice-required/);
+  assert.throws(() => bankBalanceAfterLink(200, 1100, { mode: 'add', bankBalance: 1000 }), /bank-balance-changed/);
+  assert.throws(() => bankBalanceAfterLink(-200, 1000, { mode: 'add', bankBalance: 1000 }), /link-balance-unavailable/);
+  const cash = { id: 'cash', type: 'cash', currency: 'EGP', balance: 200 };
+  assert.equal(isIndependentMethodLink(cash, { ...cash, type: 'wallet', linkedBankId: 'bank' }), true);
 });

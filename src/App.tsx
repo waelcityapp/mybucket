@@ -111,7 +111,7 @@ import {
 import { aiLearnedMemory } from './services/ai/aiLearnedMemory';
 import { isNonNegativeBalance } from './utils/formatBalance';
 import { recordTabNavigation, tabFromHistory } from './utils/navigationHistory';
-import { canLinkIndependentMethod, referencesAccount } from './utils/accountDetails';
+import { type BankLinkChoice, canLinkIndependentMethod, referencesAccount } from './utils/accountDetails';
 import { validateBalance } from './utils/accountLinking';
 
 import { redeemMarketerCode, subscribeUserSubscription, type SubscriptionReadIssue } from './services/prototypeSubscriptionClient';
@@ -1265,17 +1265,19 @@ export default function App() {
   const canLinkExistingMethod = Boolean(editingAccount && accountDetailsLoaded && !hasDependentMethods && canLinkIndependentMethod(editingAccount));
   const closeAccountEdit = () => backFromOffer(window.history.state?.offerBack || '/accounts');
 
-  const saveEditedAccount = async (expected: FinancialAccount, updated: FinancialAccount) => {
+  const saveEditedAccount = async (expected: FinancialAccount, updated: FinancialAccount, linkChoice?: BankLinkChoice) => {
     if (!editingAccount || !authUser || updated.id !== editingAccount.id) return false;
     if (!canAddAccounts && updated.type !== expected.type && (updated.type === 'card' || updated.type === 'credit')) {
       setToastMessage(lang === 'ar' ? 'يجب الترقية إلى خطة Pro لاختيار نوع البطاقة.' : 'Upgrade to Pro to choose this card type.');
       return false;
     }
     try {
-      await updateAccountDetails(authUser.uid, expected, updated);
+      await updateAccountDetails(authUser.uid, expected, updated, linkChoice);
       return true;
     } catch (error) {
-      setToastMessage(error instanceof Error && error.message === 'account-changed'
+      setToastMessage(error instanceof Error && error.message === 'bank-balance-changed'
+        ? (lang === 'ar' ? 'رصيد البنك اتغير. راجع الرصيد الحالي واختار تاني.' : 'The bank balance changed. Review the latest amount and choose again.')
+        : error instanceof Error && error.message === 'account-changed'
         ? (lang === 'ar' ? 'تغيّر الحساب أثناء التعديل. افتحه مجددًا.' : 'This account changed while editing. Reopen it.')
         : (lang === 'ar' ? 'تعذّر حفظ الحساب.' : 'Could not save account.'));
       return false;

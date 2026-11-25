@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Bank link balance choices (#311)
+
+- An existing independent account can become a bank-linked payment method with the same currency even if it has transaction history. Show the bank balance and require a choice to add a positive independent balance to the bank or confirm it was already included. Apply the selected balance and link atomically.
+
 ## Linking existing payment methods (#310)
 
 - Allow zero-balance independent wallets and debit cards with history to link to a bank in the same currency, including conversion of an existing Other Method to a linked wallet. New transactions use the current bank link. Historical transactions retain their original balance targets, and changes that would affect a former independent balance are blocked.

@@ -21,7 +21,7 @@ import {
 } from 'firebase/firestore';
 import { FinancialAccount, Transaction, Category } from '../types';
 import firebaseConfig from './firebaseConfig';
-import { isIndependentMethodLink, isProtectedCashAccount, referencesAccount } from '../utils/accountDetails';
+import { bankBalanceAfterLink, type BankLinkChoice, isIndependentMethodLink, isProtectedCashAccount, referencesAccount } from '../utils/accountDetails';
 import { isNonNegativeBalance } from '../utils/formatBalance';
 import { bindMovement, movementDeltas, validateBalance, type LinkedAccount } from '../utils/accountLinking';
 
@@ -457,7 +457,7 @@ export async function resetFinancialStart(userId: string): Promise<void> {
 }
 
 
-export async function updateAccountDetails(userId: string, expected: FinancialAccount, updated: FinancialAccount): Promise<void> {
+export async function updateAccountDetails(userId: string, expected: FinancialAccount, updated: FinancialAccount, linkChoice?: BankLinkChoice): Promise<void> {
   requireFinancialWriteAccess();
   if (auth.currentUser?.uid !== userId) throw new Error('auth-changed');
   if (!updated.name.trim() || updated.name.length > 40 || updated.nameAr.length > 40) throw new Error('invalid-account-name');
@@ -487,9 +487,15 @@ export async function updateAccountDetails(userId: string, expected: FinancialAc
     }
     if (changesStructure && updated.linkedBankId) {
       if (updated.linkedBankId === expected.id || !['card', 'wallet'].includes(updated.type)) throw new Error('invalid-link');
-      const bank = (await transaction.get(doc(db, 'users', userId, 'accounts', updated.linkedBankId))).data();
-      if (!bank || bank.type !== 'bank' || bank.currency !== updated.currency) throw new Error('invalid-link');
-      if (!current.linkedBankId && current.balance !== 0) throw new Error('nonzero-balance');
+      const bankRef = doc(db, 'users', userId, 'accounts', updated.linkedBankId);
+      const bank = (await transaction.get(bankRef)).data() as FinancialAccount | undefined;
+      if (!bank || bank.type !== 'bank' || bank.linkedBankId || bank.currency !== updated.currency) throw new Error('invalid-link');
+      if (!current.linkedBankId) {
+        if (current.currency !== updated.currency) throw new Error('currency-mismatch');
+        const nextBalance = bankBalanceAfterLink(current.balance, bank.balance, linkChoice);
+        validateBalance(bank, nextBalance);
+        if (nextBalance !== bank.balance) transaction.update(bankRef, { balance: nextBalance });
+      }
     }
     const balance = updated.linkedBankId ? 0 : updated.balance;
     validateBalance(updated, balance);

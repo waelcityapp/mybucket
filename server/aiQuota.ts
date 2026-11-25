@@ -106,9 +106,6 @@ export function proGeminiEntryLimit(limits: AiDailyLimits, publishedLimit?: numb
   return Math.min(limits.proGeminiEntries, publishedLimit ?? limits.proGeminiEntries);
 }
 
-export async function recordGeminiEntryFailure(uid: string, day: string, db = getAdminFirestore()) {
-  await db.doc(`users/${uid}/aiUsage/daily_${day}`).set({ geminiEntryUnavailable: true }, { merge: true });
-}
 
 /** Read-only snapshot for the authenticated user's settings screen. */
 export async function readOwnAiQuota(uid: string, deps?: { db: ReturnType<typeof getAdminFirestore>; getTrials: typeof readTrialSettings; getLimits: typeof readAiDailyLimits; getRegistration: (uid: string) => Promise<string>; now: () => number }) {
@@ -146,7 +143,7 @@ export async function readOwnAiQuota(uid: string, deps?: { db: ReturnType<typeof
       ? { basic: entries('basic', caps?.basicEntries) }
       : { proAi: entries('proAi'), proAdditional: entries('proAdditional', caps?.proAdditionalEntries), geminiAttempts: bucket('proGeminiEntries', proGeminiEntryLimit(limits, caps?.proAiEntries)) };
   })() : null;
-  return { day, plan, ...(plan === 'pro' && data.geminiEntryUnavailable === true && { geminiEntryUnavailable: true }), ...(savedEntries ? { savedEntries } : {}), ...(plan === 'basic' ? { local: { entries: bucket('basicLocalEntries'), inquiries: bucket('basicLocalInquiries') } } : plan === 'pro' ? { gemini: { entries: bucket('proGeminiEntries'), inquiries: bucket('proGeminiInquiries') }, local: { entries: bucket('proLocalEntries'), inquiries: bucket('proLocalInquiries') } } : {}) };
+  return { day, plan, ...(savedEntries ? { savedEntries } : {}), ...(plan === 'basic' ? { local: { entries: bucket('basicLocalEntries'), inquiries: bucket('basicLocalInquiries') } } : plan === 'pro' ? { gemini: { entries: bucket('proGeminiEntries'), inquiries: bucket('proGeminiInquiries') }, local: { entries: bucket('proLocalEntries'), inquiries: bucket('proLocalInquiries') } } : {}) };
 }
 export async function reserveAiQuota(uid: string, rawText: unknown, forceLocal = false, deps?: QuotaDeps, inquiryRequestId?: unknown): Promise<AiQuotaDecision> {
   if (typeof rawText !== 'string' || !rawText.trim() || rawText.length > 300) {

@@ -8,7 +8,7 @@ import { stageFor } from '../config/subscriptionPolicy';
 
 type Bucket = { used: number; limit: number; remaining: number };
 type SavedBucket = { used: number; limit: number | null; remaining: number | null };
-type UsageStatus = { day: string; plan: 'basic' | 'pro' | 'expired'; geminiEntryUnavailable?: boolean; savedEntries?: Partial<Record<'basic' | 'proAi' | 'proAdditional' | 'geminiAttempts', SavedBucket>>; local?: { entries: Bucket; inquiries: Bucket }; gemini?: { entries: Bucket; inquiries: Bucket } };
+type UsageStatus = { day: string; plan: 'basic' | 'pro' | 'expired'; savedEntries?: Partial<Record<'basic' | 'proAi' | 'proAdditional' | 'geminiAttempts', SavedBucket>>; local?: { entries: Bucket; inquiries: Bucket }; gemini?: { entries: Bucket; inquiries: Bucket } };
 
 interface SubscriptionCardProps {
   subscription: UserSubscription | null;
@@ -115,15 +115,13 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
                 {([
                   ['basic', isAr ? 'إجمالي الحفظ' : 'Total saved'],
                   ['proAi', isAr ? 'الحفظ بعد تحليل الذكاء الاصطناعي' : 'Saved after AI analysis'],
-                  ['proAdditional', isAr ? 'العمليات الإضافية' : 'Additional transactions'],
+                  ['proAdditional', isAr ? 'الحفظ اليدوي أو بعد التحليل المحلي' : 'Saved manually or after local analysis'],
                 ] as const).map(([key, label]) => {
                   const count = usage.savedEntries?.[key];
                   if (!count) return null;
-                  const locked = key === 'proAdditional' && count.limit !== null &&
-                    !usage.geminiEntryUnavailable && (usage.savedEntries?.geminiAttempts?.remaining ?? 0) > 0;
                   return <div key={key} className="flex flex-wrap justify-between gap-x-2">
                     <dt>{label}</dt>
-                    <dd className="font-bold">{locked ? (isAr ? 'تتاح بعد انتهاء محاولات الذكاء الاصطناعي' : 'Unlocks after AI attempts are used') : count.limit === null
+                    <dd className="font-bold">{count.limit === null
                       ? (isAr ? `${count.used} محفوظة` : `${count.used} saved`)
                       : (isAr ? `${count.used} من ${count.limit} · المتبقي ${count.remaining}` : `${count.used} of ${count.limit} · ${count.remaining} left`)}</dd>
                   </div>;

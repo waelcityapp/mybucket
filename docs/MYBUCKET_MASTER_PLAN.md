@@ -826,3 +826,5 @@ Transaction review presents editable fields directly. Voice capture remains in i
 Local transaction notes omit spoken income introductions and account references while keeping the reason or description the user provided.
 
 The app header offers sharing next to the language control. It shares the public home URL and falls back to copying the link.
+
+Pro manual saves and saves following local analysis use the daily additional transaction allowance from the start of the day. AI analysis attempts and saves with a valid AI entry ticket are tracked independently. The former AI-exhaustion gate and provider-failure marker have been retired.

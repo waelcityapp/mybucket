@@ -51,7 +51,7 @@ export function AdminPlanLimitsView({ lang }: { lang: Language }) {
 
   const rows: Array<{ label: string; basic?: PlanLimitKey; pro: PlanLimitKey }> = [
     { label: ar ? 'حصة العمليات اليومية' : 'Daily transaction allowance', basic: 'basicEntries', pro: 'proAiEntries' },
-    { label: ar ? 'عمليات إضافية بعد انتهاء محاولات الذكاء الاصطناعي' : 'Additional entries after AI attempts', pro: 'proAdditionalEntries' },
+    { label: ar ? 'الحفظ اليدوي أو بعد التحليل المحلي' : 'Saves by manual entry or local analysis', pro: 'proAdditionalEntries' },
     { label: ar ? 'الاستعلامات يوميًا' : 'Daily inquiries', basic: 'basicInquiries', pro: 'proInquiries' },
     { label: ar ? 'الحسابات' : 'Accounts', basic: 'basicAccounts', pro: 'proAccounts' },
     { label: ar ? 'بنود الصرف' : 'Expense categories', basic: 'basicCategories', pro: 'proCategories' },

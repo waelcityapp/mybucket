@@ -1067,7 +1067,6 @@ export default function App() {
       const code = error instanceof Error ? error.message : '';
       const entryErrors: Record<string, [string, string]> = {
         plan_entry_limit: ['وصلت لحد تسجيل العمليات النهارده.', 'You reached your daily transaction limit.'],
-        pro_ai_allowance_first: ['استخدم الذكاء الاصطناعي لتحليل العملية. الحصة الإضافية بتتاح بعد انتهاء محاولات الذكاء الاصطناعي.', 'Use AI to analyze the transaction. Additional entries unlock after the AI attempts are used.'],
         invalid_entry_ticket: ['انتهت صلاحية مسودة التحليل. أعد تحليل العملية قبل الحفظ.', 'The analyzed draft expired. Analyze the transaction again before saving.'],
         'insufficient-balance': ['الرصيد المتاح لا يكفي لحفظ العملية.', 'There is not enough available balance to save this transaction.'],
         'credit-limit-exceeded': ['العملية تتجاوز حد بطاقة الائتمان.', 'The transaction exceeds the credit card limit.'],

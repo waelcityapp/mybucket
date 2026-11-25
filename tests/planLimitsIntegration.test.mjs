@@ -8,7 +8,7 @@ import { getAdminFirestore } from '../server/firebaseAdmin.ts';
 import { savePlanLimitsDraft, publishPlanLimits, readPublishedPlanLimits } from '../server/planLimits.ts';
 import { saveFinancialTransaction, issueAiEntryTicket } from '../server/financialTransactions.ts';
 import { saveFinancialCollection } from '../server/financialCollections.ts';
-import { readOwnAiQuota, recordGeminiEntryFailure, reserveAiQuota } from '../server/aiQuota.ts';
+import { readOwnAiQuota, reserveAiQuota } from '../server/aiQuota.ts';
 import { reserveReportExport } from '../server/reportExport.ts';
 import { DEFAULT_PLAN_LIMITS } from '../src/config/planLimits.ts';
 
@@ -72,15 +72,18 @@ test('published limits coordinate the gateway, the Firestore write boundary and 
     await assert.rejects(saveFinancialCollection('basic', 'financial.accounts.save', { items: [{ ...account, id: 'extra' }] }), { code: 'plan_accounts_limit' });
     await assert.rejects(reserveReportExport('basic', 'csv'), { code: 'pro_plan_required' });
 
-    await assert.rejects(saveFinancialTransaction('pro', { transaction: entry('manual') }), { code: 'pro_ai_allowance_first' });
-    await assert.rejects(saveFinancialTransaction('pro-fallback', { transaction: entry('manual') }), { code: 'pro_ai_allowance_first' });
+    await assert.rejects(saveFinancialTransaction('pro', { transaction: entry('manual'), ticket: 'unknown-ticket' }), { code: 'invalid_entry_ticket' });
+    await saveFinancialTransaction('pro', { transaction: entry('manual') });
+    await saveFinancialTransaction('pro', { transaction: entry('manual') });
+    const manualUsage = (await readOwnAiQuota('pro')).savedEntries;
+    assert.deepEqual(manualUsage.proAdditional, { used: 1, limit: 1, remaining: 0 });
+    assert.deepEqual(manualUsage.geminiAttempts, { used: 0, limit: 2, remaining: 2 });
+    assert.equal((await db.doc('users/pro/accounts/cash').get()).get('balance'), 90);
+    await assert.rejects(saveFinancialTransaction('pro', { transaction: entry('another') }), { code: 'plan_entry_limit' });
+
     const failedGemini = await reserveAiQuota('pro-fallback', 'صرفت عشرة جنيه');
     assert.equal(failedGemini.remaining, 1);
-    await assert.rejects(saveFinancialTransaction('pro-fallback', { transaction: entry('manual') }), { code: 'pro_ai_allowance_first' });
-    await recordGeminiEntryFailure('pro-fallback', failedGemini.day, db);
     await saveFinancialTransaction('pro-fallback', { transaction: entry('manual') });
-    await assert.rejects(saveFinancialTransaction('pro-fallback', { transaction: entry('another') }), { code: 'plan_entry_limit' });
-    assert.equal((await readOwnAiQuota('pro-fallback')).geminiEntryUnavailable, true);
 
     const reservation = await reserveAiQuota('pro', 'صرفت عشرة جنيه');
     assert.equal(reservation.remaining, 1);
@@ -88,7 +91,6 @@ test('published limits coordinate the gateway, the Firestore write boundary and 
     assert.equal(lastAttempt.remaining, 0);
     await assert.rejects(reserveAiQuota('pro', 'صرفت عشرة جنيه'), { code: 'ai_daily_limit_reached' });
     const ticket = await issueAiEntryTicket('pro', day);
-    await saveFinancialTransaction('pro', { transaction: entry('manual') });
     await saveFinancialTransaction('pro', { transaction: entry('voice'), ticket });
     await assert.rejects(saveFinancialTransaction('pro', { transaction: entry('another') }), { code: 'plan_entry_limit' });
     const inquiry = 'كام صرفت النهاردة؟';

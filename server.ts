@@ -327,7 +327,7 @@ async function startServer() {
           if (!text || typeof text !== 'string') {
             return res.status(400).json({ ok: false, error: 'invalid_ai_input', message: 'Missing or invalid text.' });
           }
-          const { reserveAiQuota, recordGeminiEntryFailure } = await import('./server/aiQuota');
+          const { reserveAiQuota } = await import('./server/aiQuota');
           const reservation = await reserveAiQuota(user.uid, text, false, undefined, payload.inquiryRequestId);
           const result = await interpretNaturalLanguageWithGemini({
             text,
@@ -338,9 +338,8 @@ async function startServer() {
             lang: lang || 'ar',
             currentProposal,
             learnedMemory: Array.isArray(learnedMemory) ? learnedMemory : [],
-          }).catch(async error => {
+          }).catch(error => {
             if (!(error instanceof Error) || error.message !== 'gemini_unavailable') throw error;
-            if (reservation.operation === 'entry') await recordGeminiEntryFailure(user.uid, reservation.day);
             throw new SubscriptionError(503, 'gemini_unavailable', 'AI is temporarily unavailable.');
           });
           if (reservation.operation === 'entry' && result.intent === 'CREATE_TRANSACTION' && result.transaction) {

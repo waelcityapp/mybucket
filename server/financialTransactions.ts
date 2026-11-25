@@ -1,4 +1,4 @@
-import { cairoDay, proGeminiEntryLimit, readAiDailyLimits } from './aiQuota.js';
+import { cairoDay } from './aiQuota.js';
 import { randomUUID } from 'node:crypto';
 import { DEFAULT_PLAN_LIMITS } from '../src/config/planLimits.js';
 import { grantFromAccess } from '../src/config/grantPolicy.js';
@@ -83,17 +83,7 @@ export async function saveFinancialTransaction(uid: string, payload: Record<stri
     const effectiveLimits = limits ?? DEFAULT_PLAN_LIMITS;
     const validTicket = ticket?.exists && ticket.get('day') === day;
     const aiEntry = pro && validTicket;
-    if (limits && pro && !aiEntry) {
-      const [attempts, technicalLimits] = await Promise.all([
-        tx.get(user.collection('aiUsage').doc(`daily_${day}`)),
-        readAiDailyLimits(),
-      ]);
-      const used = attempts.get('proGeminiEntries') ?? 0;
-      if (!Number.isSafeInteger(used) || used < 0) return fail('invalid_quota_counter', 503);
-      if (attempts.get('geminiEntryUnavailable') !== true && used < proGeminiEntryLimit(technicalLimits, limits.proAiEntries)) {
-        return fail(ticketRef ? 'invalid_entry_ticket' : 'pro_ai_allowance_first', 409);
-      }
-    }
+    if (pro && ticketRef && !validTicket) return fail('invalid_entry_ticket', 409);
     const bucket = !pro ? 'basic' : aiEntry ? 'proAi' : 'proAdditional';
     const cap = bucket === 'basic' ? effectiveLimits.basicEntries : effectiveLimits.proAdditionalEntries;
     const used = usage.get(bucket) ?? 0;

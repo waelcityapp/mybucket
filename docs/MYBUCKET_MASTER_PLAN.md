@@ -848,3 +848,5 @@ The startup screen uses the ad’s green microphone and waveform motif with a lo
 Keep the same launch screen through authentication and the initial account data check so there is no second loading screen before the first usable page.
 
 The launch screen writes the My Bucket name in nine steps over 540 ms and remains visible until initial app readiness. Reduced-motion mode shows the complete name immediately.
+
+The approved original stereo startup chime is optional and disabled by default. Its device-local setting enables a single playback attempt on the first click inside the app after launch. Playback never gates the launch screen.

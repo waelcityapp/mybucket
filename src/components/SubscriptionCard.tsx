@@ -8,7 +8,7 @@ import { stageFor } from '../config/subscriptionPolicy';
 
 type Bucket = { used: number; limit: number; remaining: number };
 type SavedBucket = { used: number; limit: number | null; remaining: number | null };
-type UsageStatus = { day: string; plan: 'basic' | 'pro' | 'expired'; savedEntries?: Partial<Record<'basic' | 'proAi' | 'proAdditional' | 'geminiAttempts', SavedBucket>>; local?: { entries: Bucket; inquiries: Bucket }; gemini?: { entries: Bucket; inquiries: Bucket } };
+type UsageStatus = { day: string; plan: 'basic' | 'pro' | 'expired'; savedEntries?: Partial<Record<'basic' | 'pro' | 'geminiAttempts', SavedBucket>>; local?: { entries: Bucket; inquiries: Bucket }; gemini?: { entries: Bucket; inquiries: Bucket } };
 
 interface SubscriptionCardProps {
   subscription: UserSubscription | null;
@@ -62,6 +62,8 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
       : (isAr ? 'الأيام المتبقية للتجربة' : 'Trial days remaining');
 
 
+  const savedToday = usage?.savedEntries?.pro ?? usage?.savedEntries?.basic;
+
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-4">
       <div className="flex items-center justify-between">
@@ -109,27 +111,15 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
               {isAr ? `المتبقي من محاولات الذكاء الاصطناعي للعمليات: ${usage.savedEntries.geminiAttempts.remaining}`
                 : `AI transaction attempts left: ${usage.savedEntries.geminiAttempts.remaining}`}
             </p>}
-            {usage.savedEntries && <section className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-950">
+            {savedToday && <section className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-950">
               <h3 className="font-extrabold">{isAr ? 'العمليات المحفوظة اليوم' : 'Transactions saved today'}</h3>
-              <dl className="space-y-1.5">
-                {([
-                  ['basic', isAr ? 'إجمالي الحفظ' : 'Total saved'],
-                  ['proAi', isAr ? 'الحفظ بعد تحليل الذكاء الاصطناعي' : 'Saved after AI analysis'],
-                  ['proAdditional', isAr ? 'الحفظ اليدوي أو بعد التحليل المحلي' : 'Saved manually or after local analysis'],
-                ] as const).map(([key, label]) => {
-                  const count = usage.savedEntries?.[key];
-                  if (!count) return null;
-                  return <div key={key} className="flex flex-wrap justify-between gap-x-2">
-                    <dt>{label}</dt>
-                    <dd className="font-bold">{count.limit === null
-                      ? (isAr ? `${count.used} محفوظة` : `${count.used} saved`)
-                      : (isAr ? `${count.used} من ${count.limit} · المتبقي ${count.remaining}` : `${count.used} of ${count.limit} · ${count.remaining} left`)}</dd>
-                  </div>;
-                })}
-              </dl>
-              {(usage.savedEntries.basic ?? usage.savedEntries.proAdditional)?.limit === null
-                ? <p>{isAr ? 'حد الحفظ في انتظار نشر حدود الخطط.' : 'Saving limits are pending plan publication.'}</p>
-                : null}
+              <p>{isAr ? 'يشمل الحفظ اليدوي والحفظ بعد التحليل.' : 'Includes manual saves and saves after analysis.'}</p>
+              <p className="font-bold">
+                {savedToday.limit === null
+                  ? (isAr ? `${savedToday.used} عملية محفوظة` : `${savedToday.used} saved`)
+                  : (isAr ? `حفظت ${savedToday.used} من ${savedToday.limit} · المتبقي ${savedToday.remaining}`
+                    : `Saved ${savedToday.used} of ${savedToday.limit} · ${savedToday.remaining} left`)}
+              </p>
             </section>}
             {usage.plan !== 'expired' && <details className="space-y-2">
               <summary className="cursor-pointer py-2 font-bold">{isAr ? 'محاولات التحليل اليوم' : 'Analysis attempts today'}</summary>

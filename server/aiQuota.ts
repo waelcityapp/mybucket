@@ -107,6 +107,19 @@ export function proGeminiEntryLimit(limits: AiDailyLimits, publishedLimit?: numb
 }
 
 
+export function readSavedEntryCount(snapshot: { get(key: string): unknown }, key: 'basic' | 'proAi' | 'proAdditional' | 'pro'): number {
+  if (key === 'pro') {
+    const total = readSavedEntryCount(snapshot, 'proAi') + readSavedEntryCount(snapshot, 'proAdditional');
+    if (Number.isSafeInteger(total)) return total;
+    throw new SubscriptionError(503, 'invalid_entry_counter', 'Unable to verify usage.');
+  }
+  const used = snapshot.get(key) ?? 0;
+  if (typeof used !== 'number' || !Number.isSafeInteger(used) || used < 0) {
+    throw new SubscriptionError(503, 'invalid_entry_counter', 'Unable to verify usage.');
+  }
+  return used;
+}
+
 /** Read-only snapshot for the authenticated user's settings screen. */
 export async function readOwnAiQuota(uid: string, deps?: { db: ReturnType<typeof getAdminFirestore>; getTrials: typeof readTrialSettings; getLimits: typeof readAiDailyLimits; getRegistration: (uid: string) => Promise<string>; now: () => number }) {
   const db = deps?.db || getAdminFirestore();
@@ -134,14 +147,13 @@ export async function readOwnAiQuota(uid: string, deps?: { db: ReturnType<typeof
       db.doc(`users/${uid}/entryUsage/${day}`).get(),
     ]);
     const caps = publishedPlanLimits(policy);
-    const entries = (key: 'basic' | 'proAi' | 'proAdditional', limit?: number) => {
-      const used = entryCounter.get(key) ?? 0;
-      if (!Number.isSafeInteger(used) || used < 0) throw new SubscriptionError(503, 'invalid_entry_counter', 'Unable to verify usage.');
+    const entries = (key: 'basic' | 'pro', limit?: number) => {
+      const used = readSavedEntryCount(entryCounter, key);
       return { used, limit: limit ?? null, remaining: limit === undefined ? null : Math.max(0, limit - used) };
     };
     return plan === 'basic'
       ? { basic: entries('basic', caps?.basicEntries) }
-      : { proAi: entries('proAi'), proAdditional: entries('proAdditional', caps?.proAdditionalEntries), geminiAttempts: bucket('proGeminiEntries', proGeminiEntryLimit(limits, caps?.proAiEntries)) };
+      : { pro: entries('pro', caps?.proEntries), geminiAttempts: bucket('proGeminiEntries', proGeminiEntryLimit(limits, caps?.proAiEntries)) };
   })() : null;
   return { day, plan, ...(savedEntries ? { savedEntries } : {}), ...(plan === 'basic' ? { local: { entries: bucket('basicLocalEntries'), inquiries: bucket('basicLocalInquiries') } } : plan === 'pro' ? { gemini: { entries: bucket('proGeminiEntries'), inquiries: bucket('proGeminiInquiries') }, local: { entries: bucket('proLocalEntries'), inquiries: bucket('proLocalInquiries') } } : {}) };
 }

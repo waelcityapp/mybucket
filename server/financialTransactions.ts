@@ -1,4 +1,4 @@
-import { cairoDay } from './aiQuota.js';
+import { cairoDay, readSavedEntryCount } from './aiQuota.js';
 import { randomUUID } from 'node:crypto';
 import { DEFAULT_PLAN_LIMITS } from '../src/config/planLimits.js';
 import { grantFromAccess } from '../src/config/grantPolicy.js';
@@ -85,10 +85,10 @@ export async function saveFinancialTransaction(uid: string, payload: Record<stri
     const aiEntry = pro && validTicket;
     if (pro && ticketRef && !validTicket) return fail('invalid_entry_ticket', 409);
     const bucket = !pro ? 'basic' : aiEntry ? 'proAi' : 'proAdditional';
-    const cap = bucket === 'basic' ? effectiveLimits.basicEntries : effectiveLimits.proAdditionalEntries;
-    const used = usage.get(bucket) ?? 0;
-    if (!Number.isSafeInteger(used) || used < 0) return fail('invalid_entry_counter', 503);
-    if (limits && !aiEntry && used >= cap) return fail('plan_entry_limit', 429);
+    const cap = pro ? effectiveLimits.proEntries : effectiveLimits.basicEntries;
+    const used = readSavedEntryCount(usage, bucket);
+    const totalUsed = pro ? readSavedEntryCount(usage, 'pro') : used;
+    if (limits && totalUsed >= cap) return fail('plan_entry_limit', 429);
 
     const accounts = user.collection('accounts');
     const cache = new Map<string, FinancialAccount>();

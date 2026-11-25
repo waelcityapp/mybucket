@@ -1,4 +1,3 @@
-import { isStartupSoundEnabled, saveStartupSoundPreference } from '../../services/startupSound';
 import { AppLockSettings } from './AppLockSettings';
 import type { LockStatus } from '../AppLock';
 import { useState } from 'react';
@@ -64,8 +63,6 @@ export function SettingsView({
 }: SettingsViewProps) {
   const t = translations[lang];
   const [resettingStart, setResettingStart] = useState(false);
-  const [startupSound, setStartupSound] = useState(isStartupSoundEnabled);
-  const [startupSoundError, setStartupSoundError] = useState(false);
   const ar = lang === 'ar';
   const Chevron = ar ? ChevronLeft : ChevronRight;
   const [zeroConfirmed, setZeroConfirmed] = useState(false);
@@ -246,25 +243,6 @@ export function SettingsView({
       </div>
 
       {user && onAppLockChange && <AppLockSettings lang={lang} status={appLockStatus || null} onChange={onAppLockChange} />}
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
-        <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4">
-          <span>
-            <span className="block text-sm font-bold text-slate-800">{ar ? 'صوت الافتتاح' : 'Startup sound'}</span>
-            <span className="mt-1 block text-xs text-slate-600">{ar ? 'تشغيل نغمة My Bucket عند أول ضغطة بعد فتح التطبيق.' : 'Play the My Bucket chime on your first click after opening the app.'}</span>
-          </span>
-          <input type="checkbox" className="size-5 shrink-0 accent-emerald-700" checked={startupSound}
-            onChange={event => {
-              const enabled = event.target.checked;
-              const saved = saveStartupSoundPreference(enabled);
-              setStartupSoundError(!saved);
-              if (saved) setStartupSound(enabled);
-            }} />
-        </label>
-        {startupSoundError && <p role="alert" className="mt-2 text-xs text-rose-700">
-          {ar ? 'تعذّر حفظ اختيار الصوت على الجهاز ده.' : 'Could not save the sound preference on this device.'}
-        </p>}
-      </section>
 
       {/* 3. Language Preference */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">

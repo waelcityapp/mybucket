@@ -1,3 +1,4 @@
+import { normalizeArabicDigits } from '../utils/semanticParser';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
@@ -155,7 +156,10 @@ export function TransactionModal({
   const selectedToAccount = accounts.find((a) => a.id === toAccountId);
   const selectedCategory = categories.find((c) => c.id === categoryId);
 
-  const parsedAmount = parseFloat(amount);
+  const normalizedAmount = normalizeArabicDigits(amount.trim()).replace(/٫/g, '.');
+  const parsedAmount = /^(?:[0-9]+(?:[.][0-9]*)?|[.][0-9]+)$/.test(normalizedAmount)
+    ? Number(normalizedAmount)
+    : NaN;
 
   // Switching type requires an explicit category or destination choice.
   const handleTypeChange = (newType: TransactionType) => {
@@ -178,7 +182,7 @@ export function TransactionModal({
     setError('');
 
     // 1. Validate Amount
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       setError(isAr ? 'يرجى إدخال مبلغ صحيح أكبر من الصفر' : 'Please enter a valid amount greater than 0');
       return;
     }
@@ -384,8 +388,9 @@ export function TransactionModal({
                   {selectedAccount?.currency || currency}
                 </div>
                 <input
-                  type="number"
-                  step="any"
+                  type="text"
+                  inputMode="decimal"
+                  aria-label={t.labelAmount}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0.00"

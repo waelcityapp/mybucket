@@ -73,4 +73,14 @@ assert.equal(parse('صرفت 40 ج بنزين من الانستا بي النه�
 assert.equal(matchExplicitAccountFromText(spoken, [account, { ...account, id: 'other' }]), null);
 assert.equal(matchExplicitAccountFromText(spoken, [{ ...account, name: 'Wallet', nameAr: 'محفظة' }]), null);
 
+const screenshotText = 'صرفت 120 جنيه من الانستابين النهارده بنزين';
+const fuelCategory = { id: 'fuel', name: 'Transportation and fuel', nameAr: 'مواصلات وبنزين', type: 'expense' };
+const screenshotDraft = interpretLocalFinancialRequest({
+  text: screenshotText, accounts: [account], categories: [fuelCategory], currentDateTime: '2026-11-25T13:06:00.000Z', lang: 'ar',
+}).transaction;
+assert.equal(screenshotDraft?.amount, 120);
+assert.equal(screenshotDraft?.accountId, 'insta');
+assert.equal(screenshotDraft?.categoryId, 'fuel');
+assert.equal(screenshotDraft?.description, 'بنزين');
+
 console.log(cases.length+'/'+cases.length+' transaction-note test cases passed');

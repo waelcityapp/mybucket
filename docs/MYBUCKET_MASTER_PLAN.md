@@ -848,3 +848,5 @@ The startup screen uses the ad’s green microphone and waveform motif with a lo
 Keep the same launch screen through authentication and the initial account data check so there is no second loading screen before the first usable page.
 
 The launch screen writes the My Bucket name in nine steps over 540 ms and remains visible until initial app readiness. Reduced-motion mode shows the complete name immediately.
+
+The site visits card distinguishes anonymous browser IDs, first-ever expense saves, and distinct accounts that successfully saved any expense on the selected Cairo day. The daily expense metric starts on November 25, 2026.

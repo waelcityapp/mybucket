@@ -105,6 +105,8 @@ export type SiteVisits = {
   date: string;
   visitors: number;
   demoUsers: number;
+  dailyExpenseAccounts: number | null;
+  expenseReportingStart: string;
   firstExpenseAccounts: number;
   returningExpenseAccounts: number;
 };

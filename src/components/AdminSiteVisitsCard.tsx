@@ -47,24 +47,28 @@ export function AdminSiteVisitsCard({ lang }: { lang: Language }) {
           <strong className="text-3xl font-extrabold tabular-nums text-emerald-700 dark:text-emerald-400">
             {new Intl.NumberFormat(ar ? 'ar-EG' : 'en').format(result.visitors)}
           </strong>
-          <span className="text-sm text-slate-700 dark:text-slate-200">{ar ? 'متصفح زار الموقع' : 'unique browsers'}</span>
+          <span className="text-sm text-slate-700 dark:text-slate-200">{ar ? 'معرّف متصفح زار الموقع' : 'browser IDs recorded'}</span>
         </> : <span className="text-sm text-slate-600 dark:text-slate-300">
           {failed ? (ar ? 'تعذّر تحميل العدد. جرّب التحديث.' : 'Could not load the count. Try refreshing.') : (ar ? 'جارٍ تحميل العدد…' : 'Loading visit count…')}
         </span>}
       </div>
-      {result?.date === date && <dl className="grid gap-2 sm:grid-cols-3">
+      {result?.date === date && <dl className="grid gap-2 sm:grid-cols-2">
         {[
           [ar ? 'متصفحات أضافت عملية في التجربة' : 'Browsers that added a demo transaction', result.demoUsers],
-          [ar ? 'حسابات حفظت أول مصروف في اليوم ده' : 'Accounts that saved their first expense on this date', result.firstExpenseAccounts],
+          [ar ? 'حسابات حفظت مصروفًا في اليوم ده' : 'Accounts that saved an expense on this date', result.dailyExpenseAccounts],
+          [ar ? 'حسابات حفظت أول مصروف لها في اليوم ده' : 'Accounts that saved their first expense on this date', result.firstExpenseAccounts],
           [ar ? 'منهم رجعوا في يوم لاحق' : 'Of those accounts, returned on a later day', result.returningExpenseAccounts],
         ].map(([label, value]) => <div key={label} className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
           <dt className="text-xs text-slate-600 dark:text-slate-300">{label}</dt>
-          <dd className="text-xl font-bold tabular-nums">{new Intl.NumberFormat(ar ? 'ar-EG' : 'en').format(Number(value))}</dd>
+          <dd className="text-xl font-bold tabular-nums">{value === null ? '—' : new Intl.NumberFormat(ar ? 'ar-EG' : 'en').format(Number(value))}</dd>
         </div>)}
       </dl>}
       <p className="text-sm text-slate-600 dark:text-slate-300">
-        {ar ? 'كل متصفح بيتحسب مرة واحدة في اليوم، حتى لو الزائر ما سجّلش الدخول.' : 'Each browser is counted once per day, including visits without sign-in.'}
+        {ar ? 'إعادة تحميل الصفحة بنفس معرّف المتصفح ما بتزوّدش العدد. جهاز أو متصفح مختلف أو مسح بيانات الموقع ممكن يتحسب بمعرّف تاني. زيارات الإدارة داخلة في العدد.' : 'Reloads with the same browser ID count once per day. Other devices, browsers, or cleared site data can create new IDs. Admin visits are included.'}
       </p>
+      {result?.date === date && date <= result.expenseReportingStart && <p className="text-xs text-slate-500">
+        {ar ? 'عداد حفظ المصروفات اليومي يبدأ من وقت تفعيله.' : 'Daily expense activity is available from when tracking was enabled.'}
+      </p>}
     </section>
   );
 }

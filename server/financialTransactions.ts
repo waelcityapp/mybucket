@@ -9,7 +9,7 @@ import { getAdminFirestore } from './firebaseAdmin.js';
 import { PUBLISHED_PLAN_LIMITS_PATH, publishedPlanLimits } from './planLimits.js';
 import { isoDate } from './recurrence.js';
 import { getOrCreateSubscription, SubscriptionError } from './subscriptionService.js';
-import { markFirstExpense } from './siteVisits.js';
+import { markDailyExpense } from './siteVisits.js';
 import { readTrialSettings } from './trialSettings.js';
 
 const validId = (value: unknown): value is string => typeof value === 'string' && /^[\w-]{1,128}$/.test(value);
@@ -115,13 +115,14 @@ export async function saveFinancialTransaction(uid: string, payload: Record<stri
       checked(() => validateBalance(account, balance));
       return { id, balance };
     });
-    if (entry.type === 'expense') await markFirstExpense(tx, user, day, db);
+    const firstExpenseToday = entry.type === 'expense' && usage.get('expenseActivityRecorded') !== true;
+    if (firstExpenseToday) await markDailyExpense(tx, user, day, db);
     for (const update of updates) tx.update(accounts.doc(update.id), { balance: update.balance });
     tx.create(entryRef, {
       ...entry, userId: uid, balanceAccountId: movement.balanceAccountId,
       ...(movement.toBalanceAccountId ? { toBalanceAccountId: movement.toBalanceAccountId } : {}),
     });
-    tx.set(usageRef, { [bucket]: used + 1 }, { merge: true });
+    tx.set(usageRef, { [bucket]: used + 1, ...(firstExpenseToday ? { expenseActivityRecorded: true } : {}) }, { merge: true });
     if (validTicket && ticketRef) tx.delete(ticketRef);
     return { saved: true };
   });

@@ -25,9 +25,10 @@ test('demo activity counts one browser once and preserves the existing visitor c
     recordSiteVisit(origin, host, browserId, db, true),
     recordSiteVisit(origin, host, browserId, db, true),
   ]);
+  await Promise.all(Array.from({ length: 10 }, () => recordSiteVisit(origin, host, browserId, db)));
   await recordSiteVisit(origin, host, randomUUID(), db);
   assert.deepEqual(await readSiteVisits(date, db), {
-    date, visitors: 2, demoUsers: 1, firstExpenseAccounts: 0, returningExpenseAccounts: 0,
+    date, visitors: 2, demoUsers: 1, dailyExpenseAccounts: 0, expenseReportingStart: '2026-11-25', firstExpenseAccounts: 0, returningExpenseAccounts: 0,
   });
   assert.equal((await readSiteVisits(siteVisitDay(new Date(Date.now() - 86400000)), db)).demoUsers, 0);
 });
@@ -56,10 +57,12 @@ test('only a successfully saved first expense counts, and return must be on a la
   await assert.rejects(saveFinancialTransaction(uid, { transaction: entry('expense', 1000) }), { code: 'insufficient-balance' });
   await saveFinancialTransaction(uid, { transaction: entry('income', 10) });
   assert.equal((await readSiteVisits(date, db)).firstExpenseAccounts, 0);
+  assert.equal((await readSiteVisits(date, db)).dailyExpenseAccounts, 0);
   const expense = entry('expense', 1);
   await Promise.all([saveFinancialTransaction(uid, { transaction: expense }), saveFinancialTransaction(uid, { transaction: entry('expense', 2) })]);
   await saveFinancialTransaction(uid, { transaction: expense });
   assert.equal((await readSiteVisits(date, db)).firstExpenseAccounts, 1);
+  assert.equal((await readSiteVisits(date, db)).dailyExpenseAccounts, 1);
   assert.deepEqual(await recordExpenseReturn(uid, db, now), { date, finished: false });
   assert.equal((await readSiteVisits(date, db)).returningExpenseAccounts, 0);
   await Promise.all([recordExpenseReturn(uid, db, later), recordExpenseReturn(uid, db, later)]);
@@ -72,6 +75,9 @@ test('only a successfully saved first expense counts, and return must be on a la
   await recordExpenseReturn(existing, db, later);
   assert.equal((await readSiteVisits(date, db)).firstExpenseAccounts, 1);
   assert.equal((await readSiteVisits(date, db)).returningExpenseAccounts, 1);
+
+  assert.equal((await readSiteVisits(date, db)).dailyExpenseAccounts, 2);
+  assert.equal((await readSiteVisits('2026-11-24', db)).dailyExpenseAccounts, null);
 
   const rows = (await db.collection('siteExpenseActivity').get()).docs;
   assert.deepEqual(rows.map(row => row.data()).sort((a, b) => Number(!!a.legacy) - Number(!!b.legacy)),

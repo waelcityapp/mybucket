@@ -55,7 +55,7 @@ export function AdminSiteVisitsCard({ lang }: { lang: Language }) {
       {result?.date === date && <dl className="grid gap-2 sm:grid-cols-2">
         {[
           [ar ? 'متصفحات أضافت عملية في التجربة' : 'Browsers that added a demo transaction', result.demoUsers],
-          [ar ? 'حسابات حفظت مصروفًا في اليوم ده' : 'Accounts that saved an expense on this date', result.dailyExpenseAccounts],
+          [ar ? 'حسابات استخدمت التطبيق في اليوم ده' : 'Accounts that used the app on this date', result.activeAccounts],
           [ar ? 'حسابات حفظت أول مصروف لها في اليوم ده' : 'Accounts that saved their first expense on this date', result.firstExpenseAccounts],
           [ar ? 'منهم رجعوا في يوم لاحق' : 'Of those accounts, returned on a later day', result.returningExpenseAccounts],
         ].map(([label, value]) => <div key={label} className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
@@ -66,8 +66,8 @@ export function AdminSiteVisitsCard({ lang }: { lang: Language }) {
       <p className="text-sm text-slate-600 dark:text-slate-300">
         {ar ? 'إعادة تحميل الصفحة بنفس معرّف المتصفح ما بتزوّدش العدد. جهاز أو متصفح مختلف أو مسح بيانات الموقع ممكن يتحسب بمعرّف تاني. زيارات الإدارة داخلة في العدد.' : 'Reloads with the same browser ID count once per day. Other devices, browsers, or cleared site data can create new IDs. Admin visits are included.'}
       </p>
-      {result?.date === date && date <= result.expenseReportingStart && <p className="text-xs text-slate-500">
-        {ar ? 'عداد حفظ المصروفات اليومي يبدأ من وقت تفعيله.' : 'Daily expense activity is available from when tracking was enabled.'}
+      {result?.date === date && date <= result.activityReportingStart && <p className="text-xs text-slate-500">
+        {ar ? 'عداد الاستخدام يشمل الإجراءات اللي اتسجلت بعد تفعيله.' : 'Activity includes actions recorded since tracking was enabled.'}
       </p>}
     </section>
   );

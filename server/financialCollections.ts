@@ -1,3 +1,5 @@
+import { markDailyActiveAccount } from './siteVisits.js';
+import { siteVisitDay } from '../src/utils/siteVisitDay.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { DEFAULT_PLAN_LIMITS } from '../src/config/planLimits.js';
 import { grantFromAccess } from '../src/config/grantPolicy.js';
@@ -108,6 +110,9 @@ export async function saveFinancialCollection(uid: string, action: string, paylo
         if (!bank || bank.archived === true || bank.type !== 'bank' || bank.currency !== item.currency || item.balance !== 0) return invalid();
       }
       writes.push(item);
+    }
+    if (group === 'accounts' && writes.some(item => !prior.has(item.id))) {
+      markDailyActiveAccount(tx, uid, siteVisitDay(), db);
     }
     for (const item of writes) {
       const detachBank = group === 'accounts' && prior.get(item.id)?.linkedBankId && !('linkedBankId' in item);

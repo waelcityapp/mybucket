@@ -3,7 +3,7 @@ import { siteVisitDay } from '../src/utils/siteVisitDay.js';
 import { getAdminFirestore } from './firebaseAdmin.js';
 import { SubscriptionError } from './subscriptionService.js';
 
-const expenseReportingStart = '2026-11-25';
+const activityReportingStart = '2026-11-25';
 const browserIdPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 
 function dailyBrowsers(date: string, db: FirebaseFirestore.Firestore) {
@@ -45,16 +45,35 @@ function expenseAccount(uid: string, db: FirebaseFirestore.Firestore) {
   return expenseActivity(db).doc(createHash('sha256').update(uid).digest('hex'));
 }
 
-export async function markDailyExpense(
+function dailyActiveAccount(uid: string, day: string, db: FirebaseFirestore.Firestore) {
+  // Reuse existing daily markers so today's counted expense activity stays included.
+  return db.collection('siteVisitDays').doc(day).collection('expenseAccounts').doc(expenseAccount(uid, db).id);
+}
+
+export function markDailyActiveAccount(
+  tx: FirebaseFirestore.Transaction, uid: string, day: string, db: FirebaseFirestore.Firestore,
+) {
+  tx.set(dailyActiveAccount(uid, day, db), { saved: true });
+}
+
+export async function recordInteractiveActivity(uid: string, db = getAdminFirestore()) {
+  const date = siteVisitDay();
+  try {
+    await dailyActiveAccount(uid, date, db).create({ saved: true });
+  } catch (error) {
+    if ((error as { code?: number }).code !== 6) throw error;
+  }
+  return { date };
+}
+
+export async function markFirstExpense(
   tx: FirebaseFirestore.Transaction, user: FirebaseFirestore.DocumentReference, day: string, db: FirebaseFirestore.Firestore,
 ) {
   const activity = expenseAccount(user.id, db);
-  const daily = db.collection('siteVisitDays').doc(day).collection('expenseAccounts').doc(activity.id);
   if (!(await tx.get(activity)).exists) {
     const pastExpenses = await tx.get(user.collection('transactions').where('type', '==', 'expense').select().limit(1));
     tx.create(activity, pastExpenses.empty ? { firstExpenseDay: day } : { legacy: true });
   }
-  tx.set(daily, { saved: true });
 }
 
 export async function recordExpenseReturn(uid: string, db = getAdminFirestore(), now = new Date()) {
@@ -80,14 +99,14 @@ export async function readSiteVisits(date: unknown, db?: FirebaseFirestore.Fires
   const firestore = db ?? getAdminFirestore();
   const browsers = dailyBrowsers(date, firestore);
   const firstExpenses = expenseActivity(firestore).where('firstExpenseDay', '==', date);
-  const [visitors, demoUsers, started, returned, dailyExpenses] = await Promise.all([
+  const [visitors, demoUsers, started, returned, active] = await Promise.all([
     browsers.count().get(), browsers.where('demoUsed', '==', true).count().get(),
     firstExpenses.count().get(), expenseActivity(firestore).where('returnedFromDay', '==', date).count().get(),
-    date >= expenseReportingStart
+    date >= activityReportingStart
       ? firestore.collection('siteVisitDays').doc(date).collection('expenseAccounts').count().get()
       : null,
   ]);
   return { date, visitors: visitors.data().count, demoUsers: demoUsers.data().count,
-    dailyExpenseAccounts: dailyExpenses?.data().count ?? null, expenseReportingStart,
+    activeAccounts: active?.data().count ?? null, activityReportingStart,
     firstExpenseAccounts: started.data().count, returningExpenseAccounts: returned.data().count };
 }

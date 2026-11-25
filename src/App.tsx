@@ -33,7 +33,7 @@ import { VoiceNaturalInput } from './components/VoiceNaturalInput';
 import type { AnalyzerFeedbackContext } from './services/ai/analyzerFeedbackClient';
 import { APP_REVISION } from './config/appRevision';
 import { activeGrant } from './config/grantPolicy';
-import { recordDemoTransaction, startExpenseReturnTracking } from './services/siteVisitsClient';
+import { recordDemoTransaction, recordInteractiveActivity, startExpenseReturnTracking } from './services/siteVisitsClient';
 import { closePresenceBeforeSignOut, startPresence } from './services/presenceClient';
 import { QuickActions } from './components/QuickActions';
 import { MoneySources } from './components/MoneySources';
@@ -1012,6 +1012,7 @@ export default function App() {
       maxDaysHistory
     );
     setActiveFinancialQueryResult(result);
+    if (!guestDemo && authUser && financialLoaded.transactions && !transactionReadError) void recordInteractiveActivity(authUser.uid);
   };
 
   // Save only after an atomic, server-confirmed transaction and balance update.
@@ -2089,6 +2090,9 @@ export default function App() {
             accounts={historicalAccounts}
             lang={lang}
             authUser={authUser}
+            onSearch={!guestDemo && authUser && financialLoaded.transactions && !transactionReadError
+              ? () => void recordInteractiveActivity(authUser.uid)
+              : undefined}
           />
         )}
 

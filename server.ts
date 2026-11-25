@@ -253,6 +253,11 @@ async function startServer() {
           const { changeExchangeRateWidget } = await import('./server/exchangeRates');
           return res.json({ ok: true, data: await changeExchangeRateWidget(user.uid, payload) });
         }
+        case 'siteVisits.activity': {
+          if (user.signInProvider !== 'google.com') return res.status(403).json({ ok: false, error: 'google_sign_in_required' });
+          const { recordInteractiveActivity } = await import('./server/siteVisits.js');
+          return res.status(200).json({ ok: true, data: await recordInteractiveActivity(user.uid) });
+        }
         case 'siteVisits.return': {
           if (user.signInProvider !== 'google.com') return res.status(403).json({ ok: false, error: 'google_sign_in_required' });
           const { recordExpenseReturn } = await import('./server/siteVisits.js');

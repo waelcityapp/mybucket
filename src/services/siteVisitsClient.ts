@@ -101,12 +101,32 @@ export function startExpenseReturnTracking(uid: string) {
   };
 }
 
+const pendingActivity = new Set<string>();
+
+export async function recordInteractiveActivity(uid: string) {
+  const user = auth.currentUser;
+  if (user?.uid !== uid || pendingActivity.has(uid)) return;
+  const key = `mybucket.siteVisits.activity.${uid}`;
+  pendingActivity.add(uid);
+  try {
+    if (localStorage.getItem(key) === siteVisitDay()) return;
+    const token = await user.getIdToken();
+    if (auth.currentUser?.uid !== uid) return;
+    const { date } = await request<{ date: string }>('siteVisits.activity', {}, token);
+    localStorage.setItem(key, date);
+  } catch {
+    // Analytics must not interrupt search or query results.
+  } finally {
+    pendingActivity.delete(uid);
+  }
+}
+
 export type SiteVisits = {
   date: string;
   visitors: number;
   demoUsers: number;
-  dailyExpenseAccounts: number | null;
-  expenseReportingStart: string;
+  activeAccounts: number | null;
+  activityReportingStart: string;
   firstExpenseAccounts: number;
   returningExpenseAccounts: number;
 };

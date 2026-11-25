@@ -15,9 +15,10 @@ interface SearchViewProps {
   accounts: FinancialAccount[];
   lang: Language;
   authUser?: AuthUser | null;
+  onSearch?: () => void;
 }
 
-export function SearchView({ transactions, categories, accounts, lang, authUser }: SearchViewProps) {
+export function SearchView({ transactions, categories, accounts, lang, authUser, onSearch }: SearchViewProps) {
   const t = translations[lang];
   const isAr = lang === 'ar';
 
@@ -303,8 +304,7 @@ export function SearchView({ transactions, categories, accounts, lang, authUser 
               </div>
             )}
 
-            {/* Primary Search Action is implicit, filters update live. But let's add a visual button if desired, though live is better. Let's just make it a visual anchor or submit if it was a form. In React, live filtering is preferred. The image shows a big blue button. Let's add it to feel complete, even if live. */}
-            <button className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20">
+            <button type="button" onClick={onSearch} className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20">
               <Search className="w-5 h-5" />
               {t.searchBtn || 'Search'}
             </button>

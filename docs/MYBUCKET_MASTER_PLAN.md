@@ -1,5 +1,9 @@
 # MyBucket — Master Implementation Plan
 
+## Rejected ads in My Ads (#307)
+
+- Show the rejection status and reason together. Owners can delete a rejected ad and its uploads after confirmation. Removing a rejected free ad does not update the approval waiting-period ledger.
+
 ## AI analysis diagnostics (#306)
 
 - Record model, elapsed analysis time, and outcome in server logs without financial text. Update the last successful analysis only after accepting a usable response. Provider token usage continues to track returned usage metadata.

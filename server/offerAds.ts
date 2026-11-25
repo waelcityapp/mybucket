@@ -352,10 +352,12 @@ export async function removeExpiredOffer(uid: string, id: string, db = getAdminF
     const ad = (await tx.get(ref)).data() as StoredAd | undefined;
     if (!ad) return null;
     if (ad.ownerId !== uid) return fail('invalid_ad_id', 403);
-    if (ad.status !== 'approved' && ad.status !== 'deleting') return fail('ad_not_deletable', 409);
-    const ledger = db.collection('offerAdApprovalLedger').doc(uid);
-    const current = (await tx.get(ledger)).data()?.lastApproval ?? 0;
-    if (!ad.payment && (ad.reviewedAt ?? 0) > current) tx.set(ledger, { lastApproval: ad.reviewedAt });
+    if (ad.status !== 'approved' && ad.status !== 'rejected' && ad.status !== 'deleting') return fail('ad_not_deletable', 409);
+    if (ad.status === 'approved' && !ad.payment) {
+      const ledger = db.collection('offerAdApprovalLedger').doc(uid);
+      const current = (await tx.get(ledger)).data()?.lastApproval ?? 0;
+      if ((ad.reviewedAt ?? 0) > current) tx.set(ledger, { lastApproval: ad.reviewedAt });
+    }
     if (ad.status !== 'deleting') tx.update(ref, { status: 'deleting' });
     const proposedMedia = ad.editRequest?.status === 'pending' ? ad.editRequest.mediaChange : null;
     return { media: ad.media, receipt: ad.receipt, proposedMedia };

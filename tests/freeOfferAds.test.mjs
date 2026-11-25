@@ -247,3 +247,28 @@ test('the existing cleanup retains free ads for ten days and still deletes older
   assert.equal((await ad(retained).get()).exists, true);
   assert.equal((await ad(expired).get()).exists, false);
 });
+
+test('owners can remove rejected ads without changing their free approval history', async () => {
+  const uid = 'rejected-delete';
+  const id = randomUUID();
+  const media = { publicId: `mybucket/ads/submissions/${uid}/${id}`, resourceType: 'image', version: 1, format: 'png' };
+  await ad(id).set(storedAd(uid, 'rejected', { reviewedAt: Date.now(), media, mediaType: 'image' }));
+  const removed = [];
+  const destroy = async (owner, payload, _config, _fetch, folder) => { removed.push([owner, payload.publicId, folder]); };
+  await assert.rejects(removeExpiredOffer('other-owner', id, db, destroy), { code: 'invalid_ad_id' });
+  assert.deepEqual(removed, []);
+  await assert.rejects(removeExpiredOffer(uid, id, db, async () => { throw new Error('provider unavailable'); }), /provider unavailable/);
+  assert.equal((await ad(id).get()).get('status'), 'deleting');
+  await removeExpiredOffer(uid, id, db, destroy);
+  assert.equal((await ad(id).get()).exists, false);
+  assert.equal((await ledger(uid).get()).exists, false);
+  assert.equal((await request('ads.freeEligibility', uid)).status, 'available');
+  assert.deepEqual(removed, [[uid, media.publicId, 'submissions']]);
+
+  const paidId = randomUUID();
+  const receipt = { ...media, publicId: `mybucket/ads/receipts/${uid}/${paidId}` };
+  await ad(paidId).set(storedAd(uid, 'rejected', { payment: { tier: 'vip', amountEgp: 50 }, receipt }));
+  await removeExpiredOffer(uid, paidId, db, destroy);
+  assert.equal((await ad(paidId).get()).exists, false);
+  assert.deepEqual(removed.at(-1), [uid, receipt.publicId, 'receipts']);
+});

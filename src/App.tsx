@@ -2000,6 +2000,7 @@ export default function App() {
             {activeFinancialQueryResult && (
               <FinancialQueryResultCard
                 result={activeFinancialQueryResult}
+                accounts={historicalAccounts}
                 lang={lang}
                 onClose={() => setActiveFinancialQueryResult(null)}
               />

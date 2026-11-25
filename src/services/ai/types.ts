@@ -101,6 +101,7 @@ export interface DeterministicBreakdownItem {
   percentage?: number;
   icon?: string;
   color?: string;
+  transactions?: Transaction[];
 }
 
 export interface DeterministicQueryResult {

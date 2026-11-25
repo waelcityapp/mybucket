@@ -335,20 +335,24 @@ export function executeDeterministicQuery(
       const totalSpent = expenses.reduce((sum, tx) => sum + tx.amount, 0);
 
       // Group by Category to show spending breakdown
-      const catMap = new Map<string, number>();
-      expenses.forEach((tx) => {
-        const cId = tx.categoryId || 'other';
-        catMap.set(cId, (catMap.get(cId) || 0) + tx.amount);
-      });
+      const catMap = new Map<string, Transaction[]>();
+      for (const transaction of expenses) {
+        const categoryId = transaction.categoryId || 'other';
+        const group = catMap.get(categoryId);
+        if (group) group.push(transaction);
+        else catMap.set(categoryId, [transaction]);
+      }
 
       const breakdown: DeterministicBreakdownItem[] = [];
-      catMap.forEach((amt, cId) => {
+      catMap.forEach((group, cId) => {
+        const amount = group.reduce((sum, transaction) => sum + transaction.amount, 0);
         const cat = categories.find((c) => c.id === cId);
         breakdown.push({
           id: cId,
           label: cat ? (isAr ? cat.nameAr : cat.name) : isAr ? 'أخرى' : 'Other',
-          amount: amt,
-          percentage: totalSpent > 0 ? Math.round((amt / totalSpent) * 100) : 0,
+          amount,
+          percentage: totalSpent > 0 ? Math.round((amount / totalSpent) * 100) : 0,
+          transactions: group,
           icon: cat?.icon,
           color: cat?.color,
         });

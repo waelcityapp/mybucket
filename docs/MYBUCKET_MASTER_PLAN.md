@@ -856,3 +856,5 @@ Daily authenticated activity counts each account once per Cairo day for a saved 
 Financial question answers appear immediately after the home quick actions and receive focus after a query. Breakdowns show four rows initially and let users expand the remaining rows without changing the total.
 
 Server-side account matching uses explicit ESM import extensions through the transaction description utilities so Vercel can load the financial gateway.
+
+Expense breakdown rows expand in place to show the exact transactions behind their subtotals, including historical account names, amounts, notes, and date and time.

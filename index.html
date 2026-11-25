@@ -21,9 +21,111 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+      .startup-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: grid;
+        place-items: center;
+        color: #edffea;
+        background: radial-gradient(ellipse at 50% 75%, #075339, transparent 60%), #021e16;
+      }
+      #root:not(:empty) + .startup-splash,
+      html:not([lang="en"]) .startup-en,
+      html[lang="en"] .startup-ar {
+        display: none;
+      }
+      .startup-art {
+        display: grid;
+        justify-items: center;
+        gap: clamp(15px, 4vh, 28px);
+      }
+      .startup-orb {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: clamp(96px, 28vmin, 172px);
+        aspect-ratio: 1;
+        border: 2px solid #b1ffc0;
+        border-radius: 50%;
+        color: #e0ffe5;
+        background: radial-gradient(circle, #08764b 15%, #045937 64%, #45fa71 100%);
+        box-shadow: inset 0 0 22px #52ff79, 0 0 25px #44f96a, 0 0 72px #16d85c88;
+      }
+      .startup-mic {
+        position: relative;
+        width: 36%;
+        height: 34%;
+        border: 3px solid currentColor;
+        border-top: 0;
+        border-radius: 0 0 45% 45%;
+        transform: translateY(12%);
+      }
+      .startup-mic::before {
+        position: absolute;
+        content: "";
+        left: 24%;
+        bottom: 20%;
+        width: 52%;
+        height: 142%;
+        border-radius: 99px;
+        background: currentColor;
+      }
+      .startup-mic::after {
+        position: absolute;
+        content: "";
+        top: 100%;
+        left: 50%;
+        width: 55%;
+        height: 45%;
+        transform: translateX(-50%);
+        background: linear-gradient(currentColor, currentColor) center top / 3px 100% no-repeat,
+          linear-gradient(currentColor, currentColor) center bottom / 100% 3px no-repeat;
+      }
+      .startup-wave {
+        display: flex;
+        height: clamp(25px, 7vmin, 42px);
+        align-items: center;
+        gap: clamp(3px, 1vmin, 6px);
+        direction: ltr;
+      }
+      .startup-wave i {
+        width: clamp(3px, .8vmin, 5px);
+        height: var(--bar);
+        border-radius: 99px;
+        background: #baf975;
+        box-shadow: 0 0 10px #63f06a80;
+      }
+      .startup-art p {
+        margin: 0;
+        font: 700 clamp(15px, 3vmin, 20px)/1.5 Tajawal, system-ui, sans-serif;
+      }
+    </style>
+    <script>
+      try {
+        if (localStorage.getItem('mybucket_lang') === 'en') {
+          document.documentElement.lang = 'en';
+          document.documentElement.dir = 'ltr';
+        }
+      } catch {}
+    </script>
   </head>
   <body class="font-sans antialiased bg-slate-50 text-slate-900 selection:bg-emerald-500 selection:text-white">
     <div id="root"></div>
+    <div class="startup-splash" role="status">
+      <div class="startup-art">
+        <div class="startup-orb" aria-hidden="true"><div class="startup-mic"></div></div>
+        <div class="startup-wave" aria-hidden="true">
+          <i style="--bar: 12%"></i><i style="--bar: 23%"></i><i style="--bar: 45%"></i>
+          <i style="--bar: 34%"></i><i style="--bar: 73%"></i><i style="--bar: 100%"></i>
+          <i style="--bar: 62%"></i><i style="--bar: 39%"></i><i style="--bar: 48%"></i>
+          <i style="--bar: 21%"></i><i style="--bar: 12%"></i>
+        </div>
+        <p class="startup-ar">جاري التحميل…</p>
+        <p class="startup-en">Loading…</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

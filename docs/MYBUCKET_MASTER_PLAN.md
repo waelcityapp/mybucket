@@ -842,3 +842,5 @@ New transaction drafts keep an explicitly selected source account out of automat
 Recognize common spoken InstaPay spellings when a unique named account exists. The send state and transaction review remind users to check, edit and confirm fields. The engine selection remains available before submission.
 
 Transaction draft amounts use decimal text entry to prevent scroll and arrow-key value increments. The shared InstaPay spelling matcher includes the spoken variant الانستابين.
+
+The startup screen uses the ad’s green microphone and waveform motif with a localized loading label. It is present in the initial HTML and disappears when the app renders its first screen.

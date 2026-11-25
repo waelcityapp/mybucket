@@ -56,7 +56,7 @@ import { CategoriesView } from './components/views/CategoriesView';
 import { MyOfferAdsPage } from './components/views/MyOfferAdsPage';
 import { SettingsView } from './components/views/SettingsView';
 import { SearchView } from './components/views/SearchView';
-import { Smartphone, Cloud, ArrowRight, Sparkles, Clock, BookOpen, Tag } from 'lucide-react';
+import { Smartphone, Cloud, ArrowRight, Clock, BookOpen, Tag } from 'lucide-react';
 import { AIFinancialQuery, AICorrection } from './services/ai/types';
 import {
   executeDeterministicQuery,
@@ -1609,19 +1609,8 @@ export default function App() {
     return <AdSignInGate lang={lang} checking onBack={backFromCreateOffer} onSignIn={loginWithGoogle} />;
   }
 
-  // 1. Splash / Auth Checking State
-  if (isAuthChecking) {
-    return (
-      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-6 text-slate-800">
-        <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600 animate-pulse mb-3">
-          <Sparkles className="w-6 h-6" />
-        </div>
-        <p className="text-sm font-bold text-slate-600">
-          {lang === 'ar' ? 'جاري تهيئة MyBucket...' : 'Initializing MyBucket...'}
-        </p>
-      </div>
-    );
-  }
+  // The launch screen in index.html stays visible until the app renders.
+  if (isAuthChecking) return null;
 
   // Keep all signed-in financial screens hidden while checking or enforcing the PIN.
   // Never block access indefinitely when the optional lock service is unavailable.

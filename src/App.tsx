@@ -578,6 +578,7 @@ export default function App() {
   const [addModalInitialType, setAddModalInitialType] = useState<TransactionType>('expense');
   const [prefilledDraft, setPrefilledDraft] = useState<Partial<Transaction> | null>(null);
   const [analyzerFeedbackContext, setAnalyzerFeedbackContext] = useState<AnalyzerFeedbackContext | null>(null);
+  const retryDraftWithAi = useRef<(() => Promise<void>) | undefined>(undefined);
   const [draftMissingFields, setDraftMissingFields] = useState<string[]>([]);
   const [activeFinancialQueryResult, setActiveFinancialQueryResult] = useState<DeterministicQueryResult | null>(null);
   const [isEditBalanceModalOpen, setIsEditBalanceModalOpen] = useState(false);
@@ -947,8 +948,9 @@ export default function App() {
   };
 
   // Handle Natural Language / Voice input parsed draft via Gemini AI
-  const handleTransactionDraft = (draft: Partial<Transaction>, missingFields: string[], feedback:AnalyzerFeedbackContext) => {
+  const handleTransactionDraft = (draft: Partial<Transaction>, missingFields: string[], feedback:AnalyzerFeedbackContext, retryWithAi?: () => Promise<void>) => {
     if (currentTrialExpired) { showExpiredNotice(); return; }
+    retryDraftWithAi.current = retryWithAi;
     setAnalyzerFeedbackContext(guestDemo ? null : feedback);
     setPrefilledDraft(draft);
     setDraftMissingFields(missingFields || []);
@@ -1986,6 +1988,7 @@ export default function App() {
             <div className="space-y-2 sm:space-y-2.5">
               {/* Primary voice and text input */}
               <VoiceNaturalInput
+                accountUid={authUser?.uid}
                 lang={lang}
                 accounts={accounts}
                 categories={categories}
@@ -2202,6 +2205,7 @@ export default function App() {
         initialType={addModalInitialType}
         initialValues={prefilledDraft}
         feedbackContext={analyzerFeedbackContext}
+        onRetryWithAi={prefilledDraft ? retryDraftWithAi.current : undefined}
         missingFields={draftMissingFields}
         accounts={accounts}
         categories={categories}

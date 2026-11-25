@@ -40,6 +40,7 @@ interface TransactionModalProps {
   categories: Category[];
   lang: Language;
   onClose: () => void;
+  onRetryWithAi?: () => Promise<void>;
   onSaveTransaction: (tx: Omit<Transaction, 'id' | 'createdAt'>) => Promise<{ ok: boolean; message?: string }>;
   onAddCategory?: (category: Category) => void;
 }
@@ -54,6 +55,7 @@ export function TransactionModal({
   categories,
   lang,
   onClose,
+  onRetryWithAi,
   onSaveTransaction,
   onAddCategory,
 }: TransactionModalProps) {
@@ -79,6 +81,7 @@ export function TransactionModal({
   const [showToAccountDropdown, setShowToAccountDropdown] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
+  const [retryingWithAi, setRetryingWithAi] = useState(false);
   const [isAiProposal, setIsAiProposal] = useState<boolean>(false);
 
   const errorRef = useRef<HTMLDivElement | null>(null);
@@ -170,7 +173,7 @@ export function TransactionModal({
   };
 
   const handleSave = async (e?: React.FormEvent) => {
-    if (isSaving) return;
+    if (isSaving || retryingWithAi) return;
     if (e) e.preventDefault();
     setError('');
 
@@ -285,6 +288,7 @@ export function TransactionModal({
 
           <button
             type="button"
+            disabled={retryingWithAi}
             onClick={onClose}
             className="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
           >
@@ -294,6 +298,18 @@ export function TransactionModal({
 
         {/* Modal Form Body */}
         <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
+          {onRetryWithAi && <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            <button type="button" disabled={retryingWithAi || isSaving}
+              className="min-h-10 rounded-xl border border-emerald-200 px-3 font-bold text-emerald-800 disabled:opacity-50"
+              onClick={async () => {
+                setRetryingWithAi(true);
+                try { await onRetryWithAi(); } finally { setRetryingWithAi(false); }
+              }}>
+              {retryingWithAi ? (isAr ? 'جارٍ إعادة التحليل…' : 'Analyzing again…')
+                : (isAr ? 'أعد التحليل بالذكاء الاصطناعي' : 'Analyze again with AI')}
+            </button>
+            <span className="text-slate-600">{isAr ? 'يحلّل نصك الأصلي ويحدّث الحقول، ويستخدم محاولة واحدة.' : 'Uses one attempt to analyze your original text and update the draft.'}</span>
+          </div>}
           {/* Missing Account Warning Notice (from AI utterance) */}
           {isMissingAccount && isAiProposal && (
             <div className="p-3 rounded-2xl bg-amber-50/90 border border-amber-300 flex items-start gap-2.5 text-xs text-amber-900 animate-in fade-in">
@@ -763,7 +779,7 @@ export function TransactionModal({
               )}
               <button
                 type="submit"
-                disabled={isSaving}
+                disabled={isSaving || retryingWithAi}
                 className={`w-full py-3.5 px-4 active:scale-[0.99] text-white text-xs sm:text-sm font-black rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md ${
                   !selectedAccount || (type === 'transfer' && !selectedToAccount)
                     ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/20'
@@ -786,6 +802,7 @@ export function TransactionModal({
 
               <button
                 type="button"
+                disabled={retryingWithAi}
                 onClick={onClose}
                 className="w-full py-2 text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors cursor-pointer text-center"
               >

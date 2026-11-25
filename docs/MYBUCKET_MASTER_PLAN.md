@@ -834,3 +834,5 @@ Pro uses one admin-configured daily save allowance shared by manual, local, and 
 Pro cloud AI attempts share one published daily allowance across transactions and inquiries. Earlier published allowances add the former default five inquiry attempts on read. Historical attempts count toward the shared allowance. The subscription card shows completed saves and cloud attempts only. Local analysis limits remain technical settings.
 
 The subscription comparison describes financial queries as questions about balance and spending, with a concrete example and the shared AI attempt cost for Pro.
+
+On the home text and voice input, Pro starts with standard analysis and can opt into cloud AI for a submission. The input displays the current shared AI allowance. A standard transaction draft can be reanalyzed from the original text on the review screen.

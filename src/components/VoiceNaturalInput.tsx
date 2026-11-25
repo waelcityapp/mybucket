@@ -1,6 +1,6 @@
 import { aiDisplayText } from '../utils/aiDisplayText';
 import { useAppNotice } from './AppNotice';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Mic, MicOff, Send, Sparkles, Loader2, HelpCircle } from 'lucide-react';
 import { Language, FinancialAccount, Category, Transaction, CurrencyCode } from '../types';
 import { UserSubscription, UserDailyUsage } from '../types/prototypeSubscription';
@@ -9,15 +9,17 @@ import { aiClient, geminiClient, quotaLocalClient } from '../services/ai/aiClien
 import { stageFor } from '../config/subscriptionPolicy';
 import { AIFinancialQuery, AIInterpretationResult, AICorrection } from '../services/ai/types';
 import type { AnalyzerFeedbackContext } from '../services/ai/analyzerFeedbackClient';
+import { auth } from '../lib/firebase';
 import { APP_REVISION } from '../config/appRevision';
 
 interface VoiceNaturalInputProps {
+  accountUid?: string;
   lang: Language;
   accounts: FinancialAccount[];
   categories: Category[];
   userDailyUsage?: UserDailyUsage;
   userSubscription?: UserSubscription | null;
-  onTransactionDraft: (draft: Partial<Transaction>, missingFields: string[], feedback:AnalyzerFeedbackContext) => void;
+  onTransactionDraft: (draft: Partial<Transaction>, missingFields: string[], feedback:AnalyzerFeedbackContext, retryWithAi?: () => Promise<void>) => void;
   onFinancialQuery: (query: AIFinancialQuery, questionText: string) => void;
   onAICorrection?: (correction: AICorrection) => void;
   onAiEntryUsed?: () => void;
@@ -47,6 +49,7 @@ interface SpeechRecognitionLike {
 }
 
 export function VoiceNaturalInput({
+  accountUid,
   lang,
   accounts,
   categories,
@@ -62,6 +65,52 @@ export function VoiceNaturalInput({
   const isAr = lang === 'ar';
   // Keep voice recognition tied to the single app-wide language choice.
   const speechLanguage = lang === 'ar' ? 'ar-EG' : 'en-US';
+
+  const phase = userSubscription ? stageFor(userSubscription) : 'expired';
+  const canUseAi = !guestDemo && !subscriptionExpired && (phase === 'paid' || phase === 'pro-trial');
+  const [aiSelected, setAiSelected] = useState(false);
+  const [attempts, setAttempts] = useState<{ limit: number; remaining: number } | null>(null);
+  const requestVersion = useRef(0);
+  const refreshAttempts = useCallback(async () => {
+    if (!canUseAi) return;
+    const user = auth.currentUser;
+    if (!user || user.uid !== accountUid) return;
+    const version = ++requestVersion.current;
+    try {
+      const response = await fetch('/api/gateway', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
+        body: JSON.stringify({ action: 'ai.quota.status' }),
+      });
+      const result = await response.json();
+      if (version === requestVersion.current && auth.currentUser?.uid === user.uid) {
+        setAttempts(response.ok && result.ok && result.data?.plan === 'pro' ? result.data.aiAttempts ?? null : null);
+      }
+    } catch {
+      if (version === requestVersion.current) setAttempts(null);
+    }
+  }, [accountUid, canUseAi]);
+
+  useEffect(() => {
+    setAiSelected(false);
+    setAttempts(null);
+    if (!canUseAi) return;
+    void refreshAttempts();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshAttempts();
+    };
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      requestVersion.current += 1;
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [canUseAi, refreshAttempts]);
+
+  const aiAvailable = canUseAi && (attempts?.remaining ?? 0) > 0;
+  const useAi = aiAvailable && aiSelected;
+  const numberFormat = new Intl.NumberFormat(isAr ? 'ar-EG' : 'en-GB');
 
   const [inputText, setInputText] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -125,7 +174,7 @@ export function VoiceNaturalInput({
    * Unified AI Processing Pipeline
    * Both Voice STT and Typed Input go through this exact same function!
    */
-  const processInputWithAI = async (rawText: string, inputSource: 'voice'|'text' = 'text', originalTranscript = '') => {
+  const processInput = async (rawText: string, inputSource: 'voice' | 'text', originalTranscript: string, useCloudAi: boolean, retry = false) => {
     const text = rawText.trim();
     if (subscriptionExpired) { onExpiredAttempt?.(); return; }
     if (!text) return;
@@ -138,6 +187,7 @@ export function VoiceNaturalInput({
     processingRequestRef.current = true;
     setIsProcessingAI(true);
 
+    const userId = auth.currentUser?.uid;
     let analyzed = false;
     try {
       const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Cairo';
@@ -145,8 +195,7 @@ export function VoiceNaturalInput({
       // Format local ISO
       const localISO = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();
 
-      const phase = userSubscription ? stageFor(userSubscription) : 'expired';
-      const analyzer = guestDemo ? aiClient : phase === 'paid' || phase === 'pro-trial' ? geminiClient : quotaLocalClient;
+      const analyzer = guestDemo ? aiClient : useCloudAi ? geminiClient : quotaLocalClient;
       const result: AIInterpretationResult = await analyzer.interpret({
         text,
         accounts: accounts.map((a) => ({
@@ -166,15 +215,24 @@ export function VoiceNaturalInput({
         userTimezone,
         lang,
       });
-      analyzed = true;
+      if (auth.currentUser?.uid !== userId || (retry && window.location.pathname !== '/transactions/new')) return;
       const engineNotice = result.engineUsed === 'local-fallback'
         ? (result.geminiFallbackReason === 'limit'
-          ? (isAr ? 'انتهت حصة الذكاء الاصطناعي اليوم. تم التحليل بالمحلل المحلي.' : 'AI’s daily allowance is used up. The local analyzer handled this request.')
-          : (isAr ? 'الذكاء الاصطناعي غير متاح مؤقتًا. تم التحليل بالمحلل المحلي.' : 'AI is temporarily unavailable. The local analyzer handled this request.'))
+          ? (isAr ? 'انتهت حصة الذكاء الاصطناعي اليوم. تم تحليل النص بالطريقة العادية.' : 'AI’s daily allowance is used up. Standard analysis handled this request.')
+          : (isAr ? 'الذكاء الاصطناعي غير متاح مؤقتًا. تم تحليل النص بالطريقة العادية.' : 'AI is temporarily unavailable. Standard analysis handled this request.'))
         : null;
 
-      // Handle Result based on classified INTENT
+      if (retry && result.engineUsed === 'local-fallback') {
+        if (engineNotice) showNotice(engineNotice, lang);
+        return;
+      }
+
       if (result.intent === 'FINANCIAL_QUERY') {
+        if (retry) {
+          showNotice(isAr ? 'اتفسّر النص كسؤال مالي. تقدر تكمل مراجعة العملية الحالية.' : 'The text was understood as a financial question. You can keep reviewing the current draft.', lang, 'warning');
+          return;
+        }
+        analyzed = useCloudAi || !aiAvailable;
         if (engineNotice) showNotice(engineNotice, lang);
         onFinancialQuery(
           result.query || { metric: 'total_spent', period: 'all_time', transactionType: 'expense' },
@@ -182,6 +240,7 @@ export function VoiceNaturalInput({
         );
       } else if (result.intent === 'CREATE_TRANSACTION' && result.transaction) {
         if (engineNotice) showNotice(engineNotice, lang);
+        analyzed = true;
         const tx = result.transaction;
 
         // Build transaction draft
@@ -201,8 +260,9 @@ export function VoiceNaturalInput({
           analyzedText:text,
           originalText:inputSource==='voice' ? (originalTranscript.trim() || text) : text,
           entryTicket: result.entryTicket, inputSource,analysisId:crypto.randomUUID(),appRevision:APP_REVISION,
-        });
-      } else if (result.intent === 'CORRECT_PROPOSAL' && result.correction) {
+        }, !useCloudAi && aiAvailable ? () => processInput(text, inputSource, originalTranscript, true, true) : undefined);
+      } else if (!retry && result.intent === 'CORRECT_PROPOSAL' && result.correction) {
+        analyzed = true;
         if (onAICorrection) {
           onAICorrection(result.correction);
         }
@@ -225,6 +285,10 @@ export function VoiceNaturalInput({
         'warning',
       );
     } finally {
+      if (useCloudAi) {
+        setAiSelected(false);
+        void refreshAttempts();
+      }
       processingRequestRef.current = false;
       setIsProcessingAI(false);
       if (analyzed) {
@@ -364,7 +428,7 @@ export function VoiceNaturalInput({
     }
     if (!inputText.trim() || isProcessingAI || processingRequestRef.current) return;
     setPendingVoiceReview(false);
-    void processInputWithAI(inputText, pendingVoiceReview ? 'voice' : 'text', segmentBaseRef.current);
+    void processInput(inputText, pendingVoiceReview ? 'voice' : 'text', segmentBaseRef.current, useAi);
   };
 
   return (
@@ -372,7 +436,7 @@ export function VoiceNaturalInput({
       {/* Primary Big Voice / Text Card with Gemini AI styling */}
       <form
         onSubmit={handleFormSubmit}
-        className={`bg-white rounded-3xl border transition-all shadow-xs p-4 sm:p-5 flex items-center justify-between gap-3 ${
+        className={`bg-white rounded-3xl border transition-all shadow-xs p-4 sm:p-5 flex flex-wrap items-start justify-between gap-3 ${
           isRecording
             ? 'border-emerald-500 ring-4 ring-emerald-500/10'
             : isProcessingAI
@@ -423,8 +487,8 @@ export function VoiceNaturalInput({
               <span className="flex items-center gap-1 text-emerald-700 font-semibold">
                 <Sparkles className="w-3 h-3 shrink-0" />
                 {isAr
-                  ? 'عدّل النص لو محتاج، ثم اضغط سهم الإرسال لتحليله مرة واحدة وفتح حقول العملية وحفظها.'
-                  : 'Edit the transcript if needed, then tap Send to analyze it once, open the transaction fields, and save it.'}
+                  ? 'عدّل النص لو محتاج، ثم اضغط زر التحليل.'
+                  : 'Edit the transcript if needed, then tap Analyze.'}
               </span>
             ) : (
               <span className="flex items-center gap-1 text-slate-400">
@@ -449,7 +513,7 @@ export function VoiceNaturalInput({
               <span className="flex size-10 items-center justify-center rounded-full bg-slate-900 text-white shadow-xs transition-transform hover:bg-slate-800 active:scale-95">
                 <Send className="size-4" aria-hidden="true" />
               </span>
-              <span>{isAr ? 'إرسال للمراجعة والحفظ' : 'Send for review and save'}</span>
+              <span>{useAi ? (isAr ? 'حلّل بالذكاء الاصطناعي' : 'Analyze with AI') : (isAr ? 'حلّل النص' : 'Analyze text')}</span>
             </button>
           )}
 
@@ -466,7 +530,7 @@ export function VoiceNaturalInput({
                   ? 'bg-indigo-600 shadow-indigo-500/25'
                   : 'bg-emerald-500 hover:bg-emerald-600 active:scale-95 shadow-emerald-500/25'
               }`}
-              title={isRecording ? (isAr ? 'إنهاء التسجيل' : 'Finish recording') : (isAr ? 'تحدث للمساعد المالي' : 'Speak to AI Financial Assistant')}
+              title={isRecording ? (isAr ? 'إنهاء التسجيل' : 'Finish recording') : (isAr ? 'تحدث للمساعد المالي' : 'Speak to the financial assistant')}
             >
               {isProcessingAI ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -483,6 +547,19 @@ export function VoiceNaturalInput({
             )}
           </div>
         </div>
+        {canUseAi && <div className="flex w-full flex-wrap items-center justify-between gap-x-3 border-t border-slate-100 pt-2 text-xs">
+          <label className="inline-flex min-h-9 items-center gap-2 font-semibold text-slate-800">
+            <input type="checkbox" className="size-4 accent-emerald-700" checked={useAi}
+              onChange={event => setAiSelected(event.target.checked)} disabled={!aiAvailable || isProcessingAI || isRecording} />
+            {isAr ? 'استخدم الذكاء الاصطناعي' : 'Use AI'}
+          </label>
+          <span aria-live="polite" className="text-slate-600">
+            {attempts
+              ? (isAr ? `متبقي ${numberFormat.format(attempts.remaining)} من ${numberFormat.format(attempts.limit)} محاولة اليوم`
+                : `${numberFormat.format(attempts.remaining)} of ${numberFormat.format(attempts.limit)} attempts left today`)
+              : <button type="button" className="underline" onClick={() => void refreshAttempts()}>{isAr ? 'تحديث الحصة' : 'Refresh allowance'}</button>}
+          </span>
+        </div>}
       </form>
 
       {/* Speech Hint / Error if any */}

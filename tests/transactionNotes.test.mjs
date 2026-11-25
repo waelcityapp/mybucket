@@ -55,4 +55,9 @@ const cases = [
 for (const [input, amount, expected] of cases) {
   assert.equal(parse(input, amount), expected, input);
 }
+const instaPay = ['InstaPay', 'انستاباي'];
+assert.equal(parse('صرفت 40 ج من الانستاباى النهاردة', 40, instaPay), '');
+assert.equal(parse('صرفت 40 ج بنزين من انستا باي النهاردة', 40, instaPay), 'بنزين');
+assert.equal(parse('صرفت 40 ج من انستاباي علشان رسوم انستاباي', 40, instaPay), 'رسوم انستاباي');
+
 console.log(cases.length+'/'+cases.length+' transaction-note test cases passed');

@@ -1,3 +1,4 @@
+import { extractTransactionDescription } from '../../utils/transactionDescription';
 import { AIInterpretationRequest, AIInterpretationResult } from './types';
 import { parseNaturalDateTime } from '../../utils/dateTime';
 import { findRelativeDayPhrase } from '../../utils/relativeDayPhrase';
@@ -293,7 +294,9 @@ export function interpretLocalFinancialRequest(request: AIInterpretationRequest)
         accountId: sourceId,
         toAccountId: destinationId,
         categoryId: draft.categoryId || null,
-        description: draft.description,
+        description: explicitAccount
+          ? extractTransactionDescription(raw, finalAmount, [explicitAccount.name, explicitAccount.nameAr ?? ''])
+          : draft.description,
         date: finalDate,
         time: finalTime,
         missingFields,

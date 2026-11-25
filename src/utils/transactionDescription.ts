@@ -5,11 +5,21 @@ import { removeTodayDateExpression } from './todayDateExpression';
  * Extract only the user's stated transaction note. Never invent categories or
  * reasons. Reason clauses preserve their wording, numbers and private labels.
  */
-export function extractTransactionDescription(raw: string, parsedAmount: number | null): string {
+export function extractTransactionDescription(raw: string, parsedAmount: number | null, sourceNames: string[] = []): string {
   if (!raw.trim()) return '';
 
   const connector = /(?:^|\s)(علشان|عشان|بخصوص|بسبب|لأجل|من أجل|because|regarding)(?=\s|$)/i.exec(raw);
-  const header = connector ? raw.slice(0, connector.index) : raw;
+  let header = connector ? raw.slice(0, connector.index) : raw;
+  const names = sourceNames.map(name => name.trim()).filter(Boolean);
+  if (names.some(name => /(?:[إأا]نستا\s*با[ييى]|insta\s*pay)/i.test(name))) {
+    names.push('إنستاباي', 'انستاباي', 'انستا باي', 'إنستا باي', 'انستاباى', 'انستا باى', 'InstaPay', 'Insta Pay');
+  }
+  if (names.length) {
+    const alternatives = [...new Set(names)].sort((a, b) => b.length - a.length)
+      .map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    const source = new RegExp(`(^|[\\s،,])(?:من|عبر|باستخدام|from|via|using)\\s+(?:ال)?(?:${alternatives})(?=\\s|$|[،,.!؟?])`, 'gi');
+    header = header.replace(source, '$1');
+  }
   const explanation = connector
     ? removeTodayDateExpression(removeRelativeDayPhrase(raw.slice(connector.index + connector[0].length))).trim()
       .replace(/^(?:(?:أنا|انا|إني|اني)\s+)?(?:جبت|جايب|جايبة)\s+/i, '')
@@ -41,7 +51,7 @@ export function extractTransactionDescription(raw: string, parsedAmount: number 
   note = note
     // An income introduction is transaction metadata, not the user's note.
     .replace(/^(?:\s|[،,])*?(?:(?:أنا|انا)\s+)?(?:دخل|دخلت|وصل|وصلت|رجع|رجعت)\s*(?:لي|لى)(?=\s|$|[،,.])/i, '')
-    .replace(/(^|[\s،,])(?:دفعت|صرفت|صرفتها|صرفته|صرافه|صرافة|اشتريت|قبضت|اخدت|أخدت|أخذت|خدت|خدنا|استرديت|استرددت|استرجعت|رجعلي|رجعتلي|ردلي|ردولي|حولت|حول|استلمت|جالي|paid|spent|bought|purchased|received|earned|transferred|transfer|moved)(?=\s|$|[،,.])/gi, '$1')
+    .replace(/(^|[\s،,])(?:دفعت|صرفت|صرفتها|صرفته|صرف|صرافه|صرافة|اشتريت|قبضت|اخدت|أخدت|أخذت|خدت|خدنا|استرديت|استرددت|استرجعت|رجعلي|رجعتلي|ردلي|ردولي|حولت|حول|استلمت|جالي|paid|spent|bought|purchased|received|earned|transferred|transfer|moved)(?=\s|$|[،,.])/gi, '$1')
     .replace(/(?:^|\s)(?:(?:من|في|فى|على|علي)\s+)?(?:الكاش|البنك|الفيزا|كاش|فيزا|بنك|cash|card|bank)(?=\s|$|[،,.])/gi, ' ')
     .replace(/(?:^|\s)(?:للكاش|للبنك|للفيزا|إلى\s+الكاش|الى\s+الكاش|إلى\s+البنك|الى\s+البنك|إلى\s+الفيزا|الى\s+الفيزا)(?=\s|$|[،,.])/gi, ' ')
     .replace(/(?:^|\s)(?:جنيه|جنية|egp|usd|دولار|ريال|درهم|eur|يورو)(?=\s|$|[،,.])/gi, ' ')

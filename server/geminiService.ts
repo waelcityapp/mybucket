@@ -34,7 +34,7 @@ For CREATE_TRANSACTION extract type expense|income|transfer, amount, currency, a
 For FINANCIAL_QUERY return query with metric (total_spent|total_income|category_spent|account_balance|net_savings|transaction_count|recent_list), period (today|yesterday|this_week|last_week|this_month|last_month|all_time|custom), optional startDate/endDate/categoryId/accountId/transactionType.
 For CORRECT_PROPOSAL return updated complete transaction and correction {fieldToUpdate,newValue}.
 Never invent an account, amount, destination, or category; use null if missing, and list missing required fields. Match IDs ONLY from lists provided.
-Distinguish dates/times/quantities from amounts. Resolve امبارح/yesterday using the given local date. Description concise; don't repeat the entire utterance.
+Distinguish dates/times/quantities from amounts. Resolve امبارح/yesterday using the given local date. For description use only the stated purchase or reason. Omit the payment account or channel, amount, date, and time. Use null if no purchase or reason was stated.
 Output shape: {"intent":"CREATE_TRANSACTION","confidence":0.9,"transaction":null,"query":null,"correction":null,"clarificationNeeded":null,"rawInterpretationSummary":null}.
 For transaction object include type,amount,currency,accountId,toAccountId,categoryId,description,date,time,missingFields.
 For SAVE_REQUEST set clarificationNeeded to "من فضلك اضغط على زر تأكيد وحفظ".

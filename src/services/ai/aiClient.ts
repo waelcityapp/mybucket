@@ -1,3 +1,4 @@
+import { extractTransactionDescription } from '../../utils/transactionDescription';
 import { interpretLocalFinancialRequest } from './localFinancialInterpreter';
 import {
   AIInterpretationRequest,
@@ -65,7 +66,9 @@ export class GeminiAIClient implements AIInterpretationProvider {
     if (!gatewayResponse?.ok || !gatewayResponse?.data) {
       throw new Error(gatewayResponse?.message || 'Gateway returned an invalid response');
     }
-    return { ...this.validateAndSanitize(gatewayResponse.data as AIInterpretationResult, request), engineUsed: 'gemini', entryTicket: gatewayResponse.data.entryTicket };
+    const result = this.validateAndSanitize(gatewayResponse.data as AIInterpretationResult, request);
+    if (result.engineUsed === 'local') return localFallback('unavailable');
+    return { ...result, engineUsed: 'gemini', entryTicket: gatewayResponse.data.entryTicket };
   }
 
   /**
@@ -249,7 +252,7 @@ export class GeminiAIClient implements AIInterpretationProvider {
       }
 
       // If account wasn't resolved, it's missing! NEVER invent an account!
-      const missingFields: string[] = [...(transaction.missingFields || [])];
+      const missingFields: string[] = (transaction.missingFields || []).filter(field => field !== 'accountId' || !matchedAccountId);
       if (!matchedAccountId && !missingFields.includes('accountId')) {
         missingFields.push('accountId');
       }
@@ -261,7 +264,9 @@ export class GeminiAIClient implements AIInterpretationProvider {
         accountId: matchedAccountId,
         toAccountId: transaction.type === 'transfer' ? null : transaction.toAccountId || null,
         categoryId: matchedCategoryId,
-        description: transaction.description ? transaction.description.trim() : null,
+        description: explicitAccount
+          ? extractTransactionDescription(raw, amount, [explicitAccount.name, explicitAccount.nameAr ?? '']) || null
+          : transaction.description?.trim() || null,
         date: semanticRoles.specificDateStr || transaction.date || request.currentDateTime.slice(0, 10),
         time: semanticRoles.specificTimeStr || transaction.time || request.currentDateTime.slice(11, 16),
         missingFields,

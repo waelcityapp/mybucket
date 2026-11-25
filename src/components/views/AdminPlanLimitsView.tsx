@@ -49,10 +49,10 @@ export function AdminPlanLimitsView({ lang }: { lang: Language }) {
     return () => { active = false; controller.abort(); };
   }, [attempt]);
 
-  const rows: Array<{ label: string; basic?: PlanLimitKey; pro: PlanLimitKey }> = [
+  const rows: Array<{ label: string; basic?: PlanLimitKey; pro?: PlanLimitKey }> = [
     { label: ar ? 'إجمالي العمليات المحفوظة يوميًا' : 'Total daily transaction saves', basic: 'basicEntries', pro: 'proEntries' },
-    { label: ar ? 'محاولات الذكاء الاصطناعي للعمليات يوميًا' : 'Daily AI transaction analysis attempts', pro: 'proAiEntries' },
-    { label: ar ? 'الاستعلامات يوميًا' : 'Daily inquiries', basic: 'basicInquiries', pro: 'proInquiries' },
+    { label: ar ? 'محاولات الذكاء الاصطناعي يوميًا للعمليات والاستعلامات' : 'Daily AI attempts for transactions and queries', pro: 'proAiAttempts' },
+    { label: ar ? 'الاستعلامات يوميًا' : 'Daily inquiries', basic: 'basicInquiries' },
     { label: ar ? 'الحسابات' : 'Accounts', basic: 'basicAccounts', pro: 'proAccounts' },
     { label: ar ? 'بنود الصرف' : 'Expense categories', basic: 'basicCategories', pro: 'proCategories' },
     { label: ar ? 'البنود المفتوحة في كل قسم' : 'Open items per section', basic: 'basicOpenItems', pro: 'proOpenItems' },
@@ -160,10 +160,10 @@ export function AdminPlanLimitsView({ lang }: { lang: Language }) {
         </thead>
         <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
           {rows.map(({ label, basic, pro }) => (
-            <tr key={pro}>
-              <th scope="row" className="p-2 text-start font-semibold">{label}{pro === 'proAiEntries' && <span className="block text-xs font-normal">{ar ? 'Basic عمليات محفوظة · Pro محاولات الذكاء الاصطناعي' : 'Basic saved transactions · Pro AI attempts'}</span>}</th>
+            <tr key={pro ?? basic}>
+              <th scope="row" className="p-2 text-start font-semibold">{label}</th>
               <td className="p-2 text-center">{basic ? input(basic, label + ' — Basic') : (ar ? 'غير متاح' : 'Unavailable')}</td>
-              <td className="p-2">{input(pro, label + ' — Pro')}</td>
+              <td className="p-2">{pro ? input(pro, label + ' — Pro') : (ar ? 'ضمن حصة الذكاء الاصطناعي' : 'Included in AI allowance')}</td>
             </tr>
           ))}
         </tbody>

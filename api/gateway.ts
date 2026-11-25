@@ -257,7 +257,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       case 'ai.quota.reserveLocal': {
         const { reserveAiQuota } = await import('../server/aiQuota.js');
-        return res.status(200).json({ ok: true, data: await reserveAiQuota(user.uid, payload.text, true, undefined, payload.inquiryRequestId) });
+        return res.status(200).json({ ok: true, data: await reserveAiQuota(user.uid, payload.text, true) });
       }
       case 'ai.quota.status': {
         const { readOwnAiQuota } = await import('../server/aiQuota.js');
@@ -405,7 +405,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const { reserveAiQuota } = await import('../server/aiQuota.js');
-        const reservation = await reserveAiQuota(user.uid, text, false, undefined, payload.inquiryRequestId);
+        const reservation = await reserveAiQuota(user.uid, text, false);
 
         const { interpretNaturalLanguageWithGemini } = await import('../server/geminiService.js');
         const result = await interpretNaturalLanguageWithGemini({

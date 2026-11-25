@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { PUBLISHED_PLAN_LIMITS_PATH, publishedPlanLimits } from './planLimits.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminFirestore } from './firebaseAdmin.js';
@@ -91,8 +90,8 @@ export type AiQuotaDecision = {
 
 /**
  * Server-authoritative quota reservation. Client-supplied plan, engine, counters,
- * and dates are deliberately ignored. Each plan/engine/operation has its own
- * counter, so switching plans cannot replenish an earlier bucket.
+ * and dates are deliberately ignored. Pro cloud attempts share one budget,
+ * while local counters remain scoped to the plan and operation.
  */
 type QuotaDeps = {
   db: ReturnType<typeof getAdminFirestore>;
@@ -102,10 +101,17 @@ type QuotaDeps = {
   now: () => number;
 };
 
-export function proGeminiEntryLimit(limits: AiDailyLimits, publishedLimit?: number) {
-  return Math.min(limits.proGeminiEntries, publishedLimit ?? limits.proGeminiEntries);
+function readAnalysisAttempts(data: Record<string, unknown>, key: string): number {
+  const used = data[key] ?? 0;
+  if (typeof used !== 'number' || !Number.isSafeInteger(used) || used < 0) {
+    throw new SubscriptionError(503, 'invalid_quota_counter', 'Unable to verify usage.');
+  }
+  return used;
 }
 
+function readProAiAttempts(data: Record<string, unknown>): number {
+  return readAnalysisAttempts(data, 'proGeminiEntries') + readAnalysisAttempts(data, 'proGeminiInquiries');
+}
 
 export function readSavedEntryCount(snapshot: { get(key: string): unknown }, key: 'basic' | 'proAi' | 'proAdditional' | 'pro'): number {
   if (key === 'pro') {
@@ -137,27 +143,30 @@ export async function readOwnAiQuota(uid: string, deps?: { db: ReturnType<typeof
   const plan = phase === 'expired' ? 'expired' : phase === 'paid' || phase === 'pro-trial' ? 'pro' : 'basic';
   const data = counter.exists ? counter.data() || {} : {};
   const bucket = (key: keyof AiDailyLimits, limit = limits[key] as number) => {
-    const used = data[key] ?? 0;
-    if (!Number.isSafeInteger(used) || used < 0) throw new SubscriptionError(503, 'invalid_quota_counter', 'Unable to verify usage.');
+    const used = readAnalysisAttempts(data, key);
     return { used, limit, remaining: Math.max(0, limit - used) };
   };
+  const caps = !deps && plan !== 'expired' ? publishedPlanLimits(await db.doc(PUBLISHED_PLAN_LIMITS_PATH).get()) : null;
   const savedEntries = !deps && plan !== 'expired' ? await (async () => {
-    const [policy, entryCounter] = await Promise.all([
-      db.doc(PUBLISHED_PLAN_LIMITS_PATH).get(),
-      db.doc(`users/${uid}/entryUsage/${day}`).get(),
-    ]);
-    const caps = publishedPlanLimits(policy);
+    const entryCounter = await db.doc(`users/${uid}/entryUsage/${day}`).get();
     const entries = (key: 'basic' | 'pro', limit?: number) => {
       const used = readSavedEntryCount(entryCounter, key);
       return { used, limit: limit ?? null, remaining: limit === undefined ? null : Math.max(0, limit - used) };
     };
     return plan === 'basic'
       ? { basic: entries('basic', caps?.basicEntries) }
-      : { pro: entries('pro', caps?.proEntries), geminiAttempts: bucket('proGeminiEntries', proGeminiEntryLimit(limits, caps?.proAiEntries)) };
+      : { pro: entries('pro', caps?.proEntries) };
   })() : null;
-  return { day, plan, ...(savedEntries ? { savedEntries } : {}), ...(plan === 'basic' ? { local: { entries: bucket('basicLocalEntries'), inquiries: bucket('basicLocalInquiries') } } : plan === 'pro' ? { gemini: { entries: bucket('proGeminiEntries'), inquiries: bucket('proGeminiInquiries') }, local: { entries: bucket('proLocalEntries'), inquiries: bucket('proLocalInquiries') } } : {}) };
+  const limit = caps?.proAiAttempts ?? limits.proGeminiEntries + limits.proGeminiInquiries;
+  const used = plan === 'pro' ? readProAiAttempts(data) : 0;
+  return {
+    day, plan,
+    ...(savedEntries ? { savedEntries } : {}),
+    ...(plan === 'pro' ? { aiAttempts: { used, limit, remaining: Math.max(0, limit - used) } } : {}),
+    ...(plan === 'basic' ? { local: { entries: bucket('basicLocalEntries'), inquiries: bucket('basicLocalInquiries') } } : {}),
+  };
 }
-export async function reserveAiQuota(uid: string, rawText: unknown, forceLocal = false, deps?: QuotaDeps, inquiryRequestId?: unknown): Promise<AiQuotaDecision> {
+export async function reserveAiQuota(uid: string, rawText: unknown, forceLocal = false, deps?: QuotaDeps): Promise<AiQuotaDecision> {
   if (typeof rawText !== 'string' || !rawText.trim() || rawText.length > 300) {
     throw new SubscriptionError(400, 'invalid_ai_input', 'Missing or invalid AI input.');
   }
@@ -182,59 +191,34 @@ export async function reserveAiQuota(uid: string, rawText: unknown, forceLocal =
     const plan: 'basic' | 'pro' = phase === 'paid' || phase === 'pro-trial' ? 'pro' : 'basic';
     if (plan === 'basic' && !forceLocal) throw new SubscriptionError(403, 'pro_plan_required', 'AI is available on Pro; Basic uses the local analyzer.');
     const current = snapshot.exists ? snapshot.data() || {} : {};
-    const policy = !deps && (operation === 'inquiry' || (plan === 'pro' && !forceLocal))
+    const cloud = plan === 'pro' && !forceLocal;
+    const basicInquiry = plan === 'basic' && operation === 'inquiry';
+    const policy = !deps && (cloud || basicInquiry)
       ? publishedPlanLimits(await tx.get(db.doc(PUBLISHED_PLAN_LIMITS_PATH)))
       : null;
-    const inquiryCap = operation === 'inquiry' && policy ? (plan === 'basic' ? policy.basicInquiries : policy.proInquiries) : null;
-    const inquiryKey = plan === 'basic' ? 'basicPlanInquiries' : 'proPlanInquiries';
-    const totalInquiries = current[inquiryKey] ?? 0;
-    const requestKey = typeof inquiryRequestId === 'string' && /^[a-f0-9-]{36}$/i.test(inquiryRequestId) ? inquiryRequestId : null;
-    const receiptRef = inquiryCap !== null && plan === 'pro' && requestKey
-      ? counterRef.collection('inquiries').doc(requestKey)
-      : null;
-    const receipt = receiptRef ? await tx.get(receiptRef) : null;
-    const fingerprint = receiptRef ? createHash('sha256').update(rawText).digest('hex') : null;
-    const continuingLocally = forceLocal && receipt?.get('fingerprint') === fingerprint && receipt?.get('awaitsLocal') === true;
-    if (inquiryCap !== null && (!Number.isSafeInteger(totalInquiries) || totalInquiries < 0)) {
-      throw new SubscriptionError(503, 'invalid_quota_counter', 'Unable to verify usage.');
-    }
-    if (inquiryCap !== null && totalInquiries >= inquiryCap && !continuingLocally) {
-      throw new SubscriptionError(429, 'plan_inquiry_limit', 'انتهت حصة الاستعلامات اليومية، وتتجدد غدًا.');
-    }
-    const attempts: Array<{ engine: 'local' | 'gemini'; key: string; limit: number; fallback: boolean }> =
-      plan === 'basic'
-        ? [{ engine: 'local', key: `basicLocal${operation === 'entry' ? 'Entries' : 'Inquiries'}`, limit: operation === 'entry' ? limits.basicLocalEntries : limits.basicLocalInquiries, fallback: false }]
-        : forceLocal
-          ? [{ engine: 'local', key: `proLocal${operation === 'entry' ? 'Entries' : 'Inquiries'}`, limit: operation === 'entry' ? limits.proLocalEntries : limits.proLocalInquiries, fallback: true }]
-          : [
-              { engine: 'gemini', key: `proGemini${operation === 'entry' ? 'Entries' : 'Inquiries'}`, limit: operation === 'entry' ? proGeminiEntryLimit(limits, policy?.proAiEntries) : limits.proGeminiInquiries, fallback: false },
-            ];
+    const suffix = operation === 'entry' ? 'Entries' : 'Inquiries';
+    const localKey = `${plan}Local${suffix}` as const;
+    const counterKey = cloud ? `proGemini${suffix}` : localKey;
+    const limit = cloud
+      ? policy?.proAiAttempts ?? limits.proGeminiEntries + limits.proGeminiInquiries
+      : (basicInquiry ? policy?.basicInquiries : undefined) ?? limits[localKey];
+    const inquiryKey = basicInquiry && policy ? 'basicPlanInquiries' : null;
+    const used = cloud ? readProAiAttempts(current) : readAnalysisAttempts(current, inquiryKey ?? counterKey);
 
-    for (const attempt of attempts) {
-      const used = Number(current[attempt.key] || 0);
-      const localInquiry = inquiryCap !== null && attempt.engine === 'local';
-      const limit = localInquiry ? inquiryCap : attempt.limit;
-      const usedForDisplay = localInquiry ? totalInquiries : used;
-      if (localInquiry || used < attempt.limit) {
-        tx.set(counterRef, {
-          date: day,
-          timeZone: TIME_ZONE,
-          [attempt.key]: FieldValue.increment(1),
-          ...(inquiryCap !== null && !continuingLocally ? { [inquiryKey]: FieldValue.increment(1) } : {}),
-          updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
-        if (receiptRef && (!forceLocal || continuingLocally)) {
-          tx.set(receiptRef, { fingerprint, awaitsLocal: !forceLocal });
-        }
-        const nextUsed = usedForDisplay + (localInquiry && continuingLocally ? 0 : 1);
-        return {
-          plan, engine: attempt.engine, operation, used: nextUsed,
-          limit, remaining: Math.max(0, limit - nextUsed),
-          day, fallbackFromGemini: attempt.fallback,
-        };
-      }
+    if (used < limit) {
+      tx.set(counterRef, {
+        date: day,
+        timeZone: TIME_ZONE,
+        [counterKey]: FieldValue.increment(1),
+        ...(inquiryKey ? { [inquiryKey]: FieldValue.increment(1) } : {}),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      return {
+        plan, engine: cloud ? 'gemini' : 'local', operation, used: used + 1,
+        limit, remaining: limit - used - 1, day, fallbackFromGemini: plan === 'pro' && forceLocal,
+      };
     }
-
+    if (inquiryKey) throw new SubscriptionError(429, 'plan_inquiry_limit', 'انتهت حصة الاستعلامات اليومية، وتتجدد غدًا.');
     throw new SubscriptionError(429, 'ai_daily_limit_reached',
       forceLocal || plan === 'basic' ? 'انتهى الحد اليومي للمحلل المحلي، ويتجدد غدًا.' : 'انتهى حد الذكاء الاصطناعي اليومي.');
   });

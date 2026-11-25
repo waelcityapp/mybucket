@@ -830,3 +830,5 @@ The app header offers sharing next to the language control. It shares the public
 Pro manual saves and saves following local analysis use the daily additional transaction allowance from the start of the day. AI analysis attempts and saves with a valid AI entry ticket are tracked independently. The former AI-exhaustion gate and provider-failure marker have been retired.
 
 Pro uses one admin-configured daily save allowance shared by manual, local, and AI-assisted saves. Analysis attempts retain their separate limits. Older published settings and drafts derive the initial save cap from the previous two configured allowances, and daily usage includes both existing save counters.
+
+Pro cloud AI attempts share one published daily allowance across transactions and inquiries. Earlier published allowances add the former default five inquiry attempts on read. Historical attempts count toward the shared allowance. The subscription card shows completed saves and cloud attempts only. Local analysis limits remain technical settings.

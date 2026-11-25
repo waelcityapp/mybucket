@@ -1,8 +1,8 @@
 import { parsePlanFeatureCopy, type PlanFeatureCopy } from './planLimitFeatures.js';
 
 export const DEFAULT_PLAN_LIMITS = {
-  basicEntries: 15, proAiEntries: 15, proEntries: 25,
-  basicInquiries: 3, proInquiries: 10,
+  basicEntries: 15, proAiAttempts: 20, proEntries: 25,
+  basicInquiries: 3,
   basicAccounts: 4, proAccounts: 10,
   basicCategories: 7, proCategories: 20,
   basicOpenItems: 1, proOpenItems: 3,
@@ -29,9 +29,12 @@ export function parsePlanLimits(value: unknown): PlanLimits | null {
   const legacyAdditional = fields.proAdditionalEntries;
   const legacyAi = fields.proAiEntries;
   for (const key of PLAN_LIMIT_KEYS) {
+    const valueForKey = key === 'proAiAttempts' && fields.proAiAttempts === undefined && isPlanLimit(legacyAi)
+      ? legacyAi + 5
+      : fields[key];
     const limit = key === 'proEntries' && fields.proEntries === undefined && isPlanLimit(legacyAdditional) && isPlanLimit(legacyAi)
       ? legacyAdditional + legacyAi
-      : fields[key];
+      : valueForKey;
     if (!isPlanLimit(limit)) return null;
     limits[key] = limit;
   }

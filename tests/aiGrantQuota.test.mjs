@@ -11,11 +11,11 @@ function harness() {
   return {deps,setSub:value=>{sub=value;},getData:()=>({...data})};
 }
 
-test('parallel Pro grant requests cannot exceed the daily Gemini entry limit', async () => {
-  const h=harness();const results=await Promise.allSettled(Array.from({length:25},()=>reserveAiQuota('user1','دفعت 100',false,h.deps)));
-  assert.equal(results.filter(r=>r.status==='fulfilled').length,15);
-  assert.equal(results.filter(r=>r.status==='rejected'&&r.reason.code==='ai_daily_limit_reached').length,10);
-  assert.equal(h.getData().proGeminiEntries,15);
+test('parallel Pro grant requests cannot exceed the shared daily AI limit', async () => {
+  const h=harness();const results=await Promise.allSettled(Array.from({length:25},(_, i)=>reserveAiQuota('user1',i % 2 ? 'دفعت 100' : 'كام صرفت النهاردة؟',false,h.deps)));
+  assert.equal(results.filter(r=>r.status==='fulfilled').length,20);
+  assert.equal(results.filter(r=>r.status==='rejected'&&r.reason.code==='ai_daily_limit_reached').length,5);
+  assert.equal(h.getData().proGeminiEntries + h.getData().proGeminiInquiries,20);
 });
 
 test('Basic grant cannot access Gemini, local buckets stay independent', async () => {
@@ -34,13 +34,13 @@ test('an expired grant cannot reserve a quota or call Gemini', async () => {
   assert.deepEqual(h.getData(),{});
 });
 
-test('Pro inquiries stop at five and fallback local has its own counter', async () => {
+test('Pro can spend its full shared allowance on inquiries and local fallback uses a separate counter', async () => {
   const h=harness();
-  for(let i=0;i<5;i++) assert.equal((await reserveAiQuota('user1','كام صرفت النهاردة؟',false,h.deps)).operation,'inquiry');
+  for(let i=0;i<20;i++) assert.equal((await reserveAiQuota('user1','كام صرفت النهاردة؟',false,h.deps)).operation,'inquiry');
   await assert.rejects(reserveAiQuota('user1','كام صرفت النهاردة؟',false,h.deps),e=>e.code==='ai_daily_limit_reached');
   const fallback=await reserveAiQuota('user1','كام صرفت النهاردة؟',true,h.deps);
   assert.equal(fallback.engine,'local');assert.equal(fallback.operation,'inquiry');
-  assert.equal(h.getData().proGeminiInquiries,5);assert.equal(h.getData().proLocalInquiries,1);
+  assert.equal(h.getData().proGeminiInquiries,20);assert.equal(h.getData().proLocalInquiries,1);
 });
 
 test('administrator limits reject negative, fractional, or unbounded values', async () => {

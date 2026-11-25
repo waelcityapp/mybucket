@@ -328,7 +328,7 @@ async function startServer() {
             return res.status(400).json({ ok: false, error: 'invalid_ai_input', message: 'Missing or invalid text.' });
           }
           const { reserveAiQuota } = await import('./server/aiQuota');
-          const reservation = await reserveAiQuota(user.uid, text, false, undefined, payload.inquiryRequestId);
+          const reservation = await reserveAiQuota(user.uid, text, false);
           const result = await interpretNaturalLanguageWithGemini({
             text,
             accounts: Array.isArray(accounts) ? accounts : [],

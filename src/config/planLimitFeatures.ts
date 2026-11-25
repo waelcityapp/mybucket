@@ -32,13 +32,13 @@ export function planLimitFeatures(lang: 'ar' | 'en', limits: PlanLimits, copy: P
       id: 'entries',
       label: ar ? 'تسجيل العمليات' : 'Recording transactions',
       basic: ar ? `${format(limits.basicEntries)} عملية يوميًا إجمالًا، بالصوت أو يدويًا` : `${format(limits.basicEntries)} transactions a day in total, by voice or manually`,
-      pro: ar ? `${format(limits.proEntries)} عملية حفظ يوميًا بأي طريقة، و${format(limits.proAiEntries)} محاولة تحليل بالذكاء الاصطناعي` : `${format(limits.proEntries)} daily saves by any method, with ${format(limits.proAiEntries)} AI analysis attempts per day`,
+      pro: ar ? `${format(limits.proEntries)} عملية حفظ يوميًا بأي طريقة، و${format(limits.proAiAttempts)} محاولة ذكاء اصطناعي يوميًا للعمليات والاستعلامات` : `${format(limits.proEntries)} daily saves by any method, with ${format(limits.proAiAttempts)} AI attempts per day for transactions and queries`,
     },
     {
       id: 'inquiries',
       label: ar ? 'الاستعلام عن فلوسك' : 'Financial queries',
       basic: ar ? `${format(limits.basicInquiries)} يوميًا، بالصوت أو الكتابة` : `${format(limits.basicInquiries)} a day, by voice or text`,
-      pro: ar ? `${format(limits.proInquiries)} يوميًا، بالصوت أو الكتابة` : `${format(limits.proInquiries)} a day, by voice or text`,
+      pro: ar ? 'ضمن حصة محاولات الذكاء الاصطناعي' : 'Included in the AI attempt allowance',
     },
     {
       id: 'accounts',

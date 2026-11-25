@@ -8,7 +8,7 @@ import { stageFor } from '../config/subscriptionPolicy';
 
 type Bucket = { used: number; limit: number; remaining: number };
 type SavedBucket = { used: number; limit: number | null; remaining: number | null };
-type UsageStatus = { day: string; plan: 'basic' | 'pro' | 'expired'; savedEntries?: Partial<Record<'basic' | 'pro' | 'geminiAttempts', SavedBucket>>; local?: { entries: Bucket; inquiries: Bucket }; gemini?: { entries: Bucket; inquiries: Bucket } };
+type UsageStatus = { day: string; plan: 'basic' | 'pro' | 'expired'; savedEntries?: Partial<Record<'basic' | 'pro', SavedBucket>>; aiAttempts?: Bucket };
 
 interface SubscriptionCardProps {
   subscription: UserSubscription | null;
@@ -107,10 +107,6 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
           {usageError && <p role="alert">{isAr ? 'تعذر تحميل حدود الاستخدام.' : 'Could not load usage limits.'} <button type="button" onClick={() => setUsageRetry(n => n + 1)} className="font-bold text-emerald-700 underline">{isAr ? 'إعادة المحاولة' : 'Try again'}</button></p>}
           {usage && <>
             <p className="font-bold text-slate-800">{usage.plan === 'expired' ? (isAr ? 'انتهت صلاحية الاستخدام' : 'Access expired') : (isAr ? `الخطة الحالية: ${usage.plan === 'pro' ? 'Pro' : 'Basic'}` : `Current plan: ${usage.plan === 'pro' ? 'Pro' : 'Basic'}`)}</p>
-            {usage.savedEntries?.geminiAttempts && <p className="font-bold text-slate-800">
-              {isAr ? `المتبقي من محاولات الذكاء الاصطناعي للعمليات: ${usage.savedEntries.geminiAttempts.remaining}`
-                : `AI transaction attempts left: ${usage.savedEntries.geminiAttempts.remaining}`}
-            </p>}
             {savedToday && <section className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-950">
               <h3 className="font-extrabold">{isAr ? 'العمليات المحفوظة اليوم' : 'Transactions saved today'}</h3>
               <p>{isAr ? 'يشمل الحفظ اليدوي والحفظ بعد التحليل.' : 'Includes manual saves and saves after analysis.'}</p>
@@ -121,15 +117,11 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
                     : `Saved ${savedToday.used} of ${savedToday.limit} · ${savedToday.remaining} left`)}
               </p>
             </section>}
-            {usage.plan !== 'expired' && <details className="space-y-2">
-              <summary className="cursor-pointer py-2 font-bold">{isAr ? 'محاولات التحليل اليوم' : 'Analysis attempts today'}</summary>
-            {([['gemini', usage.gemini], ['local', usage.local]] as const).map(([engine, counts]) => counts && <div key={engine} className="rounded-lg border border-slate-200 bg-white p-2">
-              <p className="font-bold text-slate-700">{engine === 'gemini' ? (isAr ? 'الذكاء الاصطناعي' : 'AI') : usage.plan === 'pro' ? (isAr ? 'المحلل المحلي عند عدم توفر الذكاء الاصطناعي أو انتهاء حصته' : 'Local analyzer when AI is unavailable or exhausted') : (isAr ? 'المحلل المحلي' : 'Local analyzer')}</p>
-              {(engine !== 'gemini' || !usage.savedEntries?.geminiAttempts) && <p>{isAr ? `محاولات تحليل العمليات: ${counts.entries.used} من ${counts.entries.limit} · المتبقي ${counts.entries.remaining}` : `Entry analysis attempts: ${counts.entries.used} of ${counts.entries.limit} · ${counts.entries.remaining} left`}</p>}
-              <p>{isAr ? `محاولات تحليل الاستعلامات: ${counts.inquiries.used} من ${counts.inquiries.limit} · المتبقي ${counts.inquiries.remaining}` : `Inquiry analysis attempts: ${counts.inquiries.used} of ${counts.inquiries.limit} · ${counts.inquiries.remaining} left`}</p>
-            </div>)}
-              <p className="text-[10px] text-slate-500">{isAr ? 'تُحسب المحاولة عند بدء التحليل.' : 'An attempt counts when analysis starts.'}</p>
-            </details>}
+            {usage.aiAttempts && <section className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
+              <h3 className="font-extrabold">{isAr ? 'محاولات الذكاء الاصطناعي اليوم' : 'AI attempts today'}</h3>
+              <p>{isAr ? 'حصة واحدة للعمليات والاستعلامات. تُحسب المحاولة عند بدء التحليل.' : 'One allowance for transactions and queries. Attempts count when analysis starts.'}</p>
+              <p className="font-bold">{isAr ? `استخدمت ${usage.aiAttempts.used} من ${usage.aiAttempts.limit} · المتبقي ${usage.aiAttempts.remaining}` : `Used ${usage.aiAttempts.used} of ${usage.aiAttempts.limit} · ${usage.aiAttempts.remaining} left`}</p>
+            </section>}
             {usage.plan !== 'expired' && <p className="text-[10px] text-slate-500">{isAr ? 'العدادات تتجدد يوميًا بتوقيت القاهرة.' : 'Counters reset daily in Cairo time.'}</p>}
           </>}
         </div>

@@ -21,10 +21,10 @@ test('real Firestore transactions preserve data, enforce concurrent limits and s
     await setFreeGrant(actor,{uid,plan:'pro',endsAt:'2027-02-09T12:00:00Z'},deps,()=>now);
     const results=await Promise.allSettled(Array.from({length:25},()=>reserveAiQuota(uid,'دفعت 100',false,quotas)));
     let successes=results.filter(r=>r.status==='fulfilled').length;
-    assert.ok(successes<=15);
+    assert.ok(successes<=20);
     const counter=db.doc(`users/${uid}/aiUsage/daily_2026-11-09`);
     assert.equal((await counter.get()).data()?.proGeminiEntries,successes);
-    while(successes<15){await reserveAiQuota(uid,'دفعت 100',false,quotas);successes++;}
+    while(successes<20){await reserveAiQuota(uid,'دفعت 100',false,quotas);successes++;}
     await assert.rejects(reserveAiQuota(uid,'دفعت 100',false,quotas),e=>e.code==='ai_daily_limit_reached');
     assert.equal((await reserveAiQuota(uid,'دفعت 100',true,quotas)).engine,'local');
     await setFreeGrant(actor,{uid,plan:'basic',endsAt:'2027-05-09T12:00:00Z'},deps,()=>now+1000);

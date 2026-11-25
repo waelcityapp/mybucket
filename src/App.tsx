@@ -1997,6 +1997,14 @@ export default function App() {
               />
             </div>
 
+            {activeFinancialQueryResult && (
+              <FinancialQueryResultCard
+                result={activeFinancialQueryResult}
+                lang={lang}
+                onClose={() => setActiveFinancialQueryResult(null)}
+              />
+            )}
+
             {/* Financial overview after the main actions */}
             <HomeFinancialOverview
               accounts={accounts}
@@ -2006,15 +2014,6 @@ export default function App() {
               onViewAccounts={() => navigateTab('accounts')}
               userId={authUser?.uid}
             />
-
-            {/* AI Financial Query Result Card */}
-            {activeFinancialQueryResult && (
-              <FinancialQueryResultCard
-                result={activeFinancialQueryResult}
-                lang={lang}
-                onClose={() => setActiveFinancialQueryResult(null)}
-              />
-            )}
 
             {/* Full-width horizontal currency converter below the financial overview. */}
             <ExchangeRatesMini lang={lang} />

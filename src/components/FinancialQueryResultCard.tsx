@@ -1,5 +1,5 @@
-import React from 'react';
-import { Sparkles, X, TrendingDown, TrendingUp, Wallet, ArrowRight, Calendar } from 'lucide-react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { ChartNoAxesColumnIncreasing, X, Wallet, ArrowRight, Calendar } from 'lucide-react';
 import { DeterministicQueryResult } from '../services/ai/types';
 import { Language } from '../types';
 
@@ -16,20 +16,32 @@ export function FinancialQueryResultCard({
   onClose,
   onViewTransactions,
 }: FinancialQueryResultCardProps) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  const breakdownId = useId();
+  const [expandedResult, setExpandedResult] = useState<DeterministicQueryResult | null>(null);
+  const expanded = expandedResult === result;
+  const breakdown = result.breakdown ?? [];
+  const visibleItems = expanded ? breakdown : breakdown.slice(0, 4);
+  const hiddenCount = breakdown.length - 4;
+
+  useEffect(() => {
+    heading.current?.focus({ preventScroll: true });
+    heading.current?.scrollIntoView({ block: 'start' });
+  }, [result]);
+
   const isAr = lang === 'ar';
 
   return (
     <div className="bg-white text-slate-900 rounded-3xl p-5 shadow-xs border-2 border-emerald-500/20 animate-in fade-in zoom-in-95 duration-200 space-y-4">
-      {/* Top Header with AI Badge & Dismiss */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-            <Sparkles className="w-4 h-4" />
+            <ChartNoAxesColumnIncreasing className="w-4 h-4" aria-hidden="true" />
           </div>
           <div>
-            <span className="text-[11px] font-bold uppercase text-emerald-700 flex items-center gap-1">
+            <h2 ref={heading} tabIndex={-1} className="scroll-mt-24 text-sm font-bold text-emerald-700">
               {isAr ? 'إجابة الاستفسار المالي' : 'Financial Answer'}
-            </span>
+            </h2>
             <p className="text-xs text-slate-600 line-clamp-1 italic font-medium">
               "{result.question}"
             </p>
@@ -72,13 +84,13 @@ export function FinancialQueryResultCard({
       </p>
 
       {/* Breakdown by Category if available */}
-      {result.breakdown && result.breakdown.length > 0 && (
+      {breakdown.length > 0 && (
         <div className="space-y-2 pt-1 border-t border-slate-100">
           <div className="text-[11px] font-bold text-slate-500 uppercase">
             {isAr ? 'التوزيع حسب التصنيف:' : 'Category Breakdown:'}
           </div>
-          <div className="space-y-1.5">
-            {result.breakdown.map((item) => (
+          <div id={breakdownId} className="space-y-1.5">
+            {visibleItems.map((item) => (
               <div
                 key={item.id}
                 className="flex items-center justify-between text-xs py-1.5 px-3 rounded-xl bg-slate-50 border border-slate-200/70"
@@ -103,6 +115,14 @@ export function FinancialQueryResultCard({
               </div>
             ))}
           </div>
+          {hiddenCount > 0 && (
+            <button type="button" aria-expanded={expanded} aria-controls={breakdownId}
+              onClick={() => setExpandedResult(expanded ? null : result)}
+              className="min-h-10 px-2 text-sm font-bold text-emerald-700 hover:underline">
+              {expanded ? (isAr ? 'عرض أقل' : 'Show fewer')
+                : (isAr ? `عرض باقي التصنيفات (${hiddenCount})` : `Show remaining categories (${hiddenCount})`)}
+            </button>
+          )}
         </div>
       )}
 

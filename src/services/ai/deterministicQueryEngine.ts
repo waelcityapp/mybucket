@@ -367,7 +367,7 @@ export function executeDeterministicQuery(
           : `${expenses.length} expense transactions in this period`,
         periodText: periodLabel,
         transactionCount: expenses.length,
-        breakdown: breakdown.slice(0, 4),
+        breakdown,
         matchingTransactions: expenses.slice(0, 5),
       };
     }

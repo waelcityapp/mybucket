@@ -1,3 +1,4 @@
+import { INSTAPAY_NAME } from './transactionDescription';
 import { ARABIC_FINANCIAL_SLANG_BASE } from '../services/ai/aiKnowledgeBase.js';
 import { aiLearnedMemory } from '../services/ai/aiLearnedMemory.js';
 
@@ -242,11 +243,12 @@ export function matchExplicitAccountFromText<T extends MatchableAccount>(text: s
   if (named.length > 1) {
     return named[0].score > named[1].score && named[0].name.includes(named[1].name) ? named[0].account : null;
   }
-  // InstaPay is a transfer channel, not a user-owned wallet/account.
-  // An explicitly named account above still wins; channel-only wording cannot.
-  if (/انستا\s*باي|انستاباي|instapay/i.test(norm) &&
-      !/(?:محفظه|محافظ|فودافون|اورانج|اتصالات|بنك|بنكي|كاش|فيزا|كارت|حساب)/i.test(norm)) {
-    return null;
+  const instaPayName = new RegExp(`(?:^|\\s)(?:ال)?${INSTAPAY_NAME}(?=\\s|$)`, 'i');
+  if (instaPayName.test(norm)) {
+    const matchingChannels = accounts.filter(account =>
+      [account.name, account.nameAr].some(name => instaPayName.test(normalizeArabic(name || '')))
+    );
+    return matchingChannels.length === 1 ? matchingChannels[0] : null;
   }
   const candidate = matchAccountFromText(text, accounts, false);
   if (!candidate) return null;

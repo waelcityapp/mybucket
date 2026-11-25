@@ -1,3 +1,5 @@
+import { interpretLocalFinancialRequest } from '../src/services/ai/localFinancialInterpreter.ts';
+import { matchExplicitAccountFromText } from '../src/utils/entityMatcher.ts';
 import assert from 'node:assert/strict';
 import { extractTransactionDescription as parse } from '../src/utils/transactionDescription.ts';
 
@@ -59,5 +61,16 @@ const instaPay = ['InstaPay', 'انستاباي'];
 assert.equal(parse('صرفت 40 ج من الانستاباى النهاردة', 40, instaPay), '');
 assert.equal(parse('صرفت 40 ج بنزين من انستا باي النهاردة', 40, instaPay), 'بنزين');
 assert.equal(parse('صرفت 40 ج من انستاباي علشان رسوم انستاباي', 40, instaPay), 'رسوم انستاباي');
+
+const spoken = 'صرفت 40 ج من الانستا بي النهاردة';
+const account = { id: 'insta', name: 'InstaPay', nameAr: 'انستاباي', type: 'other', currency: 'EGP' };
+const result = interpretLocalFinancialRequest({
+  text: spoken, accounts: [account], categories: [], currentDateTime: '2026-11-25T13:06:00.000Z', lang: 'ar',
+});
+assert.equal(result.transaction?.accountId, 'insta');
+assert.equal(result.transaction?.description, '');
+assert.equal(parse('صرفت 40 ج بنزين من الانستا بي النهاردة', 40, instaPay), 'بنزين');
+assert.equal(matchExplicitAccountFromText(spoken, [account, { ...account, id: 'other' }]), null);
+assert.equal(matchExplicitAccountFromText(spoken, [{ ...account, name: 'Wallet', nameAr: 'محفظة' }]), null);
 
 console.log(cases.length+'/'+cases.length+' transaction-note test cases passed');

@@ -1,6 +1,9 @@
 import { removeRelativeDayPhrase } from './relativeDayPhrase';
 import { removeTodayDateExpression } from './todayDateExpression';
 
+export const INSTAPAY_NAME = '(?:[إأا]نستا[ -]*با?[يى]|insta[ -]*pay)';
+const instaPayName = new RegExp(INSTAPAY_NAME, 'i');
+
 /**
  * Extract only the user's stated transaction note. Never invent categories or
  * reasons. Reason clauses preserve their wording, numbers and private labels.
@@ -11,13 +14,11 @@ export function extractTransactionDescription(raw: string, parsedAmount: number 
   const connector = /(?:^|\s)(علشان|عشان|بخصوص|بسبب|لأجل|من أجل|because|regarding)(?=\s|$)/i.exec(raw);
   let header = connector ? raw.slice(0, connector.index) : raw;
   const names = sourceNames.map(name => name.trim()).filter(Boolean);
-  if (names.some(name => /(?:[إأا]نستا\s*با[ييى]|insta\s*pay)/i.test(name))) {
-    names.push('إنستاباي', 'انستاباي', 'انستا باي', 'إنستا باي', 'انستاباى', 'انستا باى', 'InstaPay', 'Insta Pay');
-  }
   if (names.length) {
     const alternatives = [...new Set(names)].sort((a, b) => b.length - a.length)
-      .map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-    const source = new RegExp(`(^|[\\s،,])(?:من|عبر|باستخدام|from|via|using)\\s+(?:ال)?(?:${alternatives})(?=\\s|$|[،,.!؟?])`, 'gi');
+      .map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    if (names.some(name => instaPayName.test(name))) alternatives.push(INSTAPAY_NAME);
+    const source = new RegExp(`(^|[\\s،,])(?:من|عبر|باستخدام|from|via|using)\\s+(?:ال)?(?:${alternatives.join('|')})(?=\\s|$|[،,.!؟?])`, 'gi');
     header = header.replace(source, '$1');
   }
   const explanation = connector

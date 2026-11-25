@@ -838,3 +838,5 @@ The subscription comparison describes financial queries as questions about balan
 On the home text and voice input, Pro starts with standard analysis and can opt into cloud AI for a submission. The input displays the current shared AI allowance. A standard transaction draft can be reanalyzed from the original text on the review screen.
 
 New transaction drafts keep an explicitly selected source account out of automatically generated notes, while preserving a stated purchase or reason. Local fallback is reported as standard analysis.
+
+Recognize common spoken InstaPay spellings when a unique named account exists. The send state and transaction review remind users to check, edit and confirm fields. The engine selection remains available before submission.

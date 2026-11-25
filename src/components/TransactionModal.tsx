@@ -327,7 +327,7 @@ export function TransactionModal({
             </div>
           )}
 
-          {isAiProposal && <p className="text-sm font-semibold text-slate-700">{isAr ? 'راجع البيانات وعدّل أي حقل قبل الضغط على حفظ.' : 'Review and edit all fields before saving.'}</p>}
+          {isAiProposal && <p className="text-sm font-semibold text-slate-700">{isAr ? 'قد يخطئ التحليل. راجع الحقول وعدّلها عند الحاجة، ثم أكّد العملية لحفظها.' : 'Analysis can make mistakes. Review the fields, edit them if needed, then confirm to save.'}</p>}
           <form onSubmit={handleSave} className="space-y-3.5">
             {/* 1. Transaction Type Segmented Toggle (مصروف, دخل, تحويل) */}
             <div className="grid grid-cols-3 gap-2 bg-slate-100/80 p-1 rounded-2xl transition-all duration-300">

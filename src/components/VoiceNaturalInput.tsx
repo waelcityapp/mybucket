@@ -431,6 +431,8 @@ export function VoiceNaturalInput({
     void processInput(inputText, pendingVoiceReview ? 'voice' : 'text', segmentBaseRef.current, useAi);
   };
 
+  const showSend = Boolean(inputText.trim()) && !isProcessingAI && !isRecording;
+
   return (
     <div className="space-y-2">
       {/* Primary Big Voice / Text Card with Gemini AI styling */}
@@ -505,7 +507,7 @@ export function VoiceNaturalInput({
 
         {/* Right Side: Action Buttons */}
         <div className="flex items-start gap-2 shrink-0 self-start">
-          {inputText.trim().length > 0 && !isProcessingAI && !isRecording && (
+          {showSend && (
             <button
               type="submit"
               className="flex w-16 cursor-pointer flex-col items-center gap-1 rounded-lg text-center text-[10px] font-bold leading-tight text-slate-700 focus-visible:outline-2 focus-visible:outline-emerald-600 sm:w-20"
@@ -547,7 +549,7 @@ export function VoiceNaturalInput({
             )}
           </div>
         </div>
-        {canUseAi && <div className="flex w-full flex-wrap items-center justify-between gap-x-3 border-t border-slate-100 pt-2 text-xs">
+        {canUseAi && <div className={`flex w-full flex-wrap items-center justify-between gap-x-3 text-xs ${showSend ? 'order-first border-b border-slate-100 pb-2' : 'border-t border-slate-100 pt-2'}`}>
           <label className="inline-flex min-h-9 items-center gap-2 font-semibold text-slate-800">
             <input type="checkbox" className="size-4 accent-emerald-700" checked={useAi}
               onChange={event => setAiSelected(event.target.checked)} disabled={!aiAvailable || isProcessingAI || isRecording} />
@@ -560,6 +562,10 @@ export function VoiceNaturalInput({
               : <button type="button" className="underline" onClick={() => void refreshAttempts()}>{isAr ? 'تحديث الحصة' : 'Refresh allowance'}</button>}
           </span>
         </div>}
+        {showSend && <p className="w-full border-t border-slate-100 pt-2 text-xs text-slate-600">
+          {isAr ? 'قد يخطئ التحليل. راجع الحقول وعدّلها عند الحاجة، ثم أكّد العملية لحفظها.'
+            : 'Analysis can make mistakes. Review the fields, edit them if needed, then confirm to save.'}
+        </p>}
       </form>
 
       {/* Speech Hint / Error if any */}

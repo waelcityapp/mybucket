@@ -4,11 +4,9 @@ import App from './App.tsx';
 import { AppConfirmProvider } from './components/AppConfirmDialog';
 import { AppNoticeProvider } from './components/AppNotice';
 import { startSiteVisitTracking } from './services/siteVisitsClient';
-import { startStartupSound } from './services/startupSound';
 import './index.css';
 
 startSiteVisitTracking();
-startStartupSound();
 
 // Register only the install worker; never cache financial pages, auth tokens or API replies.
 if ('serviceWorker' in navigator) {

@@ -860,3 +860,5 @@ Server-side account matching uses explicit ESM import extensions through the tra
 Expense breakdown rows expand in place to show the exact transactions behind their subtotals, including historical account names, amounts, notes, and date and time.
 
 Local requests such as “قل لي الحاجات اللي انا صرفتها بالانستا بي” are recognized as spending queries, resolve spoken InstaPay aliases, and filter the breakdown by the recorded payment account.
+
+The search page offers Today, This Week, This Month, and Last Month directly below the transaction type. Presets fill the editable date fields. The week starts Saturday, current periods end today, and Last Month covers the complete prior calendar month.

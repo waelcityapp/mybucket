@@ -8,6 +8,16 @@ import { Transaction, Category, FinancialAccount, Language, AuthUser } from '../
 import { translations } from '../../data/translations';
 import { ProExportModal, ExportFormat } from '../ProExportModal';
 import { getUserDateLimits } from '../../utils/userRegistration';
+import { getCurrentLocalDate } from '../../utils/dateTime';
+
+const searchPeriods = [
+  { id: 'today', ar: 'هذا اليوم', en: 'Today' },
+  { id: 'week', ar: 'هذا الأسبوع', en: 'This Week' },
+  { id: 'month', ar: 'هذا الشهر', en: 'This Month' },
+  { id: 'previousMonth', ar: 'الشهر السابق', en: 'Last Month' },
+] as const;
+
+type SearchPeriod = typeof searchPeriods[number]['id'];
 
 interface SearchViewProps {
   transactions: Transaction[];
@@ -31,6 +41,7 @@ export function SearchView({ transactions, categories, accounts, lang, authUser,
   const [txType, setTxType] = useState<'all' | 'expense' | 'income' | 'transfer'>('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [selectedPeriod, setSelectedPeriod] = useState<SearchPeriod | null>(null);
   const [categoryId, setCategoryId] = useState('all');
   const [accountId, setAccountId] = useState('all');
   const [currency, setCurrency] = useState('all');
@@ -92,12 +103,37 @@ export function SearchView({ transactions, categories, accounts, lang, authUser,
     setTxType('all');
     setFromDate('');
     setToDate('');
+    setSelectedPeriod(null);
     setCategoryId('all');
     setAccountId('all');
     setCurrency('all');
     setKeyword('');
     setSortBy('newest');
   };
+
+  const selectPeriod = (period: SearchPeriod) => {
+    const today = new Date();
+    const start = new Date(today);
+    const end = new Date(today);
+
+    if (period === 'week') {
+      start.setDate(today.getDate() - (today.getDay() + 1) % 7);
+    } else if (period === 'month') {
+      start.setDate(1);
+    } else if (period === 'previousMonth') {
+      start.setDate(1);
+      start.setMonth(today.getMonth() - 1);
+      end.setDate(0);
+    }
+
+    setFromDate(getCurrentLocalDate(start));
+    setToDate(getCurrentLocalDate(end));
+    setSelectedPeriod(period);
+  };
+
+  const dateMin = fromDate && fromDate < userDateLimits.startDateStr
+    ? fromDate
+    : userDateLimits.startDateStr;
 
   const formatNumber = (num: number) => {
     return new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US', {
@@ -170,6 +206,28 @@ export function SearchView({ transactions, categories, accounts, lang, authUser,
               </div>
             </div>
 
+            <div
+              role="group"
+              aria-label={isAr ? 'الفترة' : 'Date range'}
+              className="grid grid-cols-2 min-[380px]:grid-cols-4 gap-1 rounded-xl bg-slate-100 p-1"
+            >
+              {searchPeriods.map(({ id, ...label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={selectedPeriod === id}
+                  onClick={() => selectPeriod(id)}
+                  className={`min-h-10 rounded-lg px-1 py-1 text-xs font-bold transition-colors ${
+                    selectedPeriod === id
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:bg-white/50'
+                  }`}
+                >
+                  {label[lang]}
+                </button>
+              ))}
+            </div>
+
             {/* Dates Grid */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -178,9 +236,12 @@ export function SearchView({ transactions, categories, accounts, lang, authUser,
                   <input
                     type="date"
                     value={fromDate}
-                    min={userDateLimits.startDateStr}
-                    max={userDateLimits.currentDateStr}
-                    onChange={(e) => setFromDate(e.target.value)}
+                    min={dateMin}
+                    max={getCurrentLocalDate()}
+                    onChange={(e) => {
+                      setFromDate(e.target.value);
+                      setSelectedPeriod(null);
+                    }}
                     className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
                   <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -192,9 +253,12 @@ export function SearchView({ transactions, categories, accounts, lang, authUser,
                   <input
                     type="date"
                     value={toDate}
-                    min={userDateLimits.startDateStr}
-                    max={userDateLimits.currentDateStr}
-                    onChange={(e) => setToDate(e.target.value)}
+                    min={dateMin}
+                    max={getCurrentLocalDate()}
+                    onChange={(e) => {
+                      setToDate(e.target.value);
+                      setSelectedPeriod(null);
+                    }}
                     className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
                   <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-3" />

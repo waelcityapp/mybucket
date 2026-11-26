@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Search, Filter, RefreshCcw, Calendar, Tag, Wallet, Database, 
   ArrowDownRight, ArrowUpRight, ArrowRightLeft, SlidersHorizontal,
@@ -48,6 +48,24 @@ export function SearchView({ transactions, categories, accounts, lang, authUser,
   const [keyword, setKeyword] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   
+  const resultsHeadingRef = useRef<HTMLHeadingElement>(null);
+  const [submittedSearch, setSubmittedSearch] = useState<{ filterKey: string } | null>(null);
+  const filterKey = JSON.stringify([txType, fromDate, toDate, categoryId, accountId, currency, keyword, sortBy]);
+  const showResults = submittedSearch?.filterKey === filterKey;
+
+  useEffect(() => {
+    if (!submittedSearch) return;
+    if (!showResults) {
+      setSubmittedSearch(null);
+      return;
+    }
+    const heading = resultsHeadingRef.current;
+    if (!heading) return;
+    heading.focus({ preventScroll: true });
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    heading.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'instant' : 'smooth' });
+  }, [submittedSearch, showResults]);
+
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Pro Export Modal State
@@ -56,6 +74,7 @@ export function SearchView({ transactions, categories, accounts, lang, authUser,
 
   // Compute Results
   const filteredTransactions = useMemo(() => {
+    if (!showResults) return [];
     return transactions
       .filter(tx => {
         if (txType !== 'all' && tx.type !== txType) return false;
@@ -82,7 +101,7 @@ export function SearchView({ transactions, categories, accounts, lang, authUser,
         const timeB = new Date(`${b.date}T${b.time}`).getTime();
         return sortBy === 'newest' ? timeB - timeA : timeA - timeB;
       });
-  }, [transactions, txType, fromDate, toDate, categoryId, accountId, currency, keyword, sortBy, categories]);
+  }, [showResults, transactions, txType, fromDate, toDate, categoryId, accountId, currency, keyword, sortBy, categories]);
 
   const totalAmount = useMemo(() => {
     return filteredTransactions.reduce((sum, tx) => {
@@ -99,7 +118,13 @@ export function SearchView({ transactions, categories, accounts, lang, authUser,
     return Array.from(currSet);
   }, [accounts]);
 
+  const handleSearch = () => {
+    setSubmittedSearch({ filterKey });
+    onSearch?.();
+  };
+
   const handleClearFilters = () => {
+    setSubmittedSearch(null);
     setTxType('all');
     setFromDate('');
     setToDate('');
@@ -368,7 +393,7 @@ export function SearchView({ transactions, categories, accounts, lang, authUser,
               </div>
             )}
 
-            <button type="button" onClick={onSearch} className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20">
+            <button type="button" onClick={handleSearch} className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20">
               <Search className="w-5 h-5" />
               {t.searchBtn || 'Search'}
             </button>
@@ -376,14 +401,14 @@ export function SearchView({ transactions, categories, accounts, lang, authUser,
         </div>
 
         {/* Results Section */}
-        <div className="mt-8 space-y-4">
+        <section hidden={!showResults} aria-labelledby="search-results-title" className="mt-8 space-y-4">
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <h2 id="search-results-title" aria-describedby="search-results-count" ref={resultsHeadingRef} tabIndex={-1} className="scroll-mt-24 text-lg font-bold text-slate-800 flex items-center gap-2">
               <FileText className="w-5 h-5 text-slate-600" />
               {t.searchResults || 'Results'}
             </h2>
-            <span className="text-xs font-medium text-slate-500 bg-white px-2.5 py-1 rounded-full border border-slate-200 shadow-sm">
-              {(t.foundTxCount || '{count} found').replace('{count}', filteredTransactions.length.toString())}
+            <span id="search-results-count" className="text-xs font-medium text-slate-500 bg-white px-2.5 py-1 rounded-full border border-slate-200 shadow-sm">
+              {(t.foundTxCount || '{count} found').replace('{count}', formatNumber(filteredTransactions.length))}
             </span>
           </div>
 
@@ -520,7 +545,7 @@ export function SearchView({ transactions, categories, accounts, lang, authUser,
               </div>
             )}
           </div>
-        </div>
+        </section>
 
         {/* Summary Footer Card */}
         {filteredTransactions.length > 0 && (

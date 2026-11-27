@@ -1,8 +1,37 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { ChartNoAxesColumnIncreasing, X, Wallet, ArrowRight, Calendar, ChevronDown } from 'lucide-react';
 import { DeterministicQueryResult } from '../services/ai/types';
-import type { FinancialAccount, Language } from '../types';
+import type { FinancialAccount, Language, Transaction } from '../types';
 import { formatDateTimeDisplay } from '../utils/dateTime';
+
+const INITIAL_TRANSACTION_COUNT = 5;
+
+function QueryTransactions({ transactions, accountNames, lang }: {
+  transactions: Transaction[];
+  accountNames: Map<string, string>;
+  lang: Language;
+}) {
+  const isAr = lang === 'ar';
+  const formatAmount = new Intl.NumberFormat(isAr ? 'ar-EG' : 'en');
+  return (
+    <ul className="divide-y divide-slate-100 bg-white px-3 text-xs">
+      {transactions.map(transaction => (
+        <li key={transaction.id} className="space-y-1 py-2.5">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 font-semibold text-slate-900">
+            <span>{accountNames.get(transaction.accountId) || (isAr ? 'حساب غير متاح' : 'Unavailable account')}</span>
+            <span>{formatAmount.format(transaction.amount)} {isAr && transaction.currency === 'EGP' ? 'ج.م' : transaction.currency}</span>
+          </div>
+          <div className="text-slate-600">{formatDateTimeDisplay(transaction.date, transaction.time, transaction.dateTime, lang)}</div>
+          {transaction.description && <p className="whitespace-pre-wrap break-words text-slate-700">{transaction.description}</p>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function newestFirst(a: Transaction, b: Transaction) {
+  return `${b.date}T${b.time ?? ''}`.localeCompare(`${a.date}T${a.time ?? ''}`);
+}
 
 interface FinancialQueryResultCardProps {
   result: DeterministicQueryResult;
@@ -21,12 +50,18 @@ export function FinancialQueryResultCard({
 }: FinancialQueryResultCardProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   const breakdownId = useId();
+  const transactionListId = useId();
+  const [expandedTransactionsResult, setExpandedTransactionsResult] = useState<DeterministicQueryResult | null>(null);
   const [expandedResult, setExpandedResult] = useState<DeterministicQueryResult | null>(null);
   const [openCategory, setOpenCategory] = useState<{ result: DeterministicQueryResult; id: string } | null>(null);
   const expanded = expandedResult === result;
   const breakdown = result.breakdown ?? [];
   const visibleItems = expanded ? breakdown : breakdown.slice(0, 4);
   const hiddenCount = breakdown.length - 4;
+  const transactions = [...(result.matchingTransactions ?? [])].sort(newestFirst);
+  const transactionsExpanded = expandedTransactionsResult === result;
+  const remainingTransactions = transactions.length - INITIAL_TRANSACTION_COUNT;
+  const visibleTransactions = transactionsExpanded ? transactions : transactions.slice(0, INITIAL_TRANSACTION_COUNT);
 
   useEffect(() => {
     heading.current?.focus({ preventScroll: true });
@@ -89,6 +124,26 @@ export function FinancialQueryResultCard({
         {result.details}
       </p>
 
+      {transactions.length > 0 && (
+        <div className="space-y-2 border-t border-slate-100 pt-2">
+          <h3 className="text-xs font-bold text-slate-700">
+            {isAr ? 'العمليات المطابقة' : 'Matching transactions'} ({formatAmount.format(transactions.length)})
+          </h3>
+          <div id={transactionListId} className="overflow-hidden rounded-xl border border-slate-200/70">
+            <QueryTransactions transactions={visibleTransactions} accountNames={accountNames} lang={lang} />
+          </div>
+          {remainingTransactions > 0 && (
+            <button type="button" aria-expanded={transactionsExpanded} aria-controls={transactionListId}
+              onClick={() => setExpandedTransactionsResult(transactionsExpanded ? null : result)}
+              className="min-h-10 px-2 text-sm font-bold text-emerald-700 hover:underline">
+              {transactionsExpanded ? (isAr ? 'عرض أقل' : 'Show fewer')
+                : (isAr ? `عرض باقي العمليات (${formatAmount.format(remainingTransactions)})`
+                  : `Show remaining transactions (${formatAmount.format(remainingTransactions)})`)}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Breakdown by Category if available */}
       {breakdown.length > 0 && (
         <div className="space-y-2 pt-1 border-t border-slate-100">
@@ -128,20 +183,10 @@ export function FinancialQueryResultCard({
                     </button>
                   ) : <div className={rowClass}>{row}</div>}
                   {canExpand && <div id={panelId} hidden={!isOpen}>
-                    {isOpen && <ul className="divide-y divide-slate-100 border-t border-slate-200 bg-white px-3 text-xs">
-                      {[...(item.transactions ?? [])].sort((a, b) =>
-                        `${b.date}T${b.time ?? ''}`.localeCompare(`${a.date}T${a.time ?? ''}`)
-                      ).map(transaction => (
-                        <li key={transaction.id} className="space-y-1 py-2.5">
-                          <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 font-semibold text-slate-900">
-                            <span>{accountNames.get(transaction.accountId) || (isAr ? 'حساب غير متاح' : 'Unavailable account')}</span>
-                            <span>{formatAmount.format(transaction.amount)} {isAr && transaction.currency === 'EGP' ? 'ج.م' : transaction.currency}</span>
-                          </div>
-                          <div className="text-slate-600">{formatDateTimeDisplay(transaction.date, transaction.time, transaction.dateTime, lang)}</div>
-                          {transaction.description && <p className="whitespace-pre-wrap break-words text-slate-700">{transaction.description}</p>}
-                        </li>
-                      ))}
-                    </ul>}
+                    {isOpen && <div className="border-t border-slate-200">
+                      <QueryTransactions transactions={[...(item.transactions ?? [])].sort(newestFirst)}
+                        accountNames={accountNames} lang={lang} />
+                    </div>}
                   </div>}
                 </div>
               );

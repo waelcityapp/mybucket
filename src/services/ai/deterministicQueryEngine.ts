@@ -281,7 +281,7 @@ export function executeDeterministicQuery(
           : `Found ${catExpenses.length} transactions recorded in this period`,
         periodText: periodLabel,
         transactionCount: catExpenses.length,
-        matchingTransactions: catExpenses.slice(0, 20),
+        matchingTransactions: catExpenses,
       };
     }
 
@@ -302,7 +302,7 @@ export function executeDeterministicQuery(
           : `${incomes.length} income transactions recorded`,
         periodText: periodLabel,
         transactionCount: incomes.length,
-        matchingTransactions: incomes.slice(0, 5),
+        matchingTransactions: incomes,
       };
     }
 
@@ -375,7 +375,7 @@ export function executeDeterministicQuery(
         periodText: periodLabel,
         transactionCount: expenses.length,
         breakdown,
-        matchingTransactions: expenses.slice(0, 5),
+        matchingTransactions: expenses,
       };
     }
   }

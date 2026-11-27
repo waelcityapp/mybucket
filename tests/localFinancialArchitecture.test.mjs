@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { FinancialQueryResultCard } from '../src/components/FinancialQueryResultCard.tsx';
 import { executeDeterministicQuery } from '../src/services/ai/deterministicQueryEngine.ts';
 import { classifyLocalIntent } from '../src/services/ai/localIntentRouter.ts';
 import { interpretLocalFinancialRequest as interpret } from '../src/services/ai/localFinancialInterpreter.ts';
@@ -73,6 +76,29 @@ test('spoken account expenses only include transactions paid through the named a
  assert.match(result.details,/إنستاباي/);
  assert.equal(interpret(request(raw)).intent,'UNKNOWN');
  assert.equal(interpret(request(raw,{accounts:[...testAccounts,{...insta,id:'insta2'}]})).intent,'UNKNOWN');
+});
+test('five expenses across three categories render as five individual transactions', () => {
+ const raw = 'صرفت كام الشهر ده؟';
+ const query = interpret(request(raw)).query;
+ const expenses = Array.from({ length: 5 }, (_, index) => ({
+  ...proposal, id: `expense-${index}`, description: `Purchase ${index + 1}`,
+  categoryId: ['food1', 'transport', 'misc'][index % 3],
+ }));
+ const result = executeDeterministicQuery(query, raw, expenses, accounts, categories, 'ar');
+ assert.equal(result.transactionCount, 5);
+ assert.equal(result.breakdown.length, 3);
+ const render = (value) => renderToStaticMarkup(createElement(FinancialQueryResultCard, {
+  result: value, accounts, lang: 'ar', onClose() {},
+ }));
+ const markup = render(result);
+ assert.equal((markup.match(/<li\b/g) || []).length, 5);
+ for (const expense of expenses) assert.ok(markup.includes(expense.description));
+
+ const sixth = { ...expenses[0], id: 'expense-5', description: 'An older purchase', time: '01:00' };
+ const longer = executeDeterministicQuery(query, raw, [...expenses, sixth], accounts, categories, 'ar');
+ assert.equal(longer.matchingTransactions.length, 6);
+ assert.match(render(longer), /عرض باقي العمليات/);
+ assert.doesNotMatch(render(longer), /An older purchase/);
 });
 test('income queries report income',()=>{
  const r=interpret(request('كام دخلي الشهر ده؟'));

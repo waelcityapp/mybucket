@@ -407,60 +407,33 @@ export function SearchView({ transactions, categories, accounts, lang, authUser,
               <FileText className="w-5 h-5 text-slate-600" />
               {t.searchResults || 'Results'}
             </h2>
-            <span id="search-results-count" className="text-xs font-medium text-slate-500 bg-white px-2.5 py-1 rounded-full border border-slate-200 shadow-sm">
-              {(t.foundTxCount || '{count} found').replace('{count}', formatNumber(filteredTransactions.length))}
-            </span>
+            {filteredTransactions.length === 0 && (
+              <span id="search-results-count" className="text-xs font-medium text-slate-500 bg-white px-2.5 py-1 rounded-full border border-slate-200 shadow-sm">
+                {(t.foundTxCount || '{count} found').replace('{count}', formatNumber(0))}
+              </span>
+            )}
           </div>
 
-          {/* PRO Export Action Card */}
+          {/* Results Summary */}
           {filteredTransactions.length > 0 && (
-            <div className="bg-gradient-to-r from-amber-50 via-white to-amber-50/60 rounded-2xl p-3.5 border border-amber-200/70 shadow-xs space-y-2.5">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0">
-                    <Crown className="w-4 h-4 text-amber-100" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-black text-slate-900">
-                        {isAr ? 'تصدير نتائج الاستفسار والتقرير' : 'Export Inquired Results & Statement'}
-                      </span>
-                      <span className="text-[10px] font-black bg-amber-500 text-white px-1.5 py-0.2 rounded-md shadow-xs">
-                        PRO ⭐
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-amber-800 font-medium block">
-                      {isAr ? 'تصدير CSV متوافق مع Excel أو طباعة PDF' : 'Export CSV for Excel or print to PDF'}
-                    </span>
-                  </div>
+            <div className="bg-emerald-50/80 rounded-3xl p-5 border border-emerald-100/50 flex flex-row items-center justify-between shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
+                  <BarChart className="w-5 h-5" />
+                </div>
+                <div id="search-results-count" className="flex flex-col">
+                  <span className="text-xs font-bold text-emerald-800">{t.txCountLabel || 'Count'}</span>
+                  <span className="text-lg font-black text-emerald-700">{formatNumber(filteredTransactions.length)}</span>
                 </div>
               </div>
 
-              {/* Export Buttons Options */}
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedExportFormat('csv');
-                    setIsExportModalOpen(true);
-                  }}
-                  className="flex items-center justify-center gap-1.5 py-2 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-xl text-xs font-bold transition-transform active:scale-95 cursor-pointer"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>{isAr ? 'ملف CSV لـExcel' : 'CSV for Excel'}</span>
-                </button>
+              <div className="w-px h-10 bg-emerald-200/50"></div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedExportFormat('pdf');
-                    setIsExportModalOpen(true);
-                  }}
-                  className="flex items-center justify-center gap-1.5 py-2 px-2.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200/80 rounded-xl text-xs font-bold transition-transform active:scale-95 cursor-pointer"
-                >
-                  <FileText className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                  <span>{isAr ? 'تقرير PDF' : 'PDF Report'}</span>
-                </button>
+              <div className="flex flex-col items-end">
+                <span className="text-xs font-bold text-emerald-800">{t.totalAmount || 'Total'}</span>
+                <span className="text-xl font-black text-emerald-700">
+                  {formatNumber(totalAmount)}
+                </span>
               </div>
             </div>
           )}
@@ -545,31 +518,60 @@ export function SearchView({ transactions, categories, accounts, lang, authUser,
               </div>
             )}
           </div>
+
+          {/* PRO Export Action Card */}
+          {filteredTransactions.length > 0 && (
+            <div className="bg-gradient-to-r from-amber-50 via-white to-amber-50/60 rounded-2xl p-3.5 border border-amber-200/70 shadow-xs space-y-2.5">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0">
+                    <Crown className="w-4 h-4 text-amber-100" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-black text-slate-900">
+                        {isAr ? 'تصدير نتائج الاستفسار والتقرير' : 'Export Inquired Results & Statement'}
+                      </span>
+                      <span className="text-[10px] font-black bg-amber-500 text-white px-1.5 py-0.2 rounded-md shadow-xs">
+                        PRO ⭐
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-amber-800 font-medium block">
+                      {isAr ? 'تصدير CSV متوافق مع Excel أو طباعة PDF' : 'Export CSV for Excel or print to PDF'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Export Buttons Options */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedExportFormat('csv');
+                    setIsExportModalOpen(true);
+                  }}
+                  className="flex items-center justify-center gap-1.5 py-2 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-xl text-xs font-bold transition-transform active:scale-95 cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>{isAr ? 'ملف CSV لـExcel' : 'CSV for Excel'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedExportFormat('pdf');
+                    setIsExportModalOpen(true);
+                  }}
+                  className="flex items-center justify-center gap-1.5 py-2 px-2.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200/80 rounded-xl text-xs font-bold transition-transform active:scale-95 cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span>{isAr ? 'تقرير PDF' : 'PDF Report'}</span>
+                </button>
+              </div>
+            </div>
+          )}
         </section>
-
-        {/* Summary Footer Card */}
-        {filteredTransactions.length > 0 && (
-          <div className="mt-4 bg-emerald-50/80 rounded-3xl p-5 border border-emerald-100/50 flex flex-row items-center justify-between shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
-                <BarChart className="w-5 h-5" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs font-bold text-emerald-800">{t.txCountLabel || 'Count'}</span>
-                <span className="text-lg font-black text-emerald-700">{filteredTransactions.length}</span>
-              </div>
-            </div>
-            
-            <div className="w-px h-10 bg-emerald-200/50"></div>
-
-            <div className="flex flex-col items-end">
-              <span className="text-xs font-bold text-emerald-800">{t.totalAmount || 'Total'}</span>
-              <span className="text-xl font-black text-emerald-700">
-                {formatNumber(totalAmount)}
-              </span>
-            </div>
-          </div>
-        )}
 
       </div>
 

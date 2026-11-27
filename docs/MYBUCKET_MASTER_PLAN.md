@@ -864,3 +864,7 @@ Local requests such as “قل لي الحاجات اللي انا صرفتها 
 The search page offers Today, This Week, This Month, and Last Month directly below the transaction type. Presets fill the editable date fields. The week starts Saturday, current periods end today, and Last Month covers the complete prior calendar month.
 
 The search results are revealed on submission. The page scrolls to and focuses the results heading, with a result count and an empty state when no transactions match. Changing the filters calls for another submission.
+
+## Currency converter shortcut
+
+The financial overview offers a Currency converter shortcut next to Account details. The converter opens as a dedicated page at `/currency-converter`; the home page displays the shortcut. The existing quote, currency selections, swap, and daily quota are available on the converter page.

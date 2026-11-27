@@ -1,6 +1,6 @@
 import type { ActiveTab } from '../types';
 
-const historyTabs: ActiveTab[] = ['home', 'transactions', 'search', 'accounts', 'categories', 'settings', 'admin', 'guide'];
+const historyTabs: ActiveTab[] = ['home', 'transactions', 'search', 'accounts', 'categories', 'settings', 'admin', 'guide', 'currency-converter'];
 
 export function tabFromHistory(location: Location, state: unknown): ActiveTab {
   const path = location.pathname;
@@ -11,6 +11,7 @@ export function tabFromHistory(location: Location, state: unknown): ActiveTab {
   if (path === '/accounts' || path === '/accounts/new' || /^\/accounts\/[^/]+\/edit$/.test(path)) return 'accounts';
   if (path === '/categories' || path.startsWith('/categories/')) return 'categories';
   if (path === '/guide') return 'guide';
+  if (path === '/currency-converter') return 'currency-converter';
   if (path === '/settings/ads' || path === '/settings/favorites' || path === '/settings/delete-transactions') return 'settings';
   if (path === '/offers' || path.startsWith('/offers/category/') || path.startsWith('/offers/ad/') || path === '/offers/new' || path === '/offers/new/payment' || path === '/offers/new/featured' || path === '/offers/new/pricing') return 'offers';
   const tab = state && typeof state === 'object' && 'myBucketTab' in state ? (state as { myBucketTab: unknown }).myBucketTab : undefined;
@@ -18,8 +19,9 @@ export function tabFromHistory(location: Location, state: unknown): ActiveTab {
 }
 
 export function recordTabNavigation(history: History, location: Location, current: ActiveTab, next: ActiveTab): boolean {
-  if (next === current && location.pathname === '/') return false;
-  history.pushState({ myBucketTab: next }, '', '/');
+  const path = next === 'currency-converter' ? '/currency-converter' : '/';
+  if (next === current && location.pathname === path) return false;
+  history.pushState({ myBucketTab: next }, '', path);
   return true;
 }
 

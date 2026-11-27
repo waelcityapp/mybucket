@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Wallet, CalendarDays, Eye, EyeOff, ArrowUpRight, TrendingUp, TrendingDown, ChartNoAxesColumnIncreasing, Info, ChevronLeft } from 'lucide-react';
+import { Wallet, CalendarDays, Eye, EyeOff, ArrowUpRight, TrendingUp, TrendingDown, ChartNoAxesColumnIncreasing, Info, ChevronLeft, ArrowLeftRight } from 'lucide-react';
 import { FinancialAccount, Transaction, Language } from '../types';
 import { formatAccountBalance } from '../utils/formatBalance';
 
@@ -9,6 +9,7 @@ interface HomeFinancialOverviewProps {
   lang: Language;
   onViewTransactions?: (period: 'today' | 'month', currency: string) => void;
   onViewAccounts?: () => void;
+  onOpenCurrencyConverter?: () => void;
   userId?: string;
   simulation?: boolean;
 }
@@ -19,6 +20,7 @@ export function HomeFinancialOverview({
   lang,
   onViewTransactions,
   onViewAccounts,
+  onOpenCurrencyConverter,
   userId,
   simulation = false,
 }: HomeFinancialOverviewProps) {
@@ -149,12 +151,12 @@ export function HomeFinancialOverview({
 
   return (
     <section className="@container w-full min-w-0 rounded-[22px] border border-slate-200 bg-white p-2.5 sm:p-3 shadow-sm space-y-1.5" aria-label={isAr ? 'ملخص الوضع المالي' : 'Financial overview'}>
-      <div className="flex items-center justify-between gap-2 px-1 py-0.5">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-1 py-0.5">
         <h2 className="flex items-center gap-2 whitespace-nowrap text-sm sm:text-base font-black text-slate-950">
           <ChartNoAxesColumnIncreasing size={18} className="text-emerald-600 shrink-0" />
           {isAr ? 'الوضع المالي' : 'Financial overview'}
         </h2>
-        <div className="flex items-center gap-1 min-w-0">
+        <div className="flex min-w-0 flex-wrap items-center gap-1">
           <select
             aria-label={isAr ? 'اختيار عملة الوضع المالي' : 'Select financial overview currency'}
             title={isAr ? 'العملات الموجودة في حساباتك فقط' : 'Currencies in your accounts only'}
@@ -166,13 +168,22 @@ export function HomeFinancialOverview({
             {accountCurrencies.length === 0 && <option value="">{isAr ? 'لا توجد عملات' : 'No currencies'}</option>}
             {accountCurrencies.map(code => <option key={code} value={code}>{code}</option>)}
           </select>
-        {onViewAccounts && (
-          <button type="button" onClick={onViewAccounts}
-            className="inline-flex shrink-0 min-h-8 items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 sm:px-2.5 text-[10px] sm:text-xs font-bold text-emerald-950 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-emerald-500">
-            <span>{isAr ? 'تفاصيل الحسابات' : 'Account details'}</span>
-            <ArrowUpRight size={13} className={isAr ? 'rotate-[-90deg]' : ''}/>
-          </button>
-        )}
+          <div className="flex max-w-full flex-wrap items-center gap-1">
+            {onViewAccounts && (
+              <button type="button" onClick={onViewAccounts}
+                className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 sm:px-2.5 text-[10px] sm:text-xs font-bold text-emerald-950 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-emerald-500">
+                <span>{isAr ? 'تفاصيل الحسابات' : 'Account details'}</span>
+                <ArrowUpRight size={13} className={isAr ? 'rotate-[-90deg]' : ''} aria-hidden="true" />
+              </button>
+            )}
+            {onOpenCurrencyConverter && (
+              <button type="button" onClick={onOpenCurrencyConverter}
+                className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 sm:px-2.5 text-[10px] sm:text-xs font-bold text-emerald-950 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-emerald-500">
+                <span>{isAr ? 'محول العملات' : 'Currency converter'}</span>
+                <ArrowLeftRight size={13} className="shrink-0" aria-hidden="true" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

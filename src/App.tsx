@@ -4,8 +4,8 @@ import { ReminderAlerts } from './components/ReminderAlerts';
 import { ReminderWorkspace } from './components/views/ReminderWorkspace';
 import { LockScreen, lockRequest, type LockStatus } from './components/AppLock';
 import { TrialSubscriptionPages } from './components/views/TrialSubscriptionPages';
-import { currencyName, SUPPORTED_CURRENCIES } from './types';
-import { ArrowLeftRight, ArrowUpDown, ShoppingBag, RefreshCw } from 'lucide-react';
+import { CurrencyConverterView } from './components/views/CurrencyConverterView';
+import { ShoppingBag } from 'lucide-react';
 import { Fragment, useState, useEffect, useRef, useMemo } from 'react';
 import {
   FinancialAccount,
@@ -119,131 +119,6 @@ import { redeemMarketerCode, subscribeUserSubscription, type SubscriptionReadIss
 const STORAGE_KEY_PREFIX = 'mybucket_';
 
 
-type FxRateInfo = { from: string; to: string; rate: number | null; remaining: number; limit: number; rateDate: string; stale: boolean; availableCurrencies?: string[] };
-async function callCurrencyRates(action: 'fx.get' | 'fx.select', payload: Record<string, string> = {}): Promise<FxRateInfo> {
-  const user = auth.currentUser;
-  if (!user) throw new Error('login_required');
-  const response = await fetch('/api/gateway', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + await user.getIdToken() },
-    body: JSON.stringify({ action, payload }),
-  });
-  const result = await response.json();
-  if (!response.ok || !result?.ok || !result?.data) throw new Error(result?.error || 'rate_unavailable');
-  return result.data as FxRateInfo;
-}
-async function readPublicReferenceRate(): Promise<{ rate: number; date: string }> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 6500);
-  try {
-    const response = await fetch('https://api.frankfurter.dev/v2/rate/EGP/USD', { signal: controller.signal });
-    if (!response.ok) throw new Error('reference_provider_http_' + response.status);
-    const data: unknown = await response.json();
-    if (!data || typeof data !== 'object') throw new Error('reference_provider_format');
-    const record = data as { base?: string; quote?: string; rate?: number; date?: string };
-    if (record.base !== 'EGP' || record.quote !== 'USD' || typeof record.rate !== 'number' || !Number.isFinite(record.rate) || record.rate <= 0) {
-      throw new Error('reference_provider_invalid_rate');
-    }
-    return { rate: record.rate, date: typeof record.date === 'string' ? record.date : '' };
-  } finally { clearTimeout(timeout); }
-}
-function ExchangeRatesMini({ lang }: { lang: Language }) {
-  const ar = lang === 'ar';
-  const [info, setInfo] = useState<FxRateInfo | null>(null);
-  const [reference, setReference] = useState<{ rate: number; date: string } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [retry, setRetry] = useState(0);
-  useEffect(() => {
-    let alive = true;
-    setBusy(true);
-    callCurrencyRates('fx.get').then(value => {
-      if (alive) { setInfo(value); setReference(null); setError(''); }
-    }).catch(async failure => {
-      const code = failure instanceof Error ? failure.message : 'unknown_error';
-      const serverIssue = ['firebase_admin_not_configured', 'firebase_project_mismatch', 'firebase_database_mismatch', 'gateway_operation_failed'].includes(code);
-      try {
-        const publicQuote = await readPublicReferenceRate();
-        if (alive) {
-          setReference(publicQuote);
-          setError((serverIssue
-            ? (ar ? 'اتصال الخادم يحتاج إصلاحًا؛ تغيير العملات متوقف مؤقتًا' : 'Server connection needs repair; pair selection paused')
-            : (ar ? 'سعر مباشر مؤقت؛ تغيير العملات متوقف لحين اتصال الخادم' : 'Direct reference rate; pair selection paused until server reconnects')) + ' (' + code + ')');
-        }
-      } catch {
-        if (alive) setError(serverIssue
-          ? (ar ? 'تعذر الاتصال بخادم الأسعار' : 'Rate server unavailable')
-          : (ar ? 'السعر غير متاح الآن' : 'Rate unavailable') + ' (' + code + ')');
-      }
-    }).finally(() => { if (alive) setBusy(false); });
-    return () => { alive = false; };
-  }, [retry, ar]);
-  // Keep the same server-backed currency selection and daily quota in the compact card.
-  const changePair = async (from: string, to: string) => {
-    if (!info || busy || info.remaining <= 0 || (info.from === from && info.to === to)) return;
-    setBusy(true);
-    try {
-      const updated = await callCurrencyRates('fx.select', { from, to });
-      setInfo(updated);
-      setError('');
-    } catch (e) {
-      const limited = e instanceof Error && e.message === 'exchange_daily_limit';
-      setError(limited ? (ar ? 'انتهى حد تغييرات اليوم' : 'Daily changes used up') : (ar ? 'تعذر تغيير العملة' : 'Could not change currency'));
-    } finally { setBusy(false); }
-  };
-  const effectiveRate = info?.rate ?? reference?.rate;
-  const rate = effectiveRate == null ? '—' : new Intl.NumberFormat('en-US', { maximumSignificantDigits: 6, useGrouping: false }).format(effectiveRate);
-  const selectedFrom = info?.from || 'EGP';
-  const selectedTo = info?.to || 'USD';
-  const canChange = !!info && !busy && info.remaining > 0;
-  return (
-    <section className="w-full min-w-0 overflow-hidden rounded-2xl border border-emerald-700/40 bg-gradient-to-r from-emerald-950 via-emerald-900 to-teal-800 px-3 py-3 text-white shadow-sm sm:px-4 sm:py-3.5" aria-label={ar ? 'أسعار العملات التقريبية' : 'Approximate currency rates'}>
-      <div className="mb-2.5 flex items-center gap-1.5 text-[13px] font-black text-emerald-50 sm:text-sm">
-        <ArrowLeftRight className="h-4 w-4 shrink-0" />
-        <span>{ar ? 'أسعار العملات' : 'Exchange rates'}</span>
-      </div>
-      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-1.5 sm:gap-3">
-        {(['from', 'to'] as const).map((side, index) => (
-          <Fragment key={side}>
-            {index === 1 && (
-              <button type="button" disabled={!canChange || selectedFrom === selectedTo}
-                onClick={() => void changePair(selectedTo, selectedFrom)}
-                title={ar ? 'تبديل العملتين (يُحتسب من تغييرات اليوم)' : 'Swap currencies (counts as one daily change)'}
-                aria-label={ar ? 'تبديل العملة الأولى والثانية' : 'Swap first and second currencies'}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-emerald-400 bg-emerald-700 text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:w-10">
-                <ArrowLeftRight className="h-4 w-4" />
-              </button>
-            )}
-            <label className="flex min-w-0 flex-col gap-1">
-              <span className="text-[10px] font-bold text-emerald-100 sm:text-xs">{side === 'from' ? (ar ? 'من' : 'From') : (ar ? 'إلى' : 'To')}</span>
-              <select value={side === 'from' ? selectedFrom : selectedTo}
-                onChange={event => void changePair(side === 'from' ? event.target.value : selectedFrom, side === 'to' ? event.target.value : selectedTo)}
-                aria-label={side === 'from' ? (ar ? 'اختر العملة الأولى' : 'Choose first currency') : (ar ? 'اختر العملة الثانية' : 'Choose second currency')}
-                disabled={!canChange}
-                className="h-9 w-full min-w-0 rounded-xl border border-emerald-400/50 bg-emerald-950 px-1.5 text-[11px] font-bold text-white outline-none focus:border-emerald-200 focus:ring-1 focus:ring-emerald-200 disabled:opacity-70 sm:h-10 sm:px-3 sm:text-sm">
-                {SUPPORTED_CURRENCIES.filter(code => !info?.availableCurrencies || info.availableCurrencies.includes(code) || info[side] === code)
-                  .map(code => <option key={code} value={code}>{code} · {currencyName(code, lang)}</option>)}
-              </select>
-            </label>
-          </Fragment>
-        ))}
-      </div>
-      <strong dir="ltr" className="mt-2.5 block min-w-0 break-words rounded-xl bg-emerald-700/65 px-2 py-2 text-center text-sm font-black leading-snug tracking-tight text-white tabular-nums sm:text-lg">
-        {info ? '1 ' + selectedFrom + ' = ' + rate + ' ' + selectedTo : reference ? '1 EGP = ' + rate + ' USD' : busy ? '...' : '—'}
-      </strong>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[10px] leading-snug text-emerald-100">
-        <span>
-          {ar ? 'سعر تقريبي غير ملزم' : 'Approximate rate'}
-          {(info?.rateDate || reference?.date) ? ' · ' + (info?.rateDate || reference?.date) : ''}
-        </span>
-        {info && <span className="font-semibold">{ar ? 'تغييرات متبقية' : 'Changes left'}: {info.remaining}/{info.limit}</span>}
-        {info?.stale && <span className="text-amber-200">{ar ? 'آخر سعر محفوظ' : 'Cached rate'}</span>}
-      </div>
-      {error && <button type="button" onClick={() => setRetry(value => value + 1)} className="mt-2 flex w-full items-center justify-center gap-1 break-words text-center text-[10px] leading-tight text-rose-100"><RefreshCw className="h-3 w-3 shrink-0"/>{error}</button>}
-    </section>
-  );
-}
-
 export default function App() {
   const confirmAction = useAppConfirm();
   // 1. Language State (Arabic is default)
@@ -264,7 +139,10 @@ export default function App() {
   }, []);
   useEffect(() => { applyAppIdentity(appIdentity, lang); }, [appIdentity, lang]);
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>(() => window.location.pathname.startsWith('/admin') ? 'admin-pin' : window.location.pathname === '/trial' ? 'trial-details' : (window.location.pathname === '/subscription' || window.location.pathname === '/try/subscription') ? 'subscription' : window.location.pathname.startsWith('/reminders/') ? 'reminders' : (tabFromHistory(window.location, window.history.state) === 'accounts') ? 'accounts' : window.location.pathname === '/guide' ? 'guide' : window.location.pathname.startsWith('/categories/') ? 'categories' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/') || window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment' || window.location.pathname === '/offers/new/pricing' || window.location.pathname === '/offers/new/featured') ? 'offers' : 'home');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
+    const restoredTab = tabFromHistory(window.location, window.history.state);
+    return window.location.pathname.startsWith('/admin') ? 'admin-pin' : window.location.pathname === '/trial' ? 'trial-details' : (window.location.pathname === '/subscription' || window.location.pathname === '/try/subscription') ? 'subscription' : window.location.pathname.startsWith('/reminders/') ? 'reminders' : (restoredTab === 'accounts' || restoredTab === 'currency-converter') ? restoredTab : window.location.pathname === '/guide' ? 'guide' : window.location.pathname.startsWith('/categories/') ? 'categories' : (window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/') || window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment' || window.location.pathname === '/offers/new/pricing' || window.location.pathname === '/offers/new/featured') ? 'offers' : 'home';
+  });
   // Keep in-app tab changes in browser history so the device Back button can restore them.
   const [transactionQuickFilter, setTransactionQuickFilter] = useState<{ period: 'today' | 'month'; currency: string } | null>(null);
   const navigateTab = (tab: ActiveTab, quickFilter: { period: 'today' | 'month'; currency: string } | null = null) => {
@@ -643,7 +521,8 @@ export default function App() {
         setIsExpenseCategoriesModalOpen(false);
         setIsCategoryDetailPageOpen(Boolean(firebaseUser) && window.location.pathname.startsWith('/categories/'));
         setSelectedCategoryForDetail(null);
-        setActiveTab((window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/') || window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment' || window.location.pathname === '/offers/new/pricing' || window.location.pathname === '/offers/new/featured') ? 'offers' : firebaseUser && window.location.pathname.startsWith('/admin') ? 'admin-pin': firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && window.location.pathname.startsWith('/reminders/') ? 'reminders' : firebaseUser && (tabFromHistory(window.location, window.history.state) === 'accounts') ? 'accounts' : firebaseUser && window.location.pathname.startsWith('/categories/') ? 'categories' : 'home');
+        const restoredTab = tabFromHistory(window.location, window.history.state);
+        setActiveTab((window.location.pathname === '/offers' || window.location.pathname.startsWith('/offers/category/') || window.location.pathname === '/offers/new' || window.location.pathname === '/offers/new/payment' || window.location.pathname === '/offers/new/pricing' || window.location.pathname === '/offers/new/featured') ? 'offers' : firebaseUser && window.location.pathname.startsWith('/admin') ? 'admin-pin': firebaseUser && window.location.pathname === '/guide' ? 'guide' : firebaseUser && window.location.pathname.startsWith('/reminders/') ? 'reminders' : firebaseUser && (restoredTab === 'accounts' || restoredTab === 'currency-converter') ? restoredTab : firebaseUser && window.location.pathname.startsWith('/categories/') ? 'categories' : 'home');
         setToastMessage(null);
         aiLearnedMemory.clear();
       }
@@ -2013,11 +1892,9 @@ export default function App() {
               lang={lang}
               onViewTransactions={(period, currency) => navigateTab('transactions', { period, currency })}
               onViewAccounts={() => navigateTab('accounts')}
+              onOpenCurrencyConverter={() => navigateTab('currency-converter')}
               userId={authUser?.uid}
             />
-
-            {/* Full-width horizontal currency converter below the financial overview. */}
-            <ExchangeRatesMini lang={lang} />
 
             {/* 4. "حساباتك" - Money Sources / Accounts Grid */}
             <MoneySources
@@ -2049,6 +1926,17 @@ export default function App() {
               lang={lang}
             />
           </div>
+        )}
+
+        {activeTab === 'currency-converter' && (
+          <CurrencyConverterView lang={lang} onBack={() => {
+            if (window.history.state?.myBucketTab === 'currency-converter') {
+              window.history.back();
+            } else {
+              window.history.replaceState({ myBucketTab: 'home' }, '', guestDemo ? '/try' : '/');
+              setActiveTab('home');
+            }
+          }} />
         )}
 
         {activeTab === 'transactions' && (

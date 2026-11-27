@@ -876,3 +876,7 @@ Reports offer a collapsed spending chart under the selected period summary. On o
 ## Month-to-month comparison in reports
 
 The This Month report offers an optional comparison with the same available calendar days of the previous month. It shows the current and previous income and expenses and their changes per currency, plus the largest increase in expense categories. The comparison is calculated locally from the existing transaction history.
+
+## Weekly spending trend in reports
+
+Monthly reports offer a collapsed weekly expenses chart. Buckets start on calendar days 1, 8, 15, 22, and 29 when available, include no future days, and mark the unfinished current bucket as through today. Expenses are grouped by currency from the existing transaction history without additional Firestore reads.

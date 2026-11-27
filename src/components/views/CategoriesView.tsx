@@ -22,6 +22,7 @@ import { getUserDateLimits, getAvailableMonthsForYear } from '../../utils/userRe
 import { MonthSummaryCard } from '../MonthSummaryCard';
 import { MonthComparison } from '../MonthComparison';
 import { ExpenseBreakdown } from '../ExpenseBreakdown';
+import { WeeklySpendingTrend } from '../WeeklySpendingTrend';
 
 interface CategoriesViewProps {
   categories: Category[];
@@ -64,6 +65,12 @@ export function CategoriesView({
     return startOfMonth < userDateLimits.startDateStr ? userDateLimits.startDateStr : startOfMonth;
   });
   const [customEnd, setCustomEnd] = useState<string>(() => getCurrentLocalDate());
+  const reportMonth = period === 'this_month'
+    ? { year: currentYear, month: currentMonth }
+    : period === 'last_month'
+      ? { year: currentMonth === 1 ? currentYear - 1 : currentYear, month: currentMonth === 1 ? 12 : currentMonth - 1 }
+      : period === 'specific_month' ? { year: selectedYear, month: selectedMonth } : null;
+
 
   const expenseCategories = categories.filter((c) => c.type === 'expense');
   const incomeCategories = categories.filter((c) => c.type === 'income');
@@ -340,6 +347,10 @@ export function CategoriesView({
       {period === 'this_month' && (
         <MonthComparison transactions={transactions} categories={categories} lang={lang} loadState={loadState}
           today={userDateLimits.currentDateStr} historyStart={userDateLimits.startDateStr} />
+      )}
+      {reportMonth && (
+        <WeeklySpendingTrend transactions={transactions} year={reportMonth.year} month={reportMonth.month}
+          today={userDateLimits.currentDateStr} historyStart={userDateLimits.startDateStr} lang={lang} loadState={loadState} />
       )}
       <ExpenseBreakdown transactions={filteredTransactions} categories={categories} lang={lang} />
 

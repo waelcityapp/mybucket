@@ -872,3 +872,7 @@ The financial overview offers a Currency converter shortcut next to Account deta
 ## Spending by category in reports
 
 Reports offer a collapsed spending chart under the selected period summary. On opening, the app groups the already loaded expense transactions by currency and category, ranks categories with recorded spending, and lets users inspect the transactions behind each bar. No new Firestore read or listener is used.
+
+## Month-to-month comparison in reports
+
+The This Month report offers an optional comparison with the same available calendar days of the previous month. It shows the current and previous income and expenses and their changes per currency, plus the largest increase in expense categories. The comparison is calculated locally from the existing transaction history.

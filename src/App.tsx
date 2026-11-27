@@ -2012,6 +2012,7 @@ export default function App() {
             transactions={transactions}
             lang={lang}
             authUser={authUser}
+            loadState={guestDemo ? 'ready' : transactionReadError ? 'error' : financialLoaded.transactions ? 'ready' : 'loading'}
             onSelectCategory={(cat) => {
               if (!guestDemo) window.history.pushState({ myBucketTab: 'categories', categoryDetail: cat.id }, '', '/categories/' + encodeURIComponent(cat.id));
               setSelectedCategoryForDetail(cat);

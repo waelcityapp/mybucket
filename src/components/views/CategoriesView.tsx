@@ -20,6 +20,7 @@ import { translations } from '../../data/translations';
 import { getCurrentLocalDate } from '../../utils/dateTime';
 import { getUserDateLimits, getAvailableMonthsForYear } from '../../utils/userRegistration';
 import { MonthSummaryCard } from '../MonthSummaryCard';
+import { MonthComparison } from '../MonthComparison';
 import { ExpenseBreakdown } from '../ExpenseBreakdown';
 
 interface CategoriesViewProps {
@@ -27,6 +28,7 @@ interface CategoriesViewProps {
   transactions: Transaction[];
   lang: Language;
   authUser?: AuthUser | null;
+  loadState: 'ready' | 'loading' | 'error';
   onSelectCategory?: (cat: Category) => void;
 }
 
@@ -37,6 +39,7 @@ export function CategoriesView({
   transactions,
   lang,
   authUser,
+  loadState,
   onSelectCategory,
 }: CategoriesViewProps) {
   const t = translations[lang];
@@ -334,6 +337,10 @@ export function CategoriesView({
 
       {/* Monthly Financial Breakdown & Donut Chart Summary */}
       <MonthSummaryCard transactions={filteredTransactions} lang={lang} />
+      {period === 'this_month' && (
+        <MonthComparison transactions={transactions} categories={categories} lang={lang} loadState={loadState}
+          today={userDateLimits.currentDateStr} historyStart={userDateLimits.startDateStr} />
+      )}
       <ExpenseBreakdown transactions={filteredTransactions} categories={categories} lang={lang} />
 
       {/* Expense Categories */}

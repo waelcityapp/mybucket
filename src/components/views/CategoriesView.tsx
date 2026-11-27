@@ -20,6 +20,7 @@ import { translations } from '../../data/translations';
 import { getCurrentLocalDate } from '../../utils/dateTime';
 import { getUserDateLimits, getAvailableMonthsForYear } from '../../utils/userRegistration';
 import { MonthSummaryCard } from '../MonthSummaryCard';
+import { ExpenseBreakdown } from '../ExpenseBreakdown';
 
 interface CategoriesViewProps {
   categories: Category[];
@@ -333,6 +334,7 @@ export function CategoriesView({
 
       {/* Monthly Financial Breakdown & Donut Chart Summary */}
       <MonthSummaryCard transactions={filteredTransactions} lang={lang} />
+      <ExpenseBreakdown transactions={filteredTransactions} categories={categories} lang={lang} />
 
       {/* Expense Categories */}
       <div className="space-y-3">

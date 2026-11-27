@@ -868,3 +868,7 @@ The search results are revealed on submission. The page scrolls to and focuses t
 ## Currency converter shortcut
 
 The financial overview offers a Currency converter shortcut next to Account details. The converter opens as a dedicated page at `/currency-converter`; the home page displays the shortcut. The existing quote, currency selections, swap, and daily quota are available on the converter page.
+
+## Spending by category in reports
+
+Reports offer a collapsed spending chart under the selected period summary. On opening, the app groups the already loaded expense transactions by currency and category, ranks categories with recorded spending, and lets users inspect the transactions behind each bar. No new Firestore read or listener is used.

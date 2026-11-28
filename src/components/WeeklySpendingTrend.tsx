@@ -3,6 +3,7 @@ import { ChartColumn, ChevronDown } from 'lucide-react';
 import type { Language, Transaction } from '../types';
 
 interface SpendingWeek {
+  number: number;
   start: number;
   end: number;
   throughToday: boolean;
@@ -29,7 +30,12 @@ export function summarizeWeeklySpending(
     const weekEnd = Math.min(start + 6, end);
     if (weekStart > weekEnd) continue;
     for (let day = weekStart; day <= weekEnd; day++) weekByDay.set(day, weeks.length);
-    weeks.push({ start: weekStart, end: weekEnd, throughToday: isCurrentMonth && weekEnd < Math.min(start + 6, lastDay) });
+    weeks.push({
+      number: Math.floor((start - 1) / 7) + 1,
+      start: weekStart,
+      end: weekEnd,
+      throughToday: isCurrentMonth && weekEnd === end,
+    });
   }
 
   const currencies = new Map<string, number[]>();
@@ -78,6 +84,7 @@ function WeeklySpendingChart({ transactions, year, month, today, historyStart, l
   const monthLabel = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' })
     .format(new Date(Date.UTC(year, month - 1, 1)));
   const highest = Math.max(0, ...amounts);
+  const currencyLabel = isAr && currency === 'EGP' ? 'ج.م' : currency;
 
   return (
     <div className="space-y-3">
@@ -91,23 +98,31 @@ function WeeklySpendingChart({ transactions, year, month, today, historyStart, l
                 {codes.map(code => <option key={code} value={code}>{code}</option>)}
               </select>
             </label>
-          : <bdi>{currency}</bdi>}
+          : null}
       </div>
       <ul className="grid gap-1.5 sm:gap-3" style={{ gridTemplateColumns: `repeat(${weeks.length}, minmax(0, 1fr))` }}>
-        {weeks.map(({ start, end, throughToday }, index) => {
+        {weeks.map(({ number: weekNumber, start, end, throughToday }, index) => {
           const amount = amounts[index];
           const height = highest > 0 ? Math.max(0, amount / highest) * 100 : 0;
+          const dateLabel = start === end
+            ? (isAr ? `يوم ${number.format(start)}` : `Day ${number.format(start)}`)
+            : (isAr ? `${number.format(start)} إلى ${number.format(end)}` : `${number.format(start)} to ${number.format(end)}`);
           return (
-            <li key={start} className="min-w-0 space-y-1 text-center">
-              <div className="flex h-24 items-end justify-center rounded-lg bg-emerald-50" aria-hidden="true">
-                <div className={`w-2/3 max-w-9 rounded-t-md ${throughToday ? 'bg-emerald-400' : 'bg-emerald-600'}`}
+            <li key={weekNumber} className="min-w-0 text-center">
+              <div className="flex h-24 items-end justify-center rounded-lg bg-slate-50" aria-hidden="true">
+                <div className={`w-2/3 max-w-9 rounded-t-md ${throughToday ? 'bg-emerald-500' : 'bg-emerald-700'}`}
                   style={{ height: `${height}%` }} />
               </div>
-              <bdi className="block break-all text-xs font-black text-slate-900">{number.format(amount)}</bdi>
-              <span className="block text-[10px] font-semibold text-slate-600">
-                <bdi>{number.format(start)}–{number.format(end)}</bdi>
-              </span>
-              {throughToday && <span className="block text-[10px] font-bold leading-tight text-emerald-800">
+              <p className="mt-2 text-[11px] font-bold leading-tight text-slate-800">
+                {isAr ? `الأسبوع ${number.format(weekNumber)}` : `Week ${number.format(weekNumber)}`}
+              </p>
+              <p className="mt-0.5 text-[10px] font-medium text-slate-600">{dateLabel}</p>
+              <p className="mt-1 break-words text-[11px] font-bold leading-tight text-slate-900">
+                {amount === 0
+                  ? <span className="font-medium text-slate-600">{isAr ? 'بلا مصروفات' : 'No expenses'}</span>
+                  : <bdi>{number.format(amount)} {currencyLabel}</bdi>}
+              </p>
+              {throughToday && <span className="mt-1 inline-block rounded bg-emerald-50 px-1 py-0.5 text-[10px] font-bold leading-tight text-emerald-800">
                 {isAr ? 'حتى اليوم' : 'Through today'}
               </span>}
             </li>

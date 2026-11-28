@@ -879,4 +879,4 @@ The This Month report offers an optional comparison with the same available cale
 
 ## Weekly spending trend in reports
 
-Monthly reports offer a collapsed weekly expenses chart. Buckets start on calendar days 1, 8, 15, 22, and 29 when available, include no future days, and mark the unfinished current bucket as through today. Expenses are grouped by currency from the existing transaction history without additional Firestore reads.
+Monthly reports offer a collapsed weekly expenses chart. Buckets start on calendar days 1, 8, 15, 22, and 29 when available, include no future days, and mark the bucket containing today as through today, including on its last day. Each column identifies the week, its date range, and its amount and currency or an explicit no-expenses label. Expenses are grouped by currency from the existing transaction history without additional Firestore reads.

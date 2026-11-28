@@ -35,6 +35,12 @@ test('clips partial history and ends historical months on their actual last day'
   assert.deepEqual(currencies.get('EGP'), [0, 0, 0, 15]);
 });
 
+test('labels the current week through today even on its final day', () => {
+  const { weeks } = summarizeWeeklySpending([], 2026, 11, '2026-11-28', '2026-10-01');
+  assert.deepEqual(weeks.at(-1), { number: 4, start: 22, end: 28, throughToday: true });
+  assert.equal(weeks[2].throughToday, false);
+});
+
 test('renders a collapsed trend control in both languages before doing any chart work', () => {
   for (const [lang, label] of [['ar', 'اتجاه المصروفات'], ['en', 'Weekly spending trend']]) {
     const markup = renderToStaticMarkup(createElement(WeeklySpendingTrend, {
